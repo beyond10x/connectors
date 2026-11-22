@@ -237,6 +237,197 @@ impl Drop for Provider {
     }
 }
 
+/// A fixture upstream whose TLS root the served binary trusts.
+trait Rooted {
+    fn pem(&self) -> &str;
+}
+
+impl Rooted for Provider {
+    fn pem(&self) -> &str {
+        &self.pem
+    }
+}
+
+/// A fictional Slack bot token, and the message the fixture's post answers.
+const SLACK_TOKEN: &str = "fixture-slack-bot-token";
+const SLACK_CHANNEL: &str = "C0FIXTURE01";
+const SLACK_OTHER_CHANNEL: &str = "C0FIXTURE02";
+const SLACK_THREAD: &str = "1780000100.000100";
+const SLACK_POSTED: &str = "1780000700.000700";
+
+/// One request the Slack fixture answered: path, `Authorization` and JSON body.
+#[derive(Clone, Debug)]
+struct SlackSeen {
+    path: String,
+    authorization: Option<String>,
+    body: Value,
+}
+
+/// A Slack-shaped Web API on loopback below `/api`: `auth.test` answers
+/// `ok: true` while `identity_ok` is set, as it is at start, and Slack's
+/// `invalid_auth` refusal otherwise; `chat.postMessage` and `chat.update`
+/// answer their pinned success schemas for [`SLACK_CHANNEL`], Slack's
+/// `channel_not_found` for any other.
+/// Every request is recorded; none needs the token to be answered, so a
+/// request sent at all is visible.
+struct SlackApi {
+    port: u16,
+    pem: String,
+    seen: Arc<Mutex<Vec<SlackSeen>>>,
+    identity_ok: Arc<std::sync::atomic::AtomicBool>,
+    stop: Option<oneshot::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Rooted for SlackApi {
+    fn pem(&self) -> &str {
+        &self.pem
+    }
+}
+
+fn slack_answer(path: &str, body: &Value, identity_ok: bool) -> (u16, Value) {
+    let ours = body["channel"] == SLACK_CHANNEL;
+    match path {
+        "/api/auth.test" if identity_ok => (
+            200,
+            json!({"ok": true, "url": "https://fixture.invalid/", "team": "Fixture",
+                   "user": "fixture-bot", "team_id": "T0FIXTURE01", "user_id": "U0FIXTURE01",
+                   "bot_id": "B0FIXTURE01"}),
+        ),
+        "/api/auth.test" => (200, json!({"ok": false, "error": "invalid_auth"})),
+        "/api/chat.postMessage" if ours => (
+            200,
+            json!({"ok": true, "channel": SLACK_CHANNEL, "ts": SLACK_POSTED,
+                   "message": {"type": "message", "user": "U0FIXTURE01", "bot_id": "B0FIXTURE01",
+                               "text": body["text"], "ts": SLACK_POSTED,
+                               "thread_ts": body["thread_ts"]}}),
+        ),
+        "/api/chat.update" if ours && body["ts"] == SLACK_POSTED => (
+            200,
+            json!({"ok": true, "channel": SLACK_CHANNEL, "ts": SLACK_POSTED, "text": body["text"],
+                   "message": {"type": "message", "user": "U0FIXTURE01", "bot_id": "B0FIXTURE01",
+                               "text": body["text"], "edited": {"user": "U0FIXTURE01",
+                               "ts": "1780000900.000900"}}}),
+        ),
+        "/api/chat.postMessage" | "/api/chat.update" => {
+            (200, json!({"ok": false, "error": "channel_not_found"}))
+        }
+        _ => (404, json!({"ok": false, "error": "unknown_method"})),
+    }
+}
+
+impl SlackApi {
+    fn new() -> Self {
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let pem = cert.cert.pem();
+        let tls = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+        )
+        .unwrap();
+        let (address_tx, address_rx) = mpsc::channel();
+        let (stop, mut stopped) = oneshot::channel();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let identity_ok = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let (observed, identity) = (seen.clone(), identity_ok.clone());
+        let thread = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                address_tx.send(listener.local_addr().unwrap()).unwrap();
+                let acceptor = TlsAcceptor::from(Arc::new(tls));
+                loop {
+                    let stream = tokio::select! {
+                        _ = &mut stopped => break,
+                        accepted = listener.accept() => accepted.unwrap().0,
+                    };
+                    let Ok(mut stream) = acceptor.accept(stream).await else {
+                        continue;
+                    };
+                    let mut head = Vec::new();
+                    while !head.ends_with(b"\r\n\r\n") && head.len() < 16384 {
+                        match stream.read_u8().await {
+                            Ok(byte) => head.push(byte),
+                            Err(_) => break,
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&head).into_owned();
+                    let target = head.split_whitespace().nth(1).unwrap_or_default();
+                    let path = target.split('?').next().unwrap_or_default().to_owned();
+                    let header = |wanted: &str| {
+                        head.lines().find_map(|line| {
+                            line.split_once(':')
+                                .filter(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                                .map(|(_, value)| value.trim().to_owned())
+                        })
+                    };
+                    let length: usize = header("content-length")
+                        .and_then(|value| value.parse().ok())
+                        .unwrap_or(0);
+                    let mut sent = vec![0; length.min(65_536)];
+                    if stream.read_exact(&mut sent).await.is_err() {
+                        continue;
+                    }
+                    let body: Value = serde_json::from_slice(&sent).unwrap_or(Value::Null);
+                    let ok = identity.load(std::sync::atomic::Ordering::SeqCst);
+                    let (status, answer) = slack_answer(&path, &body, ok);
+                    observed.lock().unwrap().push(SlackSeen {
+                        path,
+                        authorization: header("authorization"),
+                        body,
+                    });
+                    let answer = serde_json::to_vec(&answer).unwrap();
+                    let head = format!(
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        answer.len()
+                    );
+                    let _ = stream.write_all(head.as_bytes()).await;
+                    let _ = stream.write_all(&answer).await;
+                    let _ = stream.shutdown().await;
+                }
+            });
+        });
+        let address = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        Self {
+            port: address.port(),
+            pem,
+            seen,
+            identity_ok,
+            stop: Some(stop),
+            thread: Some(thread),
+        }
+    }
+
+    /// The Web API base, as the pinned document's `slack.com/api` is.
+    fn endpoint(&self) -> String {
+        format!("https://localhost:{}/api", self.port)
+    }
+
+    fn seen(&self) -> Vec<SlackSeen> {
+        self.seen.lock().unwrap().clone()
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.seen().into_iter().map(|seen| seen.path).collect()
+    }
+}
+
+impl Drop for SlackApi {
+    fn drop(&mut self) {
+        let _ = self.stop.take().map(|stop| stop.send(()));
+        let _ = self.thread.take().map(std::thread::JoinHandle::join);
+    }
+}
+
 /// The jail the served binary runs in: the binary, its configuration, its
 /// service bearer and state, the provider's root and the credential source.
 struct Served {
@@ -253,7 +444,7 @@ impl Served {
     /// Lay out the jail for `instance` (its id, `<connector>.<name>`) with
     /// `catalog` as the configuration's `catalog` member, and deliver
     /// `document` as the item `<instance>/<profile>`.
-    fn new(provider: &Provider, instance: &str, profile: &str, catalog: Value) -> Self {
+    fn new(provider: &impl Rooted, instance: &str, profile: &str, catalog: Value) -> Self {
         let mut jail = Jail::new();
         jail.directory("/srv", 0o755);
         jail.directory("/srv/state", 0o700);
@@ -270,7 +461,7 @@ impl Served {
             fs::write(&path, bytes).unwrap();
             fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
         };
-        private("/srv/ca.pem", provider.pem.as_bytes(), 0o644);
+        private("/srv/ca.pem", provider.pem().as_bytes(), 0o644);
         private("/srv/service-token", SERVICE_TOKEN.as_bytes(), 0o600);
         let config = json!({
             "service": {
@@ -409,7 +600,7 @@ impl Served {
     /// [`Served::new`] whose host reads `grants` as its standing grant file
     /// (`service.standing_grants`), laid out private in the jail.
     fn granted(
-        provider: &Provider,
+        provider: &impl Rooted,
         instance: &str,
         profile: &str,
         catalog: Value,
@@ -677,6 +868,273 @@ async fn a_served_catalog_write_under_a_standing_grant_is_sent_once() {
     assert_eq!(status, 501, "{refused}");
     assert_eq!(refused["error"]["code"], "unsupported", "{refused}");
     assert_eq!(writes().len(), 1, "one write reached the provider");
+}
+
+/// A Slack bot instance `slack.fixture` started on the served host against
+/// `slack`, with a standing grant for `chat.postMessage` and `chat.update` in
+/// [`SLACK_CHANNEL`] alone, and its described revision.
+async fn slack_served(slack: &SlackApi) -> (Served, String) {
+    let grant = |id: &str, operation: &str| {
+        json!({
+            "id": id, "instance": "slack.fixture", "operation": operation,
+            "target": [{"pointer": "/body/channel", "value": SLACK_CHANNEL}],
+            "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 10
+        })
+    };
+    let grants = json!({
+        "format": "connectors.standing-grants/1",
+        "grants": [grant("g-fixture-post", "chat.postMessage"), grant("g-fixture-edit", "chat.update")],
+        "revoked": []
+    });
+    let mut served = Served::granted(
+        slack,
+        "slack.fixture",
+        "slack.bot",
+        json!({"connector": "slack", "instance": "fixture", "endpoint": slack.endpoint()}),
+        &grants,
+    );
+    served.deliver(
+        "..2026_10_30_00_00_00.000000001",
+        &document(SLACK_TOKEN),
+        0o400,
+    );
+    served.start().expect("the served binary starts");
+    let descriptor = served.describe().await;
+    for id in ["chat.postMessage", "chat.update"] {
+        let operation = descriptor["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|operation| operation["id"] == id)
+            .unwrap_or_else(|| panic!("{id} is not described: {descriptor}"));
+        assert_eq!(operation["profile"], "mutation", "{operation}");
+    }
+    let revision = descriptor["revision"].as_str().unwrap().to_owned();
+    (served, revision)
+}
+
+/// A keyed `POST /v1alpha2/invoke` body of `operation` with `body` as its
+/// input's `body`.
+fn slack_write(revision: &str, request_id: &str, key: &str, operation: &str, body: Value) -> Value {
+    json!({
+        "version": "v1alpha2", "request_id": request_id, "operation": operation,
+        "revision": revision, "idempotency_key": key, "input": {"body": body},
+    })
+}
+
+/// A reply in [`SLACK_THREAD`] to `channel`.
+fn slack_post(channel: &str) -> Value {
+    json!({"channel": channel, "text": "fixture release note", "thread_ts": SLACK_THREAD})
+}
+
+/// A Slack bot instance on the served host, under a standing grant for one
+/// channel, posts a reply in a thread and edits it, as a client of a running
+/// host does. Each write reads the `auth.test` guard first, and an `ok: false`
+/// answer there sends nothing. The same `idempotency_key` again answers the
+/// first post with no request to Slack at all. A post or an edit in a channel
+/// the grant does not name is `approval_required` before any request.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_slack_bot_posts_a_reply_and_edits_it_under_a_one_channel_grant() {
+    let slack = SlackApi::new();
+    let (served, revision) = slack_served(&slack).await;
+    let write = |request_id: &str, key: &str, operation: &str, body: Value| {
+        slack_write(&revision, request_id, key, operation, body)
+    };
+    let post = slack_post;
+    let route = "/v1alpha2/invoke";
+    let bearer = format!("Bearer {SLACK_TOKEN}");
+
+    // The guard answers `ok: true`: the reply is posted once, after it.
+    let mark = slack.seen().len();
+    let first = write("post-1", "k-post", "chat.postMessage", post(SLACK_CHANNEL));
+    let (status, posted) = served
+        .send(reqwest::Method::POST, route, Some(&first))
+        .await;
+    assert_eq!(status, 200, "{posted}\n{}", served.log());
+    assert_eq!(posted["mutation"]["classification"], "applied", "{posted}");
+    assert_eq!(posted["mutation"]["replayed"], false, "{posted}");
+    assert_eq!(posted["result"]["body"]["ts"], SLACK_POSTED, "{posted}");
+    let sent = slack.seen()[mark..].to_vec();
+    assert_eq!(
+        sent.iter()
+            .map(|seen| seen.path.as_str())
+            .collect::<Vec<_>>(),
+        ["/api/auth.test", "/api/chat.postMessage"]
+    );
+    assert_eq!(sent[1].body, post(SLACK_CHANNEL));
+    for seen in &sent {
+        assert_eq!(seen.authorization.as_deref(), Some(bearer.as_str()));
+    }
+
+    // The same key again: the first answer, and no request to Slack.
+    let mark = slack.seen().len();
+    let mut again = first.clone();
+    again["request_id"] = json!("post-1-again");
+    let (status, replay) = served
+        .send(reqwest::Method::POST, route, Some(&again))
+        .await;
+    assert_eq!(status, 200, "{replay}\n{}", served.log());
+    assert_eq!(replay["mutation"]["replayed"], true, "{replay}");
+    assert_eq!(replay["mutation"]["attempt"], posted["mutation"]["attempt"]);
+    assert_eq!(replay["result"], posted["result"]);
+    assert_eq!(slack.paths()[mark..], [] as [&str; 0]);
+
+    // The returned `ts` is edited, after the guard again.
+    let ts = posted["result"]["body"]["ts"].as_str().unwrap();
+    let edit = json!({"channel": SLACK_CHANNEL, "ts": ts, "text": "fixture release note, edited"});
+    let (status, edited) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&write("edit-1", "k-edit", "chat.update", edit.clone())),
+        )
+        .await;
+    assert_eq!(status, 200, "{edited}\n{}", served.log());
+    assert_eq!(edited["mutation"]["classification"], "applied", "{edited}");
+    assert_eq!(
+        edited["result"]["body"]["text"], "fixture release note, edited",
+        "{edited}"
+    );
+    let sent = slack.seen()[mark..].to_vec();
+    assert_eq!(
+        sent.iter()
+            .map(|seen| seen.path.as_str())
+            .collect::<Vec<_>>(),
+        ["/api/auth.test", "/api/chat.update"]
+    );
+    assert_eq!(sent[1].body, edit);
+
+    // A channel the grant does not name: refused before any request.
+    let mark = slack.seen().len();
+    let elsewhere = [
+        (
+            "post-out",
+            "k-out-post",
+            "chat.postMessage",
+            post(SLACK_OTHER_CHANNEL),
+        ),
+        (
+            "edit-out",
+            "k-out-edit",
+            "chat.update",
+            json!({"channel": SLACK_OTHER_CHANNEL, "ts": ts, "text": "fixture release note"}),
+        ),
+    ];
+    for (request_id, key, operation, body) in elsewhere {
+        let (status, refused) = served
+            .send(
+                reqwest::Method::POST,
+                route,
+                Some(&write(request_id, key, operation, body)),
+            )
+            .await;
+        assert_eq!(status, 403, "{operation}: {refused}");
+        assert_eq!(
+            refused["error"]["code"], "approval_required",
+            "{operation}: {refused}"
+        );
+        assert!(refused["mutation"].is_null(), "{operation}: {refused}");
+    }
+    assert_eq!(slack.paths()[mark..], [] as [&str; 0]);
+    let writes = |path: &str| slack.paths().iter().filter(|seen| *seen == path).count();
+    assert_eq!(writes("/api/chat.postMessage"), 1, "one post was sent");
+    assert_eq!(writes("/api/chat.update"), 1, "one edit was sent");
+
+    // The guard answers `ok: false`: neither a post nor an edit is sent. What
+    // the caller is told then is
+    // `a_served_write_whose_guard_answers_not_ok_is_refused_not_unknown`.
+    slack
+        .identity_ok
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    let guarded = [
+        (
+            "post-guard",
+            "k-guard-post",
+            "chat.postMessage",
+            post(SLACK_CHANNEL),
+        ),
+        ("edit-guard", "k-guard-edit", "chat.update", edit),
+    ];
+    for (request_id, key, operation, body) in guarded {
+        let mark = slack.seen().len();
+        let (status, answer) = served
+            .send(
+                reqwest::Method::POST,
+                route,
+                Some(&write(request_id, key, operation, body)),
+            )
+            .await;
+        assert_ne!(status, 200, "{operation}: {answer}\n{}", served.log());
+        assert_ne!(
+            answer["mutation"]["classification"], "applied",
+            "{operation}: {answer}"
+        );
+        assert_eq!(
+            slack.paths()[mark..],
+            ["/api/auth.test"],
+            "{operation}: only the guard was read"
+        );
+    }
+    assert_eq!(
+        writes("/api/chat.postMessage"),
+        1,
+        "no second post was sent"
+    );
+    assert_eq!(writes("/api/chat.update"), 1, "no second edit was sent");
+}
+
+/// A write whose `auth.test` guard answers `ok: false` is never sent, so the
+/// caller is told it was refused (`forbidden`, classification `refused`), not
+/// that it was dispatched with an unknown outcome. Today the catalog bridge
+/// returns every failed preparation as unknown (`src/served.rs`,
+/// `Bridge::write`) and the host answers `502 outcome_unknown`.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "story:served-guard-refusal-is-a-refusal (draft): served.rs:853 answers outcome_unknown when nothing was sent"]
+async fn a_served_write_whose_guard_answers_not_ok_is_refused_not_unknown() {
+    let slack = SlackApi::new();
+    let (served, revision) = slack_served(&slack).await;
+    slack
+        .identity_ok
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    let edit = json!({"channel": SLACK_CHANNEL, "ts": SLACK_POSTED, "text": "fixture release note, edited"});
+    let guarded = [
+        (
+            "post-guard",
+            "k-guard-post",
+            "chat.postMessage",
+            slack_post(SLACK_CHANNEL),
+        ),
+        ("edit-guard", "k-guard-edit", "chat.update", edit),
+    ];
+    let mut answers = Vec::new();
+    for (request_id, key, operation, body) in guarded {
+        let mark = slack.seen().len();
+        let (status, answer) = served
+            .send(
+                reqwest::Method::POST,
+                "/v1alpha2/invoke",
+                Some(&slack_write(&revision, request_id, key, operation, body)),
+            )
+            .await;
+        assert_eq!(
+            slack.paths()[mark..],
+            ["/api/auth.test"],
+            "{operation}: only the guard was read\n{}",
+            served.log()
+        );
+        answers.push((operation, status, answer));
+    }
+    for (operation, status, answer) in answers {
+        assert_eq!(status, 403, "{operation}: {answer}");
+        assert_eq!(
+            answer["error"]["code"], "forbidden",
+            "{operation}: {answer}"
+        );
+        assert_eq!(
+            answer["mutation"]["classification"], "refused",
+            "{operation}: {answer}"
+        );
+    }
 }
 
 /// The credential is the mounted item's bytes at each request: a rotation is

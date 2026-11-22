@@ -2,7 +2,7 @@ domain: connectors_catalog.selection
 summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request, and the success envelope a read's answer is held to after it.
 
 # Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
-# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `body_enums`, `body_any_of`, `body_prefixes`,
+# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `body_enums`, `body_any_of`, `body_null_clears`, `body_prefixes`,
 # `conflict_status`, `envelope`, `refusal_texts`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
@@ -64,6 +64,11 @@ types:
   # declaration requires one of them. Every named key shares one parent object, is admitted,
   # is not fixed, and is named once; at least two.
   #
+  # `body_null_clears` says a `body_any_of` member given as JSON `null` counts as the one change,
+  # because the provider clears that field on `null`, such as Jira's issue edit unassigning an
+  # issue with `assignee: null`. Without it a `null` member counts as absent, as a required key
+  # given as `null` does. Only beside `body_any_of`.
+  #
   # `body_prefixes` fixes the start of a caller's string: the engine sends the prefix followed
   # by the caller's value under that key, so the sent value always begins with it, whatever the
   # caller gives. It is for a write whose meaning rests on a marker in a text the caller writes,
@@ -81,6 +86,7 @@ types:
       - {name: body_enums, type: "Optional<Map<String, List<String>>>"}
       - {name: body_any_of, type: "Optional<List<String>>"}
       - {name: body_prefixes, type: "Optional<Map<String, String>>"}
+      - {name: body_null_clears, type: "Optional<Boolean>"}
     invariants:
       - any: [{not: defined(body_types)}, defined(body_keys)]
       - any: [{not: defined(body_required)}, defined(body_keys)]
@@ -90,6 +96,7 @@ types:
       - any: [{not: defined(body_any_of)}, defined(body_keys)]
       - any: [{not: defined(body_any_of)}, {body_any_of.count: {gte: 2}}]
       - any: [{not: defined(body_prefixes)}, defined(body_types)]
+      - any: [{not: defined(body_null_clears)}, defined(body_any_of)]
 
   # The status by which a provider answers a write that its target changed since the caller
   # read it, so nothing was applied: such as Zendesk's `409` to a ticket update sent with

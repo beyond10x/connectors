@@ -48,13 +48,13 @@ timeline:
   at: '2026-09-08T10:00:02Z'
 - command: connectors.refresh.PublishRefresh
   input:
-    decision: publication_refused
+    decision: publication_revoked
     attempt_id:
       $instance: refresh
     owner: replica-a
     ownership_token: 20000000-0000-4000-8000-000000000001
     candidate_generation_id: 10000000-0000-4000-8000-000000000002
-  outcome: publication-refused
+  outcome: publication-revoked
   error:
     name: connectors.refresh.PublicationRefused
     fields:
@@ -72,12 +72,12 @@ timeline:
   at: '2026-09-08T10:00:04Z'
 - command: connectors.refresh.ReserveRefresh
   input:
-    decision: source_unavailable
+    decision: source_revoked
     source_generation_id: 10000000-0000-4000-8000-000000000001
     owner: replica-b
     ownership_token: 20000000-0000-4000-8000-000000000002
     expected_binding_revision: binding-1
-  outcome: source-unavailable
+  outcome: source-revoked
   error:
     name: connectors.refresh.SourceUnavailable
     fields:

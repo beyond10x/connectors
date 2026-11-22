@@ -7,6 +7,8 @@
 pub mod fixture;
 mod fs;
 mod gnome;
+mod inventory;
+pub use inventory::{CustodyItem, Orphans, Removal, items_at, orphans_at, remove_authority_at};
 
 use crate::{
     Backend, CustodyBackend, Failure, MAX_BYTES, Material, Purpose, ReadBackend, Result, Scope,
@@ -26,8 +28,12 @@ use std::{
 };
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 
-/// The persistent collection custody uses, addressed by object path.
+/// The collection older custody wrote to; still read when the alias differs.
 pub const LOGIN_COLLECTION: &str = "/org/freedesktop/secrets/collection/login";
+/// The alias of the user's persistent collection; custody writes behind it.
+const DEFAULT_ALIAS: &str = "default";
+const CREDENTIAL_SCHEMA: &str = "org.beyond10x.Connectors.Credential";
+const SIGNING_SCHEMA: &str = "org.beyond10x.Connectors.ApprovalSigningKey";
 const SERVICE: &str = "/org/freedesktop/secrets";
 const SERVICE_INTERFACE: &str = "org.freedesktop.Secret.Service";
 const COLLECTION_INTERFACE: &str = "org.freedesktop.Secret.Collection";
@@ -98,6 +104,7 @@ struct Service {
     connection: zbus::blocking::Connection,
     owner: zbus::names::OwnedUniqueName,
     collection: OwnedObjectPath,
+    legacy: Option<OwnedObjectPath>,
 }
 
 impl Service {
@@ -122,20 +129,28 @@ impl Service {
             "/org/freedesktop/secrets",
             "org.freedesktop.Secret.Service",
         )?;
-        // The persistent `login` collection is addressed by its object path. The
-        // `default` alias belongs to every other application on the desktop, so it is
-        // never read, required or changed here.
-        let collection = OwnedObjectPath::try_from(LOGIN_COLLECTION)?;
+        // The collection behind the `default` alias is the user's chosen persistent
+        // collection. The alias is only read, never set or changed. Items already
+        // stored under `login` stay readable when the alias resolves elsewhere.
+        let collection: OwnedObjectPath = service.call("ReadAlias", &(DEFAULT_ALIAS,))?;
         let collections: Vec<OwnedObjectPath> = service.get_property("Collections")?;
-        if !collections.contains(&collection) {
+        if collection.as_str() == "/" || !collections.contains(&collection) {
             return Err(zbus::Error::Failure("collection unavailable".into()));
         }
+        let login = OwnedObjectPath::try_from(LOGIN_COLLECTION)?;
+        let legacy = (login != collection && collections.contains(&login)).then_some(login);
         drop(service);
         Ok(Self {
             connection,
             owner,
             collection,
+            legacy,
         })
+    }
+
+    /// The collection custody writes to, then the legacy one it still reads.
+    fn collections(&self) -> impl Iterator<Item = &OwnedObjectPath> {
+        std::iter::once(&self.collection).chain(self.legacy.as_ref())
     }
 
     fn proxy<'a>(
@@ -182,6 +197,7 @@ impl SecretService {
         Self::open_at(scope, None)
     }
     pub fn open_at(scope: Scope, socket: Option<&Path>) -> Result<Self> {
+        guard_session_bus(socket);
         Self::connect(local_stream_at(socket).map_err(unavailable)?, scope)
     }
 
@@ -258,11 +274,8 @@ impl SecretService {
 
     fn attributes(&self, version: Version) -> HashMap<&'static str, String> {
         let (schema, format) = match self.scope.purpose() {
-            Purpose::Credential => ("org.beyond10x.Connectors.Credential", "custody/1"),
-            Purpose::ApprovalSigning => (
-                "org.beyond10x.Connectors.ApprovalSigningKey",
-                "approval-signing-custody/1",
-            ),
+            Purpose::Credential => (CREDENTIAL_SCHEMA, "custody/1"),
+            Purpose::ApprovalSigning => (SIGNING_SCHEMA, "approval-signing-custody/1"),
         };
         HashMap::from([
             ("xdg:schema", schema.to_owned()),
@@ -274,13 +287,17 @@ impl SecretService {
     }
 
     fn find(&self, version: Version) -> Result<Option<OwnedObjectPath>> {
-        let proxy = self
-            .service
-            .proxy(self.service.collection.as_str(), COLLECTION_INTERFACE)
-            .map_err(unavailable)?;
-        let items: Vec<OwnedObjectPath> = proxy
-            .call("SearchItems", &(self.attributes(version),))
-            .map_err(unavailable)?;
+        let mut items: Vec<OwnedObjectPath> = Vec::new();
+        for collection in self.service.collections() {
+            let proxy = self
+                .service
+                .proxy(collection.as_str(), COLLECTION_INTERFACE)
+                .map_err(unavailable)?;
+            let found: Vec<OwnedObjectPath> = proxy
+                .call("SearchItems", &(self.attributes(version),))
+                .map_err(unavailable)?;
+            items.extend(found);
+        }
         if items.len() > 1 {
             return Err(Failure::Conflict);
         }
@@ -307,11 +324,7 @@ impl SecretService {
     }
 
     fn is_item(&self, path: &OwnedObjectPath) -> bool {
-        path.as_str()
-            .strip_prefix(self.service.collection.as_str())
-            .is_some_and(|suffix| {
-                suffix.starts_with('/') && suffix.len() > 1 && !suffix[1..].contains('/')
-            })
+        self.service.collections().any(|c| is_item_of(path, c))
     }
 }
 
@@ -411,7 +424,7 @@ impl Backend for SecretService {
         let (item, prompt): (OwnedObjectPath, OwnedObjectPath) = proxy
             .call("CreateItem", &(properties, secret, false))
             .map_err(unknown)?;
-        if prompt.as_str() != "/" || !self.is_item(&item) {
+        if prompt.as_str() != "/" || !is_item_of(&item, &self.service.collection) {
             return Err(Failure::OutcomeUnknown);
         }
         // Check for duplicates as well as a wrong returned item before ack.
@@ -466,7 +479,13 @@ impl Backend for SecretService {
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
         guard()?;
+        // The collection whose file the delete rewrote: the legacy `login` one when
+        // the item was found there, else the one custody writes to.
+        let mut touched = self.service.collection.clone();
         if let Some(item) = self.find(version)? {
+            if let Some(owner) = self.service.collections().find(|c| is_item_of(&item, c)) {
+                touched = owner.clone();
+            }
             let proxy = self
                 .service
                 .proxy(item.as_str(), ITEM_INTERFACE)
@@ -484,7 +503,7 @@ impl Backend for SecretService {
             return Err(Failure::OutcomeUnknown);
         }
         self.persistence
-            .synchronize()
+            .synchronize_collection(touched.as_str())
             .map_err(|_| Failure::OutcomeUnknown)?;
         Ok(())
     }
@@ -521,6 +540,60 @@ impl Drop for SecretService {
             let _: zbus::Result<()> = proxy.call("Close", &());
         }
     }
+}
+
+fn is_item_of(path: &OwnedObjectPath, collection: &OwnedObjectPath) -> bool {
+    path.as_str()
+        .strip_prefix(collection.as_str())
+        .is_some_and(|suffix| {
+            suffix.starts_with('/') && suffix.len() > 1 && !suffix[1..].contains('/')
+        })
+}
+
+/// Under a test build the session bus's Secret Service is the operator's real
+/// keyring: a test run that would open it fails here, before any write.
+#[cfg(any(test, feature = "test-support"))]
+fn guard_session_bus(socket: Option<&Path>) {
+    let address = std::env::var("DBUS_SESSION_BUS_ADDRESS").ok();
+    if let Some(reason) = session_bus_refusal(socket, address.as_deref()) {
+        panic!("{reason}");
+    }
+}
+#[cfg(not(any(test, feature = "test-support")))]
+fn guard_session_bus(_: Option<&Path>) {}
+
+/// Why a test run may not open this bus, or `None` when it may.
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) fn session_bus_refusal(socket: Option<&Path>, address: Option<&str>) -> Option<String> {
+    let session = PathBuf::from(format!("/run/user/{}/bus", fs::uid()));
+    let from_address = address
+        .and_then(|a| a.strip_prefix("unix:path="))
+        .map(|a| PathBuf::from(a.split(',').next().unwrap_or_default()));
+    let same = |a: &Path, b: &Path| {
+        a == b
+            || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)),
+                (Ok(x), Ok(y)) if x == y)
+    };
+    let target = socket.unwrap_or(&session);
+    if !same(target, &session) {
+        return None;
+    }
+    let named = from_address.as_deref().is_some_and(|p| same(p, &session));
+    Some(if named {
+        format!(
+            "refusing to open the session bus Secret Service ({}) from a test run: \
+             DBUS_SESSION_BUS_ADDRESS points at it; use the private fixture and \
+             pass its socket",
+            session.display()
+        )
+    } else {
+        format!(
+            "refusing to open the session bus Secret Service ({}) from a test run: \
+             no secret_service_socket was given; use the private fixture and pass \
+             its socket",
+            session.display()
+        )
+    })
 }
 
 fn unavailable<T>(_: T) -> Failure {

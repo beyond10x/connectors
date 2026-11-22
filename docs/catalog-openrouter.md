@@ -100,7 +100,7 @@ connectors --output json connections connect --adapter router --profile openrout
 
 The prompt reads the key from the terminal. The
 commands below were run in this tree against a local HTTPS fixture that plays
-OpenRouter with a fictional key (the ignored test `serve_the_fixture` in
+OpenRouter with a fictional key (the ignored test `openrouter::serve_the_fixture` of the `main` test target, in
 `adapters/catalog/tests/openrouter.rs`), so the key was supplied from an owner-only
 file with `--credential-file` instead of the prompt, and every body is the
 fixture's. Connect read the fixture's `GET /api/v1/key` and named its `label` as
@@ -224,8 +224,8 @@ custody of its own, and an operation that creates a credential with no custody t
 ### Configure both aliases
 
 The commands below were run in this tree with the debug `target/debug/connectors`
-against the same local HTTPS fixture as above (the ignored test `serve_the_fixture`
-in `adapters/catalog/tests/openrouter.rs`, which now also serves a disposable Secret
+against the same local HTTPS fixture as above (the ignored test `openrouter::serve_the_fixture`
+of the `main` test target, in `adapters/catalog/tests/openrouter.rs`, which now also serves a disposable Secret
 Service and two synthetic Roughtime sources). The fixture's instance ids are
 `fixture-openrouter` and `fixture-openrouter-inference`, and its disposable tree is
 named with `--config` and `--state-dir`, which the commands omit; a path under the
@@ -490,3 +490,10 @@ connectors --output json connections revalidate --adapter router \
    issuer or policy yet; an existing policy is republished with `--expected-revision`,
    because a changed configuration, descriptor or executable invalidates it. Then
    create as above.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> OpenRouter API from the pinned OpenAPI document; management key as `Authorization: Bearer` from keyring custody, profile `openrouter.api-key`; two pinned instances, since no OpenRouter connector declaration ships; `key.create` is an unguarded required-approval write whose created key is held in custody as a new connection of a second instance and never returned; one page per call; verified against a local fixture only, see [the OpenRouter guide](docs/catalog-openrouter.md)

@@ -16,8 +16,9 @@ struct Args {
     kubernetes: String,
     #[arg(long, default_value = "http://127.0.0.1:17103/")]
     sql: String,
-    #[arg(long, default_value = "http://127.0.0.1:17100/")]
-    gateway: String,
+    /// Gateway address; without it the federated groups are reported as not run.
+    #[arg(long)]
+    gateway: Option<String>,
     #[arg(long, default_value = "engineering")]
     namespace: String,
     #[arg(long)]
@@ -33,6 +34,34 @@ fn require(condition: bool, message: &'static str) -> Result<()> {
     }
 }
 
+struct Groups {
+    run: Vec<String>,
+    not_run: Vec<String>,
+}
+
+fn group_label(name: &str, placement: &str) -> String {
+    format!("{name}: {placement} supported operation and refusal scenarios")
+}
+
+fn groups(with_gateway: bool) -> Groups {
+    let mut groups = Groups {
+        run: Vec::new(),
+        not_run: Vec::new(),
+    };
+    for name in ["kubernetes", "sql"] {
+        groups
+            .run
+            .push(format!("{name}: authenticated discovery and token refusal"));
+        groups.run.push(group_label(name, "direct"));
+        if with_gateway {
+            groups.run.push(group_label(name, "federated"));
+        } else {
+            groups.not_run.push(group_label(name, "federated"));
+        }
+    }
+    groups
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -45,8 +74,15 @@ async fn main() -> Result<()> {
         .map_err(|_| "invalid service token")?
         .to_owned();
     drop(secret);
-    let gateway = Client::new(&args.gateway, token.clone(), args.allow_plaintext)?;
-    let gateway_desc = gateway.describe().await?;
+    let gateway = match &args.gateway {
+        Some(url) => {
+            let client = Client::new(url, token.clone(), args.allow_plaintext)?;
+            let descriptor = client.describe().await?;
+            Some((client, descriptor))
+        }
+        None => None,
+    };
+    let not_run = groups(gateway.is_some()).not_run;
     let mut checks = Vec::new();
     for (name, url) in [("kubernetes", &args.kubernetes), ("sql", &args.sql)] {
         let direct = Client::new(url, token.clone(), args.allow_plaintext)?;
@@ -65,24 +101,23 @@ async fn main() -> Result<()> {
             "unauthenticated discovery was not refused",
         )?;
         checks.push(format!("{name}: authenticated discovery and token refusal"));
-        for (client, desc, prefix, placement) in [
-            (&direct, &descriptor, "".to_owned(), "direct"),
-            (&gateway, &gateway_desc, format!("{name}__"), "federated"),
-        ] {
+        let mut placements = vec![(&direct, &descriptor, "".to_owned(), "direct")];
+        if let Some((client, desc)) = &gateway {
+            placements.push((client, desc, format!("{name}__"), "federated"));
+        }
+        for (client, desc, prefix, placement) in placements {
             match name {
                 "kubernetes" => kubernetes(client, desc, &prefix, &args.namespace).await?,
                 "sql" => sql(client, desc, &prefix).await?,
                 _ => unreachable!(),
             }
-            checks.push(format!(
-                "{name}: {placement} supported operation and refusal scenarios"
-            ));
+            checks.push(group_label(name, placement));
         }
     }
     println!(
         "{}",
         serde_json::to_string_pretty(
-            &json!({"status":"passed","wire":"v1alpha1","checks":checks,"evidence":"live configured upstreams; scoped Kubernetes service account, PostgreSQL reader role"})
+            &json!({"status":"passed","wire":"v1alpha1","checks":checks,"not_run":not_run,"evidence":"live configured upstreams; scoped Kubernetes service account, PostgreSQL reader role"})
         )?
     );
     Ok(())
@@ -265,4 +300,30 @@ async fn sql(client: &Client, descriptor: &Descriptor, prefix: &str) -> Result<(
         cancelled.code == ErrorCode::Timeout,
         "database statement deadline did not fire",
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_gateway_reports_federated_groups_not_run_by_name() {
+        let groups = groups(false);
+        assert_eq!(groups.run.len(), 4);
+        assert!(groups.run.iter().all(|g| !g.contains("federated")));
+        assert_eq!(
+            groups.not_run,
+            [
+                "kubernetes: federated supported operation and refusal scenarios",
+                "sql: federated supported operation and refusal scenarios"
+            ]
+        );
+    }
+
+    #[test]
+    fn gateway_runs_every_group() {
+        let groups = groups(true);
+        assert_eq!(groups.run.len(), 6);
+        assert!(groups.not_run.is_empty());
+    }
 }

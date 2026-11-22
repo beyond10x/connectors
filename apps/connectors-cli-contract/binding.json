@@ -275,8 +275,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -396,6 +398,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -557,6 +571,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -687,6 +719,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -887,8 +928,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -1008,6 +1051,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -1169,6 +1224,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -1299,6 +1372,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -1466,8 +1548,10 @@
                           "outcome_unknown",
                           "identity_mismatch",
                           "lifecycle_conflict",
+                          "authentication_changed",
                           "incarnation_mismatch",
                           "readiness_mismatch",
+                          "unsupported_private_protocol",
                           "description_unavailable",
                           "stale_description",
                           "not_found",
@@ -1587,6 +1671,18 @@
                             "stored",
                             "failed"
                           ]
+                        }
+                      },
+                      "environment_variable": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "environment_variable_rule": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
                         }
                       },
                       "feature": {
@@ -1748,6 +1844,24 @@
                           "none"
                         ]
                       },
+                      "owner_error": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "owner_log": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "private_protocol": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "read_with": {
                         "kind": "optional",
                         "of": {
@@ -1878,6 +1992,15 @@
                         "kind": "optional",
                         "of": {
                           "kind": "string"
+                        }
+                      },
+                      "supported_private_protocols": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "list",
+                          "of": {
+                            "kind": "string"
+                          }
                         }
                       }
                     }
@@ -2052,8 +2175,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -2173,6 +2298,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -2334,6 +2471,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -2464,6 +2619,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -2640,8 +2804,10 @@
                           "outcome_unknown",
                           "identity_mismatch",
                           "lifecycle_conflict",
+                          "authentication_changed",
                           "incarnation_mismatch",
                           "readiness_mismatch",
+                          "unsupported_private_protocol",
                           "description_unavailable",
                           "stale_description",
                           "not_found",
@@ -2761,6 +2927,18 @@
                             "stored",
                             "failed"
                           ]
+                        }
+                      },
+                      "environment_variable": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "environment_variable_rule": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
                         }
                       },
                       "feature": {
@@ -2922,6 +3100,24 @@
                           "none"
                         ]
                       },
+                      "owner_error": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "owner_log": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "private_protocol": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "read_with": {
                         "kind": "optional",
                         "of": {
@@ -3052,6 +3248,15 @@
                         "kind": "optional",
                         "of": {
                           "kind": "string"
+                        }
+                      },
+                      "supported_private_protocols": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "list",
+                          "of": {
+                            "kind": "string"
+                          }
                         }
                       }
                     }
@@ -3226,8 +3431,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -3347,6 +3554,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -3508,6 +3727,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -3638,6 +3875,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -3844,8 +4090,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -3965,6 +4213,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -4126,6 +4386,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -4256,6 +4534,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -4451,8 +4738,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -4572,6 +4861,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -4733,6 +5034,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -4863,6 +5182,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -5072,8 +5400,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -5193,6 +5523,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -5354,6 +5696,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -5484,6 +5844,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -5693,8 +6062,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -5814,6 +6185,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -5975,6 +6358,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -6105,6 +6506,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -6314,8 +6724,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -6435,6 +6847,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -6596,6 +7020,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -6726,6 +7168,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -6935,8 +7386,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -7056,6 +7509,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -7217,6 +7682,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -7347,6 +7830,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -7556,8 +8048,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -7677,6 +8171,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -7838,6 +8344,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -7968,6 +8492,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -8171,8 +8704,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -8292,6 +8827,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -8453,6 +9000,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -8583,6 +9148,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -8800,8 +9374,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -8921,6 +9497,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -9082,6 +9670,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -9212,6 +9818,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -9420,8 +10035,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -9541,6 +10158,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -9702,6 +10331,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -9832,6 +10479,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -10221,8 +10877,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -10342,6 +11000,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -10503,6 +11173,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -10634,6 +11322,15 @@
                 "of": {
                   "kind": "string"
                 }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
+                }
               }
             }
           }
@@ -10664,6 +11361,12 @@
               }
             },
             "credential_document": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "credential_env": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -10927,8 +11630,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -11048,6 +11753,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -11209,6 +11926,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -11339,6 +12074,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -11606,8 +12350,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -11727,6 +12473,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -11888,6 +12646,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -12018,6 +12794,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -12192,8 +12977,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -12313,6 +13100,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -12474,6 +13273,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -12604,6 +13421,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -12849,8 +13675,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -12970,6 +13798,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -13131,6 +13971,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -13262,6 +14120,15 @@
                 "of": {
                   "kind": "string"
                 }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
+                }
               }
             }
           }
@@ -13298,6 +14165,12 @@
               }
             },
             "credential_document": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "credential_env": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -13549,8 +14422,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -13670,6 +14545,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -13831,6 +14718,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -13961,6 +14866,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -14245,8 +15159,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -14366,6 +15282,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -14527,6 +15455,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -14657,6 +15603,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -14846,8 +15801,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -14967,6 +15924,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -15128,6 +16097,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -15258,6 +16245,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -15599,8 +16595,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -15720,6 +16718,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -15881,6 +16891,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -16011,6 +17039,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -16194,8 +17231,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -16315,6 +17354,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -16476,6 +17527,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -16606,6 +17675,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -16757,8 +17835,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -16878,6 +17958,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -17039,6 +18131,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -17169,6 +18279,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -17344,8 +18463,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -17465,6 +18586,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -17626,6 +18759,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -17756,6 +18907,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -18105,8 +19265,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -18226,6 +19388,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -18387,6 +19561,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -18517,6 +19709,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -18728,8 +19929,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -18849,6 +20052,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -19010,6 +20225,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -19140,6 +20373,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -19366,8 +20608,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -19487,6 +20731,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -19648,6 +20904,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -19778,6 +21052,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -19990,8 +21273,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -20111,6 +21396,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -20272,6 +21569,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -20402,6 +21717,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -20565,8 +21889,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -20686,6 +22012,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -20847,6 +22185,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -20977,6 +22333,686 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup-custody-orphans": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "setup-custody-orphans"
+      },
+      "input": {
+        "type_ref": "connectors.cli.SetupCustodyOrphansInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "authority": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "mode": {
+              "kind": "optional",
+              "of": {
+                "kind": "enum",
+                "variants": [
+                  "list",
+                  "remove"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.SetupCustodyOrphansResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "failed": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "failure": {
+                    "kind": "string"
+                  },
+                  "item": {
+                    "kind": "string"
+                  }
+                }
+              }
+            },
+            "groups": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "authority": {
+                    "kind": "string"
+                  },
+                  "count": {
+                    "kind": "integer"
+                  },
+                  "purpose": {
+                    "kind": "string"
+                  }
+                }
+              }
+            },
+            "mode": {
+              "kind": "enum",
+              "variants": [
+                "list",
+                "remove"
+              ]
+            },
+            "notice": {
+              "kind": "string"
+            },
+            "removed": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "authority": {
+                    "kind": "string"
+                  },
+                  "item": {
+                    "kind": "string"
+                  },
+                  "purpose": {
+                    "kind": "string"
+                  },
+                  "scope": {
+                    "kind": "string"
+                  },
+                  "version": {
+                    "kind": "string"
+                  }
+                }
+              }
+            },
+            "state_path": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "approval_steps": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "attempts": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "cause": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "provider_unavailable",
+                    "provider_timeout",
+                    "provider_rate_limited",
+                    "provider_internal",
+                    "provider_capacity",
+                    "adapter_exited",
+                    "owner_stopping"
+                  ]
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "below_quorum",
+                    "split",
+                    "too_imprecise"
+                  ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "custody_read_only",
+                  "metadata_unavailable",
+                  "revision_conflict",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "authentication_changed",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "unsupported_private_protocol",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure",
+                  "approval_required",
+                  "approval_refused",
+                  "approval_replayed",
+                  "idempotency_conflict",
+                  "owner_build_mismatch",
+                  "confirmation_required",
+                  "metadata_schema_newer",
+                  "instance_ambiguous",
+                  "connection_unresolved",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
+                ]
+              },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2",
+                    "connectors-local/3",
+                    "connectors-local/4",
+                    "connectors-local/5"
+                  ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired",
+                    "config_too_large",
+                    "definition_instance_configured",
+                    "legacy_entry_unmigrated"
+                  ]
+                }
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "connections": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "connection": {
+                        "kind": "string"
+                      },
+                      "state": {
+                        "kind": "enum",
+                        "variants": [
+                          "pending",
+                          "ready",
+                          "reauthorization_required",
+                          "stale",
+                          "custody_unavailable",
+                          "parent_degraded",
+                          "disabled",
+                          "revoked"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "installed_provider_failure": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "missing",
+                    "not_executable",
+                    "killed",
+                    "exited",
+                    "deadline",
+                    "unreadable_output"
+                  ]
+                }
+              },
+              "installed_provider_path": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instances": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "mutation": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "attempt": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "id": {
+                            "kind": "string"
+                          },
+                          "instance": {
+                            "kind": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cause": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "code": {
+                            "kind": "enum",
+                            "variants": [
+                              "invalid_input",
+                              "unsupported",
+                              "unauthorized",
+                              "forbidden",
+                              "not_found",
+                              "stale_description",
+                              "stale_cursor",
+                              "rate_limited",
+                              "unavailable",
+                              "capacity",
+                              "timeout",
+                              "upstream_protocol",
+                              "internal"
+                            ]
+                          },
+                          "stage": {
+                            "kind": "enum",
+                            "variants": [
+                              "preflight",
+                              "attempt_store",
+                              "approval",
+                              "dispatch",
+                              "response",
+                              "observation",
+                              "audit"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "classification": {
+                      "kind": "enum",
+                      "variants": [
+                        "not_attempted",
+                        "refused",
+                        "applied",
+                        "unknown"
+                      ]
+                    },
+                    "original_request_id": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "replayed": {
+                      "kind": "boolean"
+                    }
+                  }
+                }
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "revalidate_connection",
+                  "create_connection",
+                  "revoke_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "stop_owner",
+                  "upgrade",
+                  "choose_clock_source",
+                  "none"
+                ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "request_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked",
+                    "conflict"
+                  ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "source_audit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "audit_ref": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "audit_status": {
+                      "kind": "enum",
+                      "variants": [
+                        "complete",
+                        "incomplete",
+                        "unavailable",
+                        "not_required"
+                      ]
+                    },
+                    "instance": {
+                      "kind": "string"
+                    }
+                  }
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop",
+                  "installed_provider"
+                ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -21126,8 +23162,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -21247,6 +23285,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -21408,6 +23458,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -21538,6 +23606,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -21873,8 +23950,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -21994,6 +24073,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -22155,6 +24246,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -22285,6 +24394,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -22429,8 +24547,10 @@
                   "outcome_unknown",
                   "identity_mismatch",
                   "lifecycle_conflict",
+                  "authentication_changed",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -22550,6 +24670,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -22711,6 +24843,24 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -22841,6 +24991,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -23421,6 +25580,13 @@
           }
         },
         {
+          "field": "credential_env",
+          "source": {
+            "kind": "option",
+            "long": "credential-env"
+          }
+        },
+        {
           "field": "target",
           "source": {
             "kind": "positional",
@@ -23637,6 +25803,13 @@
             "file": "credential-file",
             "stdin": "credential-stdin",
             "hidden_tty": "credential-prompt"
+          }
+        },
+        {
+          "field": "credential_env",
+          "source": {
+            "kind": "option",
+            "long": "credential-env"
           }
         }
       ]
@@ -24289,6 +26462,31 @@
     {
       "path": [
         "setup",
+        "custody-orphans"
+      ],
+      "aliases": [],
+      "callable": "setup-custody-orphans",
+      "about": "List the custody items in the Secret Service that the store of this state directory does not name, grouped by authority; another store of this machine may hold a listed authority; --mode remove --authority ID deletes the items of that one authority and nothing else",
+      "arguments": [
+        {
+          "field": "mode",
+          "source": {
+            "kind": "option",
+            "long": "mode"
+          }
+        },
+        {
+          "field": "authority",
+          "source": {
+            "kind": "option",
+            "long": "authority"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "setup",
         "init"
       ],
       "aliases": [],
@@ -24358,6 +26556,7 @@
     "handler:operations-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-check: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-custody-orphans: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-init: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract"

@@ -1,0 +1,66 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/things": {
+      "get": {
+        "operationId": "fixture.things.list",
+        "parameters": [
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Selector specifying which fields to include in a partial response.",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/Thing"}}
+            }
+          }
+        }
+      }
+    },
+    "/things/{thingId}": {
+      "get": {
+        "operationId": "fixture.things.get",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {
+            "name": "alt",
+            "in": "query",
+            "description": "Data format for response.",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "media"],
+              "x-google-enum-descriptions": ["JSON", "Media"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Selector specifying which fields to include in a partial response.",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/Thing"}}
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Thing": {"type": "object", "properties": {"name": {"type": "string"}}}
+    }
+  }
+}

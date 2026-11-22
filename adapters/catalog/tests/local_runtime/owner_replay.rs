@@ -36,7 +36,7 @@ impl FixtureOwner {
         command
             .args([
                 "--exact",
-                "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture",
+                "local_runtime::cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture",
                 "--ignored",
                 "--nocapture",
                 "--test-threads=1",

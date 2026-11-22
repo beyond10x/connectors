@@ -2,6 +2,7 @@ schema: urn:beyond10x:connectors-definition:1
 source:
   openapi: upstream/hubspot/crm-objects-2026-09.json.gz
   sha256: 1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9
+  amendments: upstream/hubspot/hubspot-owners.amendments.json
 base_url: https://api.hubapi.com
 auth:
   hubspot.private-app:
@@ -15,3 +16,9 @@ operations:
   object.get:
     op: get-/crm/objects/2026-09/{objectType}/{objectId}_/crm/objects/2026-03/{objectType}/{objectId}
     description: Read one record by objectType and objectId; properties and associations are comma-separated lists
+  owners.list:
+    op: get-/crm/owners/2026-09_/crm/owners/v3
+    description: List the account's owners (the users and queues a hubspot_owner_id names), with name, email and teams, one page per call; the walk sends paging.next.after as after and ends on a page without paging.next
+  owner.get:
+    op: get-/crm/owners/2026-09/{ownerId}_getById
+    description: Read one owner by the id a record's hubspot_owner_id carries (or by userId with idProperty userId); answers name, email and teams

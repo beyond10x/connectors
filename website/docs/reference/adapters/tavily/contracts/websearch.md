@@ -60,7 +60,12 @@ the input schema admits only the family's fields.
 - `search` is complete when Tavily returned `max_results` results; fewer is `provider_limit`, because
   Tavily never states that it has no more.
 - `fetch` is complete when every requested URL is in `pages` or `failed`.
-- `crawl` is complete when it returned fewer pages than `limit`; reaching `limit` is `result_limit`.
+- `crawl` is complete when it returned fewer pages than `limit` and its `response_time` is below
+  the `timeout` the adapter sent; reaching `limit` is `result_limit`. Tavily's crawl answer has no
+  partial flag, so a `response_time` at or past the `timeout` is taken as a crawl Tavily cut short:
+  it is incomplete with `provider_partial`. This rule follows the documented meaning of `timeout`;
+  no answer that reached it has been observed. An answer without `response_time` is judged by
+  `limit` alone.
 - A content longer than 131,072 bytes is clipped on a UTF-8 boundary (`content_bytes`). Items past a
   serialized result of 3 MiB are omitted (`response_bytes`), and the result is then incomplete.
 
@@ -84,4 +89,4 @@ The host passes that deadline with each call, and the adapter sends a crawl `tim
 left to it less a 5 s margin for the transport and the answer, in whole seconds, so Tavily ends a
 crawl before the cut. Tavily accepts 10 to 150 s: when less than 15 s remain the adapter sends 10,
 and the transport still cuts the call at the deadline; when more than 155 s remain, or no deadline
-is given, it sends 150. Tavily's answer to a crawl it cut short is not checked by this adapter.
+is given, it sends 150. A crawl answered at or past that `timeout` is incomplete (see above).

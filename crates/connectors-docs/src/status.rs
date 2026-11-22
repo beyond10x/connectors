@@ -278,7 +278,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Local MCP server for Claude Code",
-        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). The macOS and Windows builds of the server compile and their lease clocks have unit tests in the macOS and Windows CI jobs, which also run a serving scenario against each platform's own credential store; that scenario has passed on Linux only so far, so serving on macOS and Windows is not yet shown.",
         "apps/connectors/tests/claude_mcp_journey.rs::claude_code_session_is_answered",
         "/docs/connectors/mcp",
     ),
@@ -369,8 +369,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "HubSpot CRM",
-        "One object type's records, paged, and one record by id; exercised against local fixtures only.",
-        "adapters/catalog/tests/hubspot.rs::shipped_hubspot_selections_are_exactly_the_two_reads",
+        "One object type's records, paged, one record by id, and the account's owners, paged or by id; exercised against local fixtures only.",
+        "adapters/catalog/tests/hubspot.rs::shipped_hubspot_selections_are_exactly_the_four_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -435,6 +435,20 @@ pub const CAPABILITIES: &[Capability] = &[
         "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
         "adapters/catalog/tests/opsgenie.rs::shipped_opsgenie_selections_are_exactly_the_five_reads",
         "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Grafana alert rules, annotations, dashboards and data sources",
+        "alert_rules.list, annotations.list over an epoch-millisecond window, dashboards.search paged by page and limit, dashboard.get and datasources.list from Grafana's pinned OpenAPI 3 document, read only, with a service-account token as Authorization: Bearer, from its definition file on a served instance or pinned; verified against a local fixture only (*unreleased*).",
+        "adapters/catalog/tests/grafana.rs::shipped_grafana_selections_are_exactly_the_eight_reads",
+        "/docs/connectors/grafana",
+    ),
+    shipped(
+        "Catalog provider",
+        "Prometheus and Loki through Grafana's data-source proxy",
+        "prometheus.query, prometheus.query_range and loki.query_range through Grafana's data-source proxy with the Grafana service-account token, each proxy sub-path a cited amendment to the pinned document; Loki's limit held to 1 to 5000, an answer over the 4 MiB limit refused as capacity, and on a served instance a uid outside catalog.allowed_values refused as forbidden before any request; verified against a local fixture only (*unreleased*).",
+        "adapters/catalog/tests/grafana.rs::the_proxy_reads_are_exactly_the_three_queries_under_the_one_profile",
+        "/docs/connectors/grafana",
     ),
     shipped(
         "Catalog provider",
@@ -596,7 +610,7 @@ pub const CAPABILITIES: &[Capability] = &[
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+        "Alertmanager has a design or typed model and no runtime; the native Grafana adapter's dashboard reads, datasource discovery and mediated route are specified and not built (dashboards are read through the catalog provider).",
         "/docs/reference/adapters",
     ),
     planned(

@@ -79,9 +79,11 @@ cannot assert that an earlier invocation was not attempted.
 
 The following table checks document decisions, not a policy engine. `policy`
 in the case file is current invocation lookup policy; `metadata_admitted` is its
-separate metadata decision; `revision_current` is `null` for a read tool call
-that names no revision. A listed mutating tool called with none is invalid
-params (`-32602`) under [mutations](mutations.md), whose cases hold it. `candidate_or_retained_key` only passes lookup/input
+separate metadata decision; `operation` is `read` or `mutating` on every row;
+`revision_current` is `null` for a call that names no revision. A read binds
+that call to the advertised revision; a listed mutating tool called with none
+is invalid params (`-32602`, shown as `invalid_params`) under
+[mutations](mutations.md). `candidate_or_retained_key` only passes lookup/input
 checks: it is neither a dispatch instruction nor a claim of a successful result.
 | Case | Discovery | First lookup/input outcome |
 |---|---|---|
@@ -99,6 +101,7 @@ checks: it is neither a dispatch instruction nor a claim of a successful result.
 | revision-beats-absent | omitted | stale_description |
 | revision-beats-input | visible | stale_description |
 | read-without-revision-binds-current | visible | candidate_or_retained_key |
+| mutating-without-revision-refused | visible | invalid_params |
 | bad-input | visible | invalid_input |
 
 ## Qualified names and inverse selection

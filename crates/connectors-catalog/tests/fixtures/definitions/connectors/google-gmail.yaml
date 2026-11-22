@@ -5,9 +5,16 @@ source:
   sha256: 7591d33ec87e4ef83551f71630213a89ac349becebe9bd9b3e4ce3851dede0fe
   projection: gmail.openapi.json
 base_url: https://gmail.googleapis.com
+default_profile: google.oauth.readonly
 auth:
+  google.oauth.readonly:
+    use: google
+    scopes:
+      minimum: ["https://www.googleapis.com/auth/gmail.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/gmail.readonly"]
   google.oauth:
     use: google
+    default: true
     scopes:
       minimum: ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]
       requested: [openid, "https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]

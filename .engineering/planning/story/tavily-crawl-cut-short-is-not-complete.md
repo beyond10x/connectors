@@ -2,13 +2,19 @@
 format: aep.planning-md/3
 id: story:tavily-crawl-cut-short-is-not-complete
 kind: story
-status: draft
+status: implemented
 title: A Tavily crawl cut short by its timeout is not reported complete
 tags:
 - from-finding
 relations:
 - informed_by: review-result:wave-a-websearch-deadline-adversary-1
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-10T08:52:34Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-10T08:52:35Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-12T15:04:47Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
@@ -21,6 +27,41 @@ cuts a crawl short has not been observed.
 
 ## Acceptance
 
-- Tavily's answer to a crawl cut short by its `timeout` is observed (recorded fixture or documented
-  upstream behaviour), and a crawl ended that way is not reported `complete: true`; a protocol test
-  pins it.
+Changed by the operator on 2026-11-12 (option A): a cut-short answer could not be produced live; four
+live crawls at the least `timeout` Tavily accepts (10) ended at 0.09 to 8.0 s.
+
+- A crawl whose `response_time` is at or past the `timeout` the adapter sent is not reported
+  `complete: true`, on the documented meaning of `timeout`; the protocol test
+  `a_crawl_that_ran_to_its_timeout_is_partial_and_incomplete` pins it.
+
+## Wave status
+
+Status on 2026-11-10: partly delivered in the single defect wave (merge 5d76bbad9, commit
+6dc27cb7e).
+
+- **Delivered.** A crawl answer whose `response_time` is at or past the `timeout` the adapter sent
+  is now `complete: false`, with `provider_partial`. The test `a_crawl_that_ran_to_its_timeout_is_partial_and_incomplete`
+  was red before the change; `adapters/tavily/tests/protocol.rs` now passes 12. The adapter's
+  `semantics.md` states the rule.
+- **Still open: acceptance line 1, "observed".** Two live crawls, each with `timeout` 10 and
+  `limit` 500, ended before their timeout:
+  - `en.wikipedia.org`: 0 pages, `response_time` 8.0;
+  - `docs.python.org/3/`: 500 pages, `response_time` 6.25.
+
+  Tavily's API reference does not say what a crawl that reaches its timeout returns. Until a
+  cut-short answer is observed, the rule rests only on the documented meaning of `timeout`. A
+  crawl that Tavily ends just before the timeout would not be caught.
+
+
+## Live crawls, 2026-11-11 (the operator's yes, decision 2 option A)
+
+Tavily accepts no `timeout` under 10 (`adapters/tavily/src/lib.rs:28`), so the crawls used 10, not
+2. Neither reached it:
+
+- `www.gutenberg.org`, `max_depth` 3, `limit` 50, `extract_depth` advanced: HTTP 200, 2 pages,
+  `response_time` 0.24, 1 credit.
+- `docs.python.org/3/`, `max_depth` 5, `limit` 100, `extract_depth` advanced, `instructions`: HTTP
+  200, 0 pages, `response_time` 0.09, 0 credits.
+
+Four live crawls so far ended at 0.09 to 8.0 s, all under the 10 s `timeout`. A cut-short answer is
+still not observed.

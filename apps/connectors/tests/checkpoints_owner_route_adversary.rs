@@ -147,10 +147,7 @@ struct OwnerProcess(std::process::Child);
 #[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
-        if self.0.try_wait().ok().flatten().is_none() {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
+        owner_start::reap::child(&mut self.0);
     }
 }
 
@@ -173,6 +170,10 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
         .env("CONNECTORS_TEST_OWNER_IDLE_MS", "120000")
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
+        .env(
+            "CONNECTORS_TEST_OWNER_PARENT",
+            std::process::id().to_string(),
+        )
         .arg(env!("CARGO_BIN_EXE_connectors"))
         .arg(root.path().join("config/config.toml"))
         .arg(&state)

@@ -55,15 +55,15 @@ fn check(until: Instant) -> Result<(), Value> {
 }
 /// What stops a request: its own cancellation before each owner call, and the
 /// end of local admission at the session's first terminal before its first one
-/// (sessions § 4.1); a request already at the owner keeps its reply. The owner
-/// protocol has no cancellation of its own, so an owner call already started
-/// runs out within its deadline.
+/// (sessions § 4.1). A request already at the owner keeps its reply unless its
+/// own cancellation is raised: the owner read it started is then cancelled
+/// there too (story:owner-cancels-a-bounded-read).
 pub(super) struct Halt {
     pub cancelled: Arc<AtomicBool>,
     pub admission_closed: Arc<AtomicBool>,
     /// The session's standard input, asked at admission whether its peer
     /// has closed it.
-    pub input: std::os::fd::RawFd,
+    pub input: super::console::Hangup,
 }
 impl Halt {
     fn cancelled(&self) -> Result<(), Value> {
@@ -78,28 +78,29 @@ impl Halt {
         // The serve loop closes admission when it reads the end of file, which
         // a loaded host can delay past this worker's first owner call; the
         // input's own hangup does not wait for that read (sessions § 4.1).
-        if self.admission_closed.load(Ordering::SeqCst) || hung_up(self.input) {
+        if self.admission_closed.load(Ordering::SeqCst) || self.input.hung_up() {
             Err(refusal("unavailable"))
         } else {
             Ok(())
         }
     }
 }
-/// Whether `input`'s peer has closed it, buffered input or not. A poll that
-/// fails answers no, which leaves the end of file to the serve loop.
-fn hung_up(input: std::os::fd::RawFd) -> bool {
-    let mut poll = libc::pollfd {
-        fd: input,
-        events: libc::POLLIN,
-        revents: 0,
-    };
-    // SAFETY: poll names one live entry and does not wait.
-    let ready = unsafe { libc::poll(&mut poll, 1, 0) };
-    ready > 0 && poll.revents & libc::POLLHUP != 0
-}
 fn client(paths: &Paths, host: Option<&str>, until: Instant) -> Result<owner::Client, Value> {
     let client = owner::Client::connect_until(paths, host.is_none(), until).map_err(owner_error)?;
     if host.is_some_and(|host| host != client.host_incarnation) {
+        return Err(refusal("stale_authority"));
+    }
+    Ok(client)
+}
+/// [`client`] for a bounded read, which its cancellation reaches the owner by.
+fn read_client(
+    paths: &Paths,
+    host: Option<&str>,
+    until: Instant,
+) -> Result<owner::ReadClient, Value> {
+    let client =
+        owner::ReadClient::connect_until(paths, host.is_none(), until).map_err(owner_error)?;
+    if host.is_some_and(|host| host != client.host_incarnation()) {
         return Err(refusal("stale_authority"));
     }
     Ok(client)
@@ -681,7 +682,7 @@ impl Reader<'_> {
             .and_then(|b| b.constrain(until))
             .map_err(|_| refusal("timeout"))?;
         halt.cancelled()?;
-        let owner = client(self.paths, Some(&snapshot.host), until)?;
+        let owner = read_client(self.paths, Some(&snapshot.host), until)?;
         // The last check before the owner read: past it a cancellation only
         // suppresses the reply.
         halt.cancelled()?;
@@ -697,6 +698,7 @@ impl Reader<'_> {
                 },
                 &snapshot.revision,
                 budget,
+                &|| halt.cancelled.load(Ordering::SeqCst),
             )
             .map_err(owner_error)?;
         check(until)?;
@@ -785,7 +787,7 @@ fn response_schema(result: Value) -> Value {
             {"properties":{"status":{"const":"error"}},"required":["error"],"not":{"required":["result"]}}],"additionalProperties":false})
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -802,7 +804,7 @@ mod tests {
         Halt {
             cancelled: Arc::new(AtomicBool::new(false)),
             admission_closed: Arc::new(AtomicBool::new(false)),
-            input: input.as_raw_fd(),
+            input: super::super::console::Hangup::of(input.as_raw_fd()),
         }
     }
 

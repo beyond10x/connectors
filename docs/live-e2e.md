@@ -160,24 +160,28 @@ jq -n '{service:{instance:"engineering-live",listen:"127.0.0.1:17100",
   > .local/e2e/federation.json
 ```
 
-Start the gateway in a fourth terminal after the three leaf services are listening. No command
-of this repository serves it since 0.60.0, which removed `connectors serve`: the gateway is a
-Rust program that embeds `connectors_host::federation` with this configuration, as
+The federated groups are optional. No command of this repository serves a gateway since 0.60.0,
+which removed `connectors serve`: a gateway is a Rust program that embeds
+`connectors_host::federation` with this configuration, as
 [Federate services](../website/docs/guides/federate-adapter-services.md) shows, listening on
-`127.0.0.1:17100`. The acceptance executable describes the gateway before any scenario group and
-has no option to leave the federated groups out, so without a gateway it fails at that describe.
+`127.0.0.1:17100`. Start it in a fourth terminal after the three leaf services are listening,
+and pass its address with `--gateway`. Without `--gateway` the runner runs every direct group
+and lists the federated groups by name under `not_run` in its output.
 
 Run the live Rust acceptance executable from another terminal:
 
 ```sh
 target/debug/connectors-conformance --token-file .local/e2e/service.secret \
-  --allow-plaintext > .local/e2e/live-acceptance.json
+  --allow-plaintext --gateway http://127.0.0.1:17100/ > .local/e2e/live-acceptance.json
 cat .local/e2e/live-acceptance.json
 ```
 
-Exit 0 and `status: passed` mean six scenario groups passed: service authentication
-for each provider, then all supported operations and selected failure cases directly
-and through federation. The SQL deadline checks intentionally take roughly ten
+Leave out `--gateway` when no gateway is running.
+
+Exit 0 and `status: passed` mean every group listed in `checks` passed: service
+authentication for each provider, then all supported operations and selected failure cases
+directly and, with `--gateway`, through federation (six groups). Without `--gateway` four
+groups run and `not_run` names the two federated ones; that is not evidence for federation. The SQL deadline checks intentionally take roughly ten
 seconds each. An unsuccessful run is not passing evidence. The runner performs no
 automatic retry.
 

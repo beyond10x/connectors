@@ -7,7 +7,7 @@
 //! refusal is driven on the guard preflight and on every feed binding, the two sites
 //! the unit's own suite does not reach. No live Runpod account, no network.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::{
     bundle::{self, Bundle},

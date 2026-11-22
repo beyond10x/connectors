@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T11:10:01Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-guard-typed-comparison",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-guard-typed-adversary-1",
+    "reference": "96513ff4b: guard.yaml Expectation and Check state the typed rule; ess validate valid",
+    "review": "review-result:wave-b-guard-typed-adversary-1",
+    "outcome": "fixed"
+  }
+}

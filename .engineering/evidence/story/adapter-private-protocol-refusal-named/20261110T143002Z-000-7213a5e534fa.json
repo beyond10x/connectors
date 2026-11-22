@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:30:02Z",
+  "actor": "human:operator",
+  "artifact": "story:adapter-private-protocol-refusal-named",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-protocol-refusal-adversary-1",
+    "reference": "9003c8d29: served.rs arm for UnsupportedPrivateProtocol; check --all-targets green on the 11 packages matching the changed enums",
+    "review": "review-result:wave-b-protocol-refusal-adversary-1",
+    "outcome": "fixed"
+  }
+}

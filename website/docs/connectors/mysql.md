@@ -12,8 +12,7 @@ readme_row: "SQL"
 
 The `mysql` connector is served by `connectors-sql`, the executable that serves
 [PostgreSQL](./postgres.md), chosen by `"engine": "mysql"` in the native file; the README's
-support table lists both as SQL. The words connector, instance, connection and operation are
-those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+support table lists both as SQL. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full MySQL guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mysql-cli.md) has
 every bound and refusal.
 
@@ -115,14 +114,7 @@ nothing here needs an approval.
 ## Reconnect when the connection is Stale
 
 A rotated password makes the connection `stale` when it is next used (the server's error 1045,
-reported as `unauthorized`). Publish the new password:
-
-```sh
-connectors --output json connections list --connector mysql --instance incidents \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector mysql --instance incidents \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+reported as `unauthorized`). Publish the new password. [Reconnect](../guides/reconnect-a-connection.md) `mysql/incidents` with `--credential-prompt`.
 
 ## Limits
 

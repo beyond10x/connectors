@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:metadata-conformance-emit-manifest-format
 kind: story
-status: active
+status: implemented
 title: metadata-conformance emit writes a manifest the pinned ess admits
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: inferred
   path: crates/connectors-build/src/metadata_conformance.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:09Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:10Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:21Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

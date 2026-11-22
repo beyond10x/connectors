@@ -1,13 +1,13 @@
 //! The shipped `claude-subscription` profiles through the production CLI, owner, catalog child
 //! and disposable Secret Service (story:claude-subscription-connector). The instance is the
 //! shipped profile with its configured client id, its endpoints moved onto the fixture of
-//! [`crate::claude_subscription`]. `connections connect` runs the grant in the CLI process: the
+//! [`crate::local_runtime::claude_subscription`]. `connections connect` runs the grant in the CLI process: the
 //! debug-build follow hook (`CONNECTORS_TEST_OAUTH_FOLLOW`, the fixture root the only trusted
 //! one) consents where a person would and follows the loopback or pasted-code redirect.
 //! `connections token` refreshes an access token inside the declared lead. No output stream and
 //! no file at rest carries a token or code.
 use super::*;
-use crate::claude_subscription::{
+use crate::local_runtime::claude_subscription::{
     CLAUDE_ACCESS, CLAUDE_ACCOUNT, CLAUDE_CLIENT_ID, CLAUDE_LOOPBACK, CLAUDE_PASTED,
     CLAUDE_REFRESH, CLAUDE_SCOPES, ClaudeServer, EXCHANGE_FIELDS, Lifetime, REFRESH_FIELDS,
     carries_claude_material, claude_config,
@@ -180,8 +180,10 @@ impl ClaudeJourney {
             .filter(|seen| seen.route == "/cai/oauth/authorize")
             .collect();
         assert_eq!(consent.len(), 1);
-        let query = crate::oauth2_refresh::decode_form(consent[0].query.as_bytes());
-        let get = |name: &str| crate::oauth2_refresh::field(&query, name).map(str::to_owned);
+        let query = crate::local_runtime::oauth2_refresh::decode_form(consent[0].query.as_bytes());
+        let get = |name: &str| {
+            crate::local_runtime::oauth2_refresh::field(&query, name).map(str::to_owned)
+        };
         assert_eq!(get("code").as_deref(), Some("true"));
         assert_eq!(get("client_id").as_deref(), Some(CLAUDE_CLIENT_ID));
         assert_eq!(get("scope"), Some(CLAUDE_SCOPES.join(" ")));

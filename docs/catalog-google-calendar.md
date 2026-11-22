@@ -85,8 +85,8 @@ the end of a walk are in it.
   `["default", "focusTime"]`, and each element is sent as its own `eventTypes`
   pair in the order given. The pinned document enumerates `birthday`,
   `default`, `focusTime`, `fromGmail`, `outOfOffice` and `workingLocation`. The
-  engine does not check a value against that list: another value is sent, and
-  Google answers it.
+  engine refuses a value outside that list as `invalid_input` before any
+  request.
 - **`maxResults`.** The pinned document states a minimum of 1 for both lists
   and, in each description only, a ceiling: a page is never larger than 2500
   events for `events.list` and never larger than 250 entries for
@@ -168,7 +168,9 @@ descriptor revision, not the input
 (`crates/connectors-host/src/local/owner/approval_issuance.rs`). Read the input
 file itself before approving — the whole input, not only the members named
 below. Writes run on the same instance as the reads, whose consent requests
-the write scope; see [The write scope](#the-write-scope).
+the write scope; the instance names the profile `google.oauth` for that,
+because the default profile is read-only. See
+[The write scope](#the-write-scope).
 
 | id | Discovery id | request | guard | beyond the event's own fields |
 |---|---|---|---|---|
@@ -179,11 +181,11 @@ the write scope; see [The write scope](#the-write-scope).
 - **`sendUpdates`** decides whom Google emails about the write: `all`,
   `externalOnly` (guests not on Google Calendar) or `none`. Name it in every
   write input. Each write's selection requires it, so an input without it is
-  refused as `invalid_input` before any request. The engine checks only that it
-  is present: the bundle records no list of allowed values, so any string or
-  integer, such as `""`, `NONE` or `0`, is sent to Google as given, and what
-  Google does with it is not documented. The issuer checks that it is one of
-  `all`, `externalOnly` or `none` before approving. The pinned document gives
+  refused as `invalid_input` before any request. The engine checks that it
+  is present and one of `all`, `externalOnly` or `none`, the values the pinned
+  document lists: any other string or integer, such as `""`, `NONE` or `0`, is
+  refused as `invalid_input` before any request, so nothing is approved for it.
+  The pinned document gives
   no default for patch and delete; for insert it says the default is false and that some emails might
   still be sent, and it warns that `none` "can have significant adverse
   effects, including events not syncing to external calendars or events being
@@ -282,7 +284,8 @@ answer's `id_token` (`identity.source: id_token`). The consent address,
 `https://accounts.google.com/o/oauth2/auth`, is handed to the host for
 obtaining the entry by consent; the provider never calls it.
 
-One instance per Google account reads and writes. Its consent requests
+One instance per Google account reads and writes when it names the
+profile `google.oauth`. Its consent requests
 `openid`, `https://www.googleapis.com/auth/calendar.readonly` and
 `https://www.googleapis.com/auth/calendar.events`, and the connection's
 `minimum_scopes` are both Calendar scopes, so a stored refresh token granted
@@ -298,6 +301,7 @@ Add to the host configuration (`~/.config/connectors/config.toml`, format
 enabled = true
 
 [connectors.calendar.instances.private]
+profile = "google.oauth"
 ```
 
 The `calendar` connector's default endpoint is
@@ -325,6 +329,38 @@ The read-only scope covers no write. The writes need
 The pinned document accepts it for `events.insert`, `events.patch`,
 `events.delete` and the `events.get` each guard reads, and not
 `calendar.readonly` for any of the three writes.
+
+### Read-only by default
+
+An instance that names no profile uses `google.oauth.readonly`: its consent
+requests `openid` and `https://www.googleapis.com/auth/calendar.readonly` only, the connection's `minimum_scopes` are that
+one scope, and the instance offers none of the writes. A write needs the
+instance to name `profile = "google.oauth"`, which requests both scopes as
+above; connect it (or reconnect it) under that profile. A read-only instance
+describes none of the writes and refuses an invoke of one, so no approval is
+ever asked for one.
+
+A connection is bound to the profile it was saved under and is never rebound. One
+saved before the default existed is under `google.oauth`: an instance that names no
+profile does not revalidate or read it. Name `profile = "google.oauth"` to keep it (the
+instance keeps its configuration revision), or `connections revoke` it and
+`connections connect` again under the read-only default.
+
+### Admit only a company's accounts
+
+An instance may state `allowed_domains`, one to eight lower-case domains such as
+`allowed_domains = ["example.org"]`, valid only with the Google profiles. The
+host passes each as `--allowed-domain` to the provider. On connect, reconnect
+and revalidation the provider reads the `hd` claim of the `id_token` Google
+returned, after its `iss`, `aud`, `sub` and `exp` checks and before any
+credential is stored, and refuses the account as `insufficient_scope` unless
+`hd` equals one of the domains. The refusal names the account's domain and the
+admitted ones; an account with no `hd` claim, such as a consumer account, is
+refused the same way. `hd` is Google's assertion of the Workspace domain; the
+provider reads the token without verifying its signature, as OpenID Connect
+Core 3.1.3.7 allows for a token received directly from the token endpoint over
+TLS. The list is part of the credential revision, so changing it needs a
+reconnect.
 
 ### Moving from read and write entries
 
@@ -382,3 +418,10 @@ old pair with `connections revoke` and remove their entries.
   [the catalog provider guide](local-catalog-provider.md) says: only its
   documented definite refusals are refused, and among them a `403` naming one
   of those reasons is a `rate_limited` refusal.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Calendar API v3 from the pinned Discovery document projected to OpenAPI; profile `google.oauth`, one instance per Google account consenting to `calendar.readonly` and `calendar.events`; `events.patch` and `events.delete` guarded by a preflight `events.get` (status `confirmed`, `etag` equal to the input's), `events.insert` unguarded; every write names `sendUpdates`; verified against a local fixture only, see [the Calendar guide](docs/catalog-google-calendar.md)

@@ -181,19 +181,17 @@ async fn run(
 }
 
 /// Correction round 1 made `sendUpdates` required. The pinned document gives
-/// the parameter exactly three values, but the declaration types it as any
-/// string or integer and nothing compares it with them: an input whose
-/// `sendUpdates` is the empty string, a miscased `NONE` or the integer `0`
-/// passes the requirement and is sent as it was given. The engine records no
-/// enumeration, so this pins today's behaviour and the guide sentence that
-/// leaves the check to the issuer.
+/// the parameter exactly three values, and the engine holds the value to them
+/// (story:catalog-validates-enum-and-date-time): an input whose `sendUpdates`
+/// is the empty string, a miscased `NONE` or the integer `0` is refused as
+/// `invalid_input` before any request, and each of the three values is sent.
 #[tokio::test]
-async fn send_updates_outside_its_three_values_is_sent_as_given() {
-    let sentence = "The issuer checks that it is one of `all`, `externalOnly` or `none` before \
-                    approving.";
+async fn send_updates_outside_its_three_values_is_refused_before_any_request() {
+    let sentence =
+        "The engine checks that it is present and one of `all`, `externalOnly` or `none`";
     assert!(
         guide().contains(sentence),
-        "the guide no longer says the issuer checks the sendUpdates value: {sentence}"
+        "the guide no longer says the engine checks the sendUpdates value: {sentence}"
     );
     let pinned = pinned();
     for method in ["insert", "patch", "delete"] {
@@ -203,33 +201,34 @@ async fn send_updates_outside_its_three_values_is_sent_as_given() {
             "`{method}`"
         );
     }
-    let mut accepted = Vec::new();
+    let mut escaped = Vec::new();
     for (operation, base) in inputs() {
         for value in [json!(""), json!("NONE"), json!(0)] {
             let mut input = base.clone();
             input["sendUpdates"] = value.clone();
             let (outcome, sent) = run(operation, input, response(200, Some(stored()))).await;
-            let verbatim = match &value {
-                Value::String(text) => text.clone(),
-                other => other.to_string(),
-            };
+            if outcome != Err(ErrorCode::InvalidInput) || !sent.is_empty() {
+                escaped.push(format!(
+                    "{operation}: sendUpdates={value} {outcome:?}, sent {sent:?}"
+                ));
+            }
+        }
+        for value in ["all", "externalOnly", "none"] {
+            let mut input = base.clone();
+            input["sendUpdates"] = json!(value);
+            let (outcome, sent) = run(operation, input, response(200, Some(stored()))).await;
             let as_given = sent.len() == 1
                 && sent[0]
                     .2
-                    .contains(&("sendUpdates".to_owned(), verbatim.clone()));
+                    .contains(&("sendUpdates".to_owned(), value.to_owned()));
             if outcome.as_deref() != Ok("applied") || !as_given {
-                accepted.push(format!(
-                    "{operation}: sendUpdates={value} {outcome:?}, sent query {:?}",
-                    sent.first().map(|s| s.2.clone())
+                escaped.push(format!(
+                    "{operation}: sendUpdates={value} {outcome:?} not sent as given"
                 ));
             }
         }
     }
-    assert!(
-        accepted.is_empty(),
-        "a sendUpdates value outside all, externalOnly, none was not sent as given, which the \
-         guide sentence \"{sentence}\" relies on: {accepted:#?}"
-    );
+    assert!(escaped.is_empty(), "{escaped:#?}");
 }
 
 /// A write that Google answers `429` is classified `unknown`, not a

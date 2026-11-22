@@ -2,7 +2,7 @@
 title: GitLab
 sidebar_position: 6
 description: Read GitLab projects, merge requests, pipelines and repositories, and write merge requests, tags, releases, branches and pipelines under approval.
-lede: One GitLab instance per host and account reads 30 operations and writes 21 under approval, the merge pinned to the head commit and the pipeline you read.
+lede: One GitLab instance per host and account reads 32 operations and writes 21 under approval, the merge pinned to the head commit and the pipeline you read.
 source: docs/local-catalog-provider.md, docs/local-gitlab-merge.md, docs/local-approvals.md, adapters/catalog/providers/gitlab/connector.json, adapters/catalog/providers/gitlab/operations.json
 connectors: "gitlab"
 ---
@@ -10,15 +10,12 @@ connectors: "gitlab"
 # GitLab
 
 The `gitlab` connector of the provider GitLab is served by the catalog provider from the pinned
-GitLab API v4 OpenAPI document. The words connector, instance, connection and operation are those
-of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+GitLab API v4 OpenAPI document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full GitLab guide](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md)
 and the [guarded merge guide](https://github.com/beyond10x/connectors/blob/main/docs/local-gitlab-merge.md)
 have every operation, guard and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a GitLab account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -49,14 +46,6 @@ enabled = true
 
 [connectors.gitlab.instances.work]
 endpoint = "https://gitlab.example.com"
-```
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}
 ```
 
 `endpoint` is the host, `https://<host>`, a trailing `/` allowed, or `https://<host>/<path>` for
@@ -96,19 +85,14 @@ connectors invoke gitlab/work merge_request.get \
   --input-json '{"id":"group/project","merge_request_iid":9}'
 ```
 
-Validation lasts 60 seconds; after that a read is refused with `next_action:
-revalidate_connection` until `connections revalidate` renews it, with no token entered.
+A read after the 60-second validation is refused with `next_action: revalidate_connection`; see [First read](../guides/first-read.md#validation).
 
 ## A first guarded write
 
-Once per instance, create the signing key (`connectors approvals key-init --connector gitlab
---instance work`) and add an `[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Publish a policy naming the writes you use:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["merge_request.merge","merge_request.update"]}\n' > policy.json
-connectors approvals policy-set --connector gitlab --instance work --input-file policy.json
 ```
 
 Pin the merge to the head commit and the successful pipeline the read above showed, in
@@ -118,45 +102,15 @@ Pin the merge to the head commit and the successful pipeline the read above show
 {"id":"group/project","merge_request_iid":17,"pipeline_id":123,"body":{"sha":"0123456789abcdef0123456789abcdef01234567"}}
 ```
 
-Take the connection, and the schema and revision of `merge_request.merge`
-from `invoke --describe`, then prepare, issue and invoke:
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `merge_request.merge` on `gitlab/work` with `merge.json`, `--idempotency-key merge-17`.
 
-```sh
-connection=$(connectors --output json connections list --connector gitlab --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke gitlab/work merge_request.merge --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke gitlab/work merge_request.merge --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector gitlab --instance work \
-  --connection "$connection" --operation merge_request.merge \
-  --schema "$schema" --revision "$revision" --input-file merge.json
-connectors approvals clock-check --connector gitlab --instance work
-connectors approvals issue --connector gitlab --instance work \
-  --connection "$connection" --operation merge_request.merge \
-  --schema "$schema" --revision "$revision" --input-file merge.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-merge-17.json"
-connectors invoke gitlab/work merge_request.merge \
-  --input-file merge.json --approval-file "$HOME/private/proof-merge-17.json" \
-  --idempotency-key merge-17
-```
-
-`mutation.classification` in the answer is `not_attempted`, `refused`, `applied` or `unknown`. A
-lost answer is `unknown` and never triggers another PUT; repeating the same `--idempotency-key`
+A lost answer is `unknown` and never triggers another PUT; repeating the same `--idempotency-key`
 observes the original attempt.
 
 ## Reconnect when the connection is Stale
 
-A token GitLab refuses (revoked, expired) makes the connection `stale`; an invoke answers
-`next_action: repair_connection`, and revalidation cannot help. Publish a new token on the same
-connection:
-
-```sh
-connectors --output json connections list --connector gitlab --instance work \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector gitlab --instance work \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+A token GitLab refuses (revoked, expired) makes the connection `stale`; revalidation cannot help. Publish a new token on the same
+connection. [Reconnect](../guides/reconnect-a-connection.md) `gitlab/work` with `--credential-prompt`.
 
 A token of another GitLab user is refused as an identity mismatch.
 

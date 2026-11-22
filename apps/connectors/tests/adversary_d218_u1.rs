@@ -205,29 +205,72 @@ fn envelope(output: &Output) -> Value {
     serde_json::from_slice(stream).unwrap_or_else(|_| panic!("one JSON envelope: {output:?}"))
 }
 
-/// A legacy `[adapters.main]` catalog entry that `setup migrate` derives
-/// connector `jira` for, beside `[connectors.jira.instances.main]`. The file
-/// is admitted: the legacy entry's own names are `catalog/main`, so no two
+/// The body of a legacy `[adapters.main]` catalog entry that `setup migrate`
+/// derives connector `jira` for, beside `[connectors.jira.instances.main]`. The
+/// file is admitted: the legacy entry's own names are `catalog/main`, so no two
 /// entries share names (`Config::check_selectors`). `invoke` names the legacy
 /// entry `jira/main` as well (D7), so `jira/main` names two entries.
+fn legacy_beside_instance_body() -> String {
+    format!(
+        "{}[connectors.jira]\nenabled=true\n{}",
+        legacy("main", "jira", "jira-legacy"),
+        instance("jira", "main", "jira-main", "jira-main")
+    )
+}
+
 fn legacy_beside_instance_of_the_same_name() -> tempfile::TempDir {
     configured(
-        &format!(
-            "{}[connectors.jira]\nenabled=true\n{}",
-            legacy("main", "jira", "jira-legacy"),
-            instance("jira", "main", "jira-main", "jira-main")
-        ),
+        &legacy_beside_instance_body(),
         &[("main", "jira-legacy"), ("jira-main", "jira-main")],
     )
 }
 
+/// The refusal of a shared name: `instance_ambiguous`, one entry per line of
+/// `instances`, each named once and both aliases among them.
+#[track_caller]
+fn assert_shared_name_refused(answer: &Value) {
+    let data = &answer["error"]["data"];
+    assert_eq!(
+        data["code"], "instance_ambiguous",
+        "story:legacy-alias-sharing-an-instance-name: {answer}"
+    );
+    let listed: Vec<&str> = data["instances"]
+        .as_array()
+        .unwrap_or_else(|| panic!("the entries are listed: {answer}"))
+        .iter()
+        .map(|item| item.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        listed.iter().collect::<BTreeSet<_>>().len(),
+        2,
+        "two distinct entries: {answer}"
+    );
+    assert!(
+        listed.iter().any(|item| item.contains("alias main"))
+            && listed.iter().any(|item| item.contains("alias jira-main")),
+        "both entries are named: {answer}"
+    );
+}
+
 /// story:connectors-do-short-invocation, D2: `instance_ambiguous` is the
-/// answer to a target that leaves the instance out. A target that names the
-/// instance, `jira/main`, is never `instance_ambiguous`, and no refusal lists
-/// one instance twice.
+/// answer to a target that leaves the instance out. A target naming an
+/// instance no other entry shares, `jira/main` beside a legacy entry of
+/// another name, is never `instance_ambiguous`.
+///
+/// Changed by story:legacy-alias-sharing-an-instance-name: a name both a
+/// `[connectors]` instance and a legacy entry derive is refused as
+/// `instance_ambiguous` (`a_shared_name_is_refused_as_ambiguous`), so this
+/// case keeps the legacy entry under a different name.
 #[test]
 fn a_named_instance_is_never_instance_ambiguous() {
-    let root = legacy_beside_instance_of_the_same_name();
+    let root = configured(
+        &format!(
+            "{}[connectors.jira]\nenabled=true\n{}",
+            legacy("other", "jira", "jira-legacy"),
+            instance("jira", "main", "jira-main", "jira-main")
+        ),
+        &[("other", "jira-legacy"), ("jira-main", "jira-main")],
+    );
     let output = run(root.path(), &["invoke", "jira/main", READ, "--describe"]);
     let answer = envelope(&output);
     let data = &answer["error"]["data"];
@@ -236,6 +279,42 @@ fn a_named_instance_is_never_instance_ambiguous() {
         "story:connectors-do-short-invocation: a target naming its instance was refused as \
          ambiguous: {answer}"
     );
+    assert!(output.status.success(), "{answer}");
+}
+
+/// story:legacy-alias-sharing-an-instance-name: a name a `[connectors]`
+/// instance and a legacy entry both derive is refused at every selection,
+/// naming both entries and listing neither twice: the `invoke` target, with
+/// or without its instance, and `--connector`/`--instance`, and
+/// `default_instance`.
+#[test]
+fn a_shared_name_is_refused_as_ambiguous() {
+    let root = legacy_beside_instance_of_the_same_name();
+    for target in ["jira/main", "jira"] {
+        let answer = envelope(&run(root.path(), &["invoke", target, READ, "--describe"]));
+        assert_shared_name_refused(&answer);
+    }
+    let answer = envelope(&run(
+        root.path(),
+        &[
+            "approvals",
+            "policy-status",
+            "--connector",
+            "jira",
+            "--instance",
+            "main",
+        ],
+    ));
+    assert_shared_name_refused(&answer);
+    let by_default = configured(
+        &format!(
+            "default_instance='jira/main'\n{}",
+            legacy_beside_instance_body()
+        ),
+        &[("main", "jira-legacy"), ("jira-main", "jira-main")],
+    );
+    let answer = envelope(&run(by_default.path(), &["approvals", "policy-status"]));
+    assert_shared_name_refused(&answer);
 }
 
 /// story:connectors-do-short-invocation, D2: `Failure.instances` lists every

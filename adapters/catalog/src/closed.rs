@@ -27,6 +27,11 @@ fn path(key: &str) -> Option<Path> {
     }
 }
 
+/// Whether a pointer segment is an array index: digits only.
+fn index(segment: &str) -> bool {
+    !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit())
+}
+
 /// Whether `inner` lies strictly inside `outer`.
 fn inside(inner: &[String], outer: &[String]) -> bool {
     inner.len() > outer.len() && inner.starts_with(outer)
@@ -88,6 +93,8 @@ pub(crate) struct Closed {
     fixed: Vec<(Path, Value)>,
     enums: BTreeMap<Path, Vec<String>>,
     any_of: Vec<Path>,
+    /// Whether a `null` any-of member counts as the one change.
+    null_clears: bool,
     prefixes: Vec<(Path, String)>,
     /// The admitted keys a guard reads, at or above the path it reads: required.
     guarded: BTreeSet<Path>,
@@ -111,6 +118,18 @@ impl Closed {
                         .iter()
                         .all(|p| !paths.iter().any(|other| inside(p, other)))
             });
+            // A closed body is objects only: a segment of digits would name a
+            // list's element, and is sent as an object's key.
+            if let Some(key) = paths
+                .iter()
+                .flat_map(|paths| paths.iter())
+                .zip(&selection.body_keys)
+                .find_map(|(p, key)| p.iter().any(|s| index(s)).then_some(key))
+            {
+                return refused(&format!(
+                    "declares body_keys `{key}`, whose segment of digits would name a list element; a closed body names object keys only"
+                ));
+            }
             if selection.effect != crate::Effect::Write || !request_body || !valid {
                 return refused(
                     "declares body_keys that do not close a write's body with distinct plain names or pointers, none inside another",
@@ -278,6 +297,12 @@ impl Closed {
                 }
             }
         }
+        if selection.body_null_clears {
+            if selection.body_any_of.is_empty() {
+                return refused("declares body_null_clears without body_any_of");
+            }
+            closed.null_clears = true;
+        }
         if !selection.body_any_of.is_empty() {
             let mut seen = BTreeSet::new();
             let paths: Option<Vec<Path>> = selection
@@ -306,6 +331,11 @@ impl Closed {
                 Some(path)
                     if string(&path) && !fixed_names.contains(&path) && !prefix.is_empty() =>
                 {
+                    if closed.enums.contains_key(&path) {
+                        return Err(refuse(format!(
+                            "selection `{id}` names body_enums and body_prefixes key `{name}`; the prefix would send a value outside the set"
+                        )));
+                    }
                     if closed.prefixes.iter().any(|(seen, _)| *seen == path) {
                         return Err(refuse(format!(
                             "selection `{id}` repeats body_prefixes key `{name}`"
@@ -388,11 +418,21 @@ impl Closed {
         Ok(())
     }
 
+    /// Whether an any-of member is absent: missing, or `null` unless the
+    /// selection declares that `null` clears.
+    fn absent(&self, value: Option<&Value>) -> bool {
+        value.is_none_or(|value| value.is_null() && !self.null_clears)
+    }
+
     /// Hold a caller's body to the closed shape and every rule of its keys,
     /// before anything is sent.
     pub(crate) fn check(&self, body: &Value) -> Result<()> {
         self.shape(body, &mut Vec::new())?;
-        if let Some(path) = self.required.iter().find(|path| at(body, path).is_none()) {
+        if let Some(path) = self
+            .required
+            .iter()
+            .find(|path| at(body, path).is_none_or(Value::is_null))
+        {
             return Err(refuse(format!(
                 "body lacks the required key `{}`",
                 self.name(path)
@@ -426,11 +466,16 @@ impl Closed {
                 self.name(path)
             )));
         }
-        if !self.any_of.is_empty() && self.any_of.iter().all(|path| at(body, path).is_none()) {
+        if !self.any_of.is_empty() && self.any_of.iter().all(|path| self.absent(at(body, path))) {
             let names: Vec<&str> = self.any_of.iter().map(|path| self.name(path)).collect();
             return Err(refuse(format!(
-                "body carries none of `{}`, one of which its selection requires",
-                names.join("`, `")
+                "body has none of `{}` {}, one of which its selection requires",
+                names.join("`, `"),
+                if self.null_clears {
+                    "present"
+                } else {
+                    "set to a value (each is absent or null)"
+                }
             )));
         }
         Ok(())
@@ -477,10 +522,17 @@ impl Closed {
             };
             properties.insert(segment.clone(), schema);
         }
+        let any_of_parents: Vec<&[String]> = self
+            .any_of
+            .first()
+            .map(|first| (1..first.len()).map(|n| &first[..n]).collect())
+            .unwrap_or_default();
         let required: BTreeSet<&str> = self
             .required
             .iter()
             .chain(&self.guarded)
+            .map(Vec::as_slice)
+            .chain(any_of_parents)
             .filter(|path| inside(path, at))
             .map(|path| path[at.len()].as_str())
             .collect();
@@ -500,7 +552,17 @@ impl Closed {
             object["anyOf"] = self
                 .any_of
                 .iter()
-                .map(|path| json!({"required": [path[at.len()]]}))
+                .map(|path| {
+                    let segment = &path[at.len()];
+                    if self.null_clears {
+                        json!({"required": [segment]})
+                    } else {
+                        json!({
+                            "required": [segment],
+                            "properties": {segment: {"not": {"type": "null"}}}
+                        })
+                    }
+                })
                 .collect();
         }
         object
@@ -521,6 +583,8 @@ impl Closed {
             schema
         } else if self.scalars.contains(key) {
             declared_type(None)
+        } else if self.required.contains(key) {
+            json!({"not": {"type": "null"}})
         } else {
             json!({})
         }

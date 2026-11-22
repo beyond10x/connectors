@@ -428,3 +428,76 @@ fn a_refused_dispatch_cancels_the_reuse_use() {
         .unwrap();
     assert_eq!(open, 0);
 }
+
+/// CR-004: the concurrent read-use bound counts uses still open, not those
+/// already released inside their deadline window. The bound is lowered to
+/// `BOUND` for the case (a thousand full read cycles cost minutes); the
+/// refusal and the count are the production ones.
+const BOUND: i64 = 3;
+
+fn with_bound<R>(body: impl FnOnce() -> R) -> R {
+    use super::use_and_retirement::TEST_READ_USE_BOUND;
+    TEST_READ_USE_BOUND.with(|bound| bound.set(Some(BOUND)));
+    let result = body();
+    TEST_READ_USE_BOUND.with(|bound| bound.set(None));
+    result
+}
+
+fn capture_reuse_of(registry: &Registry, reference: &str, revision: &str) -> Result<ReuseSource> {
+    registry.capture_reuse(
+        SOURCE,
+        ADAPTER,
+        "config-1",
+        &target(),
+        reference,
+        revision,
+        NOW + 1,
+        NOW + 10_000,
+    )
+}
+
+fn capture_open_read(registry: &Registry, reference: &str) -> Result<ReadUse> {
+    registry.capture_read(
+        &source(),
+        reference,
+        &BTreeSet::new(),
+        NOW + 1,
+        NOW + 10_000,
+    )
+}
+
+#[test]
+fn released_read_uses_inside_one_window_do_not_fill_the_concurrent_bound() {
+    with_bound(|| {
+        let (_root, registry) = fixture();
+        let (reference, revision) = connected(&registry, &source(), "one");
+        for _ in 0..=BOUND {
+            let captured = capture_open_read(&registry, &reference).unwrap();
+            let dispatched = registry.dispatch_read(captured, NOW + 1).unwrap();
+            registry.release_read(dispatched, NOW + 1).unwrap();
+        }
+        capture_open_read(&registry, &reference).unwrap();
+        capture_reuse_of(&registry, &reference, &revision).unwrap();
+        registry
+            .capture_revalidation(&source(), &reference, &revision, NOW + 1, NOW + 10_000)
+            .unwrap();
+    });
+}
+
+#[test]
+fn a_bound_of_open_read_uses_still_refuses_the_next_capture_as_capacity() {
+    with_bound(|| {
+        let (_root, registry) = fixture();
+        let (reference, revision) = connected(&registry, &source(), "one");
+        for _ in 0..BOUND {
+            capture_open_read(&registry, &reference).unwrap();
+        }
+        let read = capture_open_read(&registry, &reference);
+        assert_eq!(read.err(), Some(Failure::Capacity));
+        let reuse = capture_reuse_of(&registry, &reference, &revision);
+        assert_eq!(reuse.err(), Some(Failure::Capacity));
+        let revalidation =
+            registry.capture_revalidation(&source(), &reference, &revision, NOW + 1, NOW + 10_000);
+        assert_eq!(revalidation.err(), Some(Failure::Capacity));
+    });
+}

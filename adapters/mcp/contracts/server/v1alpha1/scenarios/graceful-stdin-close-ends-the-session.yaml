@@ -103,8 +103,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.sessions.StateConflict
-    fields:
-      state: Closing
   no_events:
   - connectors.sessions.DataPermitted
 # Teardown completes inside the deadline the close itself recorded, and records released on

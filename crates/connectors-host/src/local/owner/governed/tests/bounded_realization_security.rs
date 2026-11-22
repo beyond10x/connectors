@@ -4,10 +4,9 @@
 //! that admits the read again before any provider process starts. An
 //! `implemented` realization is served only for the `resource` profile over
 //! self-contained input and output schemas, a `generic` one only for the
-//! generic HTTP profiles; every other declaration is `unsupported`, recorded
-//! as an early refusal that claims no attempt, and never dispatched. The
-//! generic arm's schema rule is not asserted here: the owner keeps that arm as
-//! it was.
+//! generic HTTP profiles, likewise over self-contained schemas; every other
+//! declaration is `unsupported`, recorded as an early refusal that claims no
+//! attempt, and never dispatched.
 #![cfg(unix)]
 use super::*;
 use crate::local::owner::supervisor::{Pool, Task};
@@ -201,6 +200,18 @@ fn bounded_owner_serves_exactly_the_realizations_the_projection_serves() {
             inline.clone(),
         ));
     }
+    for profile in ["generic-http", "generic-http-page"] {
+        for (keyword, schema) in relocated() {
+            cases.push((
+                Some("generic"),
+                profile,
+                keyword,
+                schema.clone(),
+                inline.clone(),
+            ));
+            cases.push((Some("generic"), profile, keyword, inline.clone(), schema));
+        }
+    }
     for profile in ["resource", "generic-http"] {
         cases.push((None, profile, "inline", inline.clone(), inline.clone()));
     }
@@ -258,7 +269,7 @@ fn bounded_owner_serves_exactly_the_realizations_the_projection_serves() {
         );
     }
     // Served: implemented `resource` inline, generic on both generic profiles.
-    assert_eq!((served, refused), (3, 20));
+    assert_eq!((served, refused), (3, 40));
 }
 
 /// The serialized worker admits a bounded read again before it starts any

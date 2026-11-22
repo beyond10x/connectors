@@ -45,10 +45,7 @@ fn owner_root() -> tempfile::TempDir {
 struct OwnerProcess(Child);
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
-        if self.0.try_wait().ok().flatten().is_none() {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
+        owner_start::reap::child(&mut self.0);
     }
 }
 impl OwnerProcess {

@@ -31,7 +31,7 @@ struct Shipped {
     selection: &'static str,
 }
 
-const SHIPPED: [Shipped; 15] = [
+const SHIPPED: [Shipped; 16] = [
     Shipped {
         name: "confluence",
         catalog: "confluence",
@@ -66,6 +66,11 @@ const SHIPPED: [Shipped; 15] = [
         name: "google-slides",
         catalog: "google-slides",
         selection: "google-slides/operations.json",
+    },
+    Shipped {
+        name: "grafana",
+        catalog: "grafana",
+        selection: "grafana/operations.json",
     },
     Shipped {
         name: "hubspot",
@@ -250,8 +255,9 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
 }
 
 /// The selections with no committed connector declaration: Slack's user
-/// selection shares the catalog directory whose one declaration is the bot's.
-const UNDECLARED: [&str; 2] = ["openrouter", "slack-user"];
+/// selection shares the catalog directory whose one declaration is the bot's,
+/// and Grafana's connector name is the native `connectors-grafana` connector's.
+const UNDECLARED: [&str; 3] = ["grafana", "openrouter", "slack-user"];
 
 fn round_trip(name: &str) {
     let temp = tempfile::tempdir().unwrap();
@@ -371,6 +377,7 @@ connectors! {
     google_drive_round_trips, google_drive_is_committed => "google-drive";
     google_gmail_round_trips, google_gmail_is_committed => "google-gmail";
     google_slides_round_trips, google_slides_is_committed => "google-slides";
+    grafana_round_trips, grafana_is_committed => "grafana";
     hubspot_round_trips, hubspot_is_committed => "hubspot";
     jira_round_trips, jira_is_committed => "jira";
     openrouter_round_trips, openrouter_is_committed => "openrouter";
@@ -557,4 +564,52 @@ fn a_grant_connector_is_refused_by_name() {
 fn an_import_accepts_the_name_its_selection_derives() {
     let temp = tempfile::tempdir().unwrap();
     imported(temp.path(), "jira");
+}
+
+/// A shared auth file keeps the profiles an import does not ship: the import
+/// merges into it, the shipped profiles winning.
+#[test]
+fn an_import_keeps_the_hand_written_profiles_of_a_shared_auth_file() {
+    let temp = tempfile::tempdir().unwrap();
+    let (root, _) = imported(temp.path(), "jira");
+    let file = root.join("auth/atlassian.yaml");
+    let shipped_text = std::fs::read_to_string(&file).unwrap();
+    let hand_written = "  atlassian.oauth:\n    scheme: basic\n    label: Hand written\n";
+    let rewritten = "  atlassian.oauth: {scheme: basic, label: Hand written}\n";
+    let stale = shipped_text.replace("label: API token", "label: Edited by hand");
+    assert_ne!(stale, shipped_text);
+    std::fs::write(&file, format!("{stale}{hand_written}")).unwrap();
+    let again = import::import(&import::Request {
+        connectors: &repository(),
+        catalog: "jira",
+        selection: None,
+        definitions: &root,
+        name: None,
+    })
+    .unwrap();
+    assert!(again.written.contains(&file));
+    let merged = std::fs::read_to_string(&file).unwrap();
+    assert_eq!(merged, format!("{shipped_text}{rewritten}"));
+}
+
+/// A shared auth file that is not a library is not overwritten.
+#[test]
+fn an_import_refuses_a_shared_auth_file_it_cannot_read() {
+    let temp = tempfile::tempdir().unwrap();
+    let (root, _) = imported(temp.path(), "jira");
+    let file = root.join("auth/atlassian.yaml");
+    std::fs::write(&file, "profiles: [not, a, mapping]\n").unwrap();
+    let failure = import::import(&import::Request {
+        connectors: &repository(),
+        catalog: "jira",
+        selection: None,
+        definitions: &root,
+        name: None,
+    })
+    .unwrap_err();
+    assert!(failure.to_string().contains("atlassian.yaml"), "{failure}");
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        "profiles: [not, a, mapping]\n"
+    );
 }

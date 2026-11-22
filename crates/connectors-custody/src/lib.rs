@@ -150,7 +150,7 @@ pub enum Purpose {
 }
 
 impl Purpose {
-    fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::Credential => "credential",
             Self::ApprovalSigning => "approval-signing",

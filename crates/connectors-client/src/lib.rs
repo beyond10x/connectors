@@ -398,14 +398,19 @@ fn extended(code: ErrorCode) -> v1alpha2::ErrorCode {
 }
 
 pub async fn bounded(response: reqwest::Response) -> Result<Vec<u8>> {
-    if response
+    if let Some(length) = response
         .content_length()
-        .is_some_and(|n| n > RESPONSE_LIMIT as u64)
+        .filter(|n| *n > RESPONSE_LIMIT as u64)
     {
-        return Err(Error::new(
-            ErrorCode::Capacity,
-            "response exceeds byte limit",
-        ));
+        // Refused before any of it is read; the size the answer declared is
+        // the reason, for a caller that wants to know how far over it was.
+        return Err(
+            Error::new(ErrorCode::Capacity, "response exceeds byte limit").with_upstream_reason(
+                Some(format!(
+                    "response of {length} bytes exceeds the limit of {RESPONSE_LIMIT} bytes"
+                )),
+            ),
+        );
     }
     let mut bytes = Vec::new();
     let mut stream = response.bytes_stream();

@@ -1,8 +1,8 @@
 ---
 title: HubSpot
 sidebar_position: 10
-description: Read HubSpot CRM records of any object type with a private-app token.
-lede: One HubSpot instance per account lists and reads CRM records of every object type the account has, with a private-app token.
+description: Read HubSpot CRM records of any object type, and their owners, with a private-app token.
+lede: One HubSpot instance per account lists and reads CRM records of every object type the account has, and the owners those records name, with a private-app token.
 source: docs/catalog-hubspot.md, adapters/catalog/providers/hubspot/connector.json, adapters/catalog/providers/hubspot/operations.json, adapters/catalog/tests/hubspot.rs
 connectors: "hubspot"
 ---
@@ -10,28 +10,33 @@ connectors: "hubspot"
 # HubSpot
 
 The `hubspot` connector of the provider HubSpot is served by the catalog provider from the pinned
-HubSpot CRM Objects `2026-09` document. The words connector, instance, connection and operation
-are those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+HubSpot CRM Objects `2026-09` document and the two owner reads of the pinned Crm Owners `2026-09`
+document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full HubSpot guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-hubspot.md)
 has every parameter and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a HubSpot account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
 | Reads | Writes |
 |---|---|
-| `objects.list`, `object.get` | none |
+| `objects.list`, `object.get`, `owners.list`, `owner.get` | none |
 
-`objectType` is `contacts`, `companies`, `deals`, `tickets` or any other type the account has.
+`objectType` is `contacts`, `companies`, `deals`, `line_items`, `tickets` or any other type the
+account has. A record names its owner in the `hubspot_owner_id` property (ask for it in
+`properties`); `owner.get` with that value as `ownerId` answers the owner's name, email and teams.
+A deactivated owner, common on old deals, is an archived owner: read it with `"archived": true`,
+which HubSpot's document describes as returning only archived owners. `owners.list` takes the same
+parameter.
 
 ## Prerequisites at the provider
 
-Create a private app in the HubSpot account's settings and grant it the read scopes of the object
-types you read (`crm.objects.contacts.read`, `crm.objects.companies.read`,
-`crm.objects.deals.read`, and so on). Keep its access token. The token belongs to the account, not
+Create a private app in the HubSpot account's settings and grant it the read scopes of what you
+read. For deals, companies, line items and owners that is `crm.objects.deals.read`,
+`crm.objects.companies.read`, `crm.objects.line_items.read` and `crm.objects.owners.read`; no
+contacts scope is needed. Add the matching `read` scope of any other object type you read, and
+no `write` scope. Keep its access token. The token belongs to the account, not
 a user, and connecting does not check its scopes: a missing scope shows on the read that needs
 it.
 
@@ -46,14 +51,6 @@ enabled = true
 [connectors.hubspot.instances.work]
 ```
 
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}
-```
-
 ## Connect
 
 Put `{"token": "<private app access token>"}` in an owner-only file, then:
@@ -63,6 +60,22 @@ connectors connections connect --connector hubspot --instance work \
   --profile hubspot.private-app --credential-file ~/private/hubspot.json
 ```
 
+A token kept in a secret manager can come from an environment variable instead.
+`--credential-env` names the variable; it holds the bare token, and the value never appears on the
+command line or in any output. With 1Password, `op run` sets the variable for this one command
+only (`hubspot.env` holds `HUBSPOT_TOKEN=op://<vault>/<item>/<field>`):
+
+```sh
+op run --env-file hubspot.env -- connectors connections connect hubspot/work \
+  --profile hubspot.private-app --credential-env HUBSPOT_TOKEN
+```
+
+An unset, empty or oversized variable is refused naming the variable, never its value. The
+name is upper case letters, digits and underscores (`HUBSPOT_TOKEN`); any other word given there
+is refused without being repeated, so a token pasted in its place is not echoed, and the refusal
+says what a name is. A bare value may end in one line break, which is dropped.
+`--credential-env` stands beside no other credential input.
+
 ## A first read
 
 ```sh
@@ -70,7 +83,14 @@ connectors invoke hubspot/work objects.list \
   --input-json '{"objectType":"contacts","limit":50}'
 ```
 
-Send `paging.next.after` as `after` until a page has no `paging.next`.
+Send `paging.next.after` as `after` until a page has no `paging.next`. To read a deal with its
+amount and owner, then the owner:
+
+```sh
+connectors invoke hubspot/work objects.list \
+  --input-json '{"objectType":"deals","limit":10,"properties":"dealname,amount,hubspot_owner_id"}'
+connectors invoke hubspot/work owner.get --input-json '{"ownerId":"<hubspot_owner_id>"}'
+```
 
 ## A first guarded write
 
@@ -79,20 +99,13 @@ The connector has no write, so nothing here needs an approval.
 ## Reconnect when the connection is Stale
 
 A token HubSpot refuses (the private app's token was rotated or deleted) makes the connection
-`stale`, and an invoke answers `next_action: repair_connection`. Publish the new token on the
-same connection:
-
-```sh
-connectors --output json connections list --connector hubspot --instance work \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector hubspot --instance work \
-  --expected-revision "<revision from the list>" --credential-file ~/private/hubspot.json
-```
+`stale`. Publish the new token on the
+same connection. [Reconnect](../guides/reconnect-a-connection.md) `hubspot/work` with `--credential-file ~/private/hubspot.json`.
 
 ## Limits
 
 - Verified against a local HTTPS fixture only (`adapters/catalog/tests/hubspot.rs`); no live
   HubSpot account has been read.
-- No time filter: `objects.list` walks every record of a type. Search and batch read are POST
+- No time filter: `objects.list` and `owners.list` walk every record. Search and batch read are POST
   operations, which the catalog provider does not serve as reads yet.
 - Only private-app tokens; OAuth app installs are not offered.

@@ -11,14 +11,11 @@ connectors: "confluence, confluence-v1"
 
 The provider Atlassian's Confluence Cloud is two connectors served by the catalog provider:
 `confluence` reads through REST v2, and `confluence-v1` reads through REST v1 for a token whose
-scopes v2 does not accept. The words connector, instance, connection and operation are those of
-the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+scopes v2 does not accept. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Confluence guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-confluence.md)
 has every parameter and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs an Atlassian account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -49,14 +46,6 @@ enabled = true
 
 [connectors.confluence.instances.work]
 endpoint = "https://your-domain.atlassian.net/wiki"
-```
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}
 ```
 
 For REST v1, enable `confluence-v1` the same way, with
@@ -98,14 +87,7 @@ for the site:
 {"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"repair_connection","service_code":"unauthorized","service_reason":"Unauthorized; scope does not match","stage":"dispatch"}},"ok":false}
 ```
 
-Reconnect with a token that carries the v2 scopes, or move the reads to `confluence-v1`:
-
-```sh
-connectors --output json connections list --connector confluence --instance work \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector confluence --instance work \
-  --expected-revision "<revision from the list>" --credential-file ~/private/atlassian.json
-```
+Reconnect with a token that carries the v2 scopes, or move the reads to `confluence-v1`. [Reconnect](../guides/reconnect-a-connection.md) `confluence/work` with `--credential-file ~/private/atlassian.json`.
 
 A pinned instance can instead carry both APIs and bind the one the token reaches each time it
 validates; the guide's

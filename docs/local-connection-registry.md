@@ -107,7 +107,7 @@ a derived entry takes it from the installed provider. The binding records it
 | bundle, source or selection only | not stale and `ready`; reads, reconnect and approvals admit it under the new revision, with no credential source and no question; its next revalidation records the new revision |
 | provider executable only | not stale and `ready`; it follows once a validation under the new executable answers the recorded identity, which a read runs itself when the description is cached; another identity is refused as `identity_mismatch` and changes nothing |
 | CA file, token CA, admitted hosts or request prefix | `pending` with `stale` set; reads, reconnect and approvals refuse it until `connections revalidate` |
-| provider authority or profile authentication | `lifecycle_conflict`, as below |
+| provider authority or profile authentication | `authentication_changed`, as below |
 
 The rest of this section is the rule for a change of the credential side, and
 for a connection whose binding records no credential side: one saved before
@@ -144,7 +144,7 @@ instance to the configured revision in the same metadata commit. Reads are then
 admitted under the new binding and refused under the old one.
 
 A changed provider authority or profile authentication refuses before provider
-work as `lifecycle_conflict` with `next_action = check_configuration`, from
+work as `authentication_changed` with `next_action = check_configuration`, from
 revalidate, reconnect, a read and a new connect under the same instance id alike:
 only a new instance id helps. An invoked definition file takes one itself: its moved instance
 (`definitions::moved`; [CLI semantics](../contracts/cli/v1alpha1/semantics.md), "Invoking a
@@ -217,8 +217,10 @@ Acknowledged deletion clears byte-size metadata but retains identity/fence histo
 An unknown response retains the cleanup obligation for guarded reconciliation.
 
 The initial bounds are 1,000 connections per instance, 10,000 total connections,
-100,000 acquisition histories, eight retained material versions per connection,
-1,000 concurrent read-use records and 10,000 live cursors. Exhaustion refuses;
+100,000 acquisition histories, 64 retained material versions per connection (one bound
+for connect, reconnect and refresh),
+1,000 concurrent read-use records (those not yet released; a released use holds no
+capacity) and 10,000 live cursors. Exhaustion refuses;
 it does not evict authority or pretend an incomplete list is complete. Pages accept
 1–500 members, bind instance/configuration/limit/epoch, and expire at the
 original five-minute deadline. Publication, revoke and known invalidity invalidate

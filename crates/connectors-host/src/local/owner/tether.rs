@@ -320,10 +320,11 @@ mod tests {
     #[test]
     fn an_ended_parent_is_lost() {
         let (_root, state, directory, socket) = fixture();
-        let mut child = std::process::Command::new("/bin/sh")
-            .args(["-c", "exec sleep 30"])
-            .spawn()
-            .unwrap();
+        let mut child =
+            crate::local::parent_death::bind(&mut std::process::Command::new("/bin/sh"))
+                .args(["-c", "exec sleep 30"])
+                .spawn()
+                .unwrap();
         let mut tether = Tether::new(&directory, &state, &socket).unwrap();
         tether.parent = Some(Parent::open(child.id() as libc::pid_t));
         assert_eq!(tether.lost_now(), None);

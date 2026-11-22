@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T20:18:47Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-validates-enum-and-date-time",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-enum-date-adversary-1",
+    "reference": "F1 $ref enums: inventory follows local #/components/schemas refs (items and deepObject too, bounded hops); confluence and openrouter bundles regenerated; enum_date_time_adversary confluence case passes (43a027263c)",
+    "review": "review-result:wave-b-enum-date-adversary-1",
+    "outcome": "fixed"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "format": "connectors-source-amendments/1",
+  "source_sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
+  "amendments": [
+    {
+      "operation_id": "get-/crm/owners/2026-09_/crm/owners/v3",
+      "add_operation": {
+        "method": "get",
+        "path": "/crm/owners/2026-09",
+        "parameters": [
+          {"name": "after", "location": "query", "required": false, "type": "string"},
+          {"name": "archived", "location": "query", "required": false, "type": "boolean"},
+          {"name": "email", "location": "query", "required": false, "type": "string"},
+          {"name": "limit", "location": "query", "required": false, "type": "integer"}
+        ]
+      },
+      "cite": "https://raw.githubusercontent.com/HubSpot/HubSpot-public-api-spec-collection/55d9bcaaf1c208516f11a33aa43fb6bba7aac823/PublicApiSpecs/CRM/Crm%20Owners/Rollouts/146888/2026-09/crmOwners.json",
+      "reason": "HubSpot publishes the owners list in its Crm Owners 2026-09 document, a separate file from the pinned CRM Objects document, and a bundle has one source; the operation is added here exactly as that document declares it (operationId, path and its four query parameters), vendored beside this file as crm-owners-2026-09.json with its digest, and adapters/catalog/tests/hubspot.rs holds this entry equal to that document."
+    },
+    {
+      "operation_id": "get-/crm/owners/2026-09/{ownerId}_getById",
+      "add_operation": {
+        "method": "get",
+        "path": "/crm/owners/2026-09/{ownerId}",
+        "parameters": [
+          {"name": "ownerId", "location": "path", "required": true, "type": "integer"},
+          {"name": "archived", "location": "query", "required": false, "type": "boolean"},
+          {"name": "idProperty", "location": "query", "required": false, "type": "string", "enum": ["id", "userId"]}
+        ]
+      },
+      "cite": "https://raw.githubusercontent.com/HubSpot/HubSpot-public-api-spec-collection/55d9bcaaf1c208516f11a33aa43fb6bba7aac823/PublicApiSpecs/CRM/Crm%20Owners/Rollouts/146888/2026-09/crmOwners.json",
+      "reason": "HubSpot publishes the owner read by id in its Crm Owners 2026-09 document, a separate file from the pinned CRM Objects document, and a bundle has one source; the operation is added here exactly as that document declares it (operationId, path, the ownerId path parameter and its two query parameters), vendored beside this file as crm-owners-2026-09.json with its digest, and adapters/catalog/tests/hubspot.rs holds this entry equal to that document."
+    }
+  ]
+}

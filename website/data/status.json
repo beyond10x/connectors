@@ -193,7 +193,7 @@
     },
     {
       "area": "Local runtime",
-      "detail": "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+      "detail": "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). The macOS and Windows builds of the server compile and their lease clocks have unit tests in the macOS and Windows CI jobs, which also run a serving scenario against each platform's own credential store; that scenario has passed on Linux only so far, so serving on macOS and Windows is not yet shown.",
       "href": "/docs/connectors/mcp",
       "label": "Local MCP server for Claude Code",
       "status": "shipped"
@@ -284,7 +284,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "One object type's records, paged, and one record by id; exercised against local fixtures only.",
+      "detail": "One object type's records, paged, one record by id, and the account's owners, paged or by id; exercised against local fixtures only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "HubSpot CRM",
       "status": "shipped"
@@ -350,6 +350,20 @@
       "detail": "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Opsgenie alerts and incidents",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "alert_rules.list, annotations.list over an epoch-millisecond window, dashboards.search paged by page and limit, dashboard.get and datasources.list from Grafana's pinned OpenAPI 3 document, read only, with a service-account token as Authorization: Bearer, from its definition file on a served instance or pinned; verified against a local fixture only (*unreleased*).",
+      "href": "/docs/connectors/grafana",
+      "label": "Grafana alert rules, annotations, dashboards and data sources",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "prometheus.query, prometheus.query_range and loki.query_range through Grafana's data-source proxy with the Grafana service-account token, each proxy sub-path a cited amendment to the pinned document; Loki's limit held to 1 to 5000, an answer over the 4 MiB limit refused as capacity, and on a served instance a uid outside catalog.allowed_values refused as forbidden before any request; verified against a local fixture only (*unreleased*).",
+      "href": "/docs/connectors/grafana",
+      "label": "Prometheus and Loki through Grafana's data-source proxy",
       "status": "shipped"
     },
     {
@@ -515,7 +529,7 @@
     },
     {
       "area": "Native adapters",
-      "detail": "Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+      "detail": "Alertmanager has a design or typed model and no runtime; the native Grafana adapter's dashboard reads, datasource discovery and mediated route are specified and not built (dashboards are read through the catalog provider).",
       "href": "/docs/reference/adapters",
       "label": "Specification-only adapters",
       "status": "decided"

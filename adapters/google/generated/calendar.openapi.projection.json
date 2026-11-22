@@ -103,7 +103,7 @@
     "calendar.settings.list",
     "calendar.settings.watch"
   ],
-  "projector": "discovery-openapi/1",
+  "projector": "discovery-openapi/2",
   "rewritten_paths": [],
   "source_bytes": 169809,
   "source_sha256": "ae11869097c421ddd12e16b6cd4710ed7500379bbf669957b7014efb5b3a2698"

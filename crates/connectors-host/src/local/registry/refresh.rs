@@ -44,12 +44,12 @@ thread_local! {
 }
 
 #[cfg(not(test))]
-fn retained_bound() -> i64 {
+pub(super) fn retained_bound() -> i64 {
     RETAINED
 }
 
 #[cfg(test)]
-fn retained_bound() -> i64 {
+pub(super) fn retained_bound() -> i64 {
     RETAINED_BOUND.with(std::cell::Cell::get)
 }
 

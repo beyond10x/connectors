@@ -10,6 +10,9 @@
 //! (`support/standin.rs`), which records the arguments it is started with. This
 //! binary is that stand-in, so it runs without the standard test harness.
 #[cfg(unix)]
+#[path = "support/owner.rs"]
+mod owner_start;
+#[cfg(unix)]
 #[path = "support/standin.rs"]
 mod standin;
 
@@ -65,7 +68,27 @@ mod tests {
                 "no_other_command_takes_an_endpoint",
                 no_other_command_takes_an_endpoint,
             ),
+            (
+                "an_installation_stops_the_owner_run_under_it",
+                an_installation_stops_the_owner_run_under_it,
+            ),
         ]);
+    }
+
+    /// story:tests-stop-the-owners-they-start: an installation stops the owners
+    /// run under its root when it drops, though the test let go of its handle.
+    pub fn an_installation_stops_the_owner_run_under_it() {
+        let installation = Installation::new();
+        installation.configure("");
+        let root = installation.root.path().to_owned();
+        let owner = super::owner_start::spawn(&root.join("bin/connectors"), &root);
+        assert!(!super::owner_start::reap::owners_under(&root).is_empty());
+        std::mem::forget(owner);
+        drop(installation);
+        assert_eq!(
+            super::owner_start::reap::owners_under(&root),
+            Vec::<i32>::new()
+        );
     }
 
     fn with(args: &[&str], more: &[&str]) -> Vec<String> {

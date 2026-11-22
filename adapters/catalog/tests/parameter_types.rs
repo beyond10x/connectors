@@ -206,10 +206,10 @@ async fn strings_take_integers_as_text_and_refuse_other_types() {
         &gitlab,
         "issues.list",
         vec![
-            json!({"id": "org/project", "state": true}),
-            json!({"id": "org/project", "state": 1.5}),
-            json!({"id": "org/project", "state": 3.0}),
-            json!({"id": "org/project", "state": {"a": 1}}),
+            json!({"id": "org/project", "milestone": true}),
+            json!({"id": "org/project", "milestone": 1.5}),
+            json!({"id": "org/project", "milestone": 3.0}),
+            json!({"id": "org/project", "milestone": {"a": 1}}),
         ],
     )
     .await;
@@ -218,8 +218,8 @@ async fn strings_take_integers_as_text_and_refuse_other_types() {
         sent(
             &gitlab,
             "issues.list",
-            json!({"id": "org/project", "state": 3}),
-            "state"
+            json!({"id": "org/project", "milestone": 3}),
+            "milestone"
         )
         .await
         .as_deref(),
@@ -356,4 +356,104 @@ fn declared_page_sizes_do_not_admit_booleans() {
         assert!(connectors_sdk::validate(schema, &json!(7)).is_ok());
         assert!(connectors_sdk::validate(schema, &json!("7")).is_ok());
     }
+}
+
+/// story:catalog-validates-enum-and-date-time: a document that declares an
+/// `enum` or `format: date-time` on a path, a query or a repeated query
+/// parameter is held to it; a parameter that declares neither is not.
+fn declared_engine() -> Engine {
+    use connectors_catalog::{bundle::Bundle, ingest, inventory};
+    let parameters = json!([
+        {"name": "kind", "in": "path", "required": true,
+         "schema": {"type": "string", "enum": ["a", "b"]}},
+        {"name": "level", "in": "query", "schema": {"type": "integer", "enum": [1, 2]}},
+        {"name": "mode", "in": "query", "schema": {"type": "string", "enum": ["x", "y", null], "nullable": true}},
+        {"name": "modes", "in": "query", "schema": {"type": "array", "items": {"type": "string", "enum": ["x", "y"]}}},
+        {"name": "at", "in": "query", "schema": {"type": "string", "format": "date-time"}},
+        {"name": "ats", "in": "query", "schema": {"type": "array", "items": {"type": "string", "format": "date-time"}}},
+        {"name": "day", "in": "query", "schema": {"type": "string", "format": "date"}},
+        {"name": "free", "in": "query", "schema": {"type": "string"}}
+    ]);
+    let bytes = serde_json::to_vec(&json!({
+        "openapi": "3.0.0",
+        "info": {"title": "things", "version": "1"},
+        "paths": {"/v1/things/{kind}": {"get": {
+            "operationId": "getThing",
+            "parameters": parameters,
+            "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
+        }}}
+    }))
+    .unwrap();
+    let source = ingest("things.json", &bytes).unwrap();
+    let document: Value = serde_json::from_slice(&bytes).unwrap();
+    let bundle = Bundle {
+        provider: "things".into(),
+        source,
+        inventory: inventory::extract(&document),
+        auth_profile: "fixture.token".into(),
+    };
+    let selection: Selection = serde_json::from_value(
+        json!({"id": "thing.get", "operation_id": "getThing", "effect": "read"}),
+    )
+    .unwrap();
+    Engine::new(&bundle, "/v1", &[selection]).unwrap()
+}
+
+#[tokio::test]
+async fn declared_enums_and_date_times_refuse_other_values_before_any_request() {
+    let engine = declared_engine();
+    let escaped = refused(
+        &engine,
+        "thing.get",
+        vec![
+            json!({"kind": "c"}),
+            json!({"kind": "A"}),
+            json!({"kind": "a", "level": 3}),
+            json!({"kind": "a", "level": "3"}),
+            json!({"kind": "a", "mode": "z"}),
+            json!({"kind": "a", "modes": ["x", "z"]}),
+            json!({"kind": "a", "modes": "z"}),
+            json!({"kind": "a", "at": "yesterday"}),
+            json!({"kind": "a", "at": "2026-09-01"}),
+            json!({"kind": "a", "ats": ["2026-09-01T00:00:00Z", "soon"]}),
+        ],
+    )
+    .await;
+    assert!(escaped.is_empty(), "accepted or sent: {escaped:?}");
+}
+
+#[tokio::test]
+async fn declared_enums_and_date_times_admit_their_values_and_nothing_else_is_checked() {
+    let engine = declared_engine();
+    for (input, name, value) in [
+        (json!({"kind": "a", "level": 2}), "level", "2"),
+        (json!({"kind": "a", "level": "1"}), "level", "1"),
+        (json!({"kind": "a", "mode": "y"}), "mode", "y"),
+        (json!({"kind": "a", "modes": ["x", "y"]}), "modes", "x"),
+        (
+            json!({"kind": "a", "at": "2026-09-01T00:00:00Z"}),
+            "at",
+            "2026-09-01T00:00:00Z",
+        ),
+        (
+            json!({"kind": "a", "ats": ["2026-09-01T00:00:00+02:00", "2026-09-01t00:00:00.5z"]}),
+            "ats",
+            "2026-09-01T00:00:00+02:00",
+        ),
+        (json!({"kind": "a", "day": "yesterday"}), "day", "yesterday"),
+        (json!({"kind": "b", "free": "anything"}), "free", "anything"),
+    ] {
+        assert_eq!(
+            sent(&engine, "thing.get", input.clone(), name)
+                .await
+                .as_deref(),
+            Some(value),
+            "{input}"
+        );
+    }
+    assert_eq!(
+        sent(&engine, "thing.get", json!({"kind": "a"}), "at").await,
+        None,
+        "an absent optional parameter is neither refused nor sent"
+    );
 }

@@ -337,6 +337,7 @@ impl Tavily {
         answer: &Value,
         requested: Option<&[String]>,
         limit: Option<u32>,
+        crawl_timeout: Option<u64>,
     ) -> Result<Value> {
         let mut pages: Vec<Value> = results(answer)?.iter().filter_map(page).collect();
         let clipped = pages.iter().any(|p| p["content_truncated"] == true);
@@ -357,12 +358,24 @@ impl Tavily {
                     .chain(failed.iter())
                     .any(|p| p["url"].as_str() == Some(u))
             }),
-            // crawl: it stopped before reaching its limit.
+            // crawl: it stopped before reaching its limit and before its `timeout`. Tavily states
+            // no partial flag; an answer whose `response_time` is at or past the `timeout` sent
+            // is taken as cut short.
             (None, Some(limit)) => {
+                let cut_short = match (
+                    answer.get("response_time").and_then(Value::as_f64),
+                    crawl_timeout,
+                ) {
+                    (Some(took), Some(timeout)) => took >= timeout as f64,
+                    _ => false,
+                };
                 if reached >= limit as usize {
                     truncation.push("result_limit");
                 }
-                reached < limit as usize
+                if cut_short {
+                    truncation.push("provider_partial");
+                }
+                reached < limit as usize && !cut_short
             }
             (None, None) => false,
         } && !omitted;
@@ -384,7 +397,7 @@ impl Tavily {
     async fn fetch(&self, input: Fetch) -> Result<Value> {
         let body = json!({"urls": input.urls, "format": "markdown", "extract_depth": "basic"});
         let answer = self.post("extract", &body).await?;
-        self.pages(&answer, Some(&input.urls), None)
+        self.pages(&answer, Some(&input.urls), None, None)
     }
 
     async fn crawl(&self, input: Crawl) -> Result<Value> {
@@ -393,7 +406,8 @@ impl Tavily {
         body.insert("limit".into(), json!(input.limit));
         body.insert("format".into(), json!("markdown"));
         body.insert("extract_depth".into(), json!("basic"));
-        body.insert("timeout".into(), json!(self.crawl_timeout()));
+        let timeout = self.crawl_timeout();
+        body.insert("timeout".into(), json!(timeout));
         for (key, value) in [
             ("max_depth", input.max_depth.map(Value::from)),
             ("max_breadth", input.max_breadth.map(Value::from)),
@@ -407,7 +421,7 @@ impl Tavily {
             }
         }
         let answer = self.post("crawl", &Value::Object(body)).await?;
-        self.pages(&answer, None, Some(input.limit))
+        self.pages(&answer, None, Some(input.limit), Some(timeout))
     }
 }
 

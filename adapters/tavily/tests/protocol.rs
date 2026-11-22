@@ -404,3 +404,73 @@ fn the_protected_entry_is_one_closed_field() {
         );
     }
 }
+
+/// A crawl answered `answer` for a 15 s deadline (a `timeout` of 10 s, the least Tavily accepts) with `limit` 50.
+async fn crawl_answer(answer: Value) -> Value {
+    let (base, _) = server(vec![(200, answer)]).await;
+    tavily(&base)
+        .with_deadline(Instant::now() + Duration::from_secs(15))
+        .invoke(
+            "websearch.crawl",
+            json!({"url": "https://a.example", "limit": 50}),
+        )
+        .await
+        .unwrap()
+}
+
+fn crawl_pages(response_time: f64) -> Value {
+    json!({"base_url": "https://a.example", "response_time": response_time,
+           "results": [{"url": "https://a.example/p", "raw_content": "text"}]})
+}
+
+#[tokio::test]
+async fn a_crawl_that_ran_to_its_timeout_is_partial_and_incomplete() {
+    for response_time in [10.0, 10.4, 40.0] {
+        let out = crawl_answer(crawl_pages(response_time)).await;
+        assert_eq!(out["pages"].as_array().unwrap().len(), 1);
+        assert_eq!(out["complete"], false, "response_time {response_time}");
+        assert_eq!(out["truncation"], json!(["provider_partial"]));
+    }
+}
+
+#[tokio::test]
+async fn a_crawl_that_ended_well_before_its_timeout_with_fewer_pages_is_complete() {
+    let out = crawl_answer(crawl_pages(6.25)).await;
+    assert_eq!(out["complete"], true);
+    assert_eq!(out["truncation"], json!([]));
+    // No response_time to judge by: the answer is taken as it stands.
+    let out = crawl_answer(json!({"base_url": "https://a.example", "results": []})).await;
+    assert_eq!(out["complete"], true);
+}
+
+/// Tavily's recorded answer (request id replaced) to a crawl of a large site asked to end at 10 s:
+/// 200, no pages, `response_time` 8.0, no `usage`. Only its shape is pinned; whether Tavily
+/// finished or stopped is not known, so nothing is asserted about `complete`.
+#[tokio::test]
+async fn the_recorded_answer_to_a_crawl_with_a_10_s_timeout_has_the_shape_the_adapter_reads() {
+    let recorded: Value =
+        serde_json::from_str(include_str!("fixtures/crawl-timeout-10-no-pages.json")).unwrap();
+    let mut fields: Vec<&str> = recorded
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    fields.sort();
+    assert_eq!(
+        fields,
+        ["base_url", "request_id", "response_time", "results"]
+    );
+    assert_eq!(recorded["response_time"], 8.0);
+    let (base, seen) = server(vec![(200, recorded)]).await;
+    let out = tavily(&base)
+        .with_deadline(Instant::now() + Duration::from_secs(15))
+        .invoke(
+            "websearch.crawl",
+            json!({"url": "https://en.wikipedia.org", "limit": 100}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(seen.lock().unwrap()[0].body["timeout"], 10);
+    assert_eq!(out["pages"], json!([]));
+}

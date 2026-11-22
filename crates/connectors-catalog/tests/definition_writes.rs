@@ -510,6 +510,43 @@ fn a_body_any_of_under_two_parents_is_refused() {
 }
 
 #[test]
+fn a_body_null_clears_without_a_body_any_of_is_refused() {
+    let root = zendesk_root();
+    let text = ZENDESK.replace(
+        "    body_any_of: [/ticket/group_id, /ticket/tags, /ticket/priority, /ticket/type]\n",
+        "    body_null_clears: true\n",
+    );
+    match lower("zendesk", &text, root.path()).refusal() {
+        Refusal::BodyNullClears { key, detail } => {
+            assert_eq!(key, "ticket.update");
+            assert_eq!(detail, "is given without a body_any_of");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn a_body_null_clears_of_false_is_refused_by_name() {
+    let root = zendesk_root();
+    let text = ZENDESK.replace(
+        "    conflict_status: 409\n    guard:\n      before: {read: ticket.show",
+        "    body_null_clears: false\n    conflict_status: 409\n    guard:\n      before: {read: ticket.show",
+    );
+    match lower("zendesk", &text, root.path()).refusal() {
+        Refusal::BodyNullClears { key, detail } => {
+            assert_eq!(key, "ticket.update");
+            assert_eq!(detail, "is `false`; omit it instead");
+            assert!(
+                Refusal::BodyNullClears { key, detail }
+                    .to_string()
+                    .contains("body_null_clears is `false`; omit it instead"),
+            );
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
 fn a_body_enum_on_a_key_that_is_not_a_string_is_refused() {
     let root = zendesk_root();
     let text = ZENDESK.replace(
@@ -590,6 +627,40 @@ fn a_mismatch_outside_the_vocabulary_is_refused_as_malformed() {
     let text = ZENDESK.replacen("mismatch: conflict}", "mismatch: forbidden}", 1);
     match lower("zendesk", &text, root.path()).refusal() {
         Refusal::Malformed(detail) => assert!(detail.contains("forbidden"), "{detail}"),
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn a_body_key_with_an_array_index_segment_is_refused() {
+    let root = zendesk_root();
+    let text = ZENDESK
+        .replace("/ticket/tags: string_list", "/ticket/tags/0: string")
+        .replace(
+            "body_any_of: [/ticket/group_id, /ticket/tags, ",
+            "body_any_of: [/ticket/group_id, /ticket/tags/0, ",
+        );
+    match lower("zendesk", &text, root.path()).refusal() {
+        Refusal::BodyType { key, field, .. } => {
+            assert_eq!(key, "ticket.update");
+            assert_eq!(field, "/ticket/tags/0");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn a_body_enum_and_a_body_prefix_on_one_key_are_refused() {
+    let root = zendesk_root();
+    let text = ZENDESK.replace(
+        "    body_enums: {/ticket/priority:",
+        "    body_prefixes: {/ticket/priority: X}\n    body_enums: {/ticket/priority:",
+    );
+    match lower("zendesk", &text, root.path()).refusal() {
+        Refusal::BodyPrefix { key, field } => {
+            assert_eq!(key, "ticket.update");
+            assert_eq!(field, "/ticket/priority");
+        }
         other => panic!("refused as {other:?}"),
     }
 }

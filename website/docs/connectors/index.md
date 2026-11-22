@@ -20,11 +20,11 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Confluence](./confluence.md) `confluence` | Atlassian | 4 | 0 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/confluence/connector.json) |
 | [Confluence](./confluence.md) `confluence-v1` | Atlassian | 7 | 0 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/confluence-v1/connector.json) |
 | [GitLab](./gitlab.md) `gitlab` | GitLab | 32 | 21 | `gitlab.pat` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/gitlab/connector.json) |
-| [Google Calendar](./calendar.md) `calendar` | Google | 3 | 3 | `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-calendar/connector.json) |
-| [Google Drive](./drive.md) `drive` | Google | 6 | 3 | `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-drive/connector.json) |
-| [Gmail](./gmail.md) `gmail` | Google | 8 | 2 | `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-gmail/connector.json) |
+| [Google Calendar](./calendar.md) `calendar` | Google | 3 | 3 | `google.oauth.readonly`, `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-calendar/connector.json) |
+| [Google Drive](./drive.md) `drive` | Google | 7 | 3 | `google.oauth.readonly`, `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-drive/connector.json) |
+| [Gmail](./gmail.md) `gmail` | Google | 8 | 2 | `google.oauth.readonly`, `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-gmail/connector.json) |
 | [Google Slides](./slides.md) `slides` | Google | 3 | 2 | `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-slides/connector.json) |
-| [HubSpot](./hubspot.md) `hubspot` | HubSpot | 2 | 0 | `hubspot.private-app` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/hubspot/connector.json) |
+| [HubSpot](./hubspot.md) `hubspot` | HubSpot | 4 | 0 | `hubspot.private-app` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/hubspot/connector.json) |
 | [Jira](./jira.md) `jira` | Atlassian | 11 | 6 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/jira/connector.json) |
 | [Opsgenie](./opsgenie.md) `opsgenie` | Opsgenie | 5 | 0 | `opsgenie.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/opsgenie/connector.json) |
 | [Runpod](./runpod.md) `runpod` | Runpod | 2 | 2 | `runpod.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/runpod/connector.json) |
@@ -38,6 +38,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Tavily](./tavily.md) `tavily` | Tavily | 3 | 0 | `tavily.api-key` | pinned | hand-written |
 | [Loki](./loki.md) `loki` | Grafana Labs | 5 | 0 | `loki.bearer` | pinned | hand-written |
 | [Grafana](./grafana.md) `grafana` | Grafana Labs | 5 | 0 | `grafana.service_account`, `grafana.irm_service_account` | pinned | hand-written |
+| [Grafana](./grafana.md) `grafana` | Grafana Labs | 8 | 0 | `grafana.service-account` | pinned | hand-written |
 | [Prometheus](./prometheus.md) `prometheus` | Prometheus | 3 | 0 | `prometheus.bearer` | pinned | hand-written |
 | [MCP](./mcp.md) `mcp` | any MCP server | 0 | 0 | none | not yet: planned | hand-written |
 

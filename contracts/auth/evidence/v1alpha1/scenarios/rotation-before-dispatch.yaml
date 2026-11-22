@@ -74,12 +74,10 @@ timeline:
   input:
     admission_id:
       $instance: old
-    generation_id: 00000000-0000-4000-8000-000000000002
+    generation_id: 00000000-0000-4000-8000-000000000001
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationDispatched
 - at: '2026-09-08T09:00:04Z'

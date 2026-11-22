@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:readme-back-under-its-size-limit
 kind: story
-status: active
+status: implemented
 title: The README is back under its 27,000-byte limit, held by a test
 tags:
 - from-finding
@@ -13,10 +13,11 @@ relations:
 scope:
 - confidence: inferred
   path: README.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:47Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:48Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:29Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 

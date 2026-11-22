@@ -10,14 +10,11 @@ connectors: "opsgenie"
 # Opsgenie
 
 The `opsgenie` connector of the provider Opsgenie is served by the catalog provider from the
-pinned Opsgenie REST API document. The words connector, instance, connection and operation are
-those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+pinned Opsgenie REST API document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Opsgenie guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-opsgenie.md)
 has every parameter and refusal. Opsgenie ends service on 2027-04-05.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs an Opsgenie account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -43,14 +40,6 @@ states `endpoint = "https://api.eu.opsgenie.com"`.
 enabled = true
 
 [connectors.opsgenie.instances.work]
-```
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"opsgenie","instance":"work","instance_id":"opsgenie.work","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -80,15 +69,7 @@ are not offered.
 
 ## Reconnect when the connection is Stale
 
-A key Opsgenie refuses makes the connection `stale`, and an invoke answers `next_action:
-repair_connection`. Publish a new key on the same connection:
-
-```sh
-connectors --output json connections list --connector opsgenie --instance work \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector opsgenie --instance work \
-  --expected-revision "<revision from the list>" --credential-file ~/private/opsgenie.json
-```
+A key Opsgenie refuses makes the connection `stale`. Publish a new key on the same connection. [Reconnect](../guides/reconnect-a-connection.md) `opsgenie/work` with `--credential-file ~/private/opsgenie.json`.
 
 A key of another account is accepted as the same identity, so reconnect only with a key of this
 account.

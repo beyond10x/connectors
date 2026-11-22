@@ -81,6 +81,85 @@ pub enum Failure {
 }
 type Result<T> = std::result::Result<T, Failure>;
 
+/// One bracketed reading of the local timer pair (`timer.rs`): the timer that
+/// counts the time the machine sleeps, and its offset from the one that does
+/// not. The offset moves only by time asleep, so a lease issued and checked on
+/// the first timer refuses a reading across a sleep
+/// (story:mcp-stdio-on-macos-and-windows).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SuspendReading {
+    /// The sleep-counting timer, in nanoseconds since its own origin.
+    pub counting_ns: u64,
+    /// The sleep-counting timer minus the sleep-excluding one, in nanoseconds.
+    pub offset_ns: i128,
+}
+
+/// Qualifies both timers: a resolution of 1 ms or better.
+///
+/// # Errors
+/// [`Failure::Unavailable`] when a timer is unreadable or too coarse.
+pub fn qualify_suspend_timers() -> Result<()> {
+    timer::qualify_resolution()
+}
+
+/// Reads the timer pair, refusing a bracket wider than 1 ms or a backward
+/// reading.
+///
+/// # Errors
+/// [`Failure::Unavailable`] when a timer is unreadable or the bracket is wide.
+pub fn read_suspend_timers() -> Result<SuspendReading> {
+    let stamp = Stamp::read()?;
+    let counting = i128::from(stamp.monotonic) + stamp.offset_lower;
+    Ok(SuspendReading {
+        counting_ns: u64::try_from(counting).map_err(|_| Failure::Unavailable)?,
+        offset_ns: stamp.offset_lower,
+    })
+}
+
+#[cfg(test)]
+mod suspend_timer_tests {
+    use super::*;
+
+    /// Each platform's pair qualifies: Linux `CLOCK_BOOTTIME`/`CLOCK_MONOTONIC`,
+    /// macOS `CLOCK_MONOTONIC_RAW`/`CLOCK_UPTIME_RAW`, Windows
+    /// `QueryInterruptTimePrecise`/`QueryUnbiasedInterruptTimePrecise`.
+    #[test]
+    fn the_platform_pair_qualifies() {
+        qualify_suspend_timers().unwrap();
+    }
+
+    /// The sleep-counting timer never runs backwards and advances with real time.
+    #[test]
+    fn the_counting_timer_is_monotone_and_advances() {
+        let first = read_suspend_timers().unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        let second = read_suspend_timers().unwrap();
+        let elapsed = second.counting_ns.checked_sub(first.counting_ns).unwrap();
+        assert!(elapsed >= 25_000_000, "elapsed {elapsed} ns");
+        assert!(elapsed < 5_000_000_000, "elapsed {elapsed} ns");
+    }
+
+    /// While the machine stays awake the offset holds within the lease's 2 ms
+    /// tolerance: only time asleep moves it.
+    #[test]
+    fn the_offset_holds_while_awake() {
+        let first = read_suspend_timers().unwrap();
+        std::thread::sleep(Duration::from_millis(1500));
+        let second = read_suspend_timers().unwrap();
+        assert!((second.offset_ns - first.offset_ns).abs() <= 2_000_000);
+    }
+
+    /// The sleep-excluding timer is never ahead of the one that counts sleep,
+    /// beyond the 1 ms bracket: the offset is taken from the counting reading
+    /// made before the excluding one.
+    #[test]
+    fn the_counting_timer_is_not_behind_the_excluding_one() {
+        for _ in 0..200 {
+            assert!(read_suspend_timers().unwrap().offset_ns >= -1_000_000);
+        }
+    }
+}
+
 /// Why a quorum acquisition formed no answer (`connectors.clock.Refusal`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

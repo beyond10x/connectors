@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-guard-typed-comparison
 kind: story
-status: active
+status: implemented
 title: A catalog guard compares JSON values by type
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,15 +10,18 @@ relations:
 scope:
 - confidence: inferred
   path: adapters/catalog/src/lib.rs
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:51Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:51Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:18:53Z", actor: "human:operator", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 
-A catalog guard compares JSON values by type: a boolean literal matches only a JSON boolean, a
-number only a number, a string only a string.
+A catalog guard compares JSON booleans by type: a boolean expectation, or an input that resolves to a
+JSON boolean, matches only a JSON boolean in the provider's answer. Numbers taken from number-typed
+body keys are `story:guard-number-inputs-compare-by-type` (narrowed on 2026-11-10 after
+`review-result:wave-b-guard-typed-adversary-1`: a global number arm would break path-parameter checks).
 
 ## Why
 

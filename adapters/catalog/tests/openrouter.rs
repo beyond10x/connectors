@@ -11,9 +11,8 @@
 //! second child, configured as the guide's inference alias, proves and sends
 //! exactly those bytes, as the owner does when it holds them in custody.
 #![cfg(unix)]
+use crate::clock_fixture;
 use connectors_catalog::bundle;
-#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
-mod clock_fixture;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
@@ -960,6 +959,7 @@ fn serve_custody(parent: &Path) -> (Owned, Owned, PathBuf) {
         );
         std::thread::sleep(Duration::from_millis(20));
     }
+    let keyring_stderr = (directory.join("r1")).with_extension("stderr");
     let mut daemon = Owned(
         Command::new("/usr/bin/gnome-keyring-daemon")
             .args([
@@ -980,7 +980,7 @@ fn serve_custody(parent: &Path) -> (Owned, Owned, PathBuf) {
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::from(std::fs::File::create(&keyring_stderr).unwrap()))
             .spawn()
             .unwrap(),
     );
@@ -998,7 +998,8 @@ fn serve_custody(parent: &Path) -> (Owned, Owned, PathBuf) {
     while !connectors_host::local::keyring::custody::available_at(Some(&socket)) {
         assert!(
             std::time::Instant::now() < until,
-            "fixture custody unavailable"
+            "fixture custody unavailable; keyring stderr: {}",
+            keyring_stderr_tail(&keyring_stderr)
         );
         std::thread::sleep(Duration::from_millis(30));
     }
@@ -1009,8 +1010,8 @@ fn serve_custody(parent: &Path) -> (Owned, Owned, PathBuf) {
 /// It serves the HTTPS provider, a disposable Secret Service and two synthetic
 /// Roughtime sources, prints where each is, and answers until the file
 /// `FIXTURE_STOP` (named in its output) exists or `OPENROUTER_FIXTURE_SECONDS`
-/// (default 300) pass. `cargo test -p connectors-catalog-provider --test openrouter
-/// -- --ignored --nocapture serve_the_fixture`.
+/// (default 300) pass. `cargo test -p connectors-catalog-provider --test main
+/// -- --ignored --nocapture openrouter::serve_the_fixture`.
 #[test]
 #[ignore = "serves the fixture for the guide's commands"]
 fn serve_the_fixture() {
@@ -1050,5 +1051,21 @@ fn serve_the_fixture() {
     let until = std::time::Instant::now() + Duration::from_secs(seconds);
     while !stop.exists() && std::time::Instant::now() < until {
         std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// The last lines the fixture's GNOME Keyring wrote to its standard error, for
+/// a failure message: the daemon's own words on why it never answered.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn keyring_stderr_tail(path: &std::path::Path) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(text) if text.trim().is_empty() => {
+            format!("(empty: {} was written nothing)", path.display())
+        }
+        Ok(text) => {
+            let lines: Vec<&str> = text.lines().collect();
+            lines[lines.len().saturating_sub(20)..].join("\n")
+        }
+        Err(error) => format!("(unreadable: {}: {error})", path.display()),
     }
 }

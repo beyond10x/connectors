@@ -55,6 +55,9 @@ const SLOW: &str = "999";
 /// The input whose answer the provider holds for 8 s: longer than local
 /// teardown (5 s), inside the declared 15 s provider budget.
 const STALL: &str = "998";
+/// The input whose answer the provider holds for 25 s: longer than the 20 s
+/// execution budget of a read.
+const HOLD: &str = "997";
 /// An input number no f64 holds: it reaches the provider and comes back as
 /// these digits only through lossless reads.
 const WIDE: &str = "1844674407370955161701";
@@ -260,6 +263,9 @@ impl Provider {
                         if n == SLOW {
                             std::thread::sleep(Duration::from_secs(3));
                         }
+                        if n == HOLD {
+                            std::thread::sleep(Duration::from_secs(25));
+                        }
                         if n == STALL {
                             std::thread::sleep(Duration::from_secs(8));
                             stream.set_nonblocking(true).unwrap();
@@ -399,6 +405,11 @@ impl Served {
     /// Write the companion: each of [`EXPOSED`] as a tool, enabled when
     /// `enabled`, except `disabled`, which never is.
     fn exposures(&self, enabled: bool) {
+        self.exposures_within(enabled, 120_000);
+    }
+
+    /// [`Served::exposures`] with the request budget `request_milliseconds`.
+    fn exposures_within(&self, enabled: bool, request_milliseconds: u64) {
         let exposures: Vec<Value> = EXPOSED
             .iter()
             .map(|operation| {
@@ -409,7 +420,7 @@ impl Served {
         private(
             &self.container.path(COMPANION),
             json!({"format":"connectors-mcp-local/1","limits":{"frame_octets":1048576,"response_octets":33554432,
-                "concurrent_requests":1,"request_milliseconds":120000},"exposures":exposures})
+                "concurrent_requests":1,"request_milliseconds":request_milliseconds},"exposures":exposures})
             .to_string(),
         );
     }
@@ -974,6 +985,41 @@ fn adversary_a_cancelled_call_frees_its_slot_for_the_next_call() {
     peer.finish();
 }
 
+/// story:owner-cancels-a-bounded-read: the cancel reaches the owner, which ends
+/// the cancelled call's job. The owner runs one job at a time per instance, so
+/// the next call, a second job on the same instance, starts at once instead of
+/// waiting for the cancelled read's provider (25 s) or its budget (20 s); the
+/// owner starts the instance's adapter again for it.
+#[test]
+fn adversary_a_cancelled_call_releases_its_owner_job_before_its_budget() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    let (tool, revision) = listed(&mut peer);
+    send_call(&mut peer, 2, &tool, HOLD, &revision);
+    let until = Instant::now() + Duration::from_secs(10);
+    while served.provider.requests() == 0 {
+        assert!(
+            Instant::now() < until,
+            "the read never reached the provider"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    std::thread::sleep(Duration::from_millis(100));
+    peer.send(json!({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2}}));
+    let cancelled = Instant::now();
+    let reply = peer.call(3, tool.as_str().unwrap(), "1", &revision);
+    assert_eq!(
+        reply["result"]["structuredContent"]["status"], "success",
+        "{reply}"
+    );
+    assert!(
+        cancelled.elapsed() < Duration::from_secs(12),
+        "the call after a cancelled one waited {:?} for the cancelled read's owner job",
+        cancelled.elapsed()
+    );
+    peer.finish();
+}
+
 /// sessions § 4.1 and docs/local-mcp-stdio.md: stdin closed with a read in
 /// flight that the lease live at the close cannot carry (provider answers in
 /// 3 s, lease at most 1.9 s): no reply is written after the cutoff and the
@@ -1066,13 +1112,20 @@ fn adversary_legacy_window_admits_no_tool_request() {
 /// 5 s after stdin closed), the provider read it started must not still be
 /// held open by the owner side 8 s after dispatch.
 #[test]
-#[ignore = "deferred: the owner has no per-request cancel; story:owner-cancels-a-bounded-read"]
 fn adversary_a_lost_session_leaves_no_provider_read_open() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     let (tool, revision) = listed(&mut peer);
     send_call(&mut peer, 2, &tool, STALL, &revision);
     let dispatched = Instant::now();
+    let until = Instant::now() + Duration::from_secs(10);
+    while served.provider.requests() == 0 {
+        assert!(
+            Instant::now() < until,
+            "the read never reached the provider"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
     std::thread::sleep(Duration::from_millis(100));
     let _ = peer.exit(false);
     let ended = dispatched.elapsed();
@@ -1144,6 +1197,61 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
         "{reply}"
     );
     assert!(peer.request(3, "ping", json!({})).get("result").is_some());
+    peer.finish();
+}
+
+/// story:mcp-tool-deadline-keeps-the-server (CR-001). A list whose owner does
+/// not answer within `request_milliseconds` (the store lock is held, so the
+/// owner's authority read waits on it) is refused `timeout` at its own
+/// deadline, and the session goes on: the same server then answers the next
+/// list once the store is free.
+#[test]
+fn adversary_a_request_past_its_deadline_answers_timeout_and_the_session_continues() {
+    let served = Served::new();
+    // Warm the owner under the default budget: a cold owner start inside the
+    // 2 s budget below would end the server at startup, not at the deadline.
+    let mut warm = Peer::start(&served, true);
+    assert!(warm.request(1, "ping", json!({})).get("result").is_some());
+    served.exposures_within(true, 2000);
+    // The server's startup is bounded by the same 2 s, so on a loaded host it
+    // can end before it answers its first ping; that is not what is measured
+    // here, so such a start is retried (a session that answered and then
+    // ended is not).
+    let mut peer = None;
+    for _ in 0..5 {
+        let mut candidate = Peer::start(&served, true);
+        let ping = json!({"jsonrpc":"2.0","id":1,"method":"ping","params":{"_meta":meta()}});
+        let _ = candidate
+            .child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(format!("{ping}\n").as_bytes());
+        if let Ok(Ok(reply)) = candidate.frames.recv_timeout(Duration::from_secs(15))
+            && reply.get("result").is_some()
+        {
+            peer = Some(candidate);
+            break;
+        }
+    }
+    let mut peer = peer.expect("the server never started within 2 s in 5 tries");
+    let lock = hold_store(&served);
+    let held = peer.request(2, "tools/list", json!({}));
+    assert_eq!(
+        held["error"]["data"]["error"]["code"], "timeout",
+        "the held list was not refused timeout: {held}"
+    );
+    let status = peer.child.try_wait().unwrap();
+    if status.is_some() {
+        let stderr = peer.errors.take().unwrap().join().unwrap();
+        panic!(
+            "the session ended at a request's deadline: {status:?}, stderr {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+    drop(lock);
+    let next = peer.request(3, "tools/list", json!({}));
+    assert!(next.get("result").is_some(), "{next}");
     peer.finish();
 }
 

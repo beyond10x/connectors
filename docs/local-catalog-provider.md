@@ -116,7 +116,13 @@ is one of:
   `GET /v1/incidents/{identifier}/associated-alert-ids`. `operation_id` names
   the new operation. Each parameter is written like an added parameter, with
   `location` `path` or `query`; the path parameters must be exactly the
-  path's `{...}` placeholders, each `required: true`. The operation declares no
+  path's `{...}` placeholders, each `required: true`. A parameter may add
+  `"pattern": "^...$"`, a regular expression of at most 256 bytes anchored at
+  both ends, which the engine holds all of every value of it to before any
+  request, matching it as `\A(?:pattern)\z` so a top-level `|`, `(?m)` or a
+  `(?x)` comment cannot match part of a value, and refusing another as ``parameter `<name>` does not match its pattern``; Grafana's
+  proxy reads hold `uid` to `^[A-Za-z0-9_-]{1,40}$` this way
+  ([Grafana guide](catalog-grafana.md#the-shipped-selection-set)). The operation declares no
   body and no response, and the engine reads its answer as JSON.
 
 The file must carry the source's SHA-256. An operation that is missing or
@@ -131,7 +137,8 @@ method is not `get`, whose `operation_id` the source already declares, whose
 path a GET of the source already has, does not start with `/` or holds a
 parenthesised group, query or fragment, whose path parameters are not exactly
 its placeholders, required and unrepeated, or which declares a header or cookie
-parameter or one parameter twice are each refused before any bundle
+parameter, one parameter twice or a `pattern` that is not anchored or does not
+compile on its own or in that form, and a `pattern` on an added parameter, are each refused before any bundle
 is written, and nothing is applied. The bundle's source record then names the file and its
 SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
 `connectors_catalog.amendment` in `adapters/catalog/spec/ess`). Zendesk uses it
@@ -236,15 +243,37 @@ JSON integer or its decimal string (`100` or `"100"`), a boolean as `true` or
 its decimal text); any other value, such as `per_page=true` or `page=2.0`, is
 refused as `invalid_input` before any request.
 
+Beyond its type, the engine holds a path or query parameter to what the pinned
+document declares for it, and only to that. A parameter whose schema lists an
+`enum` takes one of those values (as the text it is sent as: `"topo"`, `2` or
+`"2"`), so `commits.list` `order` takes `default` or `topo` and `projects.list`
+`order_by` takes one of its listed fields; a value outside the list, in another
+letter case included, is refused. A parameter whose schema is a string of
+`format: date-time` takes an RFC 3339 date-time and no other form: `YYYY-MM-DD`,
+`T` (or `t`), `HH:MM:SS`, optional fractional seconds of one digit or more, and
+an offset of `Z` (or `z`), `+HH:MM` or `-HH:MM`, for a date that exists, an hour
+of at most 23, a minute of at most 59 and a second of at most 60. A date alone,
+a time without an offset, a space in place of `T`, `yesterday`, an empty string
+and a JSON integer are refused: `since`, `until` and `last_activity_after`
+are sent only as RFC 3339 date-times. Both checks hold for each
+element of a repeated parameter, and a refusal is `invalid_input` before any
+request. An absent optional parameter is never refused, and a parameter whose
+schema declares no `enum` and no `date-time` format (a `format: date`, say) is
+sent as any string is. A `null` member of an `enum` only marks the parameter
+nullable; an `enum` with a member that is not a string, an integer or a boolean
+is not checked. A selection's `bounds` `values` is checked as well, so the
+narrower of the two holds. The engine does not check any other `format`, a
+`pattern` or a body member's `format`.
+
 | id | source operation | request | time filter | effect |
 |---|---|---|---|---|
 | `projects.list` | `getApiV4Projects` | `GET /projects`, e.g. `membership`, `simple=false`, `archived`, `order_by=last_activity_at` | `last_activity_after` | read |
 | `tags.list` | `getApiV4ProjectsIdRepositoryTags` | `GET /projects/{id}/repository/tags` | none; each tag carries its commit id | read |
 | `releases.list` | `getApiV4ProjectsIdReleases` | `GET /projects/{id}/releases` | none; each release carries `released_at` | read |
 | `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
-| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: the selection withholds `pagination` and its keyset cursor `page_token`, so an input carrying either (`pagination=keyset` included) is refused as `invalid_input` before any request, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: a string that GitLab reads as an ISO 8601 date-time | read |
+| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: the selection withholds `pagination` and its keyset cursor `page_token`, so an input carrying either (`pagination=keyset` included) is refused as `invalid_input` before any request, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: an RFC 3339 date-time | read |
 | `repository.compare` | `getApiV4ProjectsIdRepositoryCompare` | `GET /projects/{id}/repository/compare` with `from` and `to` (both required) and `straight`; not paged; `read_api` scope. The body is GitLab's own: an empty compare answers `200` with `"commits": []` and `"compare_timeout": false`, a compare GitLab cut short also answers `200`, possibly with `"commits": []`, but with `"compare_timeout": true`; so read `body.compare_timeout`, not the length of `commits`, to tell them apart. GitLab always includes `diffs`, and a body over the provider's 4 MiB response limit answers `capacity` with no body at all; to place commits between two tags, walk `commits.list` instead, which carries no diffs | none | read |
-| `deployments.list` | `getApiV4ProjectsIdDeployments` | `GET /projects/{id}/deployments`, e.g. `environment`, `status`, `order_by`, `sort`; the body is GitLab's own, so each deployment carries `environment.name` and `deployable`, the job that ran it (`deployable.id`); a project the token cannot read answers GitLab's `403` or `404` with the refusal the other list reads answer; `read_api` scope | `updated_after`, `updated_before`, `finished_after`, `finished_before`: strings that GitLab reads as ISO 8601 date-times | read |
+| `deployments.list` | `getApiV4ProjectsIdDeployments` | `GET /projects/{id}/deployments`, e.g. `environment`, `status`, `order_by`, `sort`; the body is GitLab's own, so each deployment carries `environment.name` and `deployable`, the job that ran it (`deployable.id`); a project the token cannot read answers GitLab's `403` or `404` with the refusal the other list reads answer; `read_api` scope | `updated_after`, `updated_before`, `finished_after`, `finished_before`: RFC 3339 date-times | read |
 
 | `repository.tree` | `getApiV4ProjectsIdRepositoryTree` | `GET /projects/{id}/repository/tree`, e.g. `ref`, `path`, `recursive=true`; each entry carries `id`, `name`, `type` (`tree` or `blob`), `path` and `mode`; offset paging only: the selection withholds `pagination` and `page_token`, so `pagination=keyset` is refused as `invalid_input` before any request, as on `commits.list`. Example: `{"id": "org/project", "ref": "main", "path": "src", "recursive": true, "per_page": 100, "page": 1}` sends `GET /projects/org%2Fproject/repository/tree?ref=main&path=src&recursive=true&page=1&per_page=100` | none | read |
 | `commit.get` | `getApiV4ProjectsIdRepositoryCommitsSha` | `GET /projects/{id}/repository/commits/{sha}`, `sha` a commit id, branch or tag name, sent as one path segment (`release/v0.3` is encoded, never a second segment); `stats=true` adds line counts; not paged. A sha GitLab does not find answers its `404`, refused as `not_found` | none | read |
@@ -343,8 +372,8 @@ body. `file.get` stays as it is.
 
 The commands below were run in this tree with the debug `target/debug/connectors`
 against the local HTTPS GitLab fixture (the ignored test
-`cli_journey::serve_the_raw_file_fixture` in
-`adapters/catalog/tests/local_runtime.rs`), whose files and languages are
+`local_runtime::cli_journey::serve_the_raw_file_fixture` of the `main` test target, in
+`adapters/catalog/tests/local_runtime/cli_journey.rs`), whose files and languages are
 synthetic. Its disposable tree is named with `--config` and `--state-dir`, which
 the commands omit. The run, made before 0.60.0, described and invoked with the deprecated
 `--adapter gitlab` selector. Below is the 0.60.0 form on the instance `gitlab/forge`, which takes
@@ -959,7 +988,8 @@ The complete configuration used against the sandbox is
   objects. A guard reads a nested key through its dotted path
   (`body.ticket.updated_stamp` is `/ticket/updated_stamp`). A read, an operation
   without a request body, an empty, dotted or repeated name, a pointer with an
-  empty segment or a `~`, a key inside another admitted key, or a guard reading
+  empty segment or a `~`, a segment of digits (it would name a list element,
+  and the body is objects only), a key inside another admitted key, or a guard reading
   a `body.<path>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
@@ -974,9 +1004,10 @@ The complete configuration used against the sandbox is
   range, while JSON Schema's `integer` also admits `3.0` or `1e2`, so such a
   value passes the declaration and is still refused.
   `body_required` is optional too: `["<key>", …]` names the closed body keys
-  that schema requires, and a body without one is refused as `invalid_input`
-  before any request and declared required (keys a guard reads are required
-  already). GitLab's note and reply type `body` as a string and require it; its
+  that schema requires, and a body without one, or giving one as JSON `null`,
+  is refused as `invalid_input` before any request and declared required, with
+  `null` excluded for a key typed by no `body_types` (keys a guard reads are
+  required already). A `null` counts as missing. GitLab's note and reply type `body` as a string and require it; its
   discussion resolve types `resolved` as a boolean. A key either names that
   `body_keys` does not admit (so either one without `body_keys`), a key
   `body_required` repeats, or a guard reading a path nested under a typed key
@@ -1014,15 +1045,29 @@ The complete configuration used against the sandbox is
   refused as `invalid_input` naming the key, before any request, and the
   declared input schema gives the key that `enum`. A key `body_types` does not
   type as `string`, a fixed key, an empty set, or an empty or repeated value is
-  refused when the selection loads.
+  refused when the selection loads, and so is a key `body_prefixes` also names:
+  the set is checked on the caller's text before the prefix is added, so the
+  value sent would fall outside it.
 - `body_any_of` is optional, beside `body_keys`: `["<key>", …]` names keys of
   which a body must carry at least one, for a write that changes whichever
   members the caller sends, such as Zendesk's ticket update of `group_id`,
   `tags`, `priority` or `type`. A body with none of them is refused as
   `invalid_input` before any request, and the declared input schema requires
-  one of them (`anyOf`). Fewer than two keys, a key `body_keys` does not admit,
-  a fixed or repeated key, or keys under more than one parent object are
-  refused when the selection loads.
+  one of them (`anyOf`). A key given as JSON `null` counts as missing, so a
+  body whose every named key is absent or `null` is refused, unless the
+  selection declares `body_null_clears`. Fewer than two keys, a key `body_keys`
+  does not admit, a fixed or repeated key, or keys under more than one parent
+  object are refused when the selection loads.
+- `body_null_clears` is optional, beside `body_any_of`: `true` declares that the
+  provider clears a field on JSON `null`, so an untyped `body_any_of` key given
+  as `null` counts as the one change and is sent as `null`, such as Jira's
+  `issue.edit` unassigning an issue with `assignee: null`. A key typed by
+  `body_types` given as `null` is still refused as not of its declared type.
+  The declared input schema then requires only that one of the keys is
+  present, and requires each parent object above them. Without it a
+  `null` key counts as missing; a `body_required` key given as `null` is
+  refused either way. `body_null_clears` without `body_any_of` is refused when
+  the selection loads.
 - `body_prefixes` is optional, beside `body_types`: `{"<key>": "<prefix>"}`
   fixes the start of a string the caller writes. The provider sends the prefix
   followed by the caller's value under that key, so the sent value always
@@ -1031,7 +1076,7 @@ The complete configuration used against the sandbox is
   body with a first line marking it a draft. A key `body_types` does not type as
   `string`, a fixed key or an empty prefix is refused when the selection loads.
   `body_keys`, `body_types`, `body_required`, `body_nonempty`, `body_fixed`,
-  `body_enums`, `body_any_of` and `body_prefixes` are modelled as
+  `body_enums`, `body_any_of`, `body_null_clears` and `body_prefixes` are modelled as
   `connectors_catalog.selection.ClosedBody` in `adapters/catalog/spec/ess`, and
   every shipped selection is checked against it.
 - `conflict_status` is optional, for a write: `409` or `412`, the status by
@@ -1056,7 +1101,10 @@ The complete configuration used against the sandbox is
   `issue.create` answers. An absent member fails it exactly as a `null` one
   does, so before the write both refuse with the same code. `present` is only `true`; `false` is refused when
   the selection loads. The model's `connectors_catalog.guard.Expectation`
-  holds exactly one of the four. A `literal` of `"true"` or `"false"` is refused when the selection
+  holds exactly one of the four. An `input` that names a JSON boolean compares
+  by JSON type, as `boolean` does, so a string `"true"` answered for a requested
+  `true` differs; an `input` naming a string or a number keeps comparing as
+  text. A `literal` of `"true"` or `"false"` is refused when the selection
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
@@ -1262,8 +1310,10 @@ parameter. After upgrading:
    `connections revoke` the old connection first; `connections connect` under the
    same `instance` id then answers `ready` with the new lifetime. When the provider host or any other `auth` field of
    the profile changed, revalidate, reconnect, reads and `connections connect` all
-   refuse with `lifecycle_conflict` and `next_action = check_configuration`:
-   only a new `instance` id helps. Give the instance a new id in the native
+   refuse with `authentication_changed` and `next_action = check_configuration`:
+   a retry cannot succeed, and only a new `instance` id helps. A change to the
+   native configuration that moves the provider host or the profile's
+   authentication needs a new instance id. Give the instance a new id in the native
    configuration and the instance's `instance_id`, copy the new revision, and
    connect; then revoke the old connection through the same instance with
    `connections revoke`, which still reaches it. A changed `auth.profile` id
@@ -1384,6 +1434,16 @@ in the same shape. They keep working: each is selected by the connector `setup m
 for it and its alias (here `gitlab/forge`, or `--connector gitlab --instance forge`), or by the
 deprecated `--adapter <alias>`. An entry no connector is derived for, such as an OpenRouter
 entry, is no instance: selecting it is `legacy_entry_unmigrated`.
+A legacy entry beside a `[connectors.<connector>.instances.<instance>]` table that derives the
+same connector and instance (a GitLab entry `forge` beside `[connectors.gitlab.instances.forge]`)
+has one name for two entries, so selecting `gitlab/forge`, by `invoke`, by `--connector
+gitlab --instance forge` or by `default_instance`, is refused as `instance_ambiguous`, naming both
+entries; nothing is sent and no credential is read. `instances list` lists both.
+`connections connect gitlab/forge --endpoint <url>` is refused as `invalid_input` for `endpoint`
+before it writes anything, since the legacy entry's endpoint is its own: run `setup migrate`
+first. Remove or
+rename one of the two entries: `setup migrate` keeps the legacy entry (`instance_conflict`) and
+does not resolve it.
 `setup migrate` moves every entry whose native configuration names a provider with a shipped
 declaration to `[connectors.<connector>.instances.<alias>]`, in the short form or with every
 pin unchanged (below), so its connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
@@ -1559,3 +1619,24 @@ appeared, which opened merge request 11 at the moved head and was classified
   a value the preflight must not have.
 - Only GitLab has run live. A second provider through the same engine is still
   required by `specification:catalog-http-runtime-handoff`.
+
+## Support-table summary: ChatGPT
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> ChatGPT subscription sign-in as the Codex CLI makes it, profile `chatgpt.subscription` (`oauth2_grant`): browser with PKCE on `127.0.0.1:1455`, or `--device` through the ChatGPT device sign-in; JSON refresh with rotation 300 seconds before expiry; the connection is the ChatGPT account id from the `id_token`; `connections token --reveal` hands the access token to its owner; one read, `models.list`; no client id ships, so the instance is pinned with its own `oauth2_client_id`; verified against a local fixture only, see [the ChatGPT guide](website/docs/connectors/chatgpt.md)
+
+## Support-table summary: Claude subscription
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> The Claude Code sign-in (OAuth 2.0 authorization code with PKCE, JSON exchange and refresh) for the operator's own Claude plan only, as the guide's quote of the provider's terms says; profiles `claude.subscription` (loopback redirect) and `claude.subscription-pasted` (pasted `code#state`); no client id ships, so the instance is pinned and configures `oauth2_client_id`; `connections token` issues the access token; one read, `account.profile`; verified against a local fake authorization server only, see [the Claude subscription guide](website/docs/connectors/claude-subscription.md)
+
+## Support-table summary: GitHub
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> GitHub REST API from `connectors/github.yaml` of [connectors-definitions 0.5.2](https://github.com/beyond10x/connectors-definitions/releases/tag/0.5.2), run as a definition file (`invoke --definition`); profile `github.token`, a fine-grained or classic token as `Authorization: Bearer` from keyring custody; reads only: review requests, assigned issues, notifications, the user, an organization's repositories, one repository, releases and the latest release, a README or file as text; one page per call, the caller walks until a short page, the search to its first 1,000 results; a spent rate limit is `rate_limited` with its wait; verified against a scripted provider only, see [the GitHub page](website/docs/connectors/github.md)

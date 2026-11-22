@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-11T13:47:33Z",
+  "actor": "human:operator",
+  "artifact": "story:owner-invoke-frame-effects-boundary",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:owner-invoke-effects-adversary-r1-20261111",
+    "review": "review-result:owner-invoke-effects-adversary-r1-20261111",
+    "outcome": "fixed"
+  }
+}

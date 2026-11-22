@@ -4,7 +4,6 @@
   "excluded_parameters": [
     "$.xgafv",
     "access_token",
-    "alt",
     "callback",
     "key",
     "oauth_token",
@@ -131,7 +130,6 @@
     "/resources/files/methods/generateIds/parameterOrder",
     "/resources/files/methods/get/flatPath",
     "/resources/files/methods/get/parameterOrder",
-    "/resources/files/methods/get/supportsMediaDownload",
     "/resources/files/methods/get/supportsSubscription",
     "/resources/files/methods/get/useMediaDownloadService",
     "/resources/files/methods/list/flatPath",
@@ -176,7 +174,6 @@
     "/resources/revisions/methods/delete/parameterOrder",
     "/resources/revisions/methods/get/flatPath",
     "/resources/revisions/methods/get/parameterOrder",
-    "/resources/revisions/methods/get/supportsMediaDownload",
     "/resources/revisions/methods/get/useMediaDownloadService",
     "/resources/revisions/methods/list/flatPath",
     "/resources/revisions/methods/list/parameterOrder",
@@ -260,7 +257,7 @@
     "drive.teamdrives.list",
     "drive.teamdrives.update"
   ],
-  "projector": "discovery-openapi/1",
+  "projector": "discovery-openapi/2",
   "rewritten_paths": [],
   "source_bytes": 269729,
   "source_sha256": "50a01d9b5134f16b4782098bcc6694aa4edf810993432022aba49237b5c83048"

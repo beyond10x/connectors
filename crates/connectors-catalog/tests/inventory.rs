@@ -476,6 +476,9 @@ fn a_local_parameter_reference_is_read_as_the_parameter_it_names() {
                 required: true,
                 value_type: Some(ValueType::Integer),
                 repeated: false,
+                allowed: Vec::new(),
+                format: None,
+                pattern: None,
             },
             // `a~1b` is the JSON pointer spelling of the component `a/b`.
             Parameter {
@@ -484,6 +487,9 @@ fn a_local_parameter_reference_is_read_as_the_parameter_it_names() {
                 required: false,
                 value_type: Some(ValueType::String),
                 repeated: false,
+                allowed: Vec::new(),
+                format: None,
+                pattern: None,
             },
         ]
     );

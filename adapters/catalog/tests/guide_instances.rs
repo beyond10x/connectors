@@ -8,7 +8,7 @@
 //! declares, and the Google OAuth guide says that an app used only by its
 //! developer can be published without verification.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use serde_json::Value;
 use std::{fs, path::Path, process::Command};
@@ -206,12 +206,11 @@ fn each_google_guide_configures_one_instance_with_every_declared_scope() {
             .unwrap(),
         )
         .unwrap();
-        for scope in declaration["profiles"][0]["requested_scopes"]
-            .as_array()
-            .unwrap()
-        {
-            let scope = scope.as_str().unwrap();
-            assert!(text.contains(&format!("`{scope}`")), "{name}: {scope}");
+        for profile in declaration["profiles"].as_array().unwrap() {
+            for scope in profile["requested_scopes"].as_array().unwrap() {
+                let scope = scope.as_str().unwrap();
+                assert!(text.contains(&format!("`{scope}`")), "{name}: {scope}");
+            }
         }
         let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
         for stale in ["separate instance", "write instance", "read instance"] {

@@ -3,7 +3,7 @@
 //! against the code that is supposed to keep it. Fixture secrets are
 //! fictional and only ever compared, never printed.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};

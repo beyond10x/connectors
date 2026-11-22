@@ -107,6 +107,7 @@ operations:
       /fields/priority: any
       /fields/assignee: any
     body_any_of: [/fields/summary, /fields/description, /fields/labels, /fields/priority, /fields/assignee]
+    body_null_clears: true
     conflict_status: 409
     guard:
       before:

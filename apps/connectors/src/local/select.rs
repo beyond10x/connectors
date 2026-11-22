@@ -59,8 +59,11 @@ fn selects(callable: &str) -> bool {
 }
 
 /// Why the selector fields name no entry.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Refused {
+    /// A name two entries hold, a `[connectors]` instance and a legacy entry,
+    /// each as `invoke` lists it (story:legacy-alias-sharing-an-instance-name).
+    Ambiguous(Vec<String>),
     /// Both selectors, half of `--connector`/`--instance`, or none and no default.
     InvalidInput,
     /// `--connector`/`--instance` name no configured instance.
@@ -76,7 +79,7 @@ pub(super) enum Refused {
 impl From<Refused> for owner::Error {
     fn from(refused: Refused) -> Self {
         match refused {
-            Refused::InvalidInput => owner::Code::InvalidInput.into(),
+            Refused::InvalidInput | Refused::Ambiguous(_) => owner::Code::InvalidInput.into(),
             Refused::NotFound => owner::Code::NotFound.into(),
             Refused::ProfileUnnamed | Refused::Unmigrated => {
                 owner::Code::InvalidConfiguration.into()
@@ -87,6 +90,9 @@ impl From<Refused> for owner::Error {
 
 fn refusal(refused: Refused) -> HandlerReply {
     match refused {
+        Refused::Ambiguous(instances) => {
+            super::invoke::unselected(Unselected::Ambiguous(instances))
+        }
         Refused::InvalidInput => failure("invalid_input", "arguments", "none", true),
         Refused::NotFound => failure("not_found", "admission", "check_configuration", false),
         Refused::ProfileUnnamed => failure(
@@ -104,8 +110,9 @@ fn refusal(refused: Refused) -> HandlerReply {
 /// `adapter` (contracts/cli/v1alpha1/semantics.md, "The refused argument").
 /// Every other command, and every other refusal, is unchanged.
 fn refusal_of(callable: &str, refused: Refused) -> HandlerReply {
+    let invalid = refused == Refused::InvalidInput;
     let mut reply = refusal(refused);
-    if refused == Refused::InvalidInput
+    if invalid
         && matches!(
             callable,
             "approval-policy-set" | "approval-prepare" | "approval-issue"
@@ -145,21 +152,40 @@ pub(super) fn alias(input: &Value, config: &Config) -> Result<String, Refused> {
         return Ok(alias.to_owned());
     }
     let text = |field| input.get(field).and_then(Value::as_str);
+    let chosen = |connector, instance| {
+        super::invoke::select(config, connector, Some(instance))
+            .map(|(_, _, alias)| alias)
+            .map_err(|refused| match refused {
+                // An instance named matches one name, unless a `[connectors]`
+                // instance and a legacy entry both derive it
+                // (story:legacy-alias-sharing-an-instance-name).
+                Unselected::Ambiguous(instances) => Refused::Ambiguous(instances),
+                Unselected::NotFound => Refused::NotFound,
+                Unselected::ProfileUnnamed => Refused::ProfileUnnamed,
+                Unselected::Unmigrated => Refused::Unmigrated,
+            })
+    };
     let selected = match (text("connector"), text("instance")) {
-        (Some(connector), Some(instance)) => {
-            return super::invoke::select(config, connector, Some(instance))
-                .map(|(_, _, alias)| alias)
-                .map_err(|refused| match refused {
-                    // An instance named matches at most one name.
-                    Unselected::Ambiguous(_) => Refused::InvalidInput,
-                    Unselected::NotFound => Refused::NotFound,
-                    Unselected::ProfileUnnamed => Refused::ProfileUnnamed,
-                    Unselected::Unmigrated => Refused::Unmigrated,
-                });
-        }
-        (None, None) => config
-            .select(Selector::Default)
-            .ok_or(Refused::InvalidInput)?,
+        (Some(connector), Some(instance)) => return chosen(connector, instance),
+        (None, None) => match &config.default_instance {
+            // `default_instance` names an instance as `--connector` and
+            // `--instance` do, so a shared name is refused the same way.
+            Some(default) => {
+                let (connector, instance) = default.split_once('/').ok_or(Refused::InvalidInput)?;
+                match chosen(connector, instance) {
+                    // A name no entry derives: `default_instance` is admitted
+                    // at load by an entry's own names, `catalog/<alias>` for a
+                    // legacy catalog entry, and selects that entry.
+                    Err(refused @ (Refused::NotFound | Refused::Unmigrated)) => {
+                        config.select(Selector::Default).ok_or(refused)?
+                    }
+                    other => return other,
+                }
+            }
+            None => config
+                .select(Selector::Default)
+                .ok_or(Refused::InvalidInput)?,
+        },
         _ => return Err(Refused::InvalidInput),
     };
     Ok(selected.alias.to_owned())

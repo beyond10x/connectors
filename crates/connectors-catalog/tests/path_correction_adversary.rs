@@ -25,6 +25,9 @@ fn path_parameter(name: &str) -> Parameter {
         required: true,
         value_type: Some(ValueType::String),
         repeated: false,
+        allowed: Vec::new(),
+        format: None,
+        pattern: None,
     }
 }
 

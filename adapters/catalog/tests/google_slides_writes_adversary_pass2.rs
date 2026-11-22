@@ -3,7 +3,7 @@
 //! effect the guide and the selection's description characterise. Driven
 //! through the engine against a scripted provider and from the guide's own
 //! JSON blocks. No network, no credential.
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Engine, Selection};

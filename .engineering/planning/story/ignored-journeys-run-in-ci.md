@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:ignored-journeys-run-in-ci
 kind: story
-status: active
+status: implemented
 title: The ignored CLI journeys run in CI and fail a pull request when red
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
@@ -12,10 +12,11 @@ scope:
   path: .github/workflows/rust-gate.yml
 - confidence: inferred
   path: adapters/catalog/tests/local_runtime/lifecycle.rs
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:37Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:38Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:24:48Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Observed
 The ignored catalog CLI journeys (`adapters/catalog/tests/local_runtime/`) run in no CI job:
@@ -40,3 +41,7 @@ tests"). On `main` 74d8d857d (0.52.0), 2026-10-16, 17 of 26 local_runtime journe
   measured cause.
 - A journey that fails leaves no owner or provider process behind (the harness kills its own
   process group on drop).
+
+## Code review
+
+The operator-ordered code review of the repository at `23b9f1bc4` (2026-11-10, no cargo command run; "verified" means traced by reading) found this again as CR-026, verified: `.github/workflows/rust-gate.yml:64-65` runs no ignored journey; `crates/connectors-build/src/ignored.rs:186-320` lists them.

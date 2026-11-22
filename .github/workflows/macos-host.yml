@@ -41,6 +41,28 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: cargo test --locked --no-fail-fast -p connectors-host -p connectors
+      - name: The MCP stdio server's launch contract and lease timers
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          cargo test --locked -p connectors --test mcp_stdio_launch 2>&1 | tee "$RUNNER_TEMP/mcp-launch.log"
+          grep -q 'test result: ok. 2 passed' "$RUNNER_TEMP/mcp-launch.log"
+          cargo test --locked -p connectors-host --lib suspend_timer_tests 2>&1 | tee "$RUNNER_TEMP/mcp-timers.log"
+          grep -q 'test result: ok. 4 passed' "$RUNNER_TEMP/mcp-timers.log"
+          cargo test --locked -p connectors --bin connectors mcp:: 2>&1 | tee "$RUNNER_TEMP/mcp-unit.log"
+          grep -Eq 'test result: ok. [1-9][0-9]* passed' "$RUNNER_TEMP/mcp-unit.log"
+          cargo test --locked -p connectors --bin connectors mcp::console::threaded 2>&1 | tee "$RUNNER_TEMP/mcp-console.log"
+          grep -q 'test result: ok. 3 passed' "$RUNNER_TEMP/mcp-console.log"
+      - name: The MCP stdio server serves a session on the platform's own custody
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          cargo test --locked -p connectors --test mcp_stdio_serves -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/mcp-serves.log"
+          grep -q 'test result: ok. 1 passed' "$RUNNER_TEMP/mcp-serves.log"
 
   programs:
     name: provider programs on macos-latest

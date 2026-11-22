@@ -181,6 +181,11 @@ pub fn endpoint_admitted(endpoint: &str) -> bool {
             .any(|c| c.is_control() || c.is_whitespace())
 }
 
+/// The company domains an instance admits (`allowed_domains`) and the one rule
+/// that decides a list of them, shared with the provider and with the host's
+/// check of an account-domain refusal (`connectors_core::reason`).
+pub use connectors_core::reason::{COMPANY_DOMAINS, company_domains_admitted};
+
 impl Rule {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -456,6 +461,10 @@ pub struct Instance {
     /// The profile a derived instance names (`profile`), when its connector
     /// declares more than one.
     pub profile: Option<String>,
+    /// The company domains a derived instance admits (`allowed_domains`), in
+    /// the order stated; none when it states none. The provider is started
+    /// with one `--allowed-domain` each.
+    pub allowed_domains: Vec<String>,
     /// The profiles the connector of a derived instance declares when there
     /// are several and the instance names none: it has no entry in
     /// `Config::adapters` until it does ([`Config::awaiting_profile`]).
@@ -482,6 +491,8 @@ struct InstanceTable {
     endpoint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    allowed_domains: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     alias: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -512,8 +523,9 @@ impl InstanceTable {
     /// every pin the legacy entry requires. `startup`, `restart` and
     /// `permissions` default as in the legacy entry.
     fn pinned(self) -> Option<(Instance, Adapter)> {
-        // A profile is the derived instance's; the pins already select one.
-        if self.profile.is_some() {
+        // A profile and the admitted domains are the derived instance's; the
+        // pins already select one and fix the arguments.
+        if self.profile.is_some() || self.allowed_domains.is_some() {
             return None;
         }
         let adapter = Adapter {
@@ -535,6 +547,7 @@ impl InstanceTable {
             instance_id: None,
             derived: false,
             profile: None,
+            allowed_domains: Vec::new(),
             awaiting_profile: None,
         };
         Some((instance, adapter))
@@ -548,6 +561,7 @@ impl InstanceTable {
             description: instance.description,
             endpoint: instance.endpoint,
             profile: None,
+            allowed_domains: None,
             alias: Some(instance.alias),
             instance_id: Some(adapter.instance_id),
             adapter_id: Some(adapter.adapter_id),
@@ -563,8 +577,8 @@ impl InstanceTable {
     }
 
     /// Whether the table states no pin but the names a derived instance may
-    /// state: only `description`, `endpoint`, `profile`, `alias` and
-    /// `instance_id`.
+    /// state: only `description`, `endpoint`, `profile`, `allowed_domains`,
+    /// `alias` and `instance_id`.
     fn unpinned(&self) -> bool {
         self.adapter_id.is_none()
             && self.configuration_revision.is_none()
@@ -625,6 +639,10 @@ impl InstanceTable {
             || !plain(name)
             || !endpoint_admitted
             || self.profile.as_deref().is_some_and(|p| !selector(p))
+            || self
+                .allowed_domains
+                .as_deref()
+                .is_some_and(|domains| !company_domains_admitted(domains))
             || self.alias.as_deref().is_some_and(|a| !selector(a))
             || self.instance_id.as_deref().is_some_and(|i| !selector(i))
         {
@@ -643,6 +661,9 @@ impl InstanceTable {
         if let Some(profile) = &self.profile {
             args.extend(["--profile".to_owned(), profile.clone()]);
         }
+        for domain in self.allowed_domains.iter().flatten() {
+            args.extend(["--allowed-domain".to_owned(), domain.clone()]);
+        }
         let id = self.instance_id.clone().unwrap_or_else(|| default.clone());
         let instance = Instance {
             description: self.description,
@@ -651,6 +672,7 @@ impl InstanceTable {
             instance_id: self.instance_id,
             derived: true,
             profile: self.profile,
+            allowed_domains: self.allowed_domains.unwrap_or_default(),
             awaiting_profile: None,
         };
         Ok((instance, args, id))
@@ -665,6 +687,8 @@ impl InstanceTable {
             description: instance.description,
             endpoint: instance.endpoint,
             profile: instance.profile,
+            allowed_domains: (!instance.allowed_domains.is_empty())
+                .then_some(instance.allowed_domains),
             alias,
             instance_id: instance.instance_id,
             adapter_id: None,
@@ -1116,6 +1140,7 @@ impl Config {
                         instance_id: form.map(|form| form.instance_id.clone()),
                         derived: form.is_some(),
                         profile: form.and_then(|form| form.profile.clone()),
+                        allowed_domains: Vec::new(),
                         awaiting_profile: None,
                     },
                 );
@@ -1456,7 +1481,9 @@ pub fn derivation_start_failure(
         } => ProviderFailure::Killed,
         StartFailure::ExitedBeforeHandshake { .. } => ProviderFailure::Exited,
         StartFailure::HandshakeDeadline => ProviderFailure::Deadline,
-        StartFailure::HandshakeMismatch => ProviderFailure::UnreadableOutput,
+        StartFailure::HandshakeMismatch | StartFailure::UnsupportedPrivateProtocol { .. } => {
+            ProviderFailure::UnreadableOutput
+        }
         StartFailure::Admission
         | StartFailure::Digest
         | StartFailure::Copy
@@ -1480,7 +1507,7 @@ enum Derived {
 
 /// Why a provider printed nothing usable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Unprinted {
+pub(crate) enum Unprinted {
     /// It exited unsuccessfully: it refused the selection.
     Refused,
     /// It did not start, ended on a signal, printed more than the bound, or
@@ -2190,7 +2217,7 @@ impl Executable {
     /// deadline, even while a descendant still holds it open. A printed
     /// revision is checked again when the child starts, against the bootstrap
     /// the child itself reports.
-    fn print(&self, flag: &str) -> std::result::Result<Vec<u8>, Unprinted> {
+    pub(crate) fn print(&self, flag: &str) -> std::result::Result<Vec<u8>, Unprinted> {
         use std::process::{Command, Stdio};
         use std::time::{Duration, Instant};
         const LIMIT: u64 = 4 * 1024 * 1024;
@@ -2202,6 +2229,10 @@ impl Executable {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
+        // This thread waits for the provider below, so it outlives it: when
+        // the process is killed, the provider itself ends. What the provider
+        // started is not covered (production providers are single-process).
+        super::parent_death::bind(&mut command);
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut command, 0);
         #[cfg(windows)]
@@ -2766,6 +2797,49 @@ mod connector_instance_tests {
         assert_eq!(read("connectors-local/5", &twice).err(), INVALID);
     }
 
+    /// A legacy `[adapters.work]` entry of `adapter_id`, beside the instance
+    /// `work` of the connector `kubernetes`: the name is both a legacy alias
+    /// and an instance's name.
+    fn alias_and_instance_sharing_a_name(adapter_id: &str) -> String {
+        let slack = &KINDS[1];
+        let scalars = slack.scalars.replace(
+            "adapter_id='slack-credentials'",
+            &format!("adapter_id='{adapter_id}'"),
+        );
+        let legacy = Kind::table("adapters.work", &scalars, slack);
+        format!("{legacy}{}", KINDS[4].instance(""))
+    }
+
+    /// story:legacy-alias-sharing-an-instance-name. A legacy alias names an
+    /// entry as `(adapter_id, alias)` and an instance as `(connector,
+    /// instance)`. Where both name one pair the name reaches either entry, and
+    /// the file is refused at load, so no request is sent. Where the pairs
+    /// differ each selector reaches exactly the entry it names.
+    #[test]
+    fn a_read_through_a_name_that_is_both_alias_and_instance_is_refused_as_ambiguous() {
+        let same = alias_and_instance_sharing_a_name("kubernetes");
+        assert_eq!(read("connectors-local/5", &same).err(), INVALID);
+        let other = alias_and_instance_sharing_a_name("slack-credentials");
+        let config = read("connectors-local/5", &other).unwrap();
+        let reached = |selector| config.select(selector).map(|s| s.alias);
+        assert_eq!(reached(Selector::Alias("work")), Some("work"));
+        assert_eq!(
+            reached(Selector::Instance {
+                connector: "kubernetes",
+                instance: "work"
+            }),
+            Some("cluster")
+        );
+        assert_eq!(
+            reached(Selector::Instance {
+                connector: "slack-credentials",
+                instance: "work"
+            }),
+            Some("work")
+        );
+        assert_eq!(reached(Selector::Alias("cluster")), Some("cluster"));
+    }
+
     #[test]
     fn connector_tables_are_refused_outside_format_five_and_when_malformed() {
         let kind = &KINDS[4];
@@ -3200,6 +3274,60 @@ mod derived_instance_tests {
         assert_eq!(fixture.read(&invalid).err(), INVALID);
     }
 
+    /// An instance states the company domains it admits (`allowed_domains`,
+    /// story:google-read-only-profiles-and-company-domain): the provider is
+    /// started with one `--allowed-domain` each, in the order stated, the
+    /// instance keeps them, and they are written back. An empty list, an entry
+    /// that is not a bare lowercase host name, a repeat and a list over eight
+    /// entries are refused.
+    #[test]
+    fn an_instance_states_the_company_domains_it_admits() {
+        let fixture = Fixture::gmail("gmail.private");
+        let body = format!("{GMAIL}allowed_domains=['example.test','other.test']\n");
+        let config = fixture.read(&body).unwrap();
+        assert_eq!(
+            config.adapters["gmail.private"].executable.args,
+            [
+                "--connector",
+                "gmail",
+                "--instance",
+                "private",
+                "--allowed-domain",
+                "example.test",
+                "--allowed-domain",
+                "other.test"
+            ]
+        );
+        let instance = &config.connectors.as_ref().unwrap()["gmail"].instances["private"];
+        assert_eq!(instance.allowed_domains, ["example.test", "other.test"]);
+        let written: toml::Value = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+        assert_eq!(
+            written["connectors"]["gmail"]["instances"]["private"]["allowed_domains"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+        let plain = fixture.read(GMAIL).unwrap();
+        assert!(
+            plain.connectors.as_ref().unwrap()["gmail"].instances["private"]
+                .allowed_domains
+                .is_empty()
+        );
+        for bad in [
+            "[]",
+            "['']",
+            "['Example.test']",
+            "['example.test','example.test']",
+            "['*.example.test']",
+            "['example.test/x']",
+            "['example']",
+            "['a.test','b.test','c.test','d.test','e.test','f.test','g.test','h.test','i.test']",
+        ] {
+            let body = format!("{GMAIL}allowed_domains={bad}\n");
+            assert_eq!(fixture.read(&body).err(), INVALID, "{bad}");
+        }
+    }
+
     /// The coordinator's rule for a connector declaring more than one profile
     /// and an instance that names none: the file loads, the instance is
     /// listed with its connector's profiles and has no entry, so nothing
@@ -3256,10 +3384,20 @@ mod derived_instance_tests {
     #[test]
     fn printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output() {
         let fixture = Fixture::gmail("gmail.private");
-        fixture.behave("sleep 25 &\nexit 0");
-        let started = std::time::Instant::now();
+        let ended = fixture.root.path().join("ended");
+        fixture.behave(&format!("sleep 25 &\ntouch '{}'\nexit 0", ended.display()));
         assert_eq!(fixture.read(GMAIL).err(), INVALID);
-        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        // The bound is on the load after the provider ended, not on the whole
+        // read: starting the provider and the shell is as slow as the host is
+        // loaded, and the ten-second deadline it must stay clear of is not.
+        // The file's modification time marks the end; `date +%N` is not POSIX.
+        let returned = std::time::SystemTime::now();
+        let ended = std::fs::metadata(&ended).unwrap().modified().unwrap();
+        let held = returned.duration_since(ended).unwrap_or_default();
+        assert!(
+            held < std::time::Duration::from_secs(5),
+            "the load returned {held:?} after the provider ended: a descendant held the output toward the 10 s deadline"
+        );
         assert_eq!(fixture.args().matches("--connector").count(), 1);
     }
 

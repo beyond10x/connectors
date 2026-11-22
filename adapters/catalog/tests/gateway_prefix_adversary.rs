@@ -6,7 +6,7 @@
 //! service-account token is sent as `Bearer`. These cases drive the guides and
 //! the implementation against that, plus the revision and parsing edges.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use base64::Engine as _;
 use connectors_host::local::{

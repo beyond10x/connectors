@@ -264,6 +264,14 @@ Callable: `setup-checkpoints-enable`. Input: `connectors.cli.SetupCheckpointsEna
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `setup custody-orphans`
+
+List the custody items in the Secret Service that the store of this state directory does not name, grouped by authority; another store of this machine may hold a listed authority; --mode remove --authority ID deletes the items of that one authority and nothing else
+
+Callable: `setup-custody-orphans`. Input: `connectors.cli.SetupCustodyOrphansInput`. Result: `connectors.cli.SetupCustodyOrphansResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `setup init`
 
 Create private local configuration without starting services
@@ -322,6 +330,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:operations-list: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-check: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract
+- handler:setup-custody-orphans: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-init: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract

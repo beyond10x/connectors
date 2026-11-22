@@ -52,8 +52,53 @@ pub enum StartFailure {
     /// its configuration expects (`readiness_mismatch`), or broke its channel
     /// while still running.
     HandshakeMismatch,
+    /// The program answered the handshake by refusing the private protocol its
+    /// entry selects (`unsupported_private_protocol`), naming those it speaks
+    /// (story:adapter-private-protocol-refusal-named). It is answered as a
+    /// failure of its own, not an observation: `instances status` never prints
+    /// it as `start_failure`.
+    UnsupportedPrivateProtocol { supported: SupportedProtocols },
+}
+/// The private protocols a refusing program said it speaks, among those this
+/// host knows (a version it does not know is not kept).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SupportedProtocols(u8);
+impl SupportedProtocols {
+    fn bit(protocol: PrivateProtocol) -> u8 {
+        match protocol {
+            PrivateProtocol::V1 => 1,
+            PrivateProtocol::V2 => 2,
+            PrivateProtocol::V3 => 4,
+        }
+    }
+    fn named(versions: &[String]) -> Self {
+        Self(
+            versions
+                .iter()
+                .filter_map(|version| PrivateProtocol::parse(version))
+                .fold(0, |bits, protocol| bits | Self::bit(protocol)),
+        )
+    }
+    /// The protocols, lowest first.
+    pub fn protocols(self) -> Vec<PrivateProtocol> {
+        [
+            PrivateProtocol::V1,
+            PrivateProtocol::V2,
+            PrivateProtocol::V3,
+        ]
+        .into_iter()
+        .filter(|protocol| self.0 & Self::bit(*protocol) != 0)
+        .collect()
+    }
 }
 impl StartFailure {
+    /// The protocols a program that refused its entry's said it speaks.
+    pub fn supported_private_protocols(self) -> Vec<PrivateProtocol> {
+        match self {
+            Self::UnsupportedPrivateProtocol { supported } => supported.protocols(),
+            _ => Vec::new(),
+        }
+    }
     /// The value `instances status` prints as `start_failure`.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -64,6 +109,7 @@ impl StartFailure {
             Self::ExitedBeforeHandshake { .. } => "exited_before_handshake",
             Self::HandshakeDeadline => "handshake_deadline",
             Self::HandshakeMismatch => "handshake_mismatch",
+            Self::UnsupportedPrivateProtocol { .. } => "unsupported_private_protocol",
         }
     }
 }
@@ -284,6 +330,15 @@ impl Child {
     pub fn spawn(config: &super::super::config::Adapter) -> Result<Self> {
         Self::spawn_until(config, Instant::now() + Duration::from_secs(10))
     }
+    /// [`Child::spawn`] with a start budget the caller chooses, past the
+    /// ten seconds `spawn` and `start` cap a start at. For a test in another
+    /// crate, where `cfg(test)` of this one is not visible, that runs the
+    /// adapter on a loaded host.
+    #[doc(hidden)]
+    pub fn spawn_within(config: &super::super::config::Adapter, budget: Duration) -> Result<Self> {
+        Self::start_capped(config, Instant::now() + budget, budget, None)
+            .map_err(|error| error.failure)
+    }
     pub(crate) fn spawn_until(
         config: &super::super::config::Adapter,
         deadline: Instant,
@@ -303,8 +358,16 @@ impl Child {
         deadline: Instant,
         state: Option<&Path>,
     ) -> std::result::Result<Self, StartError> {
+        Self::start_capped(config, deadline, Duration::from_secs(10), state)
+    }
+    fn start_capped(
+        config: &super::super::config::Adapter,
+        deadline: Instant,
+        cap: Duration,
+        state: Option<&Path>,
+    ) -> std::result::Result<Self, StartError> {
         let mut stderr = None;
-        let started = Self::launch(config, deadline, &mut stderr);
+        let started = Self::launch(config, deadline, cap, &mut stderr);
         // A failed start's process has been ended and reaped by now: the log
         // holds what it wrote, and nothing more can arrive.
         let log = keep_start_log(stderr, state, &config.instance_id);
@@ -313,10 +376,11 @@ impl Child {
     fn launch(
         config: &super::super::config::Adapter,
         deadline: Instant,
+        cap: Duration,
         stderr: &mut Option<Stderr>,
     ) -> std::result::Result<Self, (Failure, StartFailure)> {
         let spawn = |failure| (failure, StartFailure::Spawn);
-        let until = deadline.min(Instant::now() + Duration::from_secs(10));
+        let until = deadline.min(Instant::now() + cap);
         let executable = config.executable.capture_explained(until)?;
         #[cfg(windows)]
         let _ = stderr;
@@ -450,6 +514,18 @@ impl Child {
             Err(failure) => return Err((failure, child.interrupted(failure))),
         };
         let mismatch = (Failure::ReadinessMismatch, StartFailure::HandshakeMismatch);
+        // The program refuses the protocol this entry selects, by name.
+        if let Reply::Refused { version, supported } = &response.control {
+            if version != config.private_protocol().as_str() {
+                return Err(mismatch);
+            }
+            return Err((
+                Failure::UnsupportedPrivateProtocol,
+                StartFailure::UnsupportedPrivateProtocol {
+                    supported: SupportedProtocols::named(supported),
+                },
+            ));
+        }
         let Reply::Ready {
             version,
             nonce: returned,
@@ -596,7 +672,7 @@ impl Child {
             {
                 Err(Refusal {
                     failure: code,
-                    reason: super::admitted(reason, secret),
+                    reason: super::admitted_validation(reason, secret),
                     retry_after_seconds: None,
                 })
             }
@@ -807,6 +883,25 @@ impl Child {
         input: &[u8],
         budget: ReadBudget,
     ) -> Result<Vec<u8>> {
+        self.invoke_bounded_until_cancelled(
+            operation, revision, partition, secret, input, budget, None,
+        )
+    }
+    /// [`Child::invoke_bounded`] that stops waiting for the answer once `cancel`
+    /// fails, checked at least every 250 ms: the child is then ended, so its
+    /// provider call and credential read end with it
+    /// (story:owner-cancels-a-bounded-read).
+    #[allow(clippy::too_many_arguments)]
+    pub fn invoke_bounded_until_cancelled(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        budget: ReadBudget,
+        cancel: Option<&dyn Fn() -> Result<()>>,
+    ) -> Result<Vec<u8>> {
         if self.protocol != PrivateProtocol::V3 {
             return Err(Failure::Unsupported);
         }
@@ -851,7 +946,13 @@ impl Child {
             until,
         )
         .and_then(|_| {
-            channel::read::<Reply>(&mut self.channel, until, false, budget.result_bytes())
+            channel::read_with_cancel::<Reply>(
+                &mut self.channel,
+                until,
+                false,
+                budget.result_bytes(),
+                cancel,
+            )
         })
         .and_then(|frame| match frame.control {
             Reply::Success { request_id } if request_id == id => {
@@ -1337,6 +1438,33 @@ executable: None,
         if mode == "fixture-mode-stderr-exit" {
             stderr(b"fixture: refused to start\n");
             std::process::exit(3);
+        }
+        // A program serving through the host library that speaks only
+        // `connectors-private/1`: asked for another, it refuses by the
+        // library's own reply (story:adapter-private-protocol-refusal-named).
+        #[cfg(unix)]
+        if mode == "fixture-mode-refuse-private-protocol" {
+            struct V1Only;
+            #[async_trait::async_trait]
+            impl crate::local::runtime::Adapter for V1Only {
+                fn bootstrap(&self) -> Bootstrap {
+                    bootstrap()
+                }
+                async fn validate(&self, _: &str, _: Secret) -> Result<Baseline> {
+                    Err(Failure::Unsupported)
+                }
+                async fn invoke(
+                    &self,
+                    _: &str,
+                    _: &str,
+                    _: Secret,
+                    _: serde_json::Value,
+                ) -> Result<serde_json::Value> {
+                    Err(Failure::Unsupported)
+                }
+            }
+            let _ = crate::local::runtime::serve(3, V1Only);
+            std::process::exit(1);
         }
         // Four times the start log, more than a pipe holds, before anything
         // else: exits 3, or with `-start` goes on to its handshake.
@@ -1872,6 +2000,28 @@ executable: None,
         assert_eq!(std::fs::read_to_string(&log).unwrap(), kept);
     }
 
+    /// story:adapter-private-protocol-refusal-named: a program that speaks
+    /// only `connectors-private/1`, asked for `connectors-private/2`, fails its
+    /// start as `unsupported_private_protocol`, not `unavailable`, and names
+    /// the protocols it speaks.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_refusing_the_selected_private_protocol_is_named() {
+        let state = private_state();
+        let mut config = fixture_config("fixture-mode-refuse-private-protocol");
+        config.private_protocol = Some(PrivateProtocol::V2);
+        let error = failed_start(&config, state.path());
+        assert_eq!(error.step.as_str(), "unsupported_private_protocol");
+        assert_eq!(
+            serde_json::to_value(error.failure).unwrap(),
+            "unsupported_private_protocol"
+        );
+        assert_eq!(
+            error.step.supported_private_protocols(),
+            [PrivateProtocol::V1]
+        );
+    }
+
     /// story:program-start-failure-reason: an executable whose content is
     /// not the pinned one fails as `digest`, and one whose path is not
     /// admitted as `admission`, each under its unchanged code and with no
@@ -2054,6 +2204,93 @@ executable: None,
             );
             std::thread::sleep(Duration::from_millis(10));
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    const OWNER_STAND_IN: &str = "CONNECTORS_TEST_OWNER_STAND_IN_PID_FILE";
+
+    /// Run as the harness that stands in for an owner: it starts an adapter as
+    /// the owner does, publishes the adapter's pid and waits. An ordinary run
+    /// does nothing.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn owner_stand_in_fixture() {
+        use std::os::fd::AsRawFd;
+        let Some(file) = std::env::var_os(OWNER_STAND_IN).map(std::path::PathBuf::from) else {
+            return;
+        };
+        let child = fixture_child("fixture-mode-json");
+        std::fs::write(
+            file.with_extension("fd"),
+            child.channel.as_raw_fd().to_string(),
+        )
+        .unwrap();
+        crate::local::parent_death::fixture::publish(&file, child.process.id());
+        std::thread::sleep(Duration::from_secs(60));
+        drop(child);
+    }
+
+    /// `parent_death_kill` (story:test-children-die-with-their-parent): an
+    /// owner killed without running any `Drop` leaves none of its adapters.
+    /// The killed owner's end of the adapter's channel would end the adapter
+    /// when it closes (`an_adapter_exits_when_the_owner_end_of_its_channel_closes`),
+    /// so the case first takes its own duplicate of that end from the harness
+    /// (`pidfd_getfd`) and holds it open: only the death signal can end the
+    /// adapter then.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_killed_owner_leaves_no_adapter_running() {
+        use crate::local::parent_death::fixture::{
+            Harness, Reaper, kill_harness_and_expect_gone, pid_in,
+        };
+        use std::os::fd::FromRawFd;
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("adapter.pid");
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "local::runtime::process::tests::owner_stand_in_fixture",
+                "--nocapture",
+            ])
+            .env(OWNER_STAND_IN, &file)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let mut harness = Harness::start(command);
+        let adapter = pid_in(&file, &mut harness.0);
+        let _reaper = Reaper(adapter);
+        let channel: i32 = std::fs::read_to_string(file.with_extension("fd"))
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        // SAFETY: pidfd_open takes the id of the harness this case started.
+        let pidfd = unsafe { libc::syscall(libc::SYS_pidfd_open, harness.0.id(), 0) } as i32;
+        assert!(
+            pidfd >= 0,
+            "pidfd_open: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: the successful call returned a new descriptor this case owns.
+        let pidfd = unsafe { std::os::fd::OwnedFd::from_raw_fd(pidfd) };
+        // SAFETY: pidfd_getfd copies the harness's descriptor into this process.
+        let held = unsafe {
+            libc::syscall(
+                libc::SYS_pidfd_getfd,
+                std::os::fd::AsRawFd::as_raw_fd(&pidfd),
+                channel,
+                0,
+            )
+        } as i32;
+        assert!(
+            held >= 0,
+            "pidfd_getfd: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: the successful call returned a new descriptor this case owns.
+        let _held = unsafe { std::os::fd::OwnedFd::from_raw_fd(held) };
+        kill_harness_and_expect_gone(&mut harness.0, adapter);
     }
 
     /// `exact_process_signal`: `child_reap_lock`, through the owner's stop

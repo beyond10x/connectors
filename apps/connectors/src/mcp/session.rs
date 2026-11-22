@@ -1,5 +1,6 @@
 //! Same-process lease issuance and data gating. No authority arrives over stdin.
 use super::*;
+use connectors_host::local::clock;
 use connectors_mcp::{
     lease::LeaseGate,
     supervision::{self as model, obligations::*, *},
@@ -18,46 +19,17 @@ struct Clock {
     offset: i128,
     epoch: i64,
 }
-fn ticks(clock: libc::clockid_t) -> Option<u64> {
-    let mut stamp = libc::timespec {
-        tv_sec: 0,
-        tv_nsec: 0,
-    };
-    // SAFETY: stamp is a valid writable timespec; callers use fixed clock ids.
-    if unsafe { libc::clock_gettime(clock, &mut stamp) } != 0
-        || stamp.tv_sec < 0
-        || !(0..1_000_000_000).contains(&stamp.tv_nsec)
-    {
-        return None;
-    }
-    (stamp.tv_sec as u64)
-        .checked_mul(1_000_000_000)?
-        .checked_add(stamp.tv_nsec as u64)
-}
+/// One bracketed reading of the sleep-counting timer and its offset from the
+/// sleep-excluding one (`connectors_host::local::clock`): Linux `CLOCK_BOOTTIME`,
+/// macOS `CLOCK_MONOTONIC_RAW` (`mach_continuous_time`), Windows
+/// `QueryInterruptTimePrecise`. A bracket wider than 1 ms is refused.
 fn sample() -> Option<(u64, i128)> {
-    let before = ticks(libc::CLOCK_BOOTTIME)?;
-    let mono = ticks(libc::CLOCK_MONOTONIC)?;
-    let after = ticks(libc::CLOCK_BOOTTIME)?;
-    if after.checked_sub(before)? > 1_000_000 {
-        return None;
-    }
-    Some((before, i128::from(before) - i128::from(mono)))
+    let reading = clock::read_suspend_timers().ok()?;
+    Some((reading.counting_ns, reading.offset_ns))
 }
 impl Clock {
     fn new() -> Option<Self> {
-        for clock in [libc::CLOCK_BOOTTIME, libc::CLOCK_MONOTONIC] {
-            let mut resolution = libc::timespec {
-                tv_sec: 0,
-                tv_nsec: 0,
-            };
-            // SAFETY: resolution is live and writable for this fixed-clock query.
-            if unsafe { libc::clock_getres(clock, &mut resolution) } != 0
-                || resolution.tv_sec != 0
-                || !(0..=1_000_000).contains(&resolution.tv_nsec)
-            {
-                return None;
-            }
-        }
+        clock::qualify_suspend_timers().ok()?;
         let (boot, offset) = sample()?;
         let epoch = i64::try_from(
             SystemTime::now()

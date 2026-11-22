@@ -51,6 +51,9 @@ struct VisibilityCase {
     /// as `None`.
     #[serde(deserialize_with = "Option::deserialize")]
     revision_current: Option<bool>,
+    /// `read` or `mutating`: required on every row, so a row with a `null`
+    /// revision is never assumed to be a read.
+    operation: String,
     input_valid: bool,
     dependency_ready: bool,
     approval_ready: bool,
@@ -145,12 +148,19 @@ fn visibility(case: &VisibilityCase) -> Result<(bool, &str), String> {
         && case.enabled
         && case.metadata_admitted
         && case.policy != "unavailable";
+    if !matches!(case.operation.as_str(), "read" | "mutating") {
+        return Err("unknown operation kind".into());
+    }
     let outcome = match case.policy.as_str() {
         "deny" => "not_granted",
         "unavailable" => "unavailable",
         "admit" if !case.observation_admitted => "forbidden",
         // A read tool call that names no revision binds to the advertised one;
-        // a mutating one is invalid params under mutations.md (mutation-cases.json).
+        // a listed mutating one is invalid params (-32602) under mutations.md.
+        // A name the projection does not list binds as a read and meets lookup.
+        "admit" if case.revision_current.is_none() && case.operation == "mutating" && visible => {
+            "invalid_params"
+        }
         "admit" if case.revision_current == Some(false) => "stale_description",
         "admit" if !case.implemented || !case.bound => "not_found",
         "admit" if !case.enabled => "forbidden",
@@ -466,13 +476,53 @@ fn checker_holds_a_call_without_a_revision_to_the_advertised_one() {
     );
     let authored: serde_json::Value = serde_json::from_str(&read(CASES)).unwrap();
     for case in authored["visibility"].as_array().unwrap() {
-        let mut case = case.clone();
-        case.as_object_mut().unwrap().remove("revision_current");
-        assert!(
-            serde_json::from_value::<VisibilityCase>(case.clone()).is_err(),
-            "an omitted revision_current was accepted: {case}"
-        );
+        for member in ["revision_current", "operation"] {
+            let mut case = case.clone();
+            case.as_object_mut().unwrap().remove(member);
+            assert!(
+                serde_json::from_value::<VisibilityCase>(case.clone()).is_err(),
+                "an omitted {member} was accepted: {case}"
+            );
+        }
     }
+}
+
+/// A listed mutating tool called without a revision is invalid params
+/// (`-32602`), never a read's binding to the advertised revision.
+#[test]
+fn checker_refuses_a_listed_mutating_call_without_a_revision() {
+    let (document, cases, codes) = inputs();
+    let row = cases
+        .visibility
+        .iter()
+        .find(|case| case.id == "mutating-without-revision-refused")
+        .expect("a mutating row without a revision");
+    assert_eq!(row.operation, "mutating");
+    assert!(row.revision_current.is_none() && row.visible);
+    assert_eq!(row.outcome, "invalid_params");
+    assert_eq!(check(&document, &cases, &codes), Ok(()));
+    let mut binds = cases.clone();
+    binds
+        .visibility
+        .iter_mut()
+        .find(|case| case.id == "mutating-without-revision-refused")
+        .unwrap()
+        .outcome = "candidate_or_retained_key".into();
+    assert_eq!(
+        check(&document, &binds, &codes).unwrap_err(),
+        "contradicted visibility or refusal precedence"
+    );
+    let mut unlisted = cases.clone();
+    let row = unlisted
+        .visibility
+        .iter_mut()
+        .find(|case| case.id == "mutating-without-revision-refused")
+        .unwrap();
+    row.operation = "write".into();
+    assert_eq!(
+        check(&document, &unlisted, &codes).unwrap_err(),
+        "unknown operation kind"
+    );
 }
 
 #[test]

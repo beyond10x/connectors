@@ -54,20 +54,20 @@ pub(in crate::local::owner) fn resolve(
         .operation(request.operation)
         .map_err(|_| Code::NotFound)?;
     let profile = &operation.profile;
-    // An implemented read runs only where the MCP projection would advertise
-    // it: the `resource` profile over self-contained schemas. A caller that
-    // sends a bounded-read frame directly reaches no wider set.
+    // A read runs only where the MCP projection would advertise it: over
+    // self-contained schemas, an implemented one on the `resource` profile and
+    // a generic one on the generic HTTP profiles. A caller that sends a
+    // bounded-read frame directly reaches no wider set.
+    if !connectors_core::inline_schema(&operation.input_schema)
+        || !connectors_core::inline_schema(&operation.output_schema)
+    {
+        return Err(Code::Unsupported.into());
+    }
     let expected = match value["realization"].as_str() {
         Some("generic") if matches!(profile.as_str(), "generic-http" | "generic-http-page") => {
             (40_000, 30_000, 262_144, 4_194_304)
         }
-        Some("implemented")
-            if profile == "resource"
-                && connectors_core::inline_schema(&operation.input_schema)
-                && connectors_core::inline_schema(&operation.output_schema) =>
-        {
-            (20_000, 15_000, 65_536, 4_194_304)
-        }
+        Some("implemented") if profile == "resource" => (20_000, 15_000, 65_536, 4_194_304),
         _ => return Err(Code::Unsupported.into()),
     };
     let limits = &value["limits"];

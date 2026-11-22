@@ -10,7 +10,7 @@
 //! a 5xx, a terminate answered 204, 200 and 404. No live Runpod account, no
 //! network, and the key is fictional.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};

@@ -63,6 +63,7 @@ Every command accepts these, anywhere on the command line.
 | [`connectors operations list`](#connectors-operations-list) | List operations from selected cached metadata |
 | [`connectors setup check`](#connectors-setup-check) | Check local configuration and prerequisites without authentication |
 | [`connectors setup checkpoints-enable`](#connectors-setup-checkpoints-enable) | Enable durable open checkpoints on the existing store; one-way, connectors 0.32.0 and earlier can no longer open it |
+| [`connectors setup custody-orphans`](#connectors-setup-custody-orphans) | List the custody items in the Secret Service that the store of this state directory does not name, grouped by authority; another store of this machine may hold a listed authority; --mode remove --authority ID deletes the items of that one authority and nothing else |
 | [`connectors setup init`](#connectors-setup-init) | Create private local configuration without starting services |
 | [`connectors setup migrate`](#connectors-setup-migrate) | Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id and revision, in the short form when the installed provider derives it unchanged; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC) |
 | [`connectors setup owner-stop`](#connectors-setup-owner-stop) | Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner |
@@ -325,6 +326,7 @@ connectors connections connect [OPTIONS] --profile <field:profile> [field:target
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
+| `--credential-env <NAME>` | no | none | any | The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN` |
 | `<field:target>` | no | none | any |  |
 | `--endpoint <field:endpoint>` | no | none | any |  |
 
@@ -395,6 +397,7 @@ connectors connections reconnect [OPTIONS] --expected-revision <field:expected_r
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
+| `--credential-env <NAME>` | no | none | any | The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN` |
 
 ## `connectors connections repair`
 
@@ -415,6 +418,7 @@ connectors connections repair [OPTIONS] --expected-revision <field:expected_revi
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
+| `--credential-env <NAME>` | no | none | any | The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN` |
 
 ## `connectors connections revalidate`
 
@@ -642,6 +646,19 @@ connectors setup checkpoints-enable [OPTIONS]
 | Argument | Required | Default | Values | Meaning |
 |---|---|---|---|---|
 | `--confirm <field:confirm>` | no | none | any |  |
+
+## `connectors setup custody-orphans`
+
+List the custody items in the Secret Service that the store of this state directory does not name, grouped by authority; another store of this machine may hold a listed authority; --mode remove --authority ID deletes the items of that one authority and nothing else
+
+```text
+connectors setup custody-orphans [OPTIONS]
+```
+
+| Argument | Required | Default | Values | Meaning |
+|---|---|---|---|---|
+| `--mode <field:mode>` | no | none | any |  |
+| `--authority <field:authority>` | no | none | any |  |
 
 ## `connectors setup init`
 

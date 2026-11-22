@@ -26,7 +26,9 @@
 //!   documentation does not configure it;
 //! - a profile id configured for more than one definition is shared: what all
 //!   of them agree on goes into `auth/<prefix>.yaml` (the id up to its first
-//!   `.`), and each definition `use`s it and gives the rest;
+//!   `.`), and each definition `use`s it and gives the rest. An existing
+//!   `auth/<prefix>.yaml` is merged, not replaced: the shipped profiles win and
+//!   the profiles the import does not ship stay;
 //! - URL, retrieval date and license come from the README beside the source.
 //!
 //! Choices the notation leaves open are made the same way every time: a paging
@@ -222,6 +224,8 @@ struct ShippedOperation {
     #[serde(default)]
     custody: Option<Custody>,
     #[serde(default)]
+    query_fixed: Option<IndexMap<String, String>>,
+    #[serde(default)]
     envelope: Option<Envelope>,
     #[serde(default)]
     body_keys: Vec<String>,
@@ -237,6 +241,8 @@ struct ShippedOperation {
     body_enums: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     body_any_of: Vec<String>,
+    #[serde(default)]
+    body_null_clears: bool,
     #[serde(default)]
     body_prefixes: BTreeMap<String, String>,
     #[serde(default)]
@@ -417,6 +423,8 @@ struct DocumentedAuth {
     label: String,
     identity: DocumentedIdentity,
     #[serde(default)]
+    read_only: bool,
+    #[serde(default)]
     scopes: Option<DocumentedScopes>,
     #[serde(default)]
     access: Option<DocumentedAccess>,
@@ -479,6 +487,9 @@ struct Declared {
     #[serde(default)]
     api_path: Option<String>,
     selection: String,
+    /// The profile of an instance that names none.
+    #[serde(default)]
+    default_profile: Option<String>,
     profiles: Vec<DocumentedAuth>,
 }
 
@@ -555,6 +566,7 @@ fn documented_profile(block: &DocumentedAuth) -> Result<Auth, Failure> {
             kind: Some(block.identity.kind.clone()),
             subject: block.identity.subject_pointer.clone(),
         }),
+        read_only: block.read_only.then_some(true),
         scopes: has_scopes.then_some(scopes),
         access: block.access.as_ref().map(|access| AuthAccess {
             path: access.path.clone(),
@@ -695,6 +707,9 @@ struct Configured {
     base: BTreeMap<String, String>,
     /// Definition name → the profile the bundle records.
     default: BTreeMap<String, String>,
+    /// Definition name → the profile of an instance that names none, where
+    /// the declaration names one.
+    instance_default: BTreeMap<String, String>,
     /// Definition name → its connector id, where the declaration names one
     /// other than the definition name.
     id: BTreeMap<String, String>,
@@ -757,6 +772,9 @@ fn declare(configured: &mut Configured, name: &str, declared: Declared) -> Resul
     if declared.connector_id != name {
         configured.id.insert(name.to_owned(), declared.connector_id);
     }
+    if let Some(profile) = declared.default_profile {
+        configured.instance_default.insert(name.to_owned(), profile);
+    }
     configured.base.insert(name.to_owned(), base);
     configured.profiles.insert(name.to_owned(), profiles);
     Ok(())
@@ -797,6 +815,7 @@ fn configured(connectors: &Path) -> Result<Configured, Failure> {
         profiles: BTreeMap::new(),
         base: BTreeMap::new(),
         default: BTreeMap::new(),
+        instance_default: BTreeMap::new(),
         id: BTreeMap::new(),
         defaults: BTreeMap::new(),
         grants: BTreeMap::new(),
@@ -891,6 +910,7 @@ fn common(a: &Auth, b: &Auth) -> Auth {
         label: same(&a.label, &b.label),
         account_label: same(&a.account_label, &b.account_label),
         identity,
+        read_only: same(&a.read_only, &b.read_only),
         scopes: same(&a.scopes, &b.scopes),
         access: same(&a.access, &b.access),
         evidence_lifetime_ms: same(&a.evidence_lifetime_ms, &b.evidence_lifetime_ms),
@@ -930,6 +950,7 @@ fn over(full: &Auth, base: &Auth) -> Auth {
         label: unless_same(&full.label, &base.label),
         account_label: unless_same(&full.account_label, &base.account_label),
         identity,
+        read_only: unless_same(&full.read_only, &base.read_only),
         scopes: unless_same(&full.scopes, &base.scopes),
         access: unless_same(&full.access, &base.access),
         evidence_lifetime_ms: unless_same(&full.evidence_lifetime_ms, &base.evidence_lifetime_ms),
@@ -1306,6 +1327,7 @@ fn body_notation(shipped: &ShippedOperation) -> Result<Option<IndexMap<String, S
             || !shipped.body_fixed.is_empty()
             || !shipped.body_enums.is_empty()
             || !shipped.body_any_of.is_empty()
+            || shipped.body_null_clears
             || !shipped.body_prefixes.is_empty();
         return if any {
             Err(refused("body fields without body_keys".to_owned()))
@@ -1912,6 +1934,24 @@ fn write_file(path: &Path, bytes: &[u8], written: &mut Vec<PathBuf>) -> Result<(
     Ok(())
 }
 
+/// The profiles an `auth/<library>.yaml` already holds, none when there is no
+/// such file. A file that is not a library is a failure: it is never overwritten.
+fn existing_library(path: &Path) -> Result<IndexMap<String, Auth>, Failure> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(IndexMap::new()),
+        Err(error) => return Err(Failure::Unreadable(format!("{}: {error}", path.display()))),
+    };
+    serde_yaml_ng::from_slice::<AuthLibrary>(&bytes)
+        .map(|library| library.profiles)
+        .map_err(|error| {
+            Failure::Malformed(format!(
+                "{}: not an auth library, so the import does not overwrite it: {error}",
+                path.display()
+            ))
+        })
+}
+
 /// Import one shipped selection. See the module documentation for what is
 /// taken from where.
 pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
@@ -2138,10 +2178,14 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             body: body_notation(operation)?,
             body_enums: in_body_order(operation, &operation.body_enums),
             body_any_of: (!operation.body_any_of.is_empty()).then(|| operation.body_any_of.clone()),
+            body_null_clears: operation.body_null_clears.then_some(true),
             body_prefixes: in_body_order(operation, &operation.body_prefixes),
             conflict_status: operation.conflict_status,
             guard,
-            query_fixed: None,
+            query_fixed: operation
+                .query_fixed
+                .clone()
+                .filter(|fixed| !fixed.is_empty()),
             query_folds: None,
             embedded_text: None,
             rate_limit_headers: None,
@@ -2187,6 +2231,7 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
         },
         base_url,
         config: (!config.is_empty()).then_some(config),
+        default_profile: configured.instance_default.get(&name).cloned(),
         auth,
         paging: (!paging.is_empty()).then_some(paging),
         defaults,
@@ -2304,19 +2349,16 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
     let definition_path = root.join("connectors").join(format!("{name}.yaml"));
     write_file(&definition_path, text.as_bytes(), &mut written)?;
     for library in &used_libraries {
-        let profiles: IndexMap<String, Auth> = libraries[library]
-            .iter()
-            .map(|(id, profile)| (id.clone(), profile.clone()))
-            .collect();
+        let path = root.join("auth").join(format!("{library}.yaml"));
+        let mut profiles = existing_library(&path)?;
+        for (id, profile) in &libraries[library] {
+            profiles.insert(id.clone(), profile.clone());
+        }
         let text = yaml(&AuthLibrary {
             schema: AuthLibraryId::V1,
             profiles,
         })?;
-        write_file(
-            &root.join("auth").join(format!("{library}.yaml")),
-            text.as_bytes(),
-            &mut written,
-        )?;
+        write_file(&path, text.as_bytes(), &mut written)?;
     }
     for file in &vendored {
         write_file(

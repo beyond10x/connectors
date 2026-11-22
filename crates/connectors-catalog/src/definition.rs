@@ -14,6 +14,7 @@
 //! profiles) keep the file's order: the selection lists its operations, a closed
 //! body its keys and a guard its checks in the order the definition writes them.
 
+use crate::query_template::{self, Part};
 use crate::{bundle, pipeline};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -245,6 +246,10 @@ pub struct Auth {
     pub account_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<AuthIdentity>,
+    /// The profile offers the selection's reads only: the catalog provider
+    /// offers an instance on it no write. Lowered only when true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<AuthScopes>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -835,6 +840,10 @@ pub struct Operation {
     /// one, the engine's `body_any_of`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub body_any_of: Option<Vec<String>>,
+    /// Whether a `body_any_of` key given as `null` counts as the one change,
+    /// the engine's `body_null_clears`. Only `true`, beside `body_any_of`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_null_clears: Option<bool>,
     /// The text sent before the caller's value of a `string` key of `body`,
     /// the engine's `body_prefixes`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -886,6 +895,10 @@ pub struct ProviderDefinition {
     pub base_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<IndexMap<String, ConfigField>>,
+    /// The profile of an instance that names none, one of `auth`; it may
+    /// differ from the one marked `default: true`, which the bundle records.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_profile: Option<String>,
     pub auth: IndexMap<String, Auth>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub paging: Option<IndexMap<String, PagingStyle>>,
@@ -981,6 +994,17 @@ pub enum Refusal {
     AuthLifetime { key: String, value: u64 },
     /// A `{variable}` in `base_url` or an OAuth URL that `config` does not declare.
     UndeclaredVariable(String),
+    /// An operation the definition reaches, by an `op` or a guard read, whose
+    /// path does not start with the path of a `base_url` that ends in a
+    /// variable `config` declares, or names one of its variables again. The
+    /// instance endpoint's path stands for that path ([`base_path`]), so the
+    /// operation would be sent under it.
+    OutsideBasePath {
+        key: String,
+        op: String,
+        path: String,
+        base: String,
+    },
     /// Profile ids that do not all start with one provider id and a `.`.
     ProviderId(String),
     /// A source that names other than one document, or a projection where
@@ -1041,6 +1065,8 @@ pub enum Refusal {
     /// A `body_any_of` other than at least two distinct keys under one parent
     /// that `body` declares and the caller sends.
     BodyAnyOf { key: String, detail: String },
+    /// A `body_null_clears` other than `true` beside a valid `body_any_of`.
+    BodyNullClears { key: String, detail: String },
     /// A `body_prefixes` entry other than a non-empty prefix of a key `body`
     /// declares as a `string` the caller sends.
     BodyPrefix { key: String, field: String },
@@ -1099,6 +1125,7 @@ impl Refusal {
             Self::AuthMisplaced { .. } => "auth_misplaced",
             Self::AuthLifetime { .. } => "auth_lifetime",
             Self::UndeclaredVariable(_) => "undeclared_variable",
+            Self::OutsideBasePath { .. } => "outside_base_path",
             Self::ProviderId(_) => "provider_id",
             Self::SourceKind(_) => "source_kind",
             Self::SourceOutsideRoot(_) => "source_outside_root",
@@ -1117,6 +1144,7 @@ impl Refusal {
             Self::BodyType { .. } => "body_type",
             Self::BodyEnum { .. } => "body_enum",
             Self::BodyAnyOf { .. } => "body_any_of",
+            Self::BodyNullClears { .. } => "body_null_clears",
             Self::BodyPrefix { .. } => "body_prefix",
             Self::ConflictStatus { .. } => "conflict_status",
             Self::UnknownDatasourceOperation { .. } => "unknown_datasource_operation",
@@ -1159,12 +1187,45 @@ pub enum FeedRule {
     UtcOffsets,
     /// `utc_offsets` needs `page`.
     UtcOffsetsPage,
-    /// `url`, `url_base` and `parent` are JSON pointers.
+    /// The fields that read a record, `id`, `records`, `revision`, `body.pointer`, `url`, `parent` and the rest, are JSON pointers.
     ItemPointer,
     /// The parameters a position names, `time`, `query.parameter` and
     /// `page.parameter`, are query parameters of the items' list operation,
     /// which the engine binds them to.
     PositionParameter,
+    /// A query template is one the engine's parser reads: no slot beside a
+    /// quote or backslash or inside a literal, no unknown slot, no stray brace.
+    QueryTemplate,
+    /// `containers.query`, `items.query` and the cursor's parameter name query
+    /// parameters their operation takes.
+    OperationQuery,
+    /// No parameter of an operation is bound twice.
+    ParameterTwice,
+    /// A parameter the feed sends only on resume, `time`, `page.parameter` or
+    /// the cursor's, is not one its operation requires.
+    ParameterRequired,
+    /// The containers' list, the lookup and the items' list are GET operations.
+    OperationGet,
+    /// Each parameter an operation requires is one the feed sends on every
+    /// request: the page size, the container, the query, `query` keys and the
+    /// lookup's path parameter.
+    ParameterUnbound,
+    /// `profile` is 1 to 128 visible ASCII characters.
+    Profile,
+    /// The page-size cap, the items' style's `max`, is from 1 to 100.
+    MaxLimit,
+    /// `containers.kind_word` is present and 1 to 128 visible ASCII characters.
+    KindWord,
+    /// `capabilities` name each of deletions, kind, revision and visibility
+    /// with a word the engine knows, and claim only what the reader's feed
+    /// carries: no tombstones, a fixed kind word, no visibility map, and the
+    /// update time as the revision exactly when `items.revision` is
+    /// `items.updated_at`.
+    Capabilities,
+    /// `items.body.representation` is not empty.
+    BodyRepresentation,
+    /// A `url_parameter` is 1 to 128 visible ASCII characters.
+    UrlParameter,
 }
 
 impl FeedRule {
@@ -1181,6 +1242,18 @@ impl FeedRule {
             Self::UtcOffsetsPage => "feed_utc_offsets_page",
             Self::ItemPointer => "feed_item_pointer",
             Self::PositionParameter => "feed_position_parameter",
+            Self::QueryTemplate => "feed_query_template",
+            Self::OperationQuery => "feed_operation_query",
+            Self::ParameterTwice => "feed_parameter_twice",
+            Self::ParameterRequired => "feed_parameter_required",
+            Self::OperationGet => "feed_operation_get",
+            Self::ParameterUnbound => "feed_parameter_unbound",
+            Self::Profile => "feed_profile",
+            Self::MaxLimit => "feed_max_limit",
+            Self::KindWord => "feed_kind_word",
+            Self::Capabilities => "feed_capabilities",
+            Self::BodyRepresentation => "feed_body_representation",
+            Self::UrlParameter => "feed_url_parameter",
         }
     }
 
@@ -1198,10 +1271,32 @@ impl FeedRule {
                 "utc_offsets lies within -1439..1439 and least is not above greatest"
             }
             Self::UtcOffsetsPage => "utc_offsets needs page",
-            Self::ItemPointer => "url, url_base and parent are JSON pointers",
+            Self::ItemPointer => "every feed field that reads a record is a JSON pointer",
             Self::PositionParameter => {
                 "the parameters a position names are query parameters of items.list"
             }
+            Self::QueryTemplate => {
+                "a query template has no slot beside a quote or backslash or inside a literal, no unknown slot and no stray brace"
+            }
+            Self::OperationQuery => {
+                "containers.query, items.query and the cursor's parameter are query parameters of their operation"
+            }
+            Self::ParameterTwice => "an operation's parameter is bound once",
+            Self::ParameterRequired => {
+                "a parameter sent only on resume is not one its operation requires"
+            }
+            Self::OperationGet => "a feed operation is a GET",
+            Self::ParameterUnbound => {
+                "every parameter an operation requires is one the feed sends on every request"
+            }
+            Self::Profile => "profile is 1 to 128 visible ASCII characters",
+            Self::MaxLimit => "the page-size cap is from 1 to 100",
+            Self::KindWord => "containers.kind_word is 1 to 128 visible ASCII characters",
+            Self::Capabilities => {
+                "capabilities name deletions, kind, revision and visibility, each as a claim the feed supports"
+            }
+            Self::BodyRepresentation => "items.body.representation is not empty",
+            Self::UrlParameter => "a url_parameter is 1 to 128 visible ASCII characters",
         }
     }
 }
@@ -1246,6 +1341,15 @@ impl std::fmt::Display for Refusal {
             Self::UndeclaredVariable(variable) => write!(
                 f,
                 "{name}: URL variable `{variable}` is not declared in config"
+            ),
+            Self::OutsideBasePath {
+                key,
+                op,
+                path,
+                base,
+            } => write!(
+                f,
+                "{name}: operation `{key}` reaches `{op}` at `{path}`, which is not under the base URL's path `{base}`"
             ),
             Self::SourceHashMismatch { expected, actual } => write!(
                 f,
@@ -1310,9 +1414,13 @@ impl std::fmt::Display for Refusal {
                 f,
                 "{name}: operation `{key}` body_any_of {detail}; expected at least two distinct keys under one parent that its body declares and the caller sends"
             ),
+            Self::BodyNullClears { key, detail } => write!(
+                f,
+                "{name}: operation `{key}` body_null_clears {detail}; expected `true`, beside a body_any_of"
+            ),
             Self::BodyPrefix { key, field } => write!(
                 f,
-                "{name}: operation `{key}` body_prefixes `{field}` is not a non-empty prefix of a string key its body declares and the caller sends"
+                "{name}: operation `{key}` body_prefixes `{field}` is not a non-empty prefix of a string key its body declares and the caller sends, and body_enums does not also name"
             ),
             Self::ConflictStatus { key, status } => write!(
                 f,
@@ -1483,6 +1591,8 @@ pub struct SelectionEntry {
     pub body_enums: BTreeMap<String, Vec<String>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub body_any_of: Vec<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub body_null_clears: bool,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub body_prefixes: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1521,6 +1631,7 @@ struct Body {
     fixed: BTreeMap<String, Value>,
     enums: BTreeMap<String, Vec<String>>,
     any_of: Vec<String>,
+    null_clears: bool,
     prefixes: BTreeMap<String, String>,
 }
 
@@ -1574,6 +1685,18 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
             field: field.clone(),
             spec: "a key the engine reads as a path: a plain name without `.`, or a pointer"
                 .to_owned(),
+        });
+    }
+    if let Some(field) = body.keys.iter().find(|field| {
+        path(field).is_some_and(|own| {
+            own.iter()
+                .any(|segment| !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit()))
+        })
+    }) {
+        return Err(Refusal::BodyType {
+            key: key.to_owned(),
+            field: field.clone(),
+            spec: "a key of object names: a segment of digits would name a list element".to_owned(),
         });
     }
     let mut paths = BTreeSet::new();
@@ -1644,8 +1767,27 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
         }
         body.any_of = any_of.clone();
     }
+    match operation.body_null_clears {
+        None => {}
+        Some(true) if !body.any_of.is_empty() => body.null_clears = true,
+        Some(true) => {
+            return Err(Refusal::BodyNullClears {
+                key: key.to_owned(),
+                detail: "is given without a body_any_of".to_owned(),
+            });
+        }
+        Some(false) => {
+            return Err(Refusal::BodyNullClears {
+                key: key.to_owned(),
+                detail: "is `false`; omit it instead".to_owned(),
+            });
+        }
+    }
     for (field, prefix) in operation.body_prefixes.iter().flatten() {
-        if !body.sent_string(field) || prefix.is_empty() {
+        if !body.sent_string(field)
+            || prefix.is_empty()
+            || body.enums.keys().any(|named| path(named) == path(field))
+        {
             return Err(Refusal::BodyPrefix {
                 key: key.to_owned(),
                 field: field.clone(),
@@ -1890,6 +2032,7 @@ pub fn merged(base: &Auth, over: &Auth) -> Auth {
         label: pick(&over.label, &base.label),
         account_label: pick(&over.account_label, &base.account_label),
         identity,
+        read_only: over.read_only.or(base.read_only),
         scopes: over.scopes.clone().or_else(|| base.scopes.clone()),
         access: over.access.clone().or_else(|| base.access.clone()),
         evidence_lifetime_ms: over.evidence_lifetime_ms.or(base.evidence_lifetime_ms),
@@ -2151,6 +2294,9 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
     }
     block.push(field("label", text(label)));
     block.push(field("identity", Node::Inline(probe)));
+    if profile.read_only == Some(true) {
+        block.push(field("read_only", Node::Flag(true)));
+    }
     let scopes = profile.scopes.as_ref();
     if let Some(scopes) = scopes {
         match (&scopes.path, &scopes.pointer) {
@@ -2229,8 +2375,10 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
 
 /// The declaration's `default_endpoint` and `api_path`. When the host of
 /// `base_url` is one variable, users know the host and not the API under it, so
-/// the endpoint is the origin and the path under it is `api_path`. The endpoint
-/// is a default only when `config` defaults every variable in it.
+/// the endpoint is the origin and the path under it is `api_path`, unless the
+/// path ends in a configured variable ([`base_path`]), which the endpoint
+/// names. The endpoint is a default only when `config` defaults every variable
+/// in it.
 fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<String>), Refusal> {
     let base = definition.base_url.as_str();
     let (scheme, rest) = base
@@ -2239,7 +2387,8 @@ fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<S
     let (authority, path) = rest.find('/').map_or((rest, ""), |at| rest.split_at(at));
     let one_variable =
         authority.starts_with('{') && authority.ends_with('}') && variables(authority)?.len() == 1;
-    let api_path = (one_variable && !path.is_empty()).then(|| path.to_owned());
+    let api_path = (one_variable && !path.is_empty() && base_path(definition)?.is_none())
+        .then(|| path.to_owned());
     let mut resolved = match api_path {
         Some(_) => format!("{scheme}://{authority}"),
         None => base.to_owned(),
@@ -2256,6 +2405,121 @@ fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<S
         resolved = resolved.replace(&format!("{{{variable}}}"), default);
     }
     Ok((Some(resolved), api_path))
+}
+
+/// The path of `base_url` when its last segment is one variable `config`
+/// declares, as `/{accountId}` of `https://3.basecampapi.com/{accountId}`, and
+/// the variables that path names. Every operation such a definition reaches
+/// starts with it; the lowering drops it ([`strip_base_path`]) and the
+/// instance endpoint's path fills it. A variable `config` does not declare is
+/// refused by [`declaration`] as [`Refusal::UndeclaredVariable`] first.
+fn base_path(definition: &ProviderDefinition) -> Result<Option<(&str, Vec<&str>)>, Refusal> {
+    let Some((_, rest)) = definition.base_url.split_once("://") else {
+        return Ok(None);
+    };
+    let Some(path) = rest.find('/').map(|at| &rest[at..]) else {
+        return Ok(None);
+    };
+    let last = path.rsplit('/').next().unwrap_or_default();
+    let declared = |variable: &str| {
+        definition
+            .config
+            .as_ref()
+            .is_some_and(|config| config.contains_key(variable))
+    };
+    match variables(last)?[..] {
+        [variable] if last == format!("{{{variable}}}") && declared(variable) => {
+            Ok(Some((path, variables(path)?)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Drop the base path ([`base_path`]) and the path parameters it names from
+/// every operation of `inventory` that starts with it, so no caller passes
+/// them. Every operation the definition reaches, by an `op` or by a guard
+/// read, must start with it and not name its variables again, or the
+/// definition is refused as [`Refusal::OutsideBasePath`]. An operation it does
+/// not reach is left as it is when it does not start with the path.
+fn strip_base_path(
+    definition: &ProviderDefinition,
+    inventory: &mut crate::inventory::Inventory,
+) -> Result<(), Refusal> {
+    let Some((base, names)) = base_path(definition)? else {
+        return Ok(());
+    };
+    let under = |path: &str| -> Option<String> {
+        let rest = path.strip_prefix(base)?.strip_prefix('/')?;
+        (!rest.is_empty()
+            && !names
+                .iter()
+                .any(|name| rest.contains(&format!("{{{name}}}"))))
+        .then(|| format!("/{rest}"))
+    };
+    let mut reached: Vec<(&str, &str)> = Vec::new();
+    for (key, operation) in &definition.operations {
+        reached.extend(operation.op.as_deref().map(|op| (key.as_str(), op)));
+        let Some(guard) = &operation.guard else {
+            continue;
+        };
+        let reads = std::iter::once(&guard.before.read)
+            .chain(guard.also.iter().flatten().map(|before| &before.read))
+            .chain(
+                guard
+                    .after
+                    .as_ref()
+                    .and_then(|after| after.read.as_ref())
+                    .map(|read| &read.read),
+            );
+        for read in reads {
+            let op = definition
+                .operations
+                .get(read)
+                .and_then(|local| local.op.as_deref())
+                .unwrap_or(read);
+            reached.push((key, op));
+        }
+    }
+    for (key, op) in reached {
+        if let Some(found) = inventory.operations.iter().find(|candidate| {
+            candidate.operation_id.as_deref() == Some(op) && under(&candidate.path).is_none()
+        }) {
+            return Err(Refusal::OutsideBasePath {
+                key: key.to_owned(),
+                op: op.to_owned(),
+                path: found.path.clone(),
+                base: base.to_owned(),
+            });
+        }
+    }
+    for operation in &mut inventory.operations {
+        if let Some(path) = under(&operation.path) {
+            operation.path = path;
+            operation.parameters.retain(|parameter| {
+                parameter.location != crate::inventory::Location::Path
+                    || !names.contains(&parameter.name.as_str())
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The request prefix an instance endpoint gives a declaration's
+/// `endpoint_path`, the base path the lowering dropped ([`base_path`]): the
+/// endpoint's path without a trailing `/`, when it has the template's
+/// segments, each literal one as written and each `{variable}` one not empty.
+/// Otherwise `None`, and the instance is refused: an endpoint without that
+/// path would send every operation outside it.
+pub fn endpoint_prefix(template: &str, endpoint: &str) -> Option<String> {
+    let rest = endpoint.split_once("://")?.1;
+    let path = rest.find('/').map_or("", |at| &rest[at..]);
+    let path = path.strip_suffix('/').unwrap_or(path);
+    let given: Vec<&str> = path.split('/').skip(1).collect();
+    let wanted: Vec<&str> = template.strip_prefix('/')?.split('/').collect();
+    let fills = |(given, wanted): (&&str, &&str)| {
+        !given.is_empty() && (given == wanted || (wanted.starts_with('{') && wanted.ends_with('}')))
+    };
+    (given.len() == wanted.len() && given.iter().zip(&wanted).all(fills)).then(|| path.to_owned())
 }
 
 /// The name of the selection file in the catalog's provider directory, which
@@ -2330,7 +2594,18 @@ fn declaration(
     if let Some(path) = api_path {
         head.push(field("api_path", Node::Text(path)));
     }
+    if let Some((path, _)) = base_path(definition)? {
+        head.push(field("endpoint_path", text(path)));
+    }
     head.push(field("selection", Node::Text(selection)));
+    if let Some(id) = &definition.default_profile {
+        if !profiles.contains_key(id) {
+            return Err(Refusal::Malformed(format!(
+                "default_profile `{id}` is not one of the auth profiles"
+            )));
+        }
+        head.push(field("default_profile", text(id)));
+    }
     let mut blocks = Vec::new();
     for (id, profile) in &profiles {
         blocks.push(format!(
@@ -2443,9 +2718,9 @@ fn page_size(
 /// (`adapters/catalog/src/feed.rs`, `max_limit` 1 to 100).
 pub const FEED_MAX_LIMIT: u64 = 100;
 
-/// How many times `needle` occurs in `text`, in words.
-fn times(text: &str, needle: &str) -> String {
-    match text.matches(needle).count() {
+/// How many times `slot` occurs in the parsed template `parts`, in words.
+fn times(parts: &[Part], slot: &Part) -> String {
+    match parts.iter().filter(|part| *part == slot).count() {
         1 => "once".to_owned(),
         count => format!("{count} times"),
     }
@@ -2532,25 +2807,31 @@ fn feed_rules(name: &str, datasource: &Datasource) -> Result<(), Refusal> {
         }
     };
     if let Some(query) = query {
-        if query.first.matches("{container}").count() != 1 || query.first.contains("{since}") {
+        // The engine's own parser reads each template; the slots are counted in its parts.
+        let parse = |field: &str, text: &str| {
+            query_template::parse(&format!("items.position.query.{field}"), text)
+                .map_err(|detail| refuse(FeedRule::QueryTemplate, detail))
+        };
+        let slots = |parts: &[Part], slot: Part| parts.iter().filter(|part| **part == slot).count();
+        let first = parse("first", &query.first)?;
+        if slots(&first, Part::Container) != 1 || slots(&first, Part::Since) != 0 {
             return Err(refuse(
                 FeedRule::QueryFirst,
                 format!(
                     "items.position.query.first holds {{container}} {} and {{since}} {}",
-                    times(&query.first, "{container}"),
-                    times(&query.first, "{since}")
+                    times(&first, &Part::Container),
+                    times(&first, &Part::Since)
                 ),
             ));
         }
-        if query.resume.matches("{container}").count() != 1
-            || query.resume.matches("{since}").count() != 1
-        {
+        let resume = parse("resume", &query.resume)?;
+        if slots(&resume, Part::Container) != 1 || slots(&resume, Part::Since) != 1 {
             return Err(refuse(
                 FeedRule::QueryResume,
                 format!(
                     "items.position.query.resume holds {{container}} {} and {{since}} {}",
-                    times(&query.resume, "{container}"),
-                    times(&query.resume, "{since}")
+                    times(&resume, &Part::Container),
+                    times(&resume, &Part::Since)
                 ),
             ));
         }
@@ -2598,17 +2879,147 @@ fn feed_rules(name: &str, datasource: &Datasource) -> Result<(), Refusal> {
         }
     }
     let items = &datasource.items;
+    let containers = &datasource.containers;
+    let optional = |value: &Option<String>| value.clone();
     for (field, value) in [
-        ("url", &items.url),
-        ("url_base", &items.url_base),
-        ("parent", &items.parent),
+        ("items.url", optional(&items.url)),
+        ("items.url_base", optional(&items.url_base)),
+        ("items.parent", optional(&items.parent)),
+        ("containers.records", optional(&containers.records)),
+        ("containers.id", Some(containers.id.clone())),
+        ("containers.name", optional(&containers.name)),
+        ("containers.cursor.next", optional(&cursor.next)),
+        ("containers.cursor.last", optional(&cursor.last)),
+        (
+            "containers.cursor.offset.complete.pointer",
+            cursor.offset.as_ref().map(|o| o.complete.pointer.clone()),
+        ),
+        ("items.records", optional(&items.records)),
+        ("items.id", Some(items.id.clone())),
+        ("items.revision", Some(items.revision.clone())),
+        ("items.created_at", Some(items.created_at.clone())),
+        ("items.updated_at", Some(items.updated_at.clone())),
+        ("items.body.pointer", Some(items.body.pointer.clone())),
+        (
+            "items.author.id",
+            items.author.as_ref().map(|a| a.id.clone()),
+        ),
+        (
+            "items.author.display_name",
+            items.author.as_ref().and_then(|a| a.display_name.clone()),
+        ),
+        (
+            "items.position.page.next",
+            position.page.as_ref().map(|p| p.next.clone()),
+        ),
     ] {
         if let Some(value) = value
-            && !is_pointer(value)
+            && !is_pointer(&value)
         {
             return Err(refuse(
                 FeedRule::ItemPointer,
-                format!("items.{field} `{value}` is not a JSON pointer"),
+                format!("{field} `{value}` is not a JSON pointer"),
+            ));
+        }
+    }
+    let visible = |text: &str| {
+        !text.is_empty() && text.len() <= 128 && text.bytes().all(|b| b.is_ascii_graphic())
+    };
+    if !visible(&datasource.profile) {
+        return Err(refuse(
+            FeedRule::Profile,
+            format!(
+                "profile `{}` is not 1 to 128 visible ASCII characters",
+                datasource.profile
+            ),
+        ));
+    }
+    match &containers.kind_word {
+        Some(word) if visible(word) => {}
+        Some(word) => {
+            return Err(refuse(
+                FeedRule::KindWord,
+                format!("containers.kind_word `{word}` is not 1 to 128 visible ASCII characters"),
+            ));
+        }
+        None => {
+            return Err(refuse(
+                FeedRule::KindWord,
+                "containers name no kind_word".to_owned(),
+            ));
+        }
+    }
+    for (field, value) in [
+        ("containers.cursor.url_parameter", &cursor.url_parameter),
+        (
+            "items.position.page.url_parameter",
+            &position.page.as_ref().and_then(|p| p.url_parameter.clone()),
+        ),
+    ] {
+        if let Some(value) = value
+            && !visible(value)
+        {
+            return Err(refuse(
+                FeedRule::UrlParameter,
+                format!("{field} `{value}` is not 1 to 128 visible ASCII characters"),
+            ));
+        }
+    }
+    if items.body.representation.is_empty() {
+        return Err(refuse(
+            FeedRule::BodyRepresentation,
+            "items.body.representation is empty".to_owned(),
+        ));
+    }
+    let claim = |capability: &str| -> Result<&str, Refusal> {
+        datasource
+            .capabilities
+            .get(capability)
+            .map(String::as_str)
+            .ok_or_else(|| {
+                refuse(
+                    FeedRule::Capabilities,
+                    format!("capabilities name no `{capability}`"),
+                )
+            })
+    };
+    if let Some(other) = datasource
+        .capabilities
+        .keys()
+        .find(|key| !["deletions", "kind", "revision", "visibility"].contains(&key.as_str()))
+    {
+        return Err(refuse(
+            FeedRule::Capabilities,
+            format!("capabilities name `{other}`, which is not a capability"),
+        ));
+    }
+    let update_time = items.revision == items.updated_at;
+    for (capability, supported, words) in [
+        ("deletions", "not-observed", ["observed", "not-observed"]),
+        ("kind", "fixed-word", ["provider-word", "fixed-word"]),
+        (
+            "revision",
+            if update_time { "update-time" } else { "opaque" },
+            ["opaque", "update-time"],
+        ),
+        ("visibility", "all-private", ["mapped", "all-private"]),
+    ] {
+        let claimed = claim(capability)?;
+        if !words.contains(&claimed) {
+            return Err(refuse(
+                FeedRule::Capabilities,
+                format!(
+                    "capabilities {capability} `{claimed}` is not one of {}",
+                    words.join(", ")
+                ),
+            ));
+        }
+        if claimed != supported {
+            return Err(refuse(
+                FeedRule::Capabilities,
+                format!(
+                    "capabilities claim {capability}: {claimed}, and the feed supports {capability}: {supported}"
+                ),
             ));
         }
     }
@@ -2642,6 +3053,23 @@ fn feed(
     let (_, lookup, _) = keyed(definition, inventory, name, &containers.lookup)?;
     let (items_operation, items_found, items_query) =
         keyed(definition, inventory, name, &items.list)?;
+    for (key, found) in [
+        (&containers.list, list),
+        (&containers.lookup, lookup),
+        (&items.list, items_found),
+    ] {
+        if found.method != "get" {
+            return Err(Refusal::Feed {
+                datasource: name.clone(),
+                rule: FeedRule::OperationGet,
+                detail: format!(
+                    "`{key}` is {} {}, not a GET",
+                    found.method.to_uppercase(),
+                    found.path
+                ),
+            });
+        }
+    }
     if items.position.query.is_some() {
         let path: Vec<&str> = items_found
             .parameters
@@ -2696,6 +3124,185 @@ fn feed(
     )?;
     let (items_limit, max_limit) =
         page_size(definition, name, &items.list, items_operation, &items_query)?;
+    if let Some(max) = max_limit
+        && !(1..=100).contains(&max)
+    {
+        return Err(Refusal::Feed {
+            datasource: name.clone(),
+            rule: FeedRule::MaxLimit,
+            detail: format!(
+                "the paging style of items.list `{}` has max {max}",
+                items.list
+            ),
+        });
+    }
+    // What the engine's `bind` refuses of each operation: a parameter it does not take there,
+    // one bound twice, a required one sent only on resume, and (after these) a required one the
+    // feed leaves unbound; "not a GET" is refused above. The base path the engine also holds a
+    // GET under is the instance's, which the reader does not know.
+    let keys = |query: &Option<BTreeMap<String, String>>| -> Vec<(String, String)> {
+        query
+            .iter()
+            .flatten()
+            .map(|(key, _)| (key.clone(), key.clone()))
+            .collect()
+    };
+    let items_container = if position.query.is_none() {
+        sole_path_parameter(name, &items.list, items_found).ok()
+    } else {
+        None
+    };
+    let mut items_bound: Vec<(String, String)> = Vec::new();
+    items_bound.extend(
+        items_container
+            .iter()
+            .map(|parameter| ("the items' container".to_owned(), parameter.clone())),
+    );
+    items_bound.push(("the items' page size".to_owned(), items_limit.clone()));
+    items_bound.extend(position.query.iter().map(|query| {
+        (
+            "items.position.query.parameter".to_owned(),
+            query.parameter.clone(),
+        )
+    }));
+    let sometimes: Vec<(String, String)> = [
+        ("items.position.time", position.time.as_deref()),
+        (
+            "items.position.page.parameter",
+            position.page.as_ref().map(|page| page.parameter.as_str()),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(field, parameter)| Some((field.to_owned(), parameter?.to_owned())))
+    .collect();
+    items_bound.extend(sometimes.iter().cloned());
+    items_bound.extend(
+        keys(&items.query)
+            .into_iter()
+            .map(|(key, parameter)| (format!("items.query `{key}`"), parameter)),
+    );
+    let mut containers_bound: Vec<(String, String)> = vec![
+        (
+            "the containers' page size".to_owned(),
+            containers_limit.clone(),
+        ),
+        (
+            "containers.cursor.parameter".to_owned(),
+            containers.cursor.parameter.clone(),
+        ),
+    ];
+    containers_bound.extend(
+        keys(&containers.query)
+            .into_iter()
+            .map(|(key, parameter)| (format!("containers.query `{key}`"), parameter)),
+    );
+    let feed_refusal = |rule: FeedRule, detail: String| Refusal::Feed {
+        datasource: name.clone(),
+        rule,
+        detail,
+    };
+    for (field, query, list_key, list_query) in [
+        (
+            "containers.query",
+            &containers.query,
+            &containers.list,
+            &list_query,
+        ),
+        ("items.query", &items.query, &items.list, &items_query),
+    ] {
+        for key in query.iter().flat_map(BTreeMap::keys) {
+            if !list_query.contains(&key.as_str()) {
+                return Err(feed_refusal(
+                    FeedRule::OperationQuery,
+                    format!("{field} `{key}` is not a query parameter of `{list_key}`"),
+                ));
+            }
+        }
+    }
+    if !list_query.contains(&containers.cursor.parameter.as_str()) {
+        return Err(feed_refusal(
+            FeedRule::OperationQuery,
+            format!(
+                "containers.cursor.parameter `{}` is not a query parameter of `{}`",
+                containers.cursor.parameter, containers.list
+            ),
+        ));
+    }
+    for (list_key, bound) in [
+        (&containers.list, &containers_bound),
+        (&items.list, &items_bound),
+    ] {
+        for (index, (field, parameter)) in bound.iter().enumerate() {
+            if let Some((other, _)) = bound[..index].iter().find(|(_, other)| other == parameter) {
+                return Err(feed_refusal(
+                    FeedRule::ParameterTwice,
+                    format!("{other} and {field} both bind `{parameter}` of `{list_key}`"),
+                ));
+            }
+        }
+    }
+    for (list_key, found, resumed) in [
+        (
+            &containers.list,
+            list,
+            vec![(
+                "containers.cursor.parameter".to_owned(),
+                containers.cursor.parameter.clone(),
+            )],
+        ),
+        (&items.list, items_found, sometimes.clone()),
+    ] {
+        for (field, parameter) in resumed {
+            if found
+                .parameters
+                .iter()
+                .any(|candidate| candidate.name == parameter && candidate.required)
+            {
+                return Err(feed_refusal(
+                    FeedRule::ParameterRequired,
+                    format!(
+                        "{field} `{parameter}` is sent only on resume, but `{list_key}` requires it"
+                    ),
+                ));
+            }
+        }
+    }
+    let lookup_parameter = sole_path_parameter(name, &containers.lookup, lookup)?;
+    for (list_key, found, always) in [
+        (
+            &containers.list,
+            list,
+            containers_bound
+                .iter()
+                .filter(|(field, _)| field != "containers.cursor.parameter")
+                .map(|(_, parameter)| parameter.as_str())
+                .collect::<Vec<_>>(),
+        ),
+        (&containers.lookup, lookup, vec![lookup_parameter.as_str()]),
+        (
+            &items.list,
+            items_found,
+            items_bound
+                .iter()
+                .filter(|(field, _)| !sometimes.iter().any(|(sent, _)| sent == field))
+                .map(|(_, parameter)| parameter.as_str())
+                .collect(),
+        ),
+    ] {
+        if let Some(unbound) = found
+            .parameters
+            .iter()
+            .find(|parameter| parameter.required && !always.contains(&parameter.name.as_str()))
+        {
+            return Err(feed_refusal(
+                FeedRule::ParameterUnbound,
+                format!(
+                    "`{list_key}` requires `{}`, which the feed does not send on every request",
+                    unbound.name
+                ),
+            ));
+        }
+    }
     for (filter, values) in datasource.filters.iter().flatten() {
         for parameter in values.keys() {
             if !items_query.contains(&parameter.as_str()) {
@@ -3018,6 +3625,7 @@ pub fn select(
     {
         check_rate_limit_headers("defaults", headers)?;
     }
+    let discovery = matches!(definition.source.document(), Ok((SourceKind::Discovery, _)));
     let mut operations = Vec::new();
     for (key, operation) in &definition.operations {
         let carried = carried(definition, operation);
@@ -3095,6 +3703,7 @@ pub fn select(
                 ("body", operation.body.is_some()),
                 ("body_enums", operation.body_enums.is_some()),
                 ("body_any_of", operation.body_any_of.is_some()),
+                ("body_null_clears", operation.body_null_clears.is_some()),
                 ("body_prefixes", operation.body_prefixes.is_some()),
             ]
             .iter()
@@ -3157,6 +3766,24 @@ pub fn select(
             check_embedded_text(key, embedded, found)?;
         }
         check_fixed_query(key, operation, found, &bounds, &carried)?;
+        let mut withhold = carried.withhold.clone();
+        // The projector (`discovery-openapi/2`) gives a media-download method
+        // an `alt` parameter. A selection that does not fix it never takes it
+        // from the caller, so a definition written before the projector
+        // projected it keeps its metadata read metadata-only.
+        if discovery
+            && query.contains(&crate::discovery::MEDIA_PARAMETER)
+            && !withhold
+                .iter()
+                .any(|name| name == crate::discovery::MEDIA_PARAMETER)
+            && !operation
+                .query_fixed
+                .iter()
+                .flatten()
+                .any(|(name, _)| name == crate::discovery::MEDIA_PARAMETER)
+        {
+            withhold.push(crate::discovery::MEDIA_PARAMETER.to_owned());
+        }
         let guard = operation
             .guard
             .as_ref()
@@ -3179,7 +3806,7 @@ pub fn select(
             envelope: carried.envelope,
             bounds,
             required: carried.required,
-            withhold: carried.withhold,
+            withhold,
             credential: carried.credential,
             rate_limit_reasons: carried.rate_limit_reasons,
             refusal_texts: carried.refusal_texts,
@@ -3190,6 +3817,7 @@ pub fn select(
             body_fixed: declared_body.fixed,
             body_enums: declared_body.enums,
             body_any_of: declared_body.any_of,
+            body_null_clears: declared_body.null_clears,
             body_prefixes: declared_body.prefixes,
             conflict_status: operation.conflict_status,
             guard,
@@ -3613,8 +4241,9 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
             projection.openapi().to_vec()
         }
     };
-    let bundle =
+    let mut bundle =
         bundle::load(&bundles, provider).map_err(|error| Refusal::Pipeline(error.to_string()))?;
+    strip_base_path(&definition, &mut bundle.inventory)?;
     let document = crate::parse_document(&openapi)
         .map_err(|refusal| Refusal::Pipeline(refusal.reason().to_owned()))?;
 

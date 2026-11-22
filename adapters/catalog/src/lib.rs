@@ -18,7 +18,7 @@ pub mod walk;
 
 use connectors_catalog::{
     bundle::Bundle,
-    inventory::{Location, Operation, ValueType},
+    inventory::{Format, Location, Operation, ValueType},
     template::{Supplied, Template},
 };
 use connectors_core::{Error, ErrorCode, Result};
@@ -57,7 +57,8 @@ pub enum Expectation {
 }
 
 /// One comparison: the value at `pointer` in an observed body must equal what
-/// `expect` resolves to, as text or, for a `boolean`, by JSON type.
+/// `expect` resolves to, as text or, for a `boolean` or an `input` naming a
+/// JSON boolean, by JSON type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Check {
@@ -711,6 +712,11 @@ pub struct Selection {
     /// write that changes whichever the caller sends. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_any_of: Vec<String>,
+    /// Whether a `body_any_of` member given as JSON `null` counts as the one
+    /// change, because the provider clears a field on `null`. Without it a
+    /// `null` member counts as absent. Needs `body_any_of`. Omitted when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub body_null_clears: bool,
     /// String keys whose sent value is the prefix followed by the caller's
     /// value, such as a draft reply's marker line. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -1053,6 +1059,60 @@ fn check_bound(name: &str, bound: &Bound, text: &str) -> Result<()> {
     Ok(())
 }
 
+/// Every value present must be one the pinned document allows its parameter:
+/// one of its `enum`, an RFC 3339 date-time under `format: date-time`, and a
+/// match of the `pattern` an amendment's added operation declares (such as
+/// Grafana's data-source `uid` alphabet, so a `uid` holding `/` or `\` never
+/// becomes a segment a decoding server reads as two). A parameter that
+/// declares none of them is not held to anything here, and an absent one is
+/// never refused. Checked on the value strings, the text each is sent as,
+/// before any request; a repeated parameter's declaration holds for each
+/// element.
+fn check_declared(operation: &Operation, values: &BTreeMap<String, Supplied>) -> Result<()> {
+    for parameter in &operation.parameters {
+        if parameter.allowed.is_empty() && parameter.format.is_none() && parameter.pattern.is_none()
+        {
+            continue;
+        }
+        // One scalar for a repeated parameter may be a comma-joined list of
+        // elements ([`Engine::parameter_values`]): each is held to the
+        // declaration, and the value is sent as given.
+        let texts: Vec<&str> = match values.get(&parameter.name) {
+            None => continue,
+            Some(Supplied::One(text))
+                if parameter.repeated && !parameter.allowed.iter().any(|a| a == text) =>
+            {
+                text.split(',').collect()
+            }
+            Some(Supplied::One(text)) => vec![text.as_str()],
+            Some(Supplied::Many(texts)) => texts.iter().map(String::as_str).collect(),
+        };
+        for text in texts {
+            if !parameter.allowed.is_empty() && !parameter.allowed.iter().any(|a| a == text) {
+                return Err(refuse(format!(
+                    "parameter `{}` is not one of the values its enum allows",
+                    parameter.name
+                )));
+            }
+            if parameter.format == Some(Format::DateTime) && feed::instant(text).is_none() {
+                return Err(refuse(format!(
+                    "parameter `{}` is not an RFC 3339 date-time",
+                    parameter.name
+                )));
+            }
+            if let Some(pattern) = &parameter.pattern
+                && connectors_catalog::inventory::pattern_matches(pattern, text) != Some(true)
+            {
+                return Err(refuse(format!(
+                    "parameter `{}` does not match its pattern `{pattern}`",
+                    parameter.name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Raw segments under the base path, and raw query pairs.
 type Request = (Vec<String>, Vec<(String, String)>);
 
@@ -1282,6 +1342,18 @@ impl Engine {
                 return Err(refuse(format!(
                     "selection `{}` is outside the configured base path",
                     selection.id
+                )));
+            }
+            // A pattern no value could be checked against would refuse every
+            // call; the bundle is refused when it loads instead.
+            if let Some(parameter) = operation.parameters.iter().find(|p| {
+                p.pattern.as_deref().is_some_and(|pattern| {
+                    !connectors_catalog::inventory::pattern_is_anchored(pattern)
+                })
+            }) {
+                return Err(refuse(format!(
+                    "selection `{}` exposes `{}`, whose pattern is not an anchored regular expression",
+                    selection.id, parameter.name
                 )));
             }
             if let Some(name) = selection.bounds.keys().find(|name| {
@@ -1757,8 +1829,21 @@ impl Engine {
                 }
                 _ => Supplied::One(Self::element(parameter, value, true)?),
             };
+            // A required path or query parameter names something: an empty
+            // string is refused as an absent one is, before any request.
+            if parameter.required
+                && parameter.location != Location::Header
+                && parameter.location != Location::Cookie
+                && matches!(&supplied, Supplied::One(text) if text.is_empty())
+            {
+                return Err(refuse(format!(
+                    "parameter `{}` is required and empty",
+                    parameter.name
+                )));
+            }
             values.insert(parameter.name.clone(), supplied);
         }
+        check_declared(operation, &values)?;
         Ok(values)
     }
 
@@ -2010,11 +2095,13 @@ impl Engine {
                     .iter()
                     .map(|check| {
                         let value = match &check.expect {
-                            Expectation::Input(path) => Pinned::Text(
-                                reference(&input, path).and_then(scalar).ok_or_else(|| {
+                            Expectation::Input(path) => match reference(&input, path) {
+                                // A JSON boolean input compares by type, as `boolean` does.
+                                Some(Value::Bool(flag)) => Pinned::Boolean(*flag),
+                                given => Pinned::Text(given.and_then(scalar).ok_or_else(|| {
                                     refuse(format!("guard expects input `{path}`, which is absent"))
-                                })?,
-                            ),
+                                })?),
+                            },
                             Expectation::Literal(text) => Pinned::Text(text.clone()),
                             Expectation::Boolean(flag) => Pinned::Boolean(*flag),
                             Expectation::Present(_) => Pinned::Present,
@@ -2463,6 +2550,27 @@ fn expects_text(selection: &Selection, operation: &Operation) -> bool {
     }
 }
 
+/// What a caller is told when Drive refuses a download of a file that has no
+/// bytes (`error.errors[].reason` is `fileNotDownloadable`, as for a Google
+/// Docs, Sheets or Slides file). Drive's own text sits in a nested member,
+/// which `connectors_core::reason` never reads; this fixed text is admitted in
+/// its place and points to the read that does answer such a file.
+const NOT_DOWNLOADABLE: &str =
+    "A Google Docs, Sheets or Slides file has no bytes to download; read it with files.export";
+
+/// The reason a `403` body carries for a refused download, as
+/// [`NOT_DOWNLOADABLE`], when it names `fileNotDownloadable` in
+/// `error.errors[].reason`; `None` for any other body.
+fn download_refusal(body: &[u8]) -> Option<String> {
+    let body: Value = connectors_core::read_json(body).ok()?;
+    body.pointer("/error/errors")?
+        .as_array()?
+        .iter()
+        .any(|e| e.get("reason").and_then(Value::as_str) == Some("fileNotDownloadable"))
+        .then(|| connectors_core::reason::admit(NOT_DOWNLOADABLE))
+        .flatten()
+}
+
 /// Whether a `403` body names one of the selection's rate-limit reasons, in
 /// `error.errors[].reason` or in `error.status` (the two places Google's JSON
 /// error answers carry one). A body that is not JSON, or carries the reason
@@ -2504,9 +2612,14 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
         // Only the body's admitted reason travels on, beside the code, and on
         // a `429` the delay its `Retry-After` names; the body itself, and every
         // other header, stays here.
+        let reason = connectors_core::reason::from_body(&response.body).or_else(|| {
+            (response.status == 403)
+                .then(|| download_refusal(&response.body))
+                .flatten()
+        });
         let mut error = Error::new(code, "provider refused the request")
             .answered()
-            .with_upstream_reason(connectors_core::reason::from_body(&response.body));
+            .with_upstream_reason(reason);
         if response.status == 429 {
             error.retry_after_seconds = retry_after_header(response);
         }
@@ -3505,6 +3618,7 @@ fn check_download(selection: &Selection, download: &Download) -> Result<()> {
         || !selection.body_fixed.is_empty()
         || !selection.body_enums.is_empty()
         || !selection.body_any_of.is_empty()
+        || selection.body_null_clears
         || !selection.body_prefixes.is_empty()
     {
         Some("beside members that bind a bundle operation")
@@ -3715,13 +3829,14 @@ async fn read_binary(
     }
     let length = response.body.len() as u64;
     if length > binary.max_bytes {
-        return Err(Error::new(
-            ErrorCode::Capacity,
-            format!(
-                "binary response of {length} bytes exceeds max_bytes of {}",
-                binary.max_bytes
-            ),
-        ));
+        let message = format!(
+            "binary response of {length} bytes exceeds max_bytes of {}",
+            binary.max_bytes
+        );
+        // The adapter's own limit, not the upstream's answer: the size is the
+        // reason a caller sees beside `capacity`.
+        return Err(Error::new(ErrorCode::Capacity, &message)
+            .with_upstream_reason(connectors_core::reason::admit(&message)));
     }
     Ok((response.status, binary_body(&response)?))
 }

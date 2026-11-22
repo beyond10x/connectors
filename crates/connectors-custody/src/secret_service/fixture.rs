@@ -164,6 +164,26 @@ impl Fixture {
         drop(self.daemon.take());
     }
 
+    /// The collection a Secret Service alias resolves to on this bus.
+    pub fn alias_target(&self, alias: &str) -> String {
+        let connection = zbus::blocking::connection::Builder::async_io_unix_stream(
+            UnixStream::connect(&self.socket).unwrap(),
+        )
+        .build()
+        .unwrap();
+        let reply = connection
+            .call_method(
+                Some("org.freedesktop.secrets"),
+                "/org/freedesktop/secrets",
+                Some("org.freedesktop.Secret.Service"),
+                "ReadAlias",
+                &(alias,),
+            )
+            .unwrap();
+        let path: zbus::zvariant::OwnedObjectPath = reply.body().deserialize().unwrap();
+        path.as_str().to_owned()
+    }
+
     /// The binding for one scope over this fixture's bus.
     pub fn backend(&self, scope: Scope) -> Result<SecretService> {
         SecretService::connect_stream(UnixStream::connect(&self.socket).unwrap(), scope)

@@ -32,23 +32,18 @@ const SUSPEND_EXCLUSIVE: libc::clockid_t = libc::CLOCK_UPTIME_RAW;
 // QueryUnbiasedInterruptTime advance only at each timer interrupt, about
 // 15.6 ms by default, coarser than the 1 ms bound, and are not used.
 #[cfg(windows)]
-const SUSPEND_INCLUSIVE: bool = true;
+type InterruptTime = unsafe extern "system" fn(*mut u64);
 #[cfg(windows)]
-const SUSPEND_EXCLUSIVE: bool = false;
+const SUSPEND_INCLUSIVE: InterruptTime =
+    windows_sys::Win32::System::WindowsProgramming::QueryInterruptTimePrecise;
 #[cfg(windows)]
-fn read(suspend_inclusive: bool) -> Result<u64> {
-    use windows_sys::Win32::System::WindowsProgramming::{
-        QueryInterruptTimePrecise, QueryUnbiasedInterruptTimePrecise,
-    };
+const SUSPEND_EXCLUSIVE: InterruptTime =
+    windows_sys::Win32::System::WindowsProgramming::QueryUnbiasedInterruptTimePrecise;
+#[cfg(windows)]
+fn read(clock: InterruptTime) -> Result<u64> {
     let mut units = 0u64;
     // SAFETY: both functions write one u64 through a valid pointer.
-    unsafe {
-        if suspend_inclusive {
-            QueryInterruptTimePrecise(&mut units);
-        } else {
-            QueryUnbiasedInterruptTimePrecise(&mut units);
-        }
-    }
+    unsafe { clock(&mut units) };
     units.checked_mul(100).ok_or(Failure::Unavailable)
 }
 /// The precise interrupt-time functions read the performance counter, whose
@@ -172,6 +167,41 @@ mod macos_tests {
 #[cfg(all(test, windows))]
 mod windows_tests {
     use super::*;
+    use windows_sys::Win32::System::WindowsProgramming as api;
+
+    /// The lease pins the precise interrupt-time pair: the sleep-counting
+    /// function against the sleep-excluding one. A swap of either, or the
+    /// coarse `QueryInterruptTime` pair, changes what the lease counts.
+    #[test]
+    fn the_lease_uses_the_precise_biased_and_unbiased_functions() {
+        macro_rules! at {
+            ($function:expr) => {
+                $function as *const () as usize
+            };
+        }
+        assert_eq!(at!(SUSPEND_INCLUSIVE), at!(api::QueryInterruptTimePrecise));
+        assert_eq!(
+            at!(SUSPEND_EXCLUSIVE),
+            at!(api::QueryUnbiasedInterruptTimePrecise)
+        );
+        assert_ne!(at!(SUSPEND_INCLUSIVE), at!(SUSPEND_EXCLUSIVE));
+        assert_ne!(at!(SUSPEND_INCLUSIVE), at!(api::QueryInterruptTime));
+        assert_ne!(at!(SUSPEND_EXCLUSIVE), at!(api::QueryUnbiasedInterruptTime));
+    }
+
+    /// Both functions resolve far below the 1 ms bound: a coarse one ticks
+    /// about every 15.6 ms and would show at most two values in 5 ms.
+    #[test]
+    fn both_functions_resolve_below_a_millisecond() {
+        for clock in [SUSPEND_EXCLUSIVE, SUSPEND_INCLUSIVE] {
+            let start = std::time::Instant::now();
+            let mut seen = std::collections::BTreeSet::new();
+            while start.elapsed() < std::time::Duration::from_millis(5) {
+                seen.insert(read(clock).unwrap());
+            }
+            assert!(seen.len() > 20, "{} distinct readings in 5 ms", seen.len());
+        }
+    }
 
     /// Both interrupt-time clocks qualify and are monotone.
     #[test]

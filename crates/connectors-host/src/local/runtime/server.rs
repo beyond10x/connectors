@@ -180,11 +180,37 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
     else {
         return Err(Failure::Protocol);
     };
+    // The protocols this program speaks: version one always, and each other
+    // whose bootstrap the adapter gives.
+    let supported = || {
+        let mut supported = vec![VERSION.to_owned()];
+        if adapter.bootstrap_v2().is_ok() {
+            supported.push(WRITE_VERSION.to_owned());
+        }
+        if adapter.bootstrap_v3().is_ok() {
+            supported.push(BOUNDED_READ_VERSION.to_owned());
+        }
+        supported
+    };
+    // A protocol it does not speak is answered by name, before any bootstrap.
+    let refuse = |channel: &mut channel::Stream, version: String| -> Result<()> {
+        let _ = channel::write(
+            channel,
+            &Reply::Refused {
+                version,
+                supported: supported(),
+            },
+            None,
+            &[],
+            until,
+        );
+        Err(Failure::UnsupportedPrivateProtocol)
+    };
     let protocol = match version.as_str() {
         VERSION => PrivateProtocol::V1,
         WRITE_VERSION => PrivateProtocol::V2,
         BOUNDED_READ_VERSION => PrivateProtocol::V3,
-        _ => return Err(Failure::Protocol),
+        _ => return refuse(&mut channel, version),
     };
     if uuid::Uuid::parse_str(&nonce).is_err()
         || uuid::Uuid::parse_str(&child_incarnation).is_err()
@@ -195,8 +221,14 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
     }
     let bootstrap = match protocol {
         PrivateProtocol::V1 => adapter.bootstrap(),
-        PrivateProtocol::V2 => adapter.bootstrap_v2()?,
-        PrivateProtocol::V3 => adapter.bootstrap_v3()?,
+        PrivateProtocol::V2 => match adapter.bootstrap_v2() {
+            Err(Failure::Unsupported) => return refuse(&mut channel, version),
+            other => other?,
+        },
+        PrivateProtocol::V3 => match adapter.bootstrap_v3() {
+            Err(Failure::Unsupported) => return refuse(&mut channel, version),
+            other => other?,
+        },
     };
     bootstrap.validate_for(protocol)?;
     channel::write(

@@ -119,6 +119,14 @@ bundle for a second selection; for an API with no catalog, leave it out.
 variable `config` does not declare is refused as `undeclared_variable`. Config values are strings;
 `values` lists the allowed ones.
 
+A base URL whose path ends in a variable `config` declares, such as
+`https://3.basecampapi.com/{accountId}`, is the path every operation starts with
+(`/{accountId}/projects.json`). The lowerer drops that path and its parameter from each operation
+that starts with it, so no caller passes `accountId`: the instance's endpoint names the account
+(`https://3.basecampapi.com/12345`), or the variable's `default` does, and an endpoint without
+that path is refused when the instance is configured. An operation or a guard read of the file
+whose path does not start with it is refused as `outside_base_path`.
+
 Give every variable a `default`, and make the base URL `https://`.
 `invoke --definition` takes the instance's endpoint from the lowered declaration, and
 refuses a file whose endpoint is not stated in full or is not `https://` as `invalid_input` at
@@ -142,6 +150,13 @@ profile has:
   that belongs to no user.
 - `scopes` (optional): a read and pointer that list the granted scopes, and the `minimum` the
   connection must hold.
+- `read_only: true` (optional): an instance on the profile is offered the selection's reads and
+  none of its writes.
+
+The profile marked `default: true` is the one the bundle records. With more than one profile, an
+instance names the one it takes, unless the file names one at its top level as
+`default_profile: <profile id>`, such as a read-only profile beside a write-capable one. A
+`default_profile` that names none of the file's profiles is refused as `malformed`.
 
 An OAuth profile is `scheme: oauth2_refresh`, with `authorize_url` and `token_url`, or
 `scheme: oauth2_client_credentials`, with `token_url` only. Take both URLs from the vendor's own
@@ -282,6 +297,7 @@ The names a hand-written file meets most:
 | `effect_required` | a method other than `GET` without `effect` |
 | `write_method` | `effect: write` on a method other than `POST`, `PUT`, `PATCH` or `DELETE`, or with no `op` |
 | `undeclared_variable` | a variable in `base_url` or an OAuth URL that `config` does not declare |
+| `outside_base_path` | an operation or guard read whose path does not start with the path of a `base_url` that ends in a declared variable |
 | `auth_default`, `auth_incomplete`, `auth_misplaced`, `provider_id` | the profile rules above |
 | `auth_library`, `auth_profile_missing` | `auth_library`: a profile's `use` is not a plain lowercase name of `a-z`, `0-9` and `-`; `auth/<name>.yaml` under the definitions root, which that name resolves to, cannot be read or is not a `urn:beyond10x:connectors-auth:1` file; or the profile it supplies carries `use` or `default`, which only a connector's profile may. `auth_profile_missing`: that file has no profile of the same id |
 | `auth_lifetime` | a profile's `evidence_lifetime_ms` outside 1 to 300,000 |
@@ -335,3 +351,6 @@ covers the connect question, credential reuse, the cache and a file moved to ano
   members.
 - **A host without a default.** A `base_url` variable without a `default` lowers, but
   `--definition` cannot invoke it.
+- **A `User-Agent` of its own.** Every request, the token exchanges included, carries
+  `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`, which names the
+  client and a contact, as Basecamp requires. A definition cannot set or replace it.

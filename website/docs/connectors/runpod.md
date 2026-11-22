@@ -10,14 +10,11 @@ connectors: "runpod"
 # Runpod
 
 The `runpod` connector of the provider Runpod is served by the catalog provider from the pinned
-Runpod REST API document. The words connector, instance, connection and operation are those of
-the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Runpod REST API document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Runpod guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-runpod.md) has
 every outcome.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a Runpod account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -42,14 +39,6 @@ enabled = true
 [connectors.runpod.instances.gpu]
 ```
 
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"runpod","instance":"gpu","instance_id":"runpod.gpu","restart":"never","startup":"on-demand"}
-```
-
 ## Connect
 
 Put `{"token": "<Runpod API key>"}` in an owner-only file, then:
@@ -70,14 +59,10 @@ connectors invoke runpod/gpu pods.list \
 
 ## A first guarded write
 
-Once per instance, create the signing key (`connectors approvals key-init --connector runpod
---instance gpu`) and add an `[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Publish a policy naming the writes:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["pod.create","pod.terminate"]}\n' > policy.json
-connectors approvals policy-set --connector runpod --instance gpu --input-file policy.json
 ```
 
 Describe the pod in `create.json`, with a `name` unique to it:
@@ -89,28 +74,7 @@ Describe the pod in `create.json`, with a `name` unique to it:
           "env": {"MODE": "serve"}, "cloudType": "SECURE"}}
 ```
 
-Take the connection, and the schema and revision of `pod.create` from `invoke --describe`, then
-prepare, issue and invoke:
-
-```sh
-connection=$(connectors --output json connections list --connector runpod --instance gpu \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke runpod/gpu pod.create --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke runpod/gpu pod.create --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector runpod --instance gpu \
-  --connection "$connection" --operation pod.create \
-  --schema "$schema" --revision "$revision" --input-file create.json
-connectors approvals clock-check --connector runpod --instance gpu
-connectors approvals issue --connector runpod --instance gpu \
-  --connection "$connection" --operation pod.create \
-  --schema "$schema" --revision "$revision" --input-file create.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-worker-a.json"
-connectors invoke runpod/gpu pod.create \
-  --input-file create.json --approval-file "$HOME/private/proof-worker-a.json" \
-  --idempotency-key worker-a
-```
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `pod.create` on `runpod/gpu` with `create.json`, `--idempotency-key worker-a`.
 
 A create Runpod refuses because it has no machine to place the pod on is `refused` with code
 `capacity`: no pod was created, and the same workload may be placed on another GPU type, data
@@ -120,15 +84,7 @@ the pod may exist and be billed. List by the same `name` before creating again. 
 
 ## Reconnect when the connection is Stale
 
-A key Runpod refuses makes the connection `stale`, and an invoke answers `next_action:
-repair_connection`. Publish a new key of the same account on the same connection:
-
-```sh
-connectors --output json connections list --connector runpod --instance gpu \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector runpod --instance gpu \
-  --expected-revision "<revision from the list>" --credential-file ~/private/runpod.json
-```
+A key Runpod refuses makes the connection `stale`. Publish a new key of the same account on the same connection. [Reconnect](../guides/reconnect-a-connection.md) `runpod/gpu` with `--credential-file ~/private/runpod.json`.
 
 Reconnect cannot tell two Runpod accounts apart: after a reconnect with another account's key,
 the first account's pods answer `pod.terminate` with `404` while they keep running and billing.

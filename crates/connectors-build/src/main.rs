@@ -27,6 +27,7 @@ mod live_read_loop;
 mod mcp;
 mod metadata_conformance;
 mod metadata_entities;
+mod ownership;
 mod platform_gated;
 mod release_binaries;
 mod service_metadata;
@@ -628,7 +629,7 @@ mod tests {
         assert_eq!(derivation.from_bytes, pinned.len());
         assert_eq!(derivation.from_file, "drive-api.json");
         assert_eq!(derivation.format, "google-discovery/v1");
-        assert_eq!(derivation.projector, "discovery-openapi/1");
+        assert_eq!(derivation.projector, "discovery-openapi/2");
         let revision = serde_json::from_slice::<Value>(&pinned).unwrap()["revision"].clone();
         assert_eq!(json!(derivation.discovery_revision), revision);
         assert_eq!(bundle.source.file_name, "drive-openapi.json");

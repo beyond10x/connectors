@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-11T20:24:07Z",
+  "actor": "human:operator",
+  "artifact": "story:clock-quorum-windows-unreachable-flake",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/43094185689/job/130778667333",
+    "reference": "https://github.com/beyond10x/connectors/pull/253"
+  }
+}

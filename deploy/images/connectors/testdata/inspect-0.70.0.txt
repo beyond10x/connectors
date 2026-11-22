@@ -1,0 +1,26 @@
+Name:      ghcr.io/beyond10x/connectors:0.70.0
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:00606821462e2324e129f799511c94ca4092ae8ab1535b8ba6519a429036ee4b
+           
+Manifests: 
+  Name:        ghcr.io/beyond10x/connectors:0.70.0@sha256:2bf38083cf023b798b3d0488ea7ac2685b64e7239492ea0cebcaecb7f34843d0
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/amd64
+               
+  Name:        ghcr.io/beyond10x/connectors:0.70.0@sha256:3b8743b9be31f15770b23756c71e371c0057b96f845ce2ba702264e430025044
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/arm64
+               
+  Name:        ghcr.io/beyond10x/connectors:0.70.0@sha256:3aa93b2d2b5c9708e486d2af6e7fd5ad3797676c17e9f32c0dcbde8aaf2d0cbf
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    unknown/unknown
+  Annotations: 
+    vnd.docker.reference.digest: sha256:2bf38083cf023b798b3d0488ea7ac2685b64e7239492ea0cebcaecb7f34843d0
+    vnd.docker.reference.type:   attestation-manifest
+               
+  Name:        ghcr.io/beyond10x/connectors:0.70.0@sha256:bd1200b27177e3abd6515d1774041ecad3cfcdd25d64874d305baf030c747b67
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    unknown/unknown
+  Annotations: 
+    vnd.docker.reference.digest: sha256:3b8743b9be31f15770b23756c71e371c0057b96f845ce2ba702264e430025044
+    vnd.docker.reference.type:   attestation-manifest

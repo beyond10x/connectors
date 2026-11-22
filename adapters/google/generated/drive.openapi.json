@@ -4364,6 +4364,23 @@
             }
           },
           {
+            "description": "Data format for response.",
+            "in": "query",
+            "name": "alt",
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "media"
+              ],
+              "type": "string",
+              "x-google-enum-descriptions": [
+                "Responses with Content-Type of application/json",
+                "Media download with context-dependent Content-Type"
+              ]
+            }
+          },
+          {
             "description": "Selector specifying which fields to include in a partial response.",
             "in": "query",
             "name": "fields",
@@ -6833,6 +6850,23 @@
             "schema": {
               "default": false,
               "type": "boolean"
+            }
+          },
+          {
+            "description": "Data format for response.",
+            "in": "query",
+            "name": "alt",
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "media"
+              ],
+              "type": "string",
+              "x-google-enum-descriptions": [
+                "Responses with Content-Type of application/json",
+                "Media download with context-dependent Content-Type"
+              ]
             }
           },
           {

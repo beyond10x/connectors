@@ -10,14 +10,11 @@ connectors: "jira"
 # Jira
 
 The `jira` connector of the provider Atlassian is served by the catalog provider from the pinned
-Jira Cloud platform REST v3 document. The words connector, instance, connection and operation are
-those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Jira Cloud platform REST v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Jira guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) has
 every parameter, paging rule and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs an Atlassian account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -49,14 +46,6 @@ enabled = true
 endpoint = "https://your-domain.atlassian.net/rest/api/3"
 ```
 
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"jira","instance":"work","instance_id":"jira.work","restart":"never","startup":"on-demand"}
-```
-
 ## Connect
 
 Put `{"account": "<email>", "token": "<API token>"}` in an owner-only file, then:
@@ -75,19 +64,14 @@ connectors invoke jira/work issues.search \
   --input-json '{"jql":"project = FIX AND updated >= \"2026-09-01 00:00\" ORDER BY updated ASC","maxResults":50}'
 ```
 
-Follow `nextPageToken` until a page has none. Validation lasts 60 seconds after connect; later,
-`connections revalidate` renews it.
+Follow `nextPageToken` until a page has none.
 
 ## A first guarded write
 
-Once per instance, create the signing key (`connectors approvals key-init --connector jira
---instance work`) and add an `[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Publish a policy naming the write:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["issue.transition.run"]}\n' > policy.json
-connectors approvals policy-set --connector jira --instance work --input-file policy.json
 ```
 
 Read the issue's status id (`fields.status.id` of `issue.get`) and the transition's id and target
@@ -97,28 +81,7 @@ Read the issue's status id (`fields.status.id` of `issue.get`) and the transitio
 {"issueIdOrKey":"FIX-1","current_status":"3","target_status":"10002","body":{"transition":{"id":"31"}}}
 ```
 
-Take the connection, and the schema and revision of `issue.transition.run`
-from `invoke --describe`, then prepare, issue and invoke:
-
-```sh
-connection=$(connectors --output json connections list --connector jira --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke jira/work issue.transition.run --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke jira/work issue.transition.run --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector jira --instance work \
-  --connection "$connection" --operation issue.transition.run \
-  --schema "$schema" --revision "$revision" --input-file transition.json
-connectors approvals clock-check --connector jira --instance work
-connectors approvals issue --connector jira --instance work \
-  --connection "$connection" --operation issue.transition.run \
-  --schema "$schema" --revision "$revision" --input-file transition.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-fix-1.json"
-connectors invoke jira/work issue.transition.run \
-  --input-file transition.json --approval-file "$HOME/private/proof-fix-1.json" \
-  --idempotency-key fix-1-31
-```
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `issue.transition.run` on `jira/work` with `transition.json`, `--idempotency-key fix-1-31`.
 
 An issue in another status, or a transition not open on it, is refused with the POST unsent.
 When the read afterwards finds another status, the outcome is `unknown` and nothing is sent again.
@@ -137,16 +100,8 @@ lists each write's input and guard.
 
 ## Reconnect when the connection is Stale
 
-A token Atlassian refuses (revoked, expired) makes the connection `stale`, and an invoke answers
-`next_action: repair_connection`. Publish a new token for the same account on the same
-connection:
-
-```sh
-connectors --output json connections list --connector jira --instance work \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector jira --instance work \
-  --expected-revision "<revision from the list>" --credential-file ~/private/atlassian.json
-```
+A token Atlassian refuses (revoked, expired) makes the connection `stale`. Publish a new token for the same account on the same
+connection. [Reconnect](../guides/reconnect-a-connection.md) `jira/work` with `--credential-file ~/private/atlassian.json`.
 
 ## Limits
 
@@ -154,8 +109,7 @@ connectors connections reconnect --connector jira --instance work \
   issues on 2026-09-30); the site form, the other reads and the six writes are checked against
   local fixtures in the pinned document's shapes.
 - A create or comment approved and sent twice is made twice; a link is not read back.
-- The provider does not walk pages or bound `maxResults`; a read answered `429` is
-  `rate_limited` with `retry_after_seconds` when the retry does not fit.
+- The provider does not walk pages or bound `maxResults`; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
 - `attachment.content` reads at most 2 MiB.
 - The OAuth gateway form is not verified live, and the provider does not refresh an OAuth token.
 - The issue feed (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), profile `jira-issues/1`,

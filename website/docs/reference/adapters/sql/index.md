@@ -51,7 +51,7 @@ disposable PostgreSQL 17 and MySQL 8.0 servers on 2026-10-09.
 ## Access and limits
 
 Configure a restricted database role or user. PostgreSQL queries begin with
-`search_path = public, pg_catalog`; qualify relations in other schemas. Read-only transactions
+`search_path = pg_catalog, public`; qualify relations in other schemas. Read-only transactions
 and sessions and deadlines are explicit boundaries, not a SQL sandbox for unrestricted
 credentials. The repository's
 [PostgreSQL CLI guide](https://github.com/beyond10x/connectors/blob/main/docs/local-postgres-cli.md)

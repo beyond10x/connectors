@@ -28,7 +28,7 @@ fn seed_unkeyed(cli: &Cli, provider: &Provider, subject: &Value) {
     let producer = Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            "cli_journey::guarded_merge::prepared_attempt_exit_fixture",
+            "local_runtime::cli_journey::guarded_merge::prepared_attempt_exit_fixture",
             "--ignored",
             "--nocapture",
         ])

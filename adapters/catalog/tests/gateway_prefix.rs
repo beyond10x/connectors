@@ -9,7 +9,7 @@
 //! (`hand_written`), whose gateway values the guide still shows, against a
 //! disposable HTTPS fixture. No live credential and no network.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
@@ -159,18 +159,22 @@ fn refusal(config: &Value) -> String {
 /// `issue.comment.add` required the new `id` (and the issue's `key`) present
 /// after the write, and again when it gained `projects.list`, `project.get`
 /// and the issue `feed`, and again when `issues.search` declared its `walk`.
+/// Every pair was re-pinned once more when the bundles were rebuilt to record
+/// each parameter's `enum` and `format: date-time`.
+/// The Jira pair moved once more when `issue.edit` declared `body_null_clears`
+/// (story:required-body-key-refuses-null).
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "ae21bf2222058538c7eb9036973fe8612b04feef04628ace4a5394d59a0f4fd0",
-        "46e04a9d96d0c783771ca07baf47995e159e6d2f3a8dfa461b541f45dd35d9cb",
+        "b9cca5d0fa2fc6ccd31f0279dd46c1d7cb441e2318add9c527a2a094c0a9ac4a",
+        "e4b752f75723b2de2c968185cf72fd3701158f8b991c16cb197c47695f5965bd",
     ),
     (
         "catalog-jira.md",
         "jira",
-        "4957f983d76748a1effbf84b2945f22ac1b2375247a1163bbc04ce3699041f47",
-        "825e16fc6a087d3f237b49e2a29dbb1e1d44ede342bbf3b8fe4cfa80ac4db3a2",
+        "69fb2d4257b9a038c1a759d914e4d32ef85fedbaf8bba3b0a79c12596e1f009a",
+        "0cfc0e55dd791de912e49d4a22a79b4d06a353c2ba19282737a9ca2e3c1171bf",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision. Its pair moved again when its
@@ -178,8 +182,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-confluence.md",
         "confluence",
-        "b28fc9739d6e43c7e50b6f060744f02caf12ea7a9e503414497922c6413c6db1",
-        "df461239a3e29d679d70ebd5388f42bbff7fcdd6469d5c6f431f01697e1e7b92",
+        "0fe66eacbc8e9de076e0ebebc70a188b662182cc643f6c858e70ab0379ec723e",
+        "cf2b9b88cde553a08d9655804d782d95f71b410053200beb825d06aacb82cd16",
     ),
 ];
 

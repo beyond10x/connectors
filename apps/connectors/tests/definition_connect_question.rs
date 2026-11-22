@@ -10,9 +10,10 @@
 //!
 //! The CLI runs on a fresh pseudo-terminal as the foreground of its own
 //! session, with the built catalog provider named by
-//! `CONNECTORS_TEST_CATALOG_PROVIDER` installed beside it. Custody names a
-//! socket that does not exist, so a connect that went on would be refused at
-//! its custody check: nothing is acquired or sent to any host.
+//! `CONNECTORS_TEST_CATALOG_PROVIDER` installed beside it.
+//! Custody is a live keyring, so a connect that went on would reach the token
+//! prompt; the owner refuses it first, so nothing is acquired or sent to any
+//! host.
 #![cfg(unix)]
 use sha2::{Digest, Sha256};
 use std::{
@@ -118,6 +119,8 @@ type Answer<'a> = (&'a [u8], &'a mut dyn FnMut() -> Vec<u8>);
 
 struct Fixture {
     root: tempfile::TempDir,
+    /// Test-hook variables the CLI under test is started with.
+    env: std::cell::RefCell<Vec<(&'static str, PathBuf)>>,
 }
 
 impl Fixture {
@@ -128,6 +131,7 @@ impl Fixture {
         );
         let fixture = Self {
             root: tempfile::tempdir().unwrap(),
+            env: Default::default(),
         };
         let init = fixture.command(&["setup", "init"]).output().unwrap();
         assert!(init.status.success(), "{init:?}");
@@ -193,6 +197,7 @@ impl Fixture {
             .arg("--state-dir")
             .arg(self.root.path().join("state"))
             .args(args)
+            .envs(self.env.borrow().iter().map(|(name, value)| (*name, value)))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -320,6 +325,118 @@ impl Fixture {
     fn instances(&self) -> Vec<u8> {
         fs::read(self.root.path().join("state/definitions/instances.toml")).unwrap_or_default()
     }
+
+    /// Points custody at the disposable Secret Service on `socket`.
+    fn use_custody(&self, socket: &Path) {
+        let config = self.root.path().join("config/config.toml");
+        let text = fs::read_to_string(&config).unwrap();
+        let text = text
+            .lines()
+            .map(|line| {
+                if line.trim_start().starts_with("secret_service_socket") {
+                    format!(
+                        "secret_service_socket={}",
+                        serde_json::to_string(socket.to_str().unwrap()).unwrap()
+                    )
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        private(&config, format!("{text}\n").as_bytes(), 0o600);
+    }
+}
+
+struct OwnedProcess(std::process::Child);
+
+impl Drop for OwnedProcess {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// A disposable session bus and unlocked GNOME Keyring under `parent`.
+struct Custody {
+    _daemon: OwnedProcess,
+    _bus: OwnedProcess,
+    socket: PathBuf,
+}
+
+impl Custody {
+    fn new(parent: &Path) -> Self {
+        use connectors_host::local::{filesystem, keyring};
+        let directory = parent.join("custody");
+        for path in [
+            directory.clone(),
+            directory.join("home"),
+            directory.join("data/keyrings"),
+            directory.join("runtime"),
+        ] {
+            filesystem::directory(&path, true, true).unwrap();
+        }
+        let socket = directory.join("bus");
+        let bus = OwnedProcess(
+            Command::new("/usr/bin/dbus-daemon")
+                .args(["--session", "--nofork", "--nopidfile"])
+                .arg(format!("--address=unix:path={}", socket.display()))
+                .env_clear()
+                .env("PATH", "/usr/bin")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        let until = Instant::now() + Duration::from_secs(5);
+        while std::os::unix::net::UnixStream::connect(&socket).is_err() {
+            assert!(Instant::now() < until, "fixture bus did not start");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let mut daemon = OwnedProcess(
+            Command::new("/usr/bin/gnome-keyring-daemon")
+                .args([
+                    "--foreground",
+                    "--components=secrets",
+                    "--unlock",
+                    "--control-directory",
+                ])
+                .arg(directory.join("runtime"))
+                .env_clear()
+                .env("PATH", "/usr/bin")
+                .env("HOME", directory.join("home"))
+                .env("XDG_DATA_HOME", directory.join("data"))
+                .env("XDG_RUNTIME_DIR", directory.join("runtime"))
+                .env(
+                    "DBUS_SESSION_BUS_ADDRESS",
+                    format!("unix:path={}", socket.display()),
+                )
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        daemon
+            .0
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"fictional-failed-connect-keyring-password")
+            .unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        while !keyring::custody::available_at(Some(&socket)) {
+            assert!(Instant::now() < until, "fixture custody unavailable");
+            assert!(daemon.0.try_wait().unwrap().is_none());
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        Self {
+            _daemon: daemon,
+            _bus: bus,
+            socket,
+        }
+    }
 }
 
 fn invoke(definition: &str) -> Vec<&str> {
@@ -433,5 +550,63 @@ fn an_entry_another_run_recorded_while_the_question_waits_is_not_connected() {
             &serde_json::json!("retry_explicitly")
         ),
         "A went on after its entry was replaced: {a_data}"
+    );
+}
+
+/// The CLI's test hook (a debug build only): the bytes of the file it names
+/// replace the instances file after the CLI's last check of the entry and
+/// before it sends `Begin`.
+const REPLACE_BEFORE_BEGIN: &str = "CONNECTORS_TEST_REPLACE_ENTRY_BEFORE_BEGIN";
+
+#[test]
+#[ignore = "requires dbus-daemon, gnome-keyring-daemon and CONNECTORS_TEST_CATALOG_PROVIDER"]
+fn an_entry_replaced_after_the_cli_checked_it_is_refused_at_begin_before_any_credential() {
+    let fixture = Fixture::new();
+    let custody = Custody::new(fixture.root.path());
+    fixture.use_custody(&custody.socket);
+    let a = fixture.write("gitlab", "gitlab", "gitlab.example.com", PAT);
+    let b = fixture.write("evil", "gitlab", LOOKALIKE, PAT);
+    // B's entry, recorded by a run that was refused at its own question.
+    let b_output = fixture.detached(&invoke(&b));
+    assert_eq!(data(&b_output)["code"], "not_found", "{b_output:?}");
+    let replacement = fixture.root.path().join("replacement.toml");
+    fs::write(&replacement, fixture.instances()).unwrap();
+    fixture
+        .env
+        .borrow_mut()
+        .push((REPLACE_BEFORE_BEGIN, replacement));
+    let mut recorded_by_a = Vec::new();
+    let mut yes = || {
+        recorded_by_a = fixture.instances();
+        b"y\n".to_vec()
+    };
+    let (output, shown) = fixture.on_terminal(&invoke(&a), &mut [(QUESTION_END, &mut yes)]);
+    let shown = String::from_utf8_lossy(&shown).into_owned();
+    let _ = fixture.command(&["setup", "owner-stop"]).output();
+    assert!(
+        shown.contains("No connection for gitlab/definition."),
+        "A did not ask: {shown:?} {output:?}"
+    );
+    assert_ne!(
+        fixture.instances(),
+        recorded_by_a,
+        "the hook did not replace A's entry before Begin"
+    );
+    // The owner refuses Begin for an entry the question was not asked for,
+    // before custody is consulted (a Begin that went on would reach the token
+    // prompt, custody being a live keyring here).
+    let a_data = data(&output);
+    assert_eq!(
+        (&a_data["code"], &a_data["next_action"]),
+        (
+            &serde_json::json!("revision_conflict"),
+            &serde_json::json!("retry_explicitly")
+        ),
+        "Begin went on for a replaced entry: {a_data}"
+    );
+    // No capture began, so the terminal was never asked for the credential.
+    assert!(
+        !shown.contains("personal access token"),
+        "the CLI asked for a credential: {shown:?}"
     );
 }

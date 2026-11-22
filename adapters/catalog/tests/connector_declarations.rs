@@ -5,7 +5,7 @@
 //! hand-written configuration keeps the revision it had before declarations.
 #![cfg(unix)]
 
-mod hand_written;
+use crate::hand_written;
 
 use serde_json::{Map, Value, json};
 use std::{
@@ -21,8 +21,10 @@ const DECLARATION: &str = "connector.json";
 const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const GMAIL_READONLY: &str = "https://www.googleapis.com/auth/gmail.readonly";
 const GMAIL_COMPOSE: &str = "https://www.googleapis.com/auth/gmail.compose";
-/// The catalog providers that ship no declaration and stay pinned.
-const UNDECLARED: [&str; 1] = ["openrouter"];
+/// The catalog providers that ship no declaration and stay pinned. Grafana's
+/// connector name, `grafana`, is the native `connectors-grafana` connector's, so
+/// its catalog selection runs from its definition file or as a pinned instance.
+const UNDECLARED: [&str; 2] = ["grafana", "openrouter"];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -204,7 +206,14 @@ fn gmail_derived_from_its_declaration_has_the_reference_revision() {
         assert!(named.contains(GMAIL_READONLY) && named.contains(GMAIL_COMPOSE));
     }
     let expected = legacy(&reference);
-    let actual = bootstrap(derived(&["--connector", "gmail", "--instance", "private"]));
+    let actual = bootstrap(derived(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "private",
+        "--profile",
+        "google.oauth",
+    ]));
     assert_eq!(
         actual["configuration_revision"],
         expected["configuration_revision"]
@@ -214,7 +223,8 @@ fn gmail_derived_from_its_declaration_has_the_reference_revision() {
 }
 
 /// OpenRouter holds one selection run as a management and an inference instance
-/// joined by custody, so it ships no declaration and stays pinned; every other
+/// joined by custody, so it ships no declaration and stays pinned, and Grafana's
+/// catalog selection ships none beside the native `grafana` connector; every other
 /// catalog provider directory ships exactly one, naming its own directory, its
 /// own selection and a distinct connector. Slack's declares the bot selection
 /// (`operations.json`) as the connector `slack`; its user selection
@@ -349,7 +359,12 @@ fn declared_profiles_are_the_documented_ones_with_every_scope() {
             );
         }
     }
-    let gmail = &declarations["google-gmail"]["profiles"][0];
+    let gmail = declarations["google-gmail"]["profiles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|profile| profile["profile"] == WRITE_PROFILE)
+        .expect("Gmail declares the write-capable profile");
     for key in ["minimum_scopes", "requested_scopes"] {
         let named = scopes(gmail, key);
         assert!(named.contains(GMAIL_READONLY) && named.contains(GMAIL_COMPOSE));
@@ -435,10 +450,11 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
             checked.push(format!("{connector} {id}"));
         }
     }
-    // Thirteen connectors, Slack's since 0.63.1, Zendesk with two profiles: a lane that finds
-    // no declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
-    // are refused.
-    assert_eq!(checked.len(), 14, "{checked:?}");
+    // Thirteen connectors, Slack's since 0.63.1, Zendesk with two profiles and Gmail,
+    // Calendar and Drive with two each (a read-only one and a write-capable one): a lane that
+    // finds no declaration checks nothing and must not pass. ChatGPT's one profile and Claude's
+    // two are refused.
+    assert_eq!(checked.len(), 17, "{checked:?}");
     assert_eq!(
         refused,
         [
@@ -517,35 +533,49 @@ fn google_minimum_scopes_are_the_smallest_set_covering_the_selection() {
             &read_json(&root().join(format!("../google/upstream/{api}/{api}-api.json"))),
             &mut accepted,
         );
-        let mut operations = BTreeSet::new();
-        operation_ids(
-            &read_json(
-                &root()
-                    .join("providers")
-                    .join(&directory)
-                    .join(declaration["selection"].as_str().unwrap()),
-            ),
-            &mut operations,
+        let selection = read_json(
+            &root()
+                .join("providers")
+                .join(&directory)
+                .join(declaration["selection"].as_str().unwrap()),
         );
-        assert!(!operations.is_empty(), "{directory}");
-        let uncovered = |minimum: &BTreeSet<String>| -> Vec<String> {
-            operations
-                .iter()
-                .filter(|id| {
-                    accepted
-                        .get(*id)
-                        .unwrap_or_else(|| panic!("{directory}: Discovery has no {id}"))
-                        .is_disjoint(minimum)
-                })
-                .cloned()
-                .collect()
+        // A read-only profile offers the reads of the selection alone, so its
+        // scopes cover those, guard reads of a write included only for the
+        // profile that has the write.
+        let operations_of = |read_only: bool| -> BTreeSet<String> {
+            let mut kept = selection.clone();
+            if read_only {
+                kept["operations"]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|operation| operation["effect"] == "read");
+            }
+            let mut found = BTreeSet::new();
+            operation_ids(&kept, &mut found);
+            found
         };
+        let uncovered =
+            |operations: &BTreeSet<String>, minimum: &BTreeSet<String>| -> Vec<String> {
+                operations
+                    .iter()
+                    .filter(|id| {
+                        accepted
+                            .get(*id)
+                            .unwrap_or_else(|| panic!("{directory}: Discovery has no {id}"))
+                            .is_disjoint(minimum)
+                    })
+                    .cloned()
+                    .collect()
+            };
         for profile in declaration["profiles"].as_array().unwrap() {
             let minimum = scopes(profile, "minimum_scopes");
             assert!(
                 scopes(profile, "requested_scopes").is_superset(&minimum),
                 "{directory}: a minimum scope is not requested"
             );
+            let operations = operations_of(profile["read_only"] == true);
+            assert!(!operations.is_empty(), "{directory}");
+            let uncovered = |minimum: &BTreeSet<String>| uncovered(&operations, minimum);
             assert_eq!(uncovered(&minimum), Vec::<String>::new(), "{directory}");
             for scope in &minimum {
                 if KEPT_FOR_REACH
@@ -574,7 +604,10 @@ fn google_minimum_scopes_are_the_smallest_set_covering_the_selection() {
         checked,
         [
             "google-calendar",
+            "google-calendar",
             "google-drive",
+            "google-drive",
+            "google-gmail",
             "google-gmail",
             "google-slides"
         ]
@@ -646,7 +679,14 @@ fn a_gitlab_endpoint_is_the_host_and_the_api_base_is_derived() {
 #[test]
 fn a_stated_endpoint_replaces_the_default() {
     let mut reference = read_json(&root().join("tests/connector_declarations/gmail.json"));
-    let default = bootstrap(derived(&["--connector", "gmail", "--instance", "private"]));
+    let default = bootstrap(derived(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "private",
+        "--profile",
+        "google.oauth",
+    ]));
     reference["api_base"] = json!("https://gmail.example.com");
     let expected = legacy(&reference);
     let actual = bootstrap(derived(&[
@@ -654,6 +694,8 @@ fn a_stated_endpoint_replaces_the_default() {
         "gmail",
         "--instance",
         "private",
+        "--profile",
+        "google.oauth",
         "--endpoint",
         "https://gmail.example.com",
     ]));
@@ -807,105 +849,138 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// pins when the Jira and Confluence v1 selections gained their `feed` (and
 /// Jira `projects.list` and `project.get`). The eighteen pins of Confluence,
 /// Google Calendar, Drive and Gmail, HubSpot, Jira, Slack and Zendesk moved
-/// when their selections declared a `walk` (story:catalog-operation-declares-its-walk).
+/// when their selections declared a `walk` (story:catalog-operation-declares-its-walk),
+/// and again when the bundles were rebuilt to record each parameter's `enum` and
+/// `format: date-time` (story:catalog-validates-enum-and-date-time). The Grafana
+/// guide's pin is new with its selection (story:catalog-grafana-reads); it moved
+/// the index of every later page and no revision. It moved when the selection
+/// and the bundle gained the three data-source proxy reads and each proxy
+/// `uid` its pattern (story:catalog-grafana-datasource-proxy-reads).
+/// The Jira revisions moved again when `issue.edit` gained `body_null_clears`
+/// (story:required-body-key-refuses-null).
+/// The HubSpot guide's pin (`f22df2fc…` to `8968cae8…`) moved when the bundle
+/// gained the two owner reads from the Owners document, as cited amendments
+/// bound to the CRM Objects digest, and the selection gained `owners.list`
+/// (with its walk) and `owner.get` (story:hubspot-owners-and-line-items).
+/// The Gmail, Calendar and Drive guides each gained a read-only configuration:
+/// three new pins that moved the index of every later page and no revision
+/// (story:google-read-only-profiles-and-company-domain).
+/// The Calendar, Drive, Gmail and Slides revisions moved when the Discovery
+/// projector became `discovery-openapi/2` (story:drive-file-content-read).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
         (
             "00 catalog-confluence.md",
-            "d762bc44764155933d3eddf9247cd733138d238af8300799e17e57a16cdca265",
+            "f241ef1b2fbe206c2059021881e3158f6d4f8c0b14d55458b601481ebb07b508",
         ),
         (
             "01 catalog-confluence.md",
-            "df461239a3e29d679d70ebd5388f42bbff7fcdd6469d5c6f431f01697e1e7b92",
+            "cf2b9b88cde553a08d9655804d782d95f71b410053200beb825d06aacb82cd16",
         ),
         (
             "02 catalog-confluence.md",
-            "94e3ff9c147d1952540a7bf9614ade926eebcdd148e25c8b892966009321bc4a",
+            "fd76431c0eee380736f69fb23bd2ce11c9e61a9e060c57d472de100e93ba7eb1",
         ),
         (
             "03 catalog-confluence.md",
-            "e2c0e02574a8722bd6fcf8d2555e90361ba400b945d9d0d33d7b09cd34a5ae12",
+            "85991fe70f2ecb22220c8e59153aad2f3a7bc6dafc1b3e2870dafb4cba02455b",
         ),
         (
             "04 catalog-confluence.md",
-            "d762bc44764155933d3eddf9247cd733138d238af8300799e17e57a16cdca265",
+            "f241ef1b2fbe206c2059021881e3158f6d4f8c0b14d55458b601481ebb07b508",
         ),
         (
             "05 catalog-google-calendar.md",
-            "f5e32d1fa594a4bdeb0bf391d256e545d9c443acb965db912cd4ce62398d1a62",
+            "21f28863253c2e15af454dfb8c47030a73ab7ce2b6169f0c1d06849b9753e681",
         ),
         (
             "06 catalog-google-calendar.md",
-            "bf808c6246efaabfd8a53f594992550331e7d0f489d7f5e496365c0bc9e299b9",
+            "c5f570fdbdb699c897682491a05a2d529d20b72ec793d08b7679cf21bb3c1b65",
         ),
         (
-            "07 catalog-google-drive.md",
-            "6bac52117e4df66c2b63a0d074c57e5f6ded77783002b5806845ed4a1d754d43",
+            "07 catalog-google-calendar.md",
+            "fd44078e33997b4f12b5ba087d9744362682363da103ff37c867ba06f1de801a",
         ),
         (
             "08 catalog-google-drive.md",
-            "1c5c5587e95ad69d271ad288df8c208885bc20456f90b59392383672095d80a9",
+            "e75bbfd16d0fc1e1e25dfa2f1aea46b3710d2ac0ae2353b3544be88098234e01",
         ),
         (
-            "09 catalog-google-gmail.md",
-            "cb6961af72d33dad02e2dffd043a04d024b336a44834b5035b2868781e4a033e",
+            "09 catalog-google-drive.md",
+            "9d0a6ec64bb117a05d74a2caf06e18ac1d9864559450e88d9b156392db8c583c",
         ),
         (
-            "10 catalog-google-slides.md",
-            "59351e7bbcf7431d2e398170f4bc1fdb3b46ef4447440aaa105bb4cfc02cb58b",
+            "10 catalog-google-drive.md",
+            "cd83db10d3e1a08f44eb577a541004f454d247b595a7f5b0c13aab2da6cdcf0f",
         ),
         (
-            "11 catalog-hubspot.md",
-            "f22df2fc89858454b75fc46c55187aa467458a05c8fd0d476cf052dd73e70fe9",
+            "11 catalog-google-gmail.md",
+            "540402e036de353590995a034b2dcb1ae491a37379bfa4f56532e74c765780c1",
         ),
         (
-            "12 catalog-jira.md",
-            "825e16fc6a087d3f237b49e2a29dbb1e1d44ede342bbf3b8fe4cfa80ac4db3a2",
+            "12 catalog-google-gmail.md",
+            "e30ab8646cd261edbfe24ceb49433f0a2d6afe584457c366c2bfe842bb770c7b",
         ),
         (
-            "13 catalog-jira.md",
-            "041eaf60314d7910ff42446d5be5ee9b9ebddcb3d55ea7dd88586481e11d6934",
+            "13 catalog-google-slides.md",
+            "6ded40ea130bebef82c4c795fdd8c5440c1890d032c9a0572c3f01e667549d33",
         ),
         (
-            "14 catalog-jira.md",
-            "dacdbb2d66a8b6ce5f1d63ec131196e5eaf93852dd0a450388dd85e32e761f3e",
+            "14 catalog-grafana.md",
+            "cd3a3ef9f85e05a990f6d8754e7aa2c5a190b71f0f629bec840b0d713b6dc948",
         ),
         (
-            "15 catalog-openrouter.md",
-            "edc1e2986e61cdce1a2d1dcc59571f483d8c8b4c30f5fa7ac7d694d2a21b7108",
+            "15 catalog-hubspot.md",
+            "8968cae86a853651f69e6b4eee869e6b7a68264089ca85fd6cb105ca2c7b945d",
         ),
         (
-            "16 catalog-openrouter.md",
-            "88cd4b2b3d83233bed4808105ed0bea68c0e423ee357efab57989e18226e906e",
+            "16 catalog-jira.md",
+            "0cfc0e55dd791de912e49d4a22a79b4d06a353c2ba19282737a9ca2e3c1171bf",
         ),
         (
-            "17 catalog-opsgenie.md",
-            "e3bd0d88779169436ac8cede723c60c38ad18ba5f993aee6c240effd84baad4b",
+            "17 catalog-jira.md",
+            "35926b20b288459ddcd4ffa3883b8a2ee6d182d768fe7445759baa0ccec3753d",
         ),
         (
-            "18 catalog-runpod.md",
-            "4fd4b8d636a48f045765eda600ae2a14897fa7ebaab9c3fdd5c34c5daac3deea",
+            "18 catalog-jira.md",
+            "b53c9bb9c3529ef712146895a73232e9f358d2a8cc684665991a11fd546cc039",
         ),
         (
-            "19 catalog-slack.md",
+            "19 catalog-openrouter.md",
+            "7426f67e0bae66733ee6e8c6ecc6f602d85a3cb79a43d8058f54f90224a8a731",
+        ),
+        (
+            "20 catalog-openrouter.md",
+            "6472c864700269c252a6040a05397e3370fccd7bce155098ce25916b16ffa7bc",
+        ),
+        (
+            "21 catalog-opsgenie.md",
+            "2429e78e18775efb337892511a61756edf2e2027ef3f76dda50c3b850e95ed1e",
+        ),
+        (
+            "22 catalog-runpod.md",
+            "d07cd9583fdd53e294e6c535ecdc665b8fff85191d55d0cf875bdca5ae0138bc",
+        ),
+        (
+            "23 catalog-slack.md",
             "e7220d48c9c68cfbb78e363d2a6ea5d4ce3e2595c4baad8f86492b02b010f79b",
         ),
         (
-            "20 catalog-slack.md",
+            "24 catalog-slack.md",
             "abe8a377d7f6cc4e17df36e888e4df0c4a55cfad753b4eb1b1039ac2509a1009",
         ),
         (
-            "21 catalog-zendesk.md",
-            "51e91ea435719292acb4f82190b0726dfbf4792eebf83f5330684d0b55a05208",
+            "25 catalog-zendesk.md",
+            "d14dae6d913cda517f992e5890521b8d481be0900acbff4807476d3a42387a50",
         ),
         (
-            "22 catalog-zendesk.md",
-            "8805dd84dc3975e41e558d0aa4dd56eb35415b4c2aaffc0530bf9e86472a446a",
+            "26 catalog-zendesk.md",
+            "181d0a89b6bb91e32d9666157c053594794e9841946c42598e7bffd9e9bcca2a",
         ),
         (
-            "23 local-catalog-provider.md",
-            "46e04a9d96d0c783771ca07baf47995e159e6d2f3a8dfa461b541f45dd35d9cb",
+            "27 local-catalog-provider.md",
+            "e4b752f75723b2de2c968185cf72fd3701158f8b991c16cb197c47695f5965bd",
         ),
     ]
     .into_iter()
@@ -962,6 +1037,8 @@ fn an_instance_id_derives_the_instance_under_that_id() {
         "gmail",
         "--instance",
         "mail",
+        "--profile",
+        "google.oauth",
         "--instance-id",
         "mail-local",
     ]));
@@ -971,7 +1048,14 @@ fn an_instance_id_derives_the_instance_under_that_id() {
         expected["configuration_revision"]
     );
     assert_eq!(actual, expected);
-    let unnamed = bootstrap(derived(&["--connector", "gmail", "--instance", "mail"]));
+    let unnamed = bootstrap(derived(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "mail",
+        "--profile",
+        "google.oauth",
+    ]));
     assert_eq!(unnamed["instance"], "gmail.mail");
     assert_ne!(
         unnamed["configuration_revision"],
@@ -1032,6 +1116,8 @@ fn revision_inputs_name_the_key_in_which_two_configurations_differ() {
         "gmail",
         "--instance",
         "mail",
+        "--profile",
+        "google.oauth",
         "--instance-id",
         "mail-local",
         "--print-revision-inputs",
@@ -1076,4 +1162,288 @@ fn revision_inputs_name_the_key_in_which_two_configurations_differ() {
         .filter(|key| elsewhere.get(*key) != derived.get(*key))
         .collect();
     assert_eq!(differing, ["api_base"]);
+}
+
+/// The Google connectors that carry a write-capable profile, with the scope
+/// each one's read-only profile requests.
+const GOOGLE_READ_ONLY: [(&str, &str, &str); 3] = [
+    (
+        "gmail",
+        "google-gmail",
+        "https://www.googleapis.com/auth/gmail.readonly",
+    ),
+    (
+        "calendar",
+        "google-calendar",
+        "https://www.googleapis.com/auth/calendar.readonly",
+    ),
+    (
+        "drive",
+        "google-drive",
+        "https://www.googleapis.com/auth/drive.readonly",
+    ),
+];
+const READ_ONLY_PROFILE: &str = "google.oauth.readonly";
+const WRITE_PROFILE: &str = "google.oauth";
+
+/// The profiles and the operations, each with its profile, that the provider
+/// child of the derived instance `args` name describes over private protocol
+/// two, which describes writes.
+fn described(args: &[&str]) -> (Vec<String>, Vec<(String, String)>) {
+    use connectors_host::local::{
+        config::{Adapter, Executable, Restart, Startup},
+        runtime::{Bootstrap, Child, PrivateProtocol},
+    };
+    use sha2::{Digest as _, Sha256};
+    let printed: Bootstrap = serde_json::from_value(bootstrap(derived(args))).unwrap();
+    let binary = PathBuf::from(BINARY).canonicalize().unwrap();
+    let child = Child::spawn(&Adapter {
+        credential_revision: None,
+        private_protocol: Some(PrivateProtocol::V2),
+        permissions: Default::default(),
+        instance_id: printed.instance.clone(),
+        adapter_id: "catalog".into(),
+        configuration_revision: printed.configuration_revision.clone(),
+        protocol: "v1alpha1".into(),
+        startup: Startup::OnDemand,
+        restart: Restart::Never,
+        executable: Executable {
+            sha256: hex::encode(Sha256::digest(fs::read(&binary).unwrap())),
+            path: binary,
+            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+        },
+    })
+    .unwrap();
+    let descriptor = child.bootstrap().descriptor().unwrap();
+    let profiles = child
+        .bootstrap()
+        .profiles
+        .iter()
+        .map(|profile| profile.id.clone())
+        .collect();
+    (
+        profiles,
+        descriptor
+            .operations
+            .iter()
+            .map(|operation| (operation.id.clone(), operation.profile.clone()))
+            .collect(),
+    )
+}
+
+/// Gmail, Calendar and Drive each declare a read-only profile that requests
+/// only the read scope, and it is the profile an instance that names none
+/// takes (story:google-read-only-profiles-and-company-domain). The write-capable
+/// profile stays, under its own name, for the instance that names it.
+#[test]
+fn each_google_connector_declares_a_read_only_default_profile() {
+    let declarations = declarations();
+    for (connector, directory, read) in GOOGLE_READ_ONLY {
+        let declaration = &declarations[directory];
+        assert_eq!(
+            declaration["default_profile"], READ_ONLY_PROFILE,
+            "{connector}"
+        );
+        let profiles = declaration["profiles"].as_array().unwrap();
+        let ids: Vec<&str> = profiles
+            .iter()
+            .map(|p| p["profile"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, [READ_ONLY_PROFILE, WRITE_PROFILE], "{connector}");
+        let readonly = &profiles[0];
+        assert_eq!(readonly["read_only"], true, "{connector}");
+        assert_eq!(
+            scopes(readonly, "minimum_scopes"),
+            BTreeSet::from([read.to_owned()]),
+            "{connector}"
+        );
+        assert_eq!(
+            scopes(readonly, "requested_scopes"),
+            BTreeSet::from(["openid".to_owned(), read.to_owned()]),
+            "{connector}"
+        );
+        assert!(profiles[1].get("read_only").is_none(), "{connector}");
+        assert!(
+            scopes(&profiles[1], "minimum_scopes").len() > 1,
+            "{connector}: the write-capable profile keeps its write scope"
+        );
+    }
+}
+
+/// An instance of Gmail, Calendar or Drive that names no profile is on the
+/// read-only one and its provider describes no write operation, even over
+/// private protocol two; the same connector on `google.oauth` describes its
+/// writes, and an instance on the read-only profile named outright is the same
+/// instance as the default one.
+#[test]
+fn a_read_only_google_instance_offers_no_write_operation() {
+    for (connector, _, read) in GOOGLE_READ_ONLY {
+        let by_default = bootstrap(derived(&["--connector", connector, "--instance", "work"]));
+        let named = bootstrap(derived(&[
+            "--connector",
+            connector,
+            "--instance",
+            "work",
+            "--profile",
+            READ_ONLY_PROFILE,
+        ]));
+        assert_eq!(by_default, named, "{connector}");
+        assert_eq!(by_default["profiles"][0]["id"], READ_ONLY_PROFILE);
+        assert_eq!(
+            by_default["profiles"][0]["minimum_scopes"],
+            json!([read]),
+            "{connector}"
+        );
+
+        let (profiles, operations) = described(&["--connector", connector, "--instance", "work"]);
+        assert_eq!(profiles, [READ_ONLY_PROFILE], "{connector}");
+        assert!(!operations.is_empty(), "{connector}");
+        let writes: Vec<&(String, String)> = operations
+            .iter()
+            .filter(|(_, profile)| profile == "mutation")
+            .collect();
+        assert!(writes.is_empty(), "{connector} offers {writes:?}");
+
+        let (profiles, operations) = described(&[
+            "--connector",
+            connector,
+            "--instance",
+            "work",
+            "--profile",
+            WRITE_PROFILE,
+        ]);
+        assert_eq!(profiles, [WRITE_PROFILE], "{connector}");
+        assert!(
+            operations.iter().any(|(_, profile)| profile == "mutation"),
+            "{connector}: the write-capable profile lost its writes"
+        );
+    }
+}
+
+/// Adversary (story:google-read-only-profiles-and-company-domain): a
+/// connection saved before the read-only default is under `google.oauth`, the
+/// one profile Gmail, Calendar and Drive declared. The host keeps a connection
+/// bound to the profile record it was saved under and never rebinds it to
+/// another profile (`registry::revalidation::upgradable`), so an instance
+/// naming no profile, which declares only `google.oauth.readonly`, cannot
+/// revalidate it. What an upgrading user must do is therefore exact and is
+/// said in the CHANGELOG and in each guide: name `profile = "google.oauth"`
+/// (the instance keeps its connection), or revoke the connection and connect
+/// again under the default.
+#[test]
+fn adversary_a_connection_saved_before_the_read_only_default_is_kept_or_replaced_as_documented() {
+    let declares = |args: &[&str], profile: &str| {
+        let printed: connectors_host::local::runtime::Bootstrap =
+            serde_json::from_value(bootstrap(derived(args))).unwrap();
+        printed.binding(profile).is_ok()
+    };
+    for (connector, _, _) in GOOGLE_READ_ONLY {
+        let default = ["--connector", connector, "--instance", "private"];
+        assert!(
+            declares(&default, READ_ONLY_PROFILE) && !declares(&default, WRITE_PROFILE),
+            "{connector}: the default instance does not declare the read-only profile alone"
+        );
+        let mut named = default.to_vec();
+        named.extend(["--profile", WRITE_PROFILE]);
+        assert!(
+            declares(&named, WRITE_PROFILE) && !declares(&named, READ_ONLY_PROFILE),
+            "{connector}: naming {WRITE_PROFILE} does not keep a connection saved under it"
+        );
+    }
+
+    let flat = |text: String| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    // The entry lives in the section, `## Unreleased` or `## <version> — <date>`,
+    // that introduced the read-only default: the oldest one naming its profile.
+    // Sections are newest first, so a later release mentioning it is skipped.
+    let changelog = fs::read_to_string(root_path("../../CHANGELOG.md")).unwrap();
+    let introduced = changelog
+        .split("\n## ")
+        .skip(1)
+        .filter(|section| {
+            section.starts_with("Unreleased") || section.starts_with(|c: char| c.is_ascii_digit())
+        })
+        .filter(|section| section.contains(READ_ONLY_PROFILE))
+        .last()
+        .map(|section| flat(section.to_owned()))
+        .expect("no CHANGELOG section introduces the read-only default");
+    let mut pages = vec![("CHANGELOG".to_owned(), introduced)];
+    for page in [
+        "docs/catalog-google-gmail.md",
+        "docs/catalog-google-calendar.md",
+        "docs/catalog-google-drive.md",
+        "docs/catalog-google-oauth.md",
+        "website/docs/connectors/gmail.md",
+        "website/docs/connectors/calendar.md",
+        "website/docs/connectors/drive.md",
+    ] {
+        pages.push((
+            page.to_owned(),
+            flat(fs::read_to_string(root_path(&format!("../../{page}"))).unwrap()),
+        ));
+    }
+    for (name, text) in &pages {
+        for term in [
+            "profile = \"google.oauth\"",
+            "connections revoke",
+            "never rebound",
+        ] {
+            assert!(
+                text.contains(term),
+                "{name} does not tell an upgrading user: {term}"
+            );
+        }
+        assert!(
+            !text.contains("naming no profile changes configuration revision"),
+            "{name} still says an unrenamed connection is pending until it revalidates"
+        );
+    }
+}
+
+/// Adversary (story:google-read-only-profiles-and-company-domain): the
+/// host starts a derived instance with `--allowed-domain`, and nothing else
+/// in the suite runs that flag. On Gmail it reaches the instance (another
+/// credential revision); on a profile whose `hd` is never read, Zendesk's
+/// `oauth2_client_credentials` and Jira's `basic`, it is refused at load,
+/// never ignored.
+#[test]
+fn adversary_the_allowed_domain_flag_reaches_a_derived_instance_or_is_refused() {
+    let gmail = |extra: &[&str]| {
+        let mut args = vec!["--connector", "gmail", "--instance", "private"];
+        args.extend_from_slice(extra);
+        bootstrap(derived(&args))
+    };
+    let open = gmail(&[]);
+    let admitted = gmail(&["--allowed-domain", "corp.test"]);
+    assert_ne!(
+        open["credential_revision"], admitted["credential_revision"],
+        "--allowed-domain did not reach the derived instance"
+    );
+    for args in [
+        &[
+            "--connector",
+            "zendesk",
+            "--instance",
+            "work",
+            "--endpoint",
+            "https://example.zendesk.com",
+            "--profile",
+            "zendesk.oauth",
+        ][..],
+        &[
+            "--connector",
+            "jira",
+            "--instance",
+            "work",
+            "--endpoint",
+            "https://jira.example.org",
+        ][..],
+    ] {
+        bootstrap(derived(args));
+        let mut with_domain = args.to_vec();
+        with_domain.extend_from_slice(&["--allowed-domain", "corp.test"]);
+        assert!(
+            !derived(&with_domain).status.success(),
+            "{args:?}: a domain list the profile never enforces loaded"
+        );
+    }
 }

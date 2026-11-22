@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:live-acceptance-without-serve
 kind: story
-status: active
+status: implemented
 title: The live acceptance runner runs without the removed serve command
 relations:
 - informed_by: story:connectors-do-short-invocation
@@ -13,10 +13,11 @@ scope:
   path: crates/connectors-conformance/src/main.rs
 - confidence: inferred
   path: docs/live-e2e.md
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:41Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:42Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:58:18Z", actor: "human:operator", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Problem
 

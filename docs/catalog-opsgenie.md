@@ -178,3 +178,10 @@ revision; the pinned form it writes is described in
 - The provider does not walk pages or hold the cursor itself; the caller does.
 - No write is offered: acknowledging, closing and notes, on-call and schedules
   stay out of this selection set.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Opsgenie REST API from the pinned Swagger 2.0 document projected to OpenAPI, with the incident-to-alert link added by a cited amendment; API integration key as `Authorization: GenieKey <key>` (`auth.prefix`) from keyring custody, proved with `GET /v2/alerts`; reads only, one page per call over a `createdAt` window the caller advances; verified against a local fixture only, see [the Opsgenie guide](docs/catalog-opsgenie.md)

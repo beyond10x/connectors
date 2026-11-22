@@ -15,8 +15,7 @@ connector, instance, connection and operation are those of the
 [full Tavily guide](https://github.com/beyond10x/connectors/blob/main/docs/local-tavily.md) has
 every bound and refusal.
 
-No declaration ships for it, so the instance is pinned: it names its executable, that
-executable's SHA-256 and the configuration revision the executable prints. Commands that need a
+It is a [pinned instance](../guides/pinned-instances.md). Commands that need a
 Tavily account are shown without output.
 
 ## What it reads and writes
@@ -102,19 +101,11 @@ The connector has no write, so nothing here needs an approval.
 ## Reconnect when the connection is Stale
 
 A revoked key is reported as `unauthorized` when next used; revalidation then finds it invalid and
-the connection lists as `stale`. Publish a working key:
-
-```sh
-connectors --output json connections list --connector tavily --instance tavily \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector tavily --instance tavily \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+the connection lists as `stale`. Publish a working key. [Reconnect](../guides/reconnect-a-connection.md) `tavily/tavily` with `--credential-prompt`.
 
 ## Limits
 
 - Tavily exposes no account identifier: two keys are not told apart, and a reconnect cannot
   detect a key of another account.
 - A key grants no scopes and exposes no expiry.
-- Validation lasts 60 seconds; a scheduled caller revalidates before reading.
 - A call ends at the caller's deadline: 30 seconds in the CLI, 20 seconds at the service. A crawl sends Tavily a 12-second `timeout`.

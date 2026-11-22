@@ -145,16 +145,7 @@ in `.local/tmp` older than the running task is deletable without asking (measure
 Keep unrelated worktrees' build outputs separate. Do not refresh vendor inputs during normal
 builds or edit generated output around a refusal.
 
-On the operator's shared build host, this repository's own Cargo builds use a compile cache of
-their own, so a new worktree does not recompile every dependency: `RUSTC_WRAPPER=sccache`,
-`SCCACHE_DIR=~/.cache/sccache/connectors`, `SCCACHE_SERVER_PORT=4301` and
-`SCCACHE_CACHE_SIZE=2G`. The server on port 4301 serves this repository only; never the default
-port 4226, never a wrapper set globally. Set them in the build's environment, not in a committed
-Cargo configuration, and keep the caller's `TMPDIR` short (the server binds its startup socket
-there).
-Never leave `RUSTC_WRAPPER` unset for `connectors-build gate`: a host-wide `rustc-wrapper` then
-applies, and on 2026-10-31 the gate's `oauth2_boundary` tests failed in a worktree with `sccache:
-error: path must be shorter than SUN_LEN`; set the variables above, or `RUSTC_WRAPPER=` (empty).
+The compile cache is the host's: see `~/beyond10x/AGENTS.md` § One compile cache.
 A unit that edits `ess/domains` or a cited contract runs, with its targeted tests, the gate's
 generation and drift steps (`connectors-build metadata-entities --check`, `ess-boundary`, `cli
 --check`, `mcp-bindings --check`, `service-metadata --check`, `connectors-docs generate --check`)
@@ -252,9 +243,15 @@ earlier local-only Connectors publication boundary for these releases.
    page and `sha256sum -c SHA256SUMS` passes on the downloaded archives. On the
    same tag push its image job pushes `ghcr.io/beyond10x/connectors:<version>`
    (`linux/amd64`, `linux/arm64`) from the two Linux archives' binaries, and
-   refuses a version the registry already holds; the release is verified only when
-   `docker buildx imagetools inspect` of that tag lists both platforms under the
-   digest the job's summary names.
+   refuses a version the registry holds unless its `org.opencontainers.image.revision`
+   is the release commit (a rerun then pushes nothing and only checks the platforms);
+   the release is verified only when `docker buildx imagetools inspect` of that tag
+   lists both platforms under the digest the job's summary names. Precondition,
+   before the first push: the `connectors` container package grants this repository
+   Write under the package's "Manage Actions access"; without it the push fails
+   with `denied: permission_denied: write_package`. The checks live in
+   `deploy/images/connectors/check-image.sh`, which the pull-request path runs over
+   the captured 0.70.0 inspect output.
 
 v0.8.0–v0.11.0 were cut from a checkout with no GitHub remote and published by
 replaying its history onto the `next` branch with `git commit-tree`, so each of
@@ -289,6 +286,10 @@ Gating is Gates, not Atlas. Install coordinated local hooks with
 `b10x-gates --repository beyond10x/connectors_v2 install`. Use `b10x-gates bot` for
 direct commits, tags and pushes, retaining `b10x-bot[bot]`, and Gates `check`,
 `verify` and `publish` for signed common evidence; verify both author and committer.
+Pull requests merge through the bot (`b10x-gates api`, squash) once the required checks are
+green. GitHub auto-merge does not fire here: `b10x-gates` requires `b10x-bot-branch-authority`
+to cover every branch, main included (gates `src/published_merge.rs`), so only the bot's bypass
+updates main, and auto-merge does not use it. Ruleset changes are the owner's.
 The hooks scan the index, names, messages, metadata, tags and every outgoing commit.
 Ordinary commit and publish paths need no Atlas checkout, current Atlas main or
 organization-wide admission. Private policies and enrolled signing keys stay outside

@@ -257,3 +257,10 @@ connectors --output json invoke runpod/gpu pod.terminate --input-file terminate.
   selected.
 - The identity is the configured connection, not a Runpod account (see
   [Authentication](#authentication)).
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Runpod REST API v1 from the pinned OpenAPI source; API key as `Authorization: Bearer` from keyring custody; both writes are unguarded required-approval mutations, a create refused for lack of capacity is refused with code `capacity`, a create without a definite answer is `unknown`; verified against a local fixture only, see [the Runpod guide](docs/catalog-runpod.md)

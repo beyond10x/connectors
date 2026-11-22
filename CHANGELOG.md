@@ -1,5 +1,291 @@
 # Changelog
 
+## 0.73.0 — 2026-11-14
+
+### Added
+
+- A definition whose `base_url` path ends in a variable its `config` declares, such as Basecamp's
+  `https://3.basecampapi.com/{accountId}`, lowers each operation under that path without it: the
+  lowerer drops the path and its parameter, so no caller passes `accountId`, and the instance's
+  endpoint (`https://3.basecampapi.com/12345`) or the variable's default names the account. The
+  declaration records the path as `endpoint_path`, and the catalog provider refuses an instance
+  whose endpoint has no such path. An operation or guard read the definition reaches whose path
+  does not start with it is refused as `outside_base_path`; a variable `config` does not declare
+  is still `undeclared_variable`. No other definition, bundle, declaration or configuration
+  revision changes (story:catalog-path-prefix-from-config).
+
+### Changed
+
+- Every provider now sees `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`
+  instead of `connectors/<version>`: every request of every connector, the token, form and
+  assertion exchanges, the requests of an `oauth2_grant` profile's grant and refresh, and a
+  WebSocket upgrade. Basecamp refuses a request whose `User-Agent` names no contact. Before, the
+  grant and refresh requests of an `oauth2_grant` profile carried no `User-Agent`. A definition or
+  configuration still cannot set or replace the header, and no definition, bundle or
+  configuration revision changes. The git relay keeps its own `git/connectors-<version>`
+  (story:user-agent-names-the-project).
+
+### Compatibility
+
+- Every provider sees the new `User-Agent`. A provider, proxy or allow-list that matched the
+  exact old value `connectors/<version>` must match the new one.
+
+### Limitations
+
+- The definition importer does not yet accept a declaration's `endpoint_path`: a provider
+  directory lowered from a base URL that ends in a config variable is refused on import as an
+  unknown field. No shipped definition has such a base URL
+  (story:definition-import-accepts-endpoint-path, draft).
+- The stdio MCP server serves a session on Linux and macOS. On Windows it is built and its
+  launch contract is tested, but the serving scenario has not yet passed in CI
+  (story:mcp-stdio-on-macos-and-windows stays open).
+
+## 0.72.0 — 2026-11-13
+
+### Added
+
+- The `hubspot` connector reads owners: `owners.list` (paged by `after`, `email` and `archived`
+  filters) and `owner.get`, so the `hubspot_owner_id` a deal or company carries becomes a name,
+  email and teams. Both come from HubSpot's published Crm Owners `2026-09` document, vendored
+  under `adapters/hubspot/upstream/` with its digest, and enter the one-source HubSpot bundle as
+  cited amendments that a test holds equal to that document. Deals, companies and line items
+  through `objects.list` and `object.get` are covered by a fixture test, and the guide names the
+  scopes for this set (deals, companies, line items and owners read; no contacts scope). Reads
+  only. The HubSpot configuration revision moves: a pinned `configuration_revision` must be
+  copied again (story:hubspot-owners-and-line-items).
+- Drive `files.getMedia` reads an uploaded file's content, such as a PDF, under the read-only
+  Drive scope: `drive.files.get` with `alt=media`, answered as base64 with its media type, length
+  and SHA-256, and refused as `capacity` above 2 MiB; the provider's refusal names the size
+  (also of a file over the transport's 4 MiB limit, from its `Content-Length`). A Google Docs,
+  Sheets or Slides file is refused as forbidden, with a reason pointing to `files.export`. The
+  Discovery projector is now
+  `discovery-openapi/2`: it projects `alt` (`json` or `media`) on a method that supports media
+  download and answers JSON, and a definition lowered from a Discovery source withholds `alt` on
+  every selection that does not fix it, so a Drive definition written before this keeps `files.get`
+  metadata-only. The Calendar, Drive, Gmail and Slides bundles record the new projector,
+  so those four connectors' configuration revisions move: a pinned `configuration_revision` must be
+  copied again (story:drive-file-content-read).
+- `connections connect` and `reconnect` take `--credential-env <NAME>`, exclusive with the other
+  credential inputs: the credential is read from that environment variable, so
+  `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN`
+  passes a secret manager's value to one command. A profile of one entry field takes the bare
+  value; any other takes the JSON object the other inputs take. An unset, empty or oversized
+  variable is `protected_entry_unavailable` naming the variable (`environment_variable`) and never
+  its value; a word that is no upper case variable name is refused unechoed, with the rule in
+  `environment_variable_rule`, and one trailing line break of a bare value is dropped (story:credential-from-environment-variable).
+
+### Changed
+
+- The Gmail, Calendar and Drive connectors now declare a read-only auth profile,
+  `google.oauth.readonly`, beside `google.oauth`, and it is their default: it requests `openid` and
+  the one `.readonly` scope, requires only that scope, and offers none of the writes, so even the
+  private protocol describes no write on it. A connection is bound to the profile it was saved
+  under and is never rebound to another, so a connection saved under `google.oauth` is not
+  revalidated or read by an instance that names no profile. To keep it, name
+  `profile = "google.oauth"` in the instance (and `--profile google.oauth` on connect): the
+  instance keeps its configuration revision and the connection works as before. To go read-only,
+  `connections revoke` the old connection and `connections connect` again under the default
+  profile. Slides is unchanged, and a connector declaration may name a `default_profile`. An instance of a Google
+  connector may also state `allowed_domains` (one to eight lower-case domains), which the host
+  passes as `--allowed-domain`: a connect, reconnect or revalidation compares the `hd` claim of
+  the ID token with the list before any credential is stored and refuses another domain, or an
+  account with no `hd`, as `insufficient_scope`, with a reason naming the account's domain and the
+  admitted ones. The list is part of the credential revision, and a profile that is not an OAuth
+  refresh profile with an ID-token identity refuses it at load. Instances made from a
+  connectors-definitions file cannot yet state it
+  (story:google-read-only-profiles-and-company-domain).
+- A connectors-definitions file may mark an auth profile `read_only: true` and name the profile of
+  an instance that names none at its top level as `default_profile`. Both lower into the connector
+  declaration where the catalog provider reads them, so a read-only profile of a definition offers
+  no write, as a shipped one does, and `connectors-build definition import` reads them from the
+  shipped Gmail, Calendar and Drive declarations again instead of refusing every import. A
+  `default_profile` naming none of the profiles is refused as `malformed`
+  (story:google-read-only-profiles-and-company-domain).
+- `connectors server --transport stdio` is built for macOS and Windows, not only Linux. Its data
+  lease runs on the clock that counts across sleep, as it did on `CLOCK_BOOTTIME`: macOS
+  `CLOCK_MONOTONIC_RAW` against `CLOCK_UPTIME_RAW`, Windows `QueryInterruptTimePrecise` against
+  `QueryUnbiasedInterruptTimePrecise`, the local clock's own pairs, now pinned by a test on each
+  platform. On Windows the standard handles are served through a reader and a writer thread; a
+  reply goes to the writer as one frame and the loop waits for its completion, and a write is
+  counted only once made. The macOS and Windows host jobs run the launch contract, the lease
+  timers, the console tests and a serving scenario (launch, initialize, list, one call) against
+  each platform's own credential store, with their counts checked. That scenario has passed on
+  Linux only so far, so serving on macOS and Windows is not yet shown; the other end-to-end
+  scenarios stay on Linux, against the mounted custody binding (story:mcp-stdio-on-macos-and-windows).
+- On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check
+  starts for its printed output now ends when the process that started it is killed, as an adapter
+  already did (`PR_SET_PDEATHSIG`, SIGKILL, set before exec). Test processes that wait on a
+  child of their own ask the same, so a killed test leaves no process behind. An owner is not
+  tied to the CLI that started it. No contract changed (story:test-children-die-with-their-parent).
+- The owner contract now says what the plain `invoke` frame enforces: the grant, the description's
+  revision and schema, a read requirement, the input and the connection's admission. The effects
+  rule (a semantic effect or an effect other than `network` is `unsupported`) is not among them: it
+  binds only the bounded and projected governed reads, and a granted read declaring effects is
+  still served on `invoke`. The contract also names the `GovernedRead` frame without a projection
+  revision, which skips that rule for a same-uid raw-frame client. No behaviour changed
+  (story:owner-invoke-frame-effects-boundary).
+- A connect, repair, revalidation or read under a changed provider authority or profile
+  authentication answers `authentication_changed`, not `lifecycle_conflict`: only a new instance
+  id helps, and `check_configuration` says so. MCP clients still see `unavailable`
+  (story:configuration-change-error).
+- A definition whose feed the catalog engine would refuse when an instance starts is refused when
+  the definition loads, under a named rule (`feed_parameter_twice`, `feed_parameter_required`,
+  `feed_operation_query`, `feed_query_template`, `feed_operation_get`, `feed_parameter_unbound`,
+  `feed_item_pointer` and others)
+  (story:definition-reader-refuses-what-the-feed-engine-refuses).
+- A catalog write body whose required key, or `body_any_of` key, is given as `null` is refused
+  before any request: null counts as missing. A selection may declare `body_null_clears: true`
+  so a null `body_any_of` member is the change and is sent; Jira `issue.edit` does, so
+  `assignee`, `description` or `priority` given as null alone still unassigns or clears. A
+  nested `body_any_of` now requires its parent in the declared input schema. Jira's
+  configuration revision moves: a pinned `configuration_revision` must be copied again, and a
+  connected Jira instance is `pending` until `connections revalidate`
+  (story:required-body-key-refuses-null).
+
+### Compatibility
+
+- A Gmail, Calendar or Drive instance that names no profile now connects under the read-only
+  profile `google.oauth.readonly` and offers no write. An instance that writes names
+  `profile = "google.oauth"`; an existing connection under `google.oauth` keeps working only
+  when the instance names that profile, otherwise revoke and connect again.
+- The Calendar, Drive, Gmail, Slides and HubSpot configuration revisions move: a pinned
+  `configuration_revision` must be copied again.
+- connectors-definitions files that use `read_only`, `default_profile`, Drive `files.getMedia`
+  or the HubSpot owners amendment need this release; 0.71.0 refuses them as unknown fields.
+
+### Limitations
+
+- The stdio MCP server serves a session on Linux and macOS. On Windows it is built and its
+  launch contract is tested, but the serving scenario has not yet passed in CI
+  (story:mcp-stdio-on-macos-and-windows stays open).
+- Bash completion of `--credential-env` offers file names, as `--profile` does
+  (story:cli-option-value-hint, draft).
+- A served write whose guard answers not-ok sends nothing but is answered `outcome_unknown`
+  (story:served-guard-refusal-is-a-refusal, draft).
+
+## 0.71.0 — 2026-11-11
+
+### Added
+
+- `connectors setup custody-orphans` lists the Secret Service items no store names.
+  `--mode remove --authority <id>` removes only that authority's items
+  (story:custody-keeps-out-of-the-session-keyring).
+- An owner writes its failures to `<state>/owner.log`: owner-only, bounded at 256 KiB, holding fixed
+  event names and error codes only. An `outcome_unknown` caused by an owner-side failure carries
+  `owner_log` and this connection's `owner_error` in its error data (story:owner-errors-are-readable).
+- Grafana through the catalog provider, from Grafana's OpenAPI 3 document pinned at tag
+  `v13.3.1` with its AGPL-3.0 licence (`adapters/grafana/upstream/`): five reads, no write.
+  `alert_rules.list`, `annotations.list` over a `from`/`to` window in epoch milliseconds,
+  `dashboards.search` (`type` held to `dash-db`, paged by `page` and `limit`), `dashboard.get`
+  and `datasources.list`, with a service-account token as `Authorization: Bearer` under the
+  profile `grafana.service-account`, proved by `GET /api/user`. The definition
+  `connectors/grafana.yaml` runs the five reads on a served instance with a mounted token
+  (`catalog.definition`); locally the selection runs as a pinned instance. Paging, end conditions
+  and time windows are in `docs/catalog-grafana.md` (story:catalog-grafana-reads).
+- Prometheus and Loki through Grafana's data-source proxy, on the same Grafana catalog selection
+  and token: `prometheus.query`, `prometheus.query_range` and `loki.query_range`, read only, under
+  `grafana.service-account`. Each proxy sub-path is a cited `add_operation` amendment to the pinned
+  document (`adapters/grafana/upstream/grafana.amendments.json`), which declares the proxy only as
+  one `{datasource_proxy_route}` parameter; the bundle carries 317 operations. Loki's `limit` is
+  held to 1 to 5000 (`max_entries_limit_per_query`), and an answer over the 4 MiB limit is refused
+  as `capacity`. `uid` is held to Grafana's data-source uid rule, letters, digits, `-` and `_`, at
+  most 40, and any other value is refused before any request, so a `uid` holding `/` or `\` cannot
+  reach another Grafana path. Each answer is the upstream JSON value, written compact with object
+  keys sorted, as for every catalog read. The definition `connectors/grafana.yaml` names the
+  amendments (story:catalog-grafana-datasource-proxy-reads).
+- An `add_operation` amendment's parameter may declare a `pattern`, a regular expression anchored
+  at both ends; the bundle records it and the catalog provider refuses a value that does not match
+  before any request, naming the parameter. The pipeline refuses an unanchored or invalid one, and
+  any `pattern` on an `add_parameter` amendment (`docs/local-catalog-provider.md`).
+- A served catalog instance takes `catalog.allowed_values`: per operation and string input, the
+  only values it may take. A value outside a non-empty list is `forbidden` by name before any
+  request; an empty or absent list admits every value; start refuses an operation the instance
+  does not describe, an input it does not take, an empty or repeated value, or an operation or
+  input written twice (`docs/running-services.md`). A Grafana instance holds the proxy reads'
+  `uid` to its data sources this way.
+
+### Changed
+
+- A name that both a legacy `[connectors]` entry and an `[instances]` entry derive is refused as
+  `instance_ambiguous` at every selection (invoke, connect, approvals prepare and issue), naming both
+  entries. Before, it reached the instance silently. A name that only a legacy entry holds still
+  connects through its own pinned endpoint (story:legacy-alias-sharing-an-instance-name).
+- The catalog engine refuses some values as `invalid_input` before any request, for reads and
+  writes:
+  - a value outside a parameter's pinned `enum`, including one reached through a local schema
+    `$ref` and each element of a comma-joined repeated value
+    (story:catalog-validates-enum-and-date-time);
+  - a `format: date-time` value that is not RFC 3339 (story:catalog-validates-enum-and-date-time);
+  - a required path or query parameter given as an empty string
+    (story:required-parameter-refuses-empty).
+- An adapter program that refuses the private protocol it is asked for is reported as
+  `unsupported_private_protocol`, with the protocol asked and the ones it supports, instead of
+  `unavailable` (story:adapter-private-protocol-refusal-named).
+- A Kubernetes exec credential plugin that is busy now answers `unavailable` with `retry_status`.
+  A missing plugin still answers `invalid_configuration` (story:exec-plugin-busy-reaches-the-operator).
+- Custody writes behind the Secret Service default alias. A test build refuses the session bus
+  before any write (story:custody-keeps-out-of-the-session-keyring).
+- A command without a deadline of its own counts the 60 s owner startup bound from the launch
+  (story:cli-connect-admission-timeout-under-load).
+- Documentation:
+  - provider pages share five guides under `website/docs/guides/`
+    (story:docs-provider-pages-shared-guides);
+  - contract and model pages sit in one Specification category, with no URL moved
+    (story:docs-specification-sidebar);
+  - the README is back under its size limit (story:readme-back-under-its-size-limit).
+
+### Fixed
+
+- The PostgreSQL read session resolves `pg_catalog` first and the wrapper names `pg_catalog`
+  objects, so no object another principal creates in `public` runs as the reader or defeats the
+  size guard (story:sql-wrapper-resolves-pg-catalog-first).
+- A reconnect checks retained material versions against the refresh bound of 64, not 8
+  (story:reconnect-retained-bound-matches-refresh).
+- Only unreleased read uses count against the 1,000-use bound (story:read-use-bound-counts-live-reads).
+- An MCP tool list or call past its deadline answers `timeout`, and the session continues
+  (story:mcp-tool-deadline-keeps-the-server).
+- One busy instance no longer stalls the pool's idle checks of every other instance
+  (story:pool-idle-checks-wait-outside-the-pool-lock).
+- A guard input that resolves to a JSON boolean compares by JSON type
+  (story:catalog-guard-typed-comparison).
+- A closed body with an all-digit pointer segment, or with a key in both `body_enums` and
+  `body_prefixes`, is refused when its selection loads (story:closed-body-load-refuses-ambiguous-pointers).
+- A definition import keeps hand-written profiles in the shared auth library file
+  (story:definition-import-merges-shared-auth).
+- The catalog contract classifies an over-bound response body as `capacity`
+  (story:catalog-oversized-body-one-classification).
+- The owner's bounded read refuses a generic realization whose schemas are not inline
+  (story:owner-bounded-generic-read-inline-schemas).
+- The Slack file-read checks compare the request path exactly (story:slack-file-read-checks-exact-path).
+- The SQL query text and parameters are bounded in characters, as the descriptor states
+  (story:sql-length-units).
+- A Tavily crawl whose `response_time` reaches the timeout sent is reported `complete: false` with
+  `provider_partial` (story:tavily-crawl-cut-short-is-not-complete).
+- Generated outputs (service metadata, CLI binding, MCP bindings) regenerate in a fresh checkout
+  (story:generated-output-regenerates-in-a-fresh-checkout).
+- The live acceptance runner no longer needs the removed `serve` command
+  (story:live-acceptance-without-serve).
+- The release image job's platform check tolerates the registry's inspect padding
+  (story:release-image-platform-check-tolerates-padding).
+- The Slack move guide enables the five writes the shipped selection carries
+  (story:slack-move-names-four-writes).
+
+### Compatibility
+
+- No migration. A name that both a legacy `[connectors]` entry and an `[instances]` entry
+  derive is now refused as `instance_ambiguous`; rename one of the two entries. The Grafana
+  catalog selection, the amendment `pattern` and `catalog.allowed_values` are additions; a
+  bundle or configuration without them loads as before.
+
+### Limitations
+
+- The Grafana catalog reads are verified against a local fixture only. The catalog selection
+  ships no connector declaration, because `grafana` is the native `connectors-grafana`
+  connector's name; that connector is unchanged.
+- The Prometheus and Loki proxy reads are verified against a local fixture only; that Grafana's
+  proxy passes each query and answer through unchanged is not checked against a live Grafana. A
+  pinned local instance has no `allowed_values`.
+
 ## 0.70.0 — 2026-11-10
 
 ### Added

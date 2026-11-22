@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:32:38Z",
+  "actor": "human:operator",
+  "artifact": "story:mcp-tool-deadline-keeps-the-server",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-mcp-deadline-adversary-1",
+    "reference": "eed1107db: the acceptance case warms the owner with a default-budget server and retries a start that ends before its first ping; adversary_local_mcp_server 17 passed 1 ignored on 3 runs. The startup bound itself is story:mcp-startup-has-its-own-bound",
+    "review": "review-result:wave-b-mcp-deadline-adversary-1",
+    "outcome": "fixed"
+  }
+}

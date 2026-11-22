@@ -129,3 +129,42 @@ fn a_revalidation_waits_for_a_slow_owner_start() {
         "{revalidated}"
     );
 }
+
+/// story:cli-connect-admission-timeout-under-load. On a loaded host the CLI
+/// spends longer than 10 seconds launching the owner (reading and sealing its
+/// own executable) before the owner can answer its greeting. The launch is
+/// part of the start a command without a deadline of its own waits for up to
+/// the startup bound: it is not `timeout` at `admission`.
+#[test]
+fn a_revalidation_waits_for_a_slow_owner_launch() {
+    let (container, connection, revision) = connected();
+    let started = Instant::now();
+    let output = Jail::output(
+        container
+            .jail
+            .command("/bin-test/connectors", Map::Own)
+            .args(["--output", "json", "--config", CONFIG, "--state-dir", STATE])
+            .args([
+                "connections",
+                "revalidate",
+                "--adapter",
+                ALIAS,
+                "--connection",
+                &connection,
+                "--expected-revision",
+                &revision,
+            ])
+            .env_clear()
+            .env(
+                "CONNECTORS_TEST_OWNER_LAUNCH_DELAY_MS",
+                SLOW_START.as_millis().to_string(),
+            )
+            .stdin(Stdio::null()),
+    );
+    let revalidated = success(&output);
+    assert!(started.elapsed() >= SLOW_START, "{:?}", started.elapsed());
+    assert_eq!(
+        revalidated["connection"]["summary"]["state"], "ready",
+        "{revalidated}"
+    );
+}

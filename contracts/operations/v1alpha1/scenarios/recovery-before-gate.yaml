@@ -20,6 +20,26 @@ timeline:
       input_digest: test-digest
       approval_mode: required
       approval_ref: opaque-test-reference
+      approval_subject:
+        format: b10x.connectors-approval-subject/v1
+        target:
+          instance: test-instance
+          operation: issue.create
+          connection: test-connection
+          connection_revision: connection-r1
+          contract: operations/v1alpha1
+          profile: mutation
+          descriptor_revision: descriptor-r1
+          configuration_revision: config-r1
+        authority:
+          scope: {tenant: null, realm: null, caller: test-caller, executor: null}
+          current_authority: null
+          executor: null
+        origin: {kind: direct, authority_ref: test-authority}
+        route: null
+        canonicalization: adapter-v1-canonical-json
+        input_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+        approval_mode: required
       idempotency_key: null
       request_fingerprint:
         operation_ref: '["connectors.operation/v1","test-instance","test-adapter","issue.create"]'
@@ -57,7 +77,6 @@ timeline:
     outcome: wrong-state
     error:
       name: connectors.mutations.AttemptStateConflict
-      fields: {state: Aborted}
     no_events: [connectors.mutations.DispatchOpened]
 
 assert:

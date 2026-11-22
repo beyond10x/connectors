@@ -7,7 +7,7 @@
 //! drives the provider child against a disposable HTTPS fixture. Fixture
 //! secrets are fictional and only ever compared, never printed. No network.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},

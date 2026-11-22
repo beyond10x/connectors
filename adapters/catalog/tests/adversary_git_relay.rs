@@ -948,7 +948,7 @@ fn check(fixture: &str) -> Value {
 fn an_object_no_pushed_ref_reaches_never_reaches_the_forge() {
     let (forge, served) = started(|git| {
         git["commit_identity"] = json!({"name": IDENTITY_NAME, "email": IDENTITY_EMAIL});
-        git["pre_push_check"] = check("fixture_scan_check");
+        git["pre_push_check"] = check("adversary_git_relay::fixture_scan_check");
     });
     let client = Client::new(Some(AGENT_TOKEN));
     client.cloned(&served.url(PROJECT));

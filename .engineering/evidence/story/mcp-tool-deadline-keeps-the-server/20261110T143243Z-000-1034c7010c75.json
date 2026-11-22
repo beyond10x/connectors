@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:32:43Z",
+  "actor": "human:operator",
+  "artifact": "story:mcp-tool-deadline-keeps-the-server",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-mcp-deadline-security-1",
+    "reference": "eed1107db: warm-up and first-ping retry in the acceptance case; startup bound filed as story:mcp-startup-has-its-own-bound",
+    "review": "review-result:wave-b-mcp-deadline-security-1",
+    "outcome": "fixed"
+  }
+}

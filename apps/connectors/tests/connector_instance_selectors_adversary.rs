@@ -109,7 +109,8 @@ fn configured() -> tempfile::TempDir {
     fs::write(
         &config_path,
         format!(
-            "format = \"connectors-local/5\"\n{owner}\n[connectors.{CONNECTOR}]\nenabled=true\n[{table}]\nalias='{ALIAS}'\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[{table}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[{table}.permissions]\nprofiles=['token']\noperations=['{OPERATION}']\n",
+            "format = \"connectors-local/5\"\n{owner}\nsecret_service_socket = '{}'\n[connectors.{CONNECTOR}]\nenabled=true\n[{table}]\nalias='{ALIAS}'\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[{table}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[{table}.permissions]\nprofiles=['token']\noperations=['{OPERATION}']\n",
+            root.path().join("no-bus").display(),
             "a".repeat(64)
         ),
     )

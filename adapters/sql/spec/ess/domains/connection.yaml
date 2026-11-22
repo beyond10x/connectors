@@ -77,7 +77,8 @@ types:
     kind: newtype
     of: String
     invariants:
-      - value.count: {gte: 1, lte: 8192}
+      - value.utf8_bytes >= 1
+      - value.utf8_bytes <= 8192
 
   # The protected entry of the password profile, for either engine.
   - name: connectors_sql.connection.PasswordEntry

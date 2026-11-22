@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:32:41Z",
+  "actor": "human:operator",
+  "artifact": "story:mcp-tool-deadline-keeps-the-server",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-mcp-deadline-adversary-1",
+    "reference": "eed1107db: adversary_a_late_timeout_queued_behind_a_full_pipe_is_still_written committed as the guard of LATE_WRITE_GRACE",
+    "review": "review-result:wave-b-mcp-deadline-adversary-1",
+    "outcome": "fixed"
+  }
+}

@@ -26,6 +26,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use connectors_catalog::{
     bundle::Bundle,
     inventory::{Location, Operation},
+    query_template::{self, Part},
     template::{Supplied, Template},
 };
 use connectors_core::{Error, ErrorCode, Result};
@@ -47,8 +48,6 @@ pub const RESULT_BYTES: usize = 3 * 1024 * 1024;
 pub const WATERMARK_BYTES: usize = 16 * 1024;
 /// The longest id, revision or instant read from a provider record.
 const FIELD_BYTES: usize = 1024;
-/// The longest query template.
-const TEMPLATE_BYTES: usize = 1024;
 /// The most listing requests one `feed.items` call with a page continuation makes.
 pub const PAGES: usize = 10;
 const MARK_FORMAT: &str = "catalog-feed/1";
@@ -397,14 +396,6 @@ fn url_name(name: &str, value: &str) -> Result<()> {
 
 // ---- query templates -------------------------------------------------------------------------
 
-/// One piece of a parsed query template.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Part {
-    Text(String),
-    Container,
-    Since,
-}
-
 /// A time query, its templates parsed and checked.
 struct Query {
     parameter: String,
@@ -418,107 +409,11 @@ const OFFSET_MINUTES: i64 = 1439;
 
 const MINUTE: i128 = 60_000_000_000;
 
-/// `text`, the template `name`, as text and slots. Refused: a template longer than
-/// [`TEMPLATE_BYTES`], a control character, a brace outside a slot, a slot other than
-/// `{container}` and `{since}`, a slot beside a `"`, `'` or `\` or inside a literal the template
-/// opens with `"` or `'` (where a value would be read as part of that literal, not as its own),
-/// a literal left open, a `\` outside a literal, and slot counts other than `first`
-/// (`{container}` once, no `{since}`) and `resume` (each once) take.
+/// `text`, the template `name`, as text and slots: what [`query_template::parse`] reads, which
+/// the definition reader shares, and slot counts other than `first` (`{container}` once, no
+/// `{since}`) and `resume` (each once) take.
 fn template(name: &str, text: &str, resume: bool) -> Result<Vec<Part>> {
-    if text.len() > TEMPLATE_BYTES {
-        return Err(refuse(format!(
-            "feed `{name}` is longer than {TEMPLATE_BYTES} bytes"
-        )));
-    }
-    if text.chars().any(char::is_control) {
-        return Err(refuse(format!("feed `{name}` holds a control character")));
-    }
-    let stray = || refuse(format!("feed `{name}` has a stray brace"));
-    let mut parts = Vec::new();
-    let mut rest = text;
-    while !rest.is_empty() {
-        let at = rest.find(['{', '}']).unwrap_or(rest.len());
-        if at > 0 {
-            parts.push(Part::Text(rest[..at].to_owned()));
-        }
-        rest = &rest[at..];
-        if rest.is_empty() {
-            break;
-        }
-        if rest.starts_with('}') {
-            return Err(stray());
-        }
-        let end = rest.find('}').ok_or_else(stray)?;
-        let slot = &rest[1..end];
-        if slot.contains('{') {
-            return Err(stray());
-        }
-        parts.push(match slot {
-            "container" => Part::Container,
-            "since" => Part::Since,
-            other => {
-                return Err(refuse(format!(
-                    "feed `{name}` names an unknown slot `{{{other}}}`"
-                )));
-            }
-        });
-        rest = &rest[end + 1..];
-    }
-    let quoting = |c: char| matches!(c, '"' | '\'' | '\\');
-    for (index, part) in parts.iter().enumerate() {
-        if matches!(part, Part::Text(_)) {
-            continue;
-        }
-        let before = index
-            .checked_sub(1)
-            .and_then(|i| parts.get(i))
-            .and_then(|p| match p {
-                Part::Text(text) => text.chars().next_back(),
-                _ => None,
-            });
-        let after = parts.get(index + 1).and_then(|p| match p {
-            Part::Text(text) => text.chars().next(),
-            _ => None,
-        });
-        if before.is_some_and(quoting) || after.is_some_and(quoting) {
-            return Err(refuse(format!(
-                "feed `{name}` puts a slot beside a quote or backslash; the engine quotes each value"
-            )));
-        }
-    }
-    // A slot inside a literal the template opens would let its value close that literal.
-    let mut open: Option<char> = None;
-    let mut escaped = false;
-    for part in &parts {
-        let Part::Text(text) = part else {
-            if open.is_some() {
-                return Err(refuse(format!(
-                    "feed `{name}` puts a slot inside a literal; the engine quotes each value"
-                )));
-            }
-            continue;
-        };
-        for c in text.chars() {
-            match open {
-                Some(_) if escaped => escaped = false,
-                Some(_) if c == '\\' => escaped = true,
-                Some(quote) if c == quote => open = None,
-                Some(_) => {}
-                None if matches!(c, '"' | '\'') => open = Some(c),
-                // Outside a literal a provider may or may not read `\` as an escape, so where a
-                // literal starts would be the provider's guess, not the template's.
-                None if c == '\\' => {
-                    return Err(refuse(format!(
-                        "feed `{name}` has a backslash outside a literal"
-                    )));
-                }
-                None => {}
-            }
-        }
-    }
-    if open.is_some() {
-        return Err(refuse(format!("feed `{name}` leaves a literal open")));
-    }
+    let parts = query_template::parse(name, text).map_err(refuse)?;
     let count = |slot: &Part| parts.iter().filter(|p| *p == slot).count();
     let (containers, sinces) = (count(&Part::Container), count(&Part::Since));
     if !resume && (containers, sinces) != (1, 0) {

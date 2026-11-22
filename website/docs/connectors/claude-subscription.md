@@ -12,9 +12,7 @@ connectors: "claude-subscription"
 The `claude-subscription` connector of the provider Anthropic signs in to a Claude plan through the
 sign-in the Claude Code binary uses: an OAuth 2.0 authorization code grant with PKCE at
 `https://claude.com/cai/oauth/authorize`, its tokens from `https://platform.claude.com/v1/oauth/token`.
-A program then asks `connections token` for a current access token. The words connector, instance,
-connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
+A program then asks `connections token` for a current access token. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
 
 It is built for one person's use of their own Claude plan, on their own machine. Read the
 provider's terms before you connect.
@@ -305,13 +303,7 @@ None: the connector selects no write.
 ## Reconnect when the connection is Stale
 
 A refresh token the provider refuses makes the connection `stale`, and `connections token` answers
-`repair_connection`. Sign in again on the same connection:
-
-```sh
-connectors connections list --connector claude-subscription --instance mine
-connectors connections reconnect --connector claude-subscription --instance mine \
-  --expected-revision "<revision from the list>"
-```
+`repair_connection`. Sign in again on the same connection. [Reconnect](../guides/reconnect-a-connection.md) `claude-subscription/mine`.
 
 `reconnect` runs the same grant as `connect` and replaces the stored tokens on the same
 connection. The Claude journeys do not run it; the generic grant journey

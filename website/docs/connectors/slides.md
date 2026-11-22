@@ -10,14 +10,11 @@ connectors: "slides"
 # Google Slides
 
 The `slides` connector of the provider Google is served by the catalog provider from the pinned
-Slides API v1 document. The words connector, instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Slides API v1 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Slides guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-slides.md)
 has every parameter and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a Google account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -30,15 +27,9 @@ out here. A command that needs a Google account is shown without output.
 1. In the Google Cloud console, select or create a project and enable the Google Slides API.
 2. Configure the OAuth consent screen and add the scopes this connector requests: `openid`,
    `https://www.googleapis.com/auth/presentations` and
-   `https://www.googleapis.com/auth/presentations.readonly`. One instance per Google account
-   requests every scope its operations need, reads and writes alike.
-3. Under *Credentials*, create an OAuth client ID of type *Desktop app*, download its JSON and
-   make it readable by you alone (`chmod 600`).
-4. Choose the publishing status. Google expires the refresh token of an app in *Testing* seven
-   days after consent, and every account that connects must be a test user. An app used only by
-   its developer can be set to *In production* without Google's verification
-   ([Google's exemption for personal use](https://support.google.com/cloud/answer/13464323)),
-   which lifts the seven-day expiry.
+   `https://www.googleapis.com/auth/presentations.readonly`.
+3. Create the OAuth client and choose the publishing status as in
+   [Google OAuth setup](../guides/google-oauth-setup.md).
 
 ## Enable the connector and add an instance
 
@@ -50,14 +41,6 @@ enabled = true
 ```
 
 The instance uses Slides' default endpoint, `https://slides.googleapis.com`, and pins nothing.
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"slides","instance":"private","instance_id":"slides.private","restart":"never","startup":"on-demand"}
-```
 
 ## Connect
 
@@ -80,14 +63,10 @@ connectors invoke slides/private presentations.get \
 
 ## A first guarded write
 
-Once per instance, create the signing key (`connectors approvals key-init --connector slides
---instance private`) and add an `[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Publish a policy naming the writes:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["presentations.create","presentations.batchUpdate"]}\n' > policy.json
-connectors approvals policy-set --connector slides --instance private --input-file policy.json
 ```
 
 Add a slide at the revision the read above answered, in `slide.json`:
@@ -96,45 +75,14 @@ Add a slide at the revision the read above answered, in `slide.json`:
 {"presentationId": "<id>", "body": {"requests": [{"createSlide": {}}], "writeControl": {"requiredRevisionId": "<revisionId>"}}}
 ```
 
-Take the connection, and the schema and revision of `presentations.batchUpdate`
-from `invoke --describe`, then prepare, issue and invoke:
-
-```sh
-connection=$(connectors --output json connections list --connector slides --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke slides/private presentations.batchUpdate --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke slides/private presentations.batchUpdate --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector slides --instance private \
-  --connection "$connection" --operation presentations.batchUpdate \
-  --schema "$schema" --revision "$revision" --input-file slide.json
-connectors approvals clock-check --connector slides --instance private
-connectors approvals issue --connector slides --instance private \
-  --connection "$connection" --operation presentations.batchUpdate \
-  --schema "$schema" --revision "$revision" --input-file slide.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-slide-1.json"
-connectors invoke slides/private presentations.batchUpdate \
-  --input-file slide.json --approval-file "$HOME/private/proof-slide-1.json" \
-  --idempotency-key slide-1
-```
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `presentations.batchUpdate` on `slides/private` with `slide.json`, `--idempotency-key slide-1`.
 
 A deck edited since you read it is refused with no POST; Google checks the pinned revision again
 and applies the requests all or none.
 
 ## Reconnect when the connection is Stale
 
-When Google stops honouring the refresh token, an invoke answers `next_action:
-repair_connection` and the connection turns `stale`. Reconnect with the same client file and the
-same Google account:
-
-```sh
-connectors --output json connections list --connector slides --instance private \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector slides --instance private \
-  --expected-revision "<revision from the list>" \
-  --credential-file ~/Downloads/client_secret_1234.json
-```
+Google no longer honours the refresh token and the connection turns `stale`. [Reconnect](../guides/reconnect-a-connection.md) `slides/private` with `--credential-file ~/Downloads/client_secret_1234.json`.
 
 ## Limits
 

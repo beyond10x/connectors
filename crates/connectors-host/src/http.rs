@@ -10,8 +10,14 @@ use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 /// The `User-Agent` of every provider request: this build, by name and
-/// version. Some providers refuse a request without one (GitHub's REST API).
-const USER_AGENT: &str = concat!("connectors/", env!("CARGO_PKG_VERSION"));
+/// version, and the project's public repository as its contact. Some providers
+/// refuse a request without one (GitHub's REST API), and some one that names no
+/// contact (Basecamp). The grant transport of an `oauth2_grant` profile sends it too.
+pub(crate) const USER_AGENT: &str = concat!(
+    "connectors/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/beyond10x/connectors)"
+);
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -1815,9 +1821,11 @@ mod tests {
         assert!(custom.with_fixed_header("X-Api-Key", "v").is_err());
     }
 
-    /// Every provider request names this build as `User-Agent: connectors/<version>`,
-    /// which some providers require of every request (GitHub refuses one without it):
-    /// a read, a read post, a probe, a write, a form post and an assertion post alike.
+    /// Every provider request names this build and the project's public repository as
+    /// `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`, which
+    /// some providers require of every request (GitHub refuses one without it, Basecamp one
+    /// that names no contact): a read, a read post, a probe, a write, a form post and an
+    /// assertion post alike.
     #[tokio::test]
     async fn every_provider_request_carries_the_connectors_user_agent() {
         let (base, server) = heads(6).await;
@@ -1864,7 +1872,10 @@ mod tests {
                 .status,
             200
         );
-        let expected = format!("user-agent: connectors/{}\r\n", env!("CARGO_PKG_VERSION"));
+        let expected = format!(
+            "user-agent: connectors/{} (https://github.com/beyond10x/connectors)\r\n",
+            env!("CARGO_PKG_VERSION")
+        );
         let heads = server.await.unwrap();
         assert_eq!(heads.len(), 6);
         for head in heads {

@@ -10,7 +10,7 @@
 //! waits at the fixture until the revocation is recorded.
 use super::*;
 
-const RACE_NAME: &str = "cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published";
+const RACE_NAME: &str = "local_runtime::cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published";
 
 /// Waits until a connection to the fixture's port 443 is established in this
 /// network namespace: the copy's identity probe, which the owner sends only

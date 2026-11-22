@@ -92,6 +92,7 @@ impl Custody {
         self.epoch += 1;
         let runtime = self.directory.join(format!("r{}", self.epoch));
         filesystem::directory(&runtime, true, true).unwrap();
+        let keyring_stderr = (runtime.clone()).with_extension("stderr");
         let mut daemon = OwnedProcess(
             Command::new("/usr/bin/gnome-keyring-daemon")
                 .args([
@@ -112,7 +113,7 @@ impl Custody {
                 )
                 .stdin(Stdio::piped())
                 .stdout(Stdio::null())
-                .stderr(Stdio::null())
+                .stderr(Stdio::from(std::fs::File::create(&keyring_stderr).unwrap()))
                 .spawn()
                 .unwrap(),
         );
@@ -126,7 +127,11 @@ impl Custody {
         self.daemon = Some(daemon);
         let until = Instant::now() + Duration::from_secs(10);
         while !keyring::custody::available_at(Some(&self.socket)) {
-            assert!(Instant::now() < until, "fixture custody unavailable");
+            assert!(
+                Instant::now() < until,
+                "fixture custody unavailable; keyring stderr: {}",
+                keyring_stderr_tail(&keyring_stderr)
+            );
             assert!(
                 self.daemon
                     .as_mut()
@@ -134,7 +139,9 @@ impl Custody {
                     .0
                     .try_wait()
                     .unwrap()
-                    .is_none()
+                    .is_none(),
+                "fixture keyring daemon exited; its stderr: {}",
+                keyring_stderr_tail(&keyring_stderr)
             );
             std::thread::sleep(Duration::from_millis(30));
         }
@@ -1350,8 +1357,8 @@ fn adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_ow
 /// printing the configuration, state directory, connection and this process's
 /// id, until `FIXTURE_STOP` (named in its output) exists or
 /// `GITLAB_FIXTURE_SECONDS` (default 300) pass. `CONNECTORS_TEST_CLI=<debug
-/// connectors> cargo test -p connectors-catalog-provider --test local_runtime --
-/// --ignored --nocapture serve_the_raw_file_fixture`.
+/// connectors> cargo test -p connectors-catalog-provider --test main --
+/// --ignored --nocapture local_runtime::cli_journey::serve_the_raw_file_fixture`.
 #[test]
 #[ignore = "serves the fixture for the guide's commands"]
 fn serve_the_raw_file_fixture() {
@@ -1394,5 +1401,21 @@ fn serve_the_raw_file_fixture() {
     let until = Instant::now() + Duration::from_secs(seconds);
     while !stop.exists() && Instant::now() < until {
         std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// The last lines the fixture's GNOME Keyring wrote to its standard error, for
+/// a failure message: the daemon's own words on why it never answered.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn keyring_stderr_tail(path: &std::path::Path) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(text) if text.trim().is_empty() => {
+            format!("(empty: {} was written nothing)", path.display())
+        }
+        Ok(text) => {
+            let lines: Vec<&str> = text.lines().collect();
+            lines[lines.len().saturating_sub(20)..].join("\n")
+        }
+        Err(error) => format!("(unreadable: {}: {error})", path.display()),
     }
 }

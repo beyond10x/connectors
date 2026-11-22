@@ -1,0 +1,53 @@
+{
+  "format": "connectors-source-amendments/1",
+  "source_sha256": "be8923b42413a640f92af54a728f5b04f936a2851a04b8dfa277ae0db3bdebdc",
+  "amendments": [
+    {
+      "operation_id": "datasourceProxyPrometheusQuery",
+      "add_operation": {
+        "method": "get",
+        "path": "/api/datasources/proxy/uid/{uid}/api/v1/query",
+        "parameters": [
+          {"name": "uid", "location": "path", "required": true, "type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$"},
+          {"name": "query", "location": "query", "required": true, "type": "string"},
+          {"name": "time", "location": "query", "required": false, "type": "string"}
+        ]
+      },
+      "cite": "https://github.com/prometheus/prometheus/blob/v3.9.1/docs/querying/api.md#instant-queries",
+      "reason": "Prometheus's HTTP API reference documents the instant query GET /api/v1/query with query and an optional evaluation time; the pinned Grafana document declares the data-source proxy only as GET /datasources/proxy/uid/{uid}/{datasource_proxy_route} below its one server /api, one path parameter standing for the whole sub-path, so the sub-path of a Prometheus data source's instant query is fixed here. Its uid is held to Grafana's data-source uid rule, letters, digits, - and _, at most 40 characters (ValidateUID in https://github.com/grafana/grafana/blob/v13.3.1/pkg/util/shortid_generator.go, which data-source create and update apply), so a uid is always one path segment."
+    },
+    {
+      "operation_id": "datasourceProxyPrometheusQueryRange",
+      "add_operation": {
+        "method": "get",
+        "path": "/api/datasources/proxy/uid/{uid}/api/v1/query_range",
+        "parameters": [
+          {"name": "uid", "location": "path", "required": true, "type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$"},
+          {"name": "query", "location": "query", "required": true, "type": "string"},
+          {"name": "start", "location": "query", "required": true, "type": "string"},
+          {"name": "end", "location": "query", "required": true, "type": "string"},
+          {"name": "step", "location": "query", "required": true, "type": "string"}
+        ]
+      },
+      "cite": "https://github.com/prometheus/prometheus/blob/v3.9.1/docs/querying/api.md#range-queries",
+      "reason": "Prometheus's HTTP API reference documents the range query GET /api/v1/query_range with query, start, end and step; the pinned Grafana document declares the data-source proxy only as GET /datasources/proxy/uid/{uid}/{datasource_proxy_route} below its one server /api, one path parameter standing for the whole sub-path, so the sub-path of a Prometheus data source's range query is fixed here. Its uid is held to Grafana's data-source uid rule, letters, digits, - and _, at most 40 characters (ValidateUID in https://github.com/grafana/grafana/blob/v13.3.1/pkg/util/shortid_generator.go, which data-source create and update apply), so a uid is always one path segment."
+    },
+    {
+      "operation_id": "datasourceProxyLokiQueryRange",
+      "add_operation": {
+        "method": "get",
+        "path": "/api/datasources/proxy/uid/{uid}/loki/api/v1/query_range",
+        "parameters": [
+          {"name": "uid", "location": "path", "required": true, "type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$"},
+          {"name": "query", "location": "query", "required": true, "type": "string"},
+          {"name": "start", "location": "query", "required": true, "type": "string"},
+          {"name": "end", "location": "query", "required": true, "type": "string"},
+          {"name": "limit", "location": "query", "required": true, "type": "integer"},
+          {"name": "direction", "location": "query", "required": false, "type": "string"}
+        ]
+      },
+      "cite": "https://github.com/grafana/loki/blob/v3.7.0/docs/sources/reference/loki-http-api.md#query-logs-within-a-range-of-time",
+      "reason": "Loki's HTTP API reference documents GET /loki/api/v1/query_range with query, start, end, limit and direction forward or backward; the pinned Grafana document declares the data-source proxy only as GET /datasources/proxy/uid/{uid}/{datasource_proxy_route} below its one server /api, one path parameter standing for the whole sub-path, so the sub-path of a Loki data source's range query is fixed here. Its uid is held to Grafana's data-source uid rule, letters, digits, - and _, at most 40 characters (ValidateUID in https://github.com/grafana/grafana/blob/v13.3.1/pkg/util/shortid_generator.go, which data-source create and update apply), so a uid is always one path segment."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T20:18:51Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-validates-enum-and-date-time",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-enum-date-adversary-1",
+    "reference": "F4 deployments.list guide row says RFC 3339 (43a027263c)",
+    "review": "review-result:wave-b-enum-date-adversary-1",
+    "outcome": "fixed"
+  }
+}

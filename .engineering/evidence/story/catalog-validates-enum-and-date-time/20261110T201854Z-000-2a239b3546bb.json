@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T20:18:54Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-validates-enum-and-date-time",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-enum-date-adversary-1",
+    "reference": "F5 duplicate RFC 3339 reader removed; engine uses feed::instant (43a027263c)",
+    "review": "review-result:wave-b-enum-date-adversary-1",
+    "outcome": "fixed"
+  }
+}

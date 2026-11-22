@@ -7,10 +7,16 @@ custody, audited metadata and bounded read dispatch. Resources, prompts,
 subscriptions, mutations and outbound MCP are not implemented by this entry.
 The full inbound runtime story remains active.
 
-The entry runs on Linux only: its local lease is measured on `CLOCK_BOOTTIME`
-(below). On macOS and Windows a valid launch exits 1 with the stderr diagnostic
-`mcp_unavailable` before any protocol byte; `--help` still prints the launch
-grammar.
+The entry is shown to serve on Linux. On macOS and Windows it is built for the
+platform: its local lease is measured on that platform's clock that counts
+across sleep (below), the clock and launch-contract tests run in those CI jobs,
+and the serving scenario `mcp_stdio_serves` is wired into them against the
+platform's own credential store. That scenario has passed on Linux only so far;
+no serving run on macOS or Windows is recorded here, and cross-target
+`cargo check` is all that has been run for the Windows console threads and the
+platform stores' use by the owner. A launch whose clock does not qualify, like
+any launch whose owner is unavailable, exits 1 with the stderr diagnostic
+`mcp_unavailable` before any protocol byte.
 
 ## Configure and launch
 
@@ -65,6 +71,14 @@ effects. Missing or incompatible declarations, disabled exposures and ungranted
 operations are omitted. Metadata-policy failure refuses the list. Listing never
 probes a credential or invokes the provider.
 
+The owner holds the effects rule itself on the bounded and projected governed
+reads: a declared semantic effect, or an effect other than `network`, is
+`unsupported` before any provider request. The owner's plain `invoke` frame,
+which carries only reads, does not read that metadata: it enforces the host
+configuration's grant and the read's admission, not the effects rule. A write
+takes the write frames, under its approval
+([owner](../contracts/cli/v1alpha1/owner.md)).
+
 ```console
 connectors --config /absolute/config.toml --state-dir /absolute/state server --transport stdio
 ```
@@ -117,9 +131,22 @@ the `initialize` response and `notifications/initialized` only `ping` is answere
 
 The supervisor issues and checks its own lease on one correlated local timeline.
 A startup wall-time value labels that timeline; it is not independent UTC evidence.
-Elapsed time uses Linux `CLOCK_BOOTTIME`; a bracketed `CLOCK_MONOTONIC` comparison
-refuses suspend/clock discontinuity before more data is sent. The clock resolution
-and sample bracket must each fit 1 ms, with 2 ms observation uncertainty.
+Elapsed time uses the platform's clock that counts the time the machine sleeps,
+and a bracketed comparison with the clock that does not refuses suspend/clock
+discontinuity before more data is sent:
+
+| Platform | Counts sleep | Excludes sleep |
+|---|---|---|
+| Linux | `CLOCK_BOOTTIME` | `CLOCK_MONOTONIC` |
+| macOS | `CLOCK_MONOTONIC_RAW` (`mach_continuous_time`) | `CLOCK_UPTIME_RAW` (`mach_absolute_time`) |
+| Windows | `QueryInterruptTimePrecise` | `QueryUnbiasedInterruptTimePrecise` |
+
+The pairs are the local clock's ([local clock](local-clock.md)): each reads one
+unadjusted time base, so their offset moves only by time asleep. Darwin's
+`CLOCK_MONOTONIC` and Windows' `QueryInterruptTime` are not used: the first is
+frequency-adjusted, the second advances only at each timer interrupt, about
+15.6 ms. The clock resolution and sample bracket must each fit 1 ms, with 2 ms
+observation uncertainty.
 
 Configuration must supply a valid `roughtime-quorum/1` `approval_clock` table with
 the existing explicit deployment rate assumption (at most 10,000 ppm); the retired
@@ -137,12 +164,20 @@ does not shorten them. The supervisor renews the lease while the session is
 ready, so a read that outlasts one lease, or a reply the client drains slowly, is
 still answered. An unrenewed lease still ends the session at its expiry.
 
+A list or call that reaches its own deadline before the owner answers (the
+owner is busy, or the store is held) is answered with the `timeout` refusal,
+written within a short grace after the deadline, and the session continues: the
+next request is admitted as usual. A request's timeout does not end the session.
+A client that leaves a reply unread for longer than that grace (2 s) past its
+request's deadline loses the session.
+
 Cancellation suppresses the matching reply, does not replay a call and frees the
 request slot at once, so the next list or call is admitted. A reply already partly
 written when its cancellation arrives is finished rather than cut off, and the
-session stays usable. The owner has no cancellation of its own: owner work that
-a cancelled call already started runs out within its original deadline. While two
-cancelled calls' owner work is still running, a new list or call is refused with
+session stays usable. The cancel reaches the owner: a call already at the owner is
+cancelled there by name (the owner protocol `connectors-owner/3`), which stops its
+provider call and credential read and frees its instance's job at once. While two
+cancelled calls' owner work is still ending, a new list or call is refused with
 `capacity`.
 
 Closing standard input ends the session (`remote_hangup`), and local admission
@@ -154,8 +189,9 @@ at the close, which is not renewed; the process then exits successfully. A reply
 lease cannot carry is discarded and the exit is unsuccessful. Loss during partial
 output terminates the process. Local worker teardown, cancelled calls included,
 finishes within five seconds of the terminal, and unjoined work is not recorded
-as released. Owner work still running then is not cancelled either: it runs out
-at the owner within its own deadline, after the process has exited. These
+as released. The owner cancels work whose caller's stream closes, so a read
+still running at the owner when the process exits is cancelled there, not left
+to run out its deadline. These
 guarantees make no claim about remote rollback.
 
 ## Verification boundary
@@ -176,6 +212,38 @@ owner, and stopped-process lease expiry:
 cargo test --locked --offline -p connectors --test local_mcp_server
 ```
 
-No scenario is ignored; the file compiles on Linux only. These process bindings
+No scenario is ignored; the file compiles on Linux only, because its scenarios
+run the owner against the read-only `mounted_secret` binding in a jail. The
+launch contract that needs no custody binding (`--help`, an invalid launch, an
+unavailable owner) is `apps/connectors/tests/mcp_stdio_launch.rs`, which runs on
+every platform, with the clock's own tests in `connectors-host` and the console's
+thread tests (`mcp::console::threaded`, which run on Linux too). One serving
+scenario is not gated to Linux: `apps/connectors/tests/mcp_stdio_serves.rs`
+launches the server, initializes, lists tools and answers one call, with the
+credential stored in the platform's own custody (the disposable Secret Service
+fixture on Linux, the login keychain on macOS, the Credential Manager on
+Windows). It is `#[ignore]`d because it writes to a real store, and the macOS and
+Windows jobs run it with `-- --ignored` and check `1 passed`. It has run on
+Linux only. These process bindings
 cover the read-tools subset of the AEP acceptance scenarios; they are not a
 complete ESS runtime conformance report, independent review or full MCP release.
+
+## Recorded Claude Code session
+
+A headless Claude Code session listed a Jira instance's reads through it and
+called its search tool. The `--mcp-config` entry that ran named a capturing wrapper, which ran
+`connectors` with the same arguments in a bubblewrap sandbox
+(`{"type":"stdio","command":"CAPTURE_WRAPPER","args":["--config","/srv/connectors/config.toml","--state-dir","/srv/connectors/state","server","--transport","stdio"],"env":{"RIG_CAPTURE":"CAPTURE_DIR"}}`);
+the user form names `connectors` itself
+(`{"type":"stdio","command":"connectors","args":["--config","CONFIG","--state-dir","STATE_DIR","server","--transport","stdio"]}`).
+`claude mcp add --scope project connectors -- connectors --config CONFIG --state-dir STATE_DIR server --transport stdio`
+was recorded once, with Claude Code 2.1.318 in an empty project directory, `CONFIG` being
+`/srv/connectors/config.toml` and `STATE_DIR` `/srv/connectors/state`. It printed
+`Added stdio MCP server connectors with command: connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state server --transport stdio to project config`
+and `File modified: PROJECT_DIR/.mcp.json`, `PROJECT_DIR` standing for the project directory,
+and wrote `.mcp.json`, the project-scope file Claude Code reads:
+`{"mcpServers":{"connectors":{"type":"stdio","command":"connectors","args":["--config","/srv/connectors/config.toml","--state-dir","/srv/connectors/state","server","--transport","stdio"],"env":{}}}}`,
+the user form on those paths with an empty `env`
+(`apps/connectors/tests/fixtures/claude-code/mcp-add.json`).
+The recorded session is replayed against the server in every `cargo test` on Linux
+(`apps/connectors/tests/claude_mcp_journey.rs`). 

@@ -10,8 +10,7 @@ connectors: "slack"
 # Slack
 
 The `slack` connector of the provider Slack is served by the catalog provider from the pinned
-Slack Web API document. The words connector, instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Slack Web API document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Slack guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md) has
 every parameter, scope and refusal.
 
@@ -129,8 +128,7 @@ prints the operation's input schema, schema and revision without calling Slack.
 
 ## A first guarded write
 
-The bot instance needs a signing key, an `[approval_clock]` table
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)) and
+The bot instance needs the [signing key and clock](../guides/guarded-write.md#once-per-instance) and
 a policy naming the writes. `~/private/slack-policy.json` holds
 `{"operations":["chat.postMessage","conversations.open"]}`:
 
@@ -141,18 +139,10 @@ $ connectors approvals policy-set --connector slack --instance bot --input-file 
 {"instance_id":"slack-bot","operations":["chat.postMessage","conversations.open"],"revision":1}
 ```
 
-Prepare the approval for `~/private/post.json`, which holds
-`{"body":{"channel":"C0000000001","text":"migration check"}}`, check the clock, issue the proof
-for the subject's digest and invoke with it. The approval names the connection, and the schema
-and revision `connectors invoke slack/bot chat.postMessage --describe` prints:
+[Prepare, check the clock, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `chat.postMessage` for `~/private/post.json`, which holds
+`{"body":{"channel":"C0000000001","text":"migration check"}}`, with the proof in `~/private/proof-post-1.json`. In the guide's run, the invoke answered:
 
 ```console
-$ connectors approvals prepare --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json | jq -c '.result.preparation|{subject_sha256, presentation}'
-{"subject_sha256":"5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d","presentation":{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","descriptor_revision":"87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6","instance":"slack-bot","operation":"chat.postMessage"}}
-$ connectors approvals clock-check --connector slack --instance bot | jq -c '.result.observation.sources|map({address,result})'
-[{"address":"51.81.57.55:2002","result":"agreed"},{"address":"148.113.255.71:2002","result":"agreed"}]
-$ connectors approvals issue --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approve-subject 5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d --proof-output ~/private/proof-post-1.json | jq -c '.result|{connector,instance,disposition,subject_sha256}'
-{"connector":"slack","instance":"bot","disposition":"published","subject_sha256":"5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d"}
 $ connectors invoke slack/bot chat.postMessage --approval-file ~/private/proof-post-1.json --idempotency-key post-1 < ~/private/post.json | jq -c '.result|{classification: .mutation.classification, status: .result.status, body: .result.body}'
 {"classification":"applied","status":200,"body":{"channel":"C0000000001","message":{"text":"migration check","ts":"1780000700.000700"},"ok":true,"ts":"1780000700.000700"}}
 ```

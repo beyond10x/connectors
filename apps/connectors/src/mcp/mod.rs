@@ -10,12 +10,10 @@ use connectors_mcp::configuration::{Configuration, FILE_LIMIT};
 use serde_json::json;
 use std::path::PathBuf;
 
+mod console;
 mod entry;
-#[cfg(target_os = "linux")]
 mod projection;
-#[cfg(target_os = "linux")]
 mod session;
-#[cfg(target_os = "linux")]
 mod stdio;
 pub(super) use entry::{run, selected};
 

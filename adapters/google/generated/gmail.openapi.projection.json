@@ -354,7 +354,7 @@
     "gmail.users.threads.untrash",
     "gmail.users.watch"
   ],
-  "projector": "discovery-openapi/1",
+  "projector": "discovery-openapi/2",
   "rewritten_paths": [],
   "source_bytes": 217686,
   "source_sha256": "7591d33ec87e4ef83551f71630213a89ac349becebe9bd9b3e4ce3851dede0fe"

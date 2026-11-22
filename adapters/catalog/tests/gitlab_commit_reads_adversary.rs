@@ -157,48 +157,76 @@ async fn adversary_keyset_pagination_is_refused_before_any_request() {
 }
 
 /// `order` is an enum in the pinned document (`default`, `topo`); a value
-/// outside it is a malformed request the engine could refuse locally, but
-/// today it is sent.
+/// outside it is refused before any request, and a value inside it is sent.
 #[tokio::test]
-async fn adversary_commits_list_order_outside_its_enum_is_sent_today() {
+async fn adversary_commits_list_order_outside_its_enum_is_refused() {
     let engine = engine();
-    let query = sent(
-        &engine,
-        "commits.list",
-        json!({"id": "org/project", "order": "newest"}),
-    )
-    .await;
-    assert_eq!(
-        query,
-        [("order".to_string(), "newest".to_string())],
-        "today an `order` outside its enum is sent; when \
-         story:catalog-validates-enum-and-date-time lands this flips to a refusal"
-    );
-}
-
-/// `since` and `until` are `format: date-time` in the pinned document; today a
-/// value that is not one reaches GitLab unchanged.
-#[tokio::test]
-async fn adversary_commits_list_since_that_is_not_a_date_time_is_sent_today() {
-    let engine = engine();
-    for (since, text) in [
-        (json!("yesterday"), "yesterday"),
-        (json!(""), ""),
-        (json!(20260901), "20260901"),
-    ] {
+    for order in [json!("newest"), json!(""), json!("TOPO"), json!(1)] {
+        refused(
+            &engine,
+            "commits.list",
+            json!({"id": "org/project", "order": order}),
+        )
+        .await;
+    }
+    for order in ["default", "topo"] {
         let query = sent(
             &engine,
             "commits.list",
-            json!({"id": "org/project", "since": since}),
+            json!({"id": "org/project", "order": order}),
         )
         .await;
-        assert_eq!(
-            query,
-            [("since".to_string(), text.to_string())],
-            "today a `since` of {since} is sent; when \
-             story:catalog-validates-enum-and-date-time lands this flips to a refusal"
-        );
+        assert_eq!(query, [("order".to_string(), order.to_string())]);
     }
+}
+
+/// `since` and `until` are `format: date-time` in the pinned document; a value
+/// that is not an RFC 3339 date-time is refused before any request, and the
+/// valid forms are sent unchanged.
+#[tokio::test]
+async fn adversary_commits_list_since_that_is_not_a_date_time_is_refused() {
+    let engine = engine();
+    for name in ["since", "until"] {
+        for bad in [
+            json!("yesterday"),
+            json!(""),
+            json!(20260901),
+            json!("2026-09-01"),
+            json!("2026-09-01T00:00:00"),
+            json!("2026-09-01 00:00:00Z"),
+            json!("2026-13-01T00:00:00Z"),
+            json!("2026-02-30T00:00:00Z"),
+            json!("2026-09-01T24:00:00Z"),
+            json!("2026-09-01T00:00:00+24:00"),
+            json!("2026-09-01T00:00:00.Z"),
+            json!(" 2026-09-01T00:00:00Z"),
+        ] {
+            refused(
+                &engine,
+                "commits.list",
+                json!({"id": "org/project", (name): bad}),
+            )
+            .await;
+        }
+        for good in [
+            "2026-09-01T00:00:00Z",
+            "2026-09-01t00:00:00z",
+            "2026-09-01T00:00:00.123456Z",
+            "2026-09-01T02:00:00+02:00",
+            "2026-09-01T02:00:00-00:00",
+            "2028-02-29T23:59:60Z",
+        ] {
+            let query = sent(
+                &engine,
+                "commits.list",
+                json!({"id": "org/project", (name): good}),
+            )
+            .await;
+            assert_eq!(query, [(name.to_string(), good.to_string())]);
+        }
+    }
+    let query = sent(&engine, "commits.list", json!({"id": "org/project"})).await;
+    assert!(query.is_empty(), "an absent optional parameter is not sent");
 }
 
 /// `from` and `to` are both required: either missing, or given as JSON null,
@@ -271,39 +299,35 @@ async fn adversary_commits_list_per_page_bounds() {
 }
 
 /// Twin of the `order` case on an operation the base already shipped:
-/// `projects.list` `order_by` is an enum in the pinned document, and the
-/// engine (unchanged by this unit) sends any string. The enum gap predates
-/// the unit.
+/// `projects.list` `order_by` is an enum in the pinned document.
 #[tokio::test]
-async fn adversary_base_twin_projects_list_order_by_outside_its_enum_is_sent_today() {
+async fn adversary_base_twin_projects_list_order_by_outside_its_enum_is_refused() {
     let engine = engine();
-    let query = sent(&engine, "projects.list", json!({"order_by": "newest"})).await;
+    refused(&engine, "projects.list", json!({"order_by": "newest"})).await;
+    let query = sent(
+        &engine,
+        "projects.list",
+        json!({"order_by": "last_activity_at"}),
+    )
+    .await;
     assert_eq!(
         query,
-        [("order_by".to_string(), "newest".to_string())],
-        "today an `order_by` outside its enum is sent; when \
-         story:catalog-validates-enum-and-date-time lands this flips to a refusal"
+        [("order_by".to_string(), "last_activity_at".to_string())]
     );
 }
 
 /// Twin of the `since` case on an operation the base already shipped:
 /// `projects.list` `last_activity_after` is `format: date-time` in the pinned
-/// document. The format gap predates the unit.
+/// document.
 #[tokio::test]
-async fn adversary_base_twin_projects_list_last_activity_after_not_a_date_time_is_sent_today() {
+async fn adversary_base_twin_projects_list_last_activity_after_not_a_date_time_is_refused() {
     let engine = engine();
-    let query = sent(
+    refused(
         &engine,
         "projects.list",
         json!({"last_activity_after": "yesterday"}),
     )
     .await;
-    assert_eq!(
-        query,
-        [("last_activity_after".to_string(), "yesterday".to_string())],
-        "today a `last_activity_after` that is not a date-time is sent; when \
-         story:catalog-validates-enum-and-date-time lands this flips to a refusal"
-    );
 }
 
 /// The re-pinned GitLab bootstrap digest in `gateway_prefix.rs` is explained
@@ -393,6 +417,11 @@ fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
     // undo them too.
     gitlab.source.amendments = None;
     for operation in &mut gitlab.inventory.operations {
+        // The enum and format records came later than all of those.
+        for parameter in &mut operation.parameters {
+            parameter.allowed.clear();
+            parameter.format = None;
+        }
         if operation.operation_id.as_deref() == Some("getApiV4ProjectsIdDashSearch") {
             operation.path = "/api/v4/projects/{id}/(-/)search".into();
         }

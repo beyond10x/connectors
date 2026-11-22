@@ -4,7 +4,7 @@
 //! provider's own bootstrap and the host's connection registry. No network, no
 //! credential.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Engine, Selection};

@@ -1,7 +1,10 @@
 //! Regenerate native MCP launch projections with the repository's exact ESS pin.
 use std::{collections::BTreeMap, path::Path, process::Command};
 
-use super::Result;
+use super::{
+    Result,
+    ownership::{Family, adopt_existing},
+};
 
 const SPEC: &str = "adapters/mcp/spec/ess";
 const CLI: &str = "adapters/mcp/generated/launch-cli";
@@ -11,6 +14,9 @@ const SUPERVISION: &str = "adapters/mcp/generated/supervision";
 
 pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
     connectors_spec::toolchain::check(ess)?;
+    if !check {
+        adopt_existing_outputs(root, ess)?;
+    }
     let mut cli = Command::new(ess);
     cli.current_dir(root).args([
         "generate",
@@ -70,6 +76,55 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
         if check { "match" } else { "generated" }
     );
     Ok(())
+}
+
+/// Enrol committed output that has no ESS ownership record (a fresh checkout) when its bytes are
+/// exactly what the pinned ESS generates; see `ownership`.
+fn adopt_existing_outputs(root: &Path, ess: &Path) -> Result<()> {
+    const SOURCES: &[&str] = &["ess", "adapters/mcp/spec"];
+    let family = |destination, owner| Family {
+        destination,
+        owner,
+        sources: SOURCES,
+    };
+    adopt_existing(root, ess, &family(CLI, "cli-binding"), &|source, out| {
+        let mut command = Command::new(ess);
+        command
+            .current_dir(source)
+            .args([
+                "generate",
+                "cli",
+                "--path",
+                SPEC,
+                "--binding",
+                "adapters/mcp/spec/cli.yaml",
+                "--out",
+            ])
+            .arg(out);
+        execute(&mut command)
+    })?;
+    adopt_existing(root, ess, &family(TYPES, "model-types"), &|source, out| {
+        generate_types(source, ess, out)
+    })?;
+    adopt_existing(
+        root,
+        ess,
+        &family(CONFIGURATION, "model-types"),
+        &|source, out| generate_configuration(source, ess, out),
+    )?;
+    adopt_existing(
+        root,
+        ess,
+        &family(SUPERVISION, "synthesis"),
+        &|source, out| {
+            let base = root.join(".local/tmp");
+            std::fs::create_dir_all(&base)?;
+            let temp = tempfile::Builder::new()
+                .prefix("mcp-supervision-")
+                .tempdir_in(base)?;
+            generate_supervision(source, ess, temp.path(), out)
+        },
+    )
 }
 
 fn generate_supervision(root: &Path, ess: &Path, temp: &Path, out: &Path) -> Result<()> {

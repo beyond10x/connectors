@@ -1,0 +1,48 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": ["json", "media", "proto"],
+      "enumDescriptions": ["JSON", "Media", "Protobuf"],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "resources": {
+    "things": {
+      "methods": {
+        "get": {
+          "id": "fixture.things.get",
+          "path": "things/{thingId}",
+          "httpMethod": "GET",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}},
+          "response": {"$ref": "Thing"},
+          "supportsMediaDownload": true
+        },
+        "list": {
+          "id": "fixture.things.list",
+          "path": "things",
+          "httpMethod": "GET",
+          "response": {"$ref": "Thing"}
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Thing": {"id": "Thing", "type": "object", "properties": {"name": {"type": "string"}}}
+  }
+}

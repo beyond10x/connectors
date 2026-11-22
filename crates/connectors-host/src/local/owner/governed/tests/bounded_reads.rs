@@ -207,6 +207,178 @@ fn bounded_owner_refuses_semantic_and_non_network_effects_before_any_request() {
     }
 }
 
+/// Effects a bounded or projected read refuses.
+const REFUSED_EFFECTS: [(&str, &str); 4] = [
+    ("semantic_effects", r#"["human_visible"]"#),
+    ("semantic_effects", r#"["billable"]"#),
+    ("effects", r#"["network","process"]"#),
+    ("effects", r#"["local_system"]"#),
+];
+
+fn declared(field: &str, effects: &str) -> Value {
+    let mut value = declaration(false);
+    value[field] = serde_json::from_str(effects).unwrap();
+    value
+}
+
+/// The protected operation curation (`<config>.operation-curation.json`),
+/// pinned to the fixture's selection and cache, declaring `metadata` for
+/// `item.read`: the one place an owner reads an operation's declared effects.
+fn write_curation(target: &Target, metadata: &Value) {
+    use std::io::Write as _;
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let adapter = Config::load(&target.paths.config).unwrap().adapters["fixture"].clone();
+    let bootstrap = crate::local::owner::cached(&target.paths, "fixture").unwrap();
+    let document = json!({"format":"connectors-operation-curation/1","adapters":[{
+        "adapter_alias":"fixture","executable_selection":adapter.selection(),
+        "bootstrap_sha256":connectors_core::digest(&serde_json::to_value(&bootstrap).unwrap()),
+        "operations":[{"operation":"item.read","metadata":metadata}]}]});
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(crate::local::operation_curation::path(&target.paths))
+        .unwrap()
+        .write_all(document.to_string().as_bytes())
+        .unwrap();
+}
+
+/// The native projection policy's metadata source: the protected curation.
+struct CurationPolicy;
+impl ReadPolicy for CurationPolicy {
+    fn admit(&self, _: &Paths, _: &str, _: &Request<'_>, _: &str) -> Result<()> {
+        Ok(())
+    }
+    fn metadata(
+        &self,
+        paths: &Paths,
+        alias: &str,
+        adapter: &config::Adapter,
+        bootstrap: &runtime::Bootstrap,
+    ) -> Result<ProjectionMetadata> {
+        let snapshot = crate::local::operation_curation::load(paths, alias, adapter, bootstrap)?;
+        Ok(ProjectionMetadata {
+            revision: "projection".into(),
+            operations: snapshot.operations,
+        })
+    }
+}
+
+/// Publish one connection of the fixture's `token` profile and answer its
+/// reference, through the registry as the owner's own connect does.
+fn connect(target: &Target) -> String {
+    let now = connectors_sdk::now_ms();
+    let bootstrap = crate::local::owner::cached(&target.paths, "fixture").unwrap();
+    let binding = bootstrap.binding("token").unwrap();
+    let registry = registry::Registry::new(&target.paths.state);
+    let acquisition = registry.begin_unchecked(&binding, now).unwrap();
+    let claim = registry.consume(acquisition, now).unwrap();
+    let prepared = registry
+        .prepare(
+            &claim,
+            registry::ValidatedBaseline {
+                binding: None,
+                identity: registry::ExternalIdentity {
+                    kind: "fixture-account".into(),
+                    subject: "fixture-subject".into(),
+                },
+                granted_scopes: Some(BTreeSet::new()),
+                credential_expires_at_ms: Some(now + 3_600_000),
+                collected_at_ms: now,
+                valid_until_ms: now + 60_000,
+            },
+            12,
+            now,
+        )
+        .unwrap();
+    let receipt = crate::local::keyring::custody::WrittenVersion::fixture(prepared.version());
+    let stored = registry.acknowledge(prepared, receipt, now).unwrap();
+    registry.publish(stored, now).unwrap()
+}
+
+/// The effects rule binds the bounded and projected read paths, not the plain
+/// `invoke` frame (story:owner-invoke-frame-effects-boundary). The declaration
+/// lives in the protected curation, where the bounded read finds it; a granted,
+/// connected read whose curation that read refuses is admitted on `invoke` all
+/// the same, as it is with no curation at all.
+#[test]
+fn invoke_admission_is_unchanged_by_a_curation_the_bounded_read_refuses() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    let reference = connect(&target);
+    let call = json!({"connection":reference,"operation":"item.read",
+        "schema":target.schema,"revision":"desc-1"});
+    // Admission's last step asks the custody binding whether it is available,
+    // which needs a live Secret Service or a read-only mount the fixture has
+    // not got. Every step before it (the grant, the revision, the read
+    // requirement, the input and the connection) must pass: the answer is `Ok`
+    // where a Secret Service runs and `custody_unavailable` where not, and
+    // never a refusal of the declared effects.
+    let admit = || match crate::local::owner::admit_invoke(
+        &target.paths,
+        "fixture",
+        &call,
+        br#"{"n":1}"#,
+    ) {
+        Err(error) if error.code != Code::CustodyUnavailable => Err(error),
+        _ => Ok(()),
+    };
+    admit().expect("a granted, connected read is admitted without a curation");
+    write_curation(&target, &declaration(false));
+    admit().expect("a network-only curation is admitted");
+    for (field, effects) in REFUSED_EFFECTS {
+        write_curation(&target, &declared(field, effects));
+        let request = Request {
+            connection: &reference,
+            ..target.request()
+        };
+        assert!(
+            matches!(
+                bounded::resolve(
+                    &target.paths,
+                    "fixture",
+                    &request,
+                    Some((&CurationPolicy, "projection")),
+                    Some(budget(false)),
+                ),
+                Err(Error {
+                    code: Code::Unsupported,
+                    ..
+                })
+            ),
+            "bounded path admitted {field} {effects}"
+        );
+        admit().unwrap_or_else(|error| panic!("{field} {effects}: invoke refused {error:?}"));
+    }
+}
+
+/// The refusal `invoke` does hold for what it is not for: a requirement that is
+/// not a read is `unsupported`, whatever the grant (writes take the write frames).
+#[test]
+fn invoke_refuses_a_write_requirement_unsupported() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    let reference = connect(&target);
+    let call = json!({"connection":reference,"operation":"item.read",
+        "schema":target.schema,"revision":"desc-1"});
+    let adapter = Config::load(&target.paths.config).unwrap().adapters["fixture"].clone();
+    let mut bootstrap = runtime::state::State::new(&target.paths.state)
+        .cached(&adapter.instance_id, &adapter.selection())
+        .unwrap()
+        .unwrap();
+    bootstrap.requirements[0].effect = runtime::Effect::Write;
+    runtime::state::State::new(&target.paths.state)
+        .remember(&adapter.selection(), &bootstrap)
+        .unwrap();
+    assert_eq!(
+        crate::local::owner::admit_invoke(&target.paths, "fixture", &call, br#"{"n":1}"#)
+            .unwrap_err()
+            .code,
+        Code::Unsupported
+    );
+}
+
 /// A bounded read of `target` under the implemented declaration: the
 /// resolution's refusal code, the served value and the provider request count.
 fn implemented_read(target: &Target) -> (Option<Code>, Value, usize) {

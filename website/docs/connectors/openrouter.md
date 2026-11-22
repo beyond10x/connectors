@@ -10,15 +10,13 @@ connectors: "openrouter"
 # OpenRouter
 
 The `openrouter` connector of the provider OpenRouter is served by the catalog provider from the
-pinned OpenRouter OpenAPI document. The words connector, instance, connection and operation are
-those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+pinned OpenRouter OpenAPI document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full OpenRouter guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-openrouter.md)
 has every parameter, refusal and the fixture run its outputs come from.
 
 The catalog provider ships no connector declaration for OpenRouter yet, so neither instance is
 derived: each pins its executable, that executable's SHA-256 and its configuration revision.
-Commands use `connectors` on your `PATH` with your own configuration; a command that needs an
-OpenRouter account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -92,29 +90,12 @@ connectors invoke openrouter/router workspaces.list --input-json '{}'
 once; Connectors puts it straight into custody as a new connection of a second instance and
 returns only that connection's reference and the key's `hash`. The management instance needs
 `key.create` in its operations, a custody table naming the instance and profile that hold created
-keys, a second pinned instance `inference` granted only `key.get`, a signing key, an
-`[approval_clock]` table and a policy naming the write; the
+keys, a second pinned instance `inference` granted only `key.get`, a [signing key and clock](../guides/guarded-write.md#once-per-instance) and a policy naming the write; the
 [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-openrouter.md#creating-a-key)
-shows each table. Then take the connection, and the schema and revision from `invoke --describe`,
-prepare, issue and invoke:
+shows each table. Then [prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `key.create` on `openrouter/router` with the input below and `--idempotency-key agent-inference-1`; the input goes in with `--input-json` instead of `--input-file`:
 
-```sh
-connection=$(connectors --output json connections list --connector openrouter --instance router \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke openrouter/router key.create --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke openrouter/router key.create --describe \
-  | jq -r .result.revision)
-connectors approvals prepare --connector openrouter --instance router \
-  --connection "$connection" --operation key.create --schema "$schema" --revision "$revision" \
-  --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}'
-connectors approvals issue --connector openrouter --instance router \
-  --connection "$connection" --operation key.create --schema "$schema" --revision "$revision" \
-  --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof.json"
-connectors invoke openrouter/router key.create \
-  --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
-  --idempotency-key agent-inference-1 --approval-file "$HOME/private/proof.json"
+```json
+{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}
 ```
 
 The body is closed to `name`, `limit`, `limit_reset`, `include_byok_in_limit`, `expires_at` and
@@ -123,14 +104,7 @@ create makes a second key.
 
 ## Reconnect when the connection is Stale
 
-A management key OpenRouter refuses makes the connection `stale`, and an invoke answers
-`next_action: repair_connection`. Publish a new key of the same account on the same connection:
-
-```sh
-connectors connections list --connector openrouter --instance router
-connectors connections reconnect --connector openrouter --instance router \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+A management key OpenRouter refuses makes the connection `stale`. Publish a new key of the same account on the same connection. [Reconnect](../guides/reconnect-a-connection.md) `openrouter/router` with `--credential-prompt`.
 
 ## Limits
 

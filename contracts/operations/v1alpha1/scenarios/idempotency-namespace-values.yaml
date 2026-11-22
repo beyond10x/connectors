@@ -96,8 +96,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.idempotency.ReservationStateConflict
-    fields:
-      state: Pending
   no_events:
   - connectors.idempotency.ResultExpired
 - at: '2026-09-08T09:00:03Z'

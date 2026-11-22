@@ -241,7 +241,9 @@ pub(super) fn child_lock_wait(
     command: &mut std::process::Command,
     wait: Duration,
 ) -> &mut std::process::Command {
-    command.env(
+    // Every caller starts a child that waits on a lock another process holds:
+    // one a killed test could otherwise leave waiting.
+    super::parent_death::bind(command).env(
         LOCK_WAIT_ENV,
         format!("{}:{}", std::process::id(), wait.as_millis()),
     )
@@ -253,7 +255,7 @@ pub(super) fn child_lock_wait(
 pub(super) fn child_production_lock_wait(
     command: &mut std::process::Command,
 ) -> &mut std::process::Command {
-    command.env_remove(LOCK_WAIT_ENV)
+    super::parent_death::bind(command).env_remove(LOCK_WAIT_ENV)
 }
 
 #[cfg(test)]

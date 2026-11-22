@@ -102,6 +102,7 @@ fn the_selected_inventory_has_thirty_four_commands_and_explicit_runtime_obligati
         "setup init",
         "setup check",
         "setup checkpoints-enable",
+        "setup custody-orphans",
         "setup owner-stop",
         "setup migrate",
         "instances list",
@@ -557,6 +558,81 @@ fn a_connect_without_a_protected_source_reads_none_and_passes_no_document() {
         input.get("credential_document").is_none_or(Value::is_null),
         "{input}"
     );
+}
+
+/// story:credential-from-environment-variable: `--credential-env` on connect
+/// and reconnect hands the handler the variable's NAME, reads no protected
+/// source in the contract and stands on no other command.
+#[test]
+fn credential_env_reaches_the_handler_as_a_name_on_connect_and_reconnect_only() {
+    for (args, callable, result) in [
+        (
+            &[
+                "connections",
+                "connect",
+                "--adapter",
+                "forge",
+                "--profile",
+                "static",
+            ][..],
+            "connections-connect",
+            "ConnectionConnectResult",
+        ),
+        (
+            &[
+                "connections",
+                "reconnect",
+                "--adapter",
+                "forge",
+                "--connection",
+                "conn-1",
+                "--expected-revision",
+                "rev-1",
+            ],
+            "connections-reconnect",
+            "ConnectionReconnectResult",
+        ),
+    ] {
+        let mut handler = Recorder::new(fixture(result));
+        let mut sources = InputSources::default();
+        let argv = [
+            args,
+            &["--credential-env", "FICTIONAL_TOKEN", "--output", "json"],
+        ]
+        .concat();
+        let output = run(&argv, &mut sources, &mut handler, None);
+        assert_eq!(output.exit_code, 0, "{argv:?}: {output:?}");
+        assert!(sources.calls.is_empty());
+        let (called, input, _) = handler.last.unwrap();
+        assert_eq!(called, callable);
+        assert_eq!(input["credential_env"], "FICTIONAL_TOKEN", "{input}");
+        assert!(
+            input.get("credential_document").is_none_or(Value::is_null),
+            "{input}"
+        );
+    }
+    let mut handler = Recorder::new(fixture("ConnectionRevokeResult"));
+    let output = run(
+        &[
+            "connections",
+            "revoke",
+            "--adapter",
+            "forge",
+            "--connection",
+            "conn-1",
+            "--expected-revision",
+            "rev-1",
+            "--credential-env",
+            "FICTIONAL_TOKEN",
+            "--output",
+            "json",
+        ],
+        &mut InputSources::default(),
+        &mut handler,
+        None,
+    );
+    refusal(&output, 2);
+    assert_eq!(handler.calls, 0);
 }
 
 /// story:connect-runs-an-oauth2-grant: `--device` on connect and reconnect
@@ -1370,8 +1446,9 @@ fn no_alias_or_path_replaces_another_command() {
     }
     // story:connectors-do-short-invocation: `invoke` is one of the paths and
     // `operations invoke` is removed; `definitions install` (story:definitions-install)
-    // is the newest, 34 commands and 5 aliases.
-    assert_eq!(reached, 39);
+    // 34 commands and 5 aliases, and `setup custody-orphans`
+    // (story:custody-keeps-out-of-the-session-keyring) the newest.
+    assert_eq!(reached, 40);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

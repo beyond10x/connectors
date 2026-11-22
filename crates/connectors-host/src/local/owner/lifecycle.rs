@@ -25,6 +25,30 @@ pub(super) struct Owned {
 pub(super) struct Start {
     pub step: runtime::StartFailure,
     pub log: Option<std::path::PathBuf>,
+    /// The private protocol the entry selected when this start began.
+    pub asked: runtime::PrivateProtocol,
+}
+/// The refusal a failed start answers: `failure` as its code, and for a
+/// program that refused the private protocol the entry selects, the protocol
+/// asked for and those the program speaks
+/// (story:adapter-private-protocol-refusal-named).
+pub(super) fn refusal(
+    failure: runtime::Failure,
+    step: runtime::StartFailure,
+    asked: runtime::PrivateProtocol,
+) -> Error {
+    let mut error = Error::from(failure);
+    if let runtime::StartFailure::UnsupportedPrivateProtocol { .. } = step {
+        error.protocol_refusal = Some(Box::new(super::ProtocolRefusal {
+            private_protocol: asked.as_str().to_owned(),
+            supported_private_protocols: step
+                .supported_private_protocols()
+                .into_iter()
+                .map(|protocol| protocol.as_str().to_owned())
+                .collect(),
+        }));
+    }
+    error
 }
 #[derive(Default)]
 pub(super) struct Control {
@@ -69,6 +93,21 @@ impl Control {
         } else {
             "not_running"
         };
+        // A failed instance whose program refused the private protocol its
+        // entry selects is answered by that refusal, not observed.
+        if state == "failed"
+            && let Some(Start { step, asked, .. }) = &self.start_failure
+            && matches!(
+                step,
+                runtime::StartFailure::UnsupportedPrivateProtocol { .. }
+            )
+        {
+            return Err(refusal(
+                runtime::Failure::UnsupportedPrivateProtocol,
+                *step,
+                *asked,
+            ));
+        }
         let revision = self
             .child
             .as_ref()

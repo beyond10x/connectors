@@ -162,3 +162,10 @@ probe. A scheduled caller revalidates before reading.
 The instance pins the executable's SHA-256. After rebuilding `connectors-prometheus`, update
 `sha256`, stop the running incarnation (`instances stop`), then `connections revalidate` or
 reconnect the connection, which performs the admitted launch under the same connection id.
+
+## Support-table summary: Prometheus
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Prometheus HTTP API, one GET each; bearer token from keyring custody under `prometheus.bearer`, proved with `GET api/v1/status/buildinfo`; a range spans at most seven days and 2,000 points per series; no tenant header is sent; directly or through Grafana's data-source proxy; see [the Prometheus guide](adapters/prometheus/README.md)

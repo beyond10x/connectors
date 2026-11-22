@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T18:23:59Z",
+  "actor": "human:operator",
+  "artifact": "story:custody-keeps-out-of-the-session-keyring",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-custody-keyring-security-1",
+    "reference": "e8991556f: docs state inspect_at and available_at open the session bus read-only in a test build (guarding them would refuse setup check tests)",
+    "review": "review-result:wave-b-custody-keyring-security-1",
+    "outcome": "fixed"
+  }
+}

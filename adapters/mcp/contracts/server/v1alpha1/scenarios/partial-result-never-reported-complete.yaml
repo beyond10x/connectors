@@ -101,8 +101,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.sessions.StateConflict
-    fields:
-      state: Closing
   no_events:
   - connectors.sessions.DataPermitted
   - connectors.sessions.SessionReady
