@@ -1,4 +1,5 @@
 [package]
+autotests = false
 name = "connectors-tool-contracts"
 description = "Publishes an instance's tool-contract/1 document from its descriptor and the tool profiles authored beside its adapter, and serves it as a tool-conformance/1 toolset over the adapter's invoke."
 version.workspace = true
@@ -26,3 +27,7 @@ async-trait.workspace = true
 connectors-host.workspace = true
 connectors-tavily = { path = "../../adapters/tavily", default-features = false }
 tempfile.workspace = true
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

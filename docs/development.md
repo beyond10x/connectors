@@ -46,10 +46,45 @@ run `setup` under it answer `invalid_configuration`. Run the host and CLI tests 
 [`.github/workflows/macos-host.yml`](../.github/workflows/macos-host.yml) does with the
 runner's temporary directory.
 
+The gate's test step is `cargo nextest run --workspace` under
+[`.config/nextest.toml`](../.config/nextest.toml): every test runs in its own process, a test
+still running at 60 s is killed and fails, and the gate prints the ten slowest tests from
+`target/nextest/default/junit.xml` and the step's time (its budget is 120 s). The build runs
+before it (`--no-run`) and is not counted. nextest runs no doctests; `cargo test --workspace
+--doc` runs them after. Install cargo-nextest to run the gate locally (`cargo install
+cargo-nextest --locked`, or the release archive CI pins). The runner above reaches test binaries
+under nextest too, through the same `--config`. A package with `autotests = false` builds its
+integration tests into `tests/main.rs`, one module per file; declare a new file there, or
+`every_integration_test_file_is_built` fails.
+
+Mutation emission of the local metadata authority takes minutes, so no test runs it.
+`connectors-build metadata-conformance emissions` writes the component's precedence-swap
+emission manifest and the all-class emission manifests of `connectors.oauth2` and
+`connectors.approval_issuers` to `crates/connectors-build/generated/metadata-emissions`, after
+checking each emission the way the tests did (the pinned `ess` reads it, every mutant suite has
+its recorded digest, a separate synthesis reports the same refusals, no refused scenario is in
+the baseline suite). `inputs.json` beside them records the digest of the ESS crates in
+`Cargo.lock`, the `ess` pin, every file under `ess/` and the generator;
+`the_committed_metadata_emissions_are_current` fails when it differs, and names what changed.
+Regenerate then, one part per pool job: a part took 8 to 27 minutes on this workstation in November 2026, depending on load, and a pool
+job may name at most 30 minutes, so the whole run does not fit one job. Build `connectors-build`
+first, then run each of `--part component`, `--part connectors.oauth2` and
+`--part connectors.approval_issuers` as
+`slot --timeout 30m target/debug/connectors-build metadata-conformance emissions --part <part>`;
+each part also rewrites `inputs.json`. The synthesized baseline suite
+(12 MB) is not committed: the gate synthesizes it once per digest into
+`target/metadata-emissions/<digest>/suite.json` before the tests run, and every test process
+reads that file. A test run outside the gate with no cached file synthesizes it in the first test
+that needs it.
+The [`slow`](../.github/workflows/slow.yml) workflow runs it with `--check`, which writes
+nothing and fails on any differing byte, when one of those inputs changes. A new ESS pin works
+the same way: its crates change the digest, and the files are regenerated with it.
+
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
 gate without `--msrv` on every pull request and every push to `main`. It installs
 Rust 1.98.1 with rustfmt and Clippy, installs the pinned ESS and AEP releases after
-checking each archive against its release's `SHA256SUMS`, fetches the locked
+checking each archive against its release's `SHA256SUMS`, installs cargo-nextest 0.9.143 after
+checking its archive against the SHA-256 the workflow pins, fetches the locked
 dependencies and runs `cargo run --locked -p connectors-build -- gate`. It reads the
 repository with `contents: read` only and carries no credential. The `--msrv`
 checks remain local.

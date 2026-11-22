@@ -1,0 +1,154 @@
+{
+  "digest": "08c26610064678aa30cde61fd58db3a00130aac8604937dcca84143ae00adafa",
+  "ess_crates": [
+    "entity-core 0.28.0",
+    "entity-core 0.32.0",
+    "entity-eventlog 0.32.0",
+    "entity-executor 0.32.0",
+    "entity-query 0.32.0",
+    "entity-store 0.32.0",
+    "ess-compiler 0.87.0",
+    "ess-conformance 0.87.0",
+    "ess-domain 0.87.0",
+    "ess-entity-runtime 0.87.0",
+    "ess-gen 0.87.0",
+    "ess-http 0.87.0",
+    "ess-primitives 0.87.0",
+    "ess-service-contract 0.87.0",
+    "ess-synth 0.87.0",
+    "ess-transport 0.87.0",
+    "ess-yaml 0.87.0"
+  ],
+  "files": [
+    {
+      "path": "crates/connectors-build/src/metadata_emissions.rs",
+      "sha256": "aff819486e91f9f58ff79b9a28d9208231740b5a0e909f298d0afbf706ae1c24"
+    },
+    {
+      "path": "crates/connectors-build/src/metadata_entities.rs",
+      "sha256": "01900a8feacb9912b9b267e53141c60f97b961111c7f051b59c2df88262c2dd4"
+    },
+    {
+      "path": "crates/connectors-spec/toolchain.json",
+      "sha256": "69a3033984076ee8bf2b92569a75ece81da546f684257db69a0c8dcb8419a566"
+    },
+    {
+      "path": "ess/components.yaml",
+      "sha256": "ef867e1c465573f9d96fa5764ae0446fd75667478d9cdaae993ed6f9273c2cf3"
+    },
+    {
+      "path": "ess/domains/approval_issuers.yaml",
+      "sha256": "7b76a822159e527e5f7b0993e4c2e91e697cc2e6087f236e51a377a6865b8e61"
+    },
+    {
+      "path": "ess/domains/artifact_provenance.yaml",
+      "sha256": "fa6c3ace0e25ff7508b6bc8f4f76fadddf3df51c50eb67dc07f2ab251acb200c"
+    },
+    {
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "c94bc265387ced27d344617815f106b25d3951a5e449695e314853467d97a69f"
+    },
+    {
+      "path": "ess/domains/auth_bindings.yaml",
+      "sha256": "93ec0bd564c06c5f29f834c5b91512dd0e007b2f2b0ce114591449b1b6add0fb"
+    },
+    {
+      "path": "ess/domains/cli.yaml",
+      "sha256": "c06c8a40c48d2bc7d87185040ff7cb815ce4d79c75a0f654906c336b2e7e1acb"
+    },
+    {
+      "path": "ess/domains/clock.yaml",
+      "sha256": "2d1fee8dda9d9390aaf31c174519931753901583c3a6cab8562b79647b0741a6"
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "8d8003230b5d6f5dbb92a934e36f5fc786004173b2b1ae90b3b35ea4868b4495"
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "a2127d3e85f7db3a42c89cc9205e52fd033614db7c152c4d01d13a9567e7d116"
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "2a5ce84a2dba9304d21b6f4f18bc55468f766d9a7a42057daee25798208eeb64"
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "4e98df27a610a35cd45f13f3f8eb6b5f4b1ae6b8523275bcad799358325e92c8"
+    },
+    {
+      "path": "ess/domains/definitions_install.yaml",
+      "sha256": "742cd8a4af6d8df23bf6aa8849fad310e2625b40feb9afe70f5682391731df59"
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "cfff8929ba7a17c60e1dc8329369325fedb562179956fa1f824d25d95b1d0805"
+    },
+    {
+      "path": "ess/domains/discovery.yaml",
+      "sha256": "72e87239ebcc19e3351f74189a09fdcdd219c884165895178cc98fe3b21a6126"
+    },
+    {
+      "path": "ess/domains/discovery_state.yaml",
+      "sha256": "b25be19ef7a407335ee3db4617e01ac6697e831904ebe19852da2775a1e1ca35"
+    },
+    {
+      "path": "ess/domains/execution_audit.yaml",
+      "sha256": "16f86e9078dd1e3676971dd70fd0d4b5aefeb5ac6a260521809089941dac8edb"
+    },
+    {
+      "path": "ess/domains/feed.yaml",
+      "sha256": "ce5df856749c798ef86108281882a56cd0f2ce88f7bda38f18824bc8021960d9"
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "9cfdeffab834b75a8259f1f00a12cf29ebaff4e694a42f4cf40e39f6986796c9"
+    },
+    {
+      "path": "ess/domains/local_approval_policy.yaml",
+      "sha256": "281678dda56cb7e69a6522fba7083077424a7f235256bd46d739d55ab126f10b"
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "65acd5cd0dca806bdeedc5c6d78e18a5d5fabfe57de09502b00caaf057cc508c"
+    },
+    {
+      "path": "ess/domains/oauth2.yaml",
+      "sha256": "9d466fd08ceff1607b9ee4e9b71106289033d541af26f7f5f22d1a0fc82e235a"
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "c7223d0141e9fbc0cf7a2b8461976d6968359ab86a44264277e4e8485cb04a52"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "48b1596a4fd2ee32b413028b3b321f8a8cbe777a752ceda8e737e44e8d8f82b7"
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "8c4ea6d4f5bfa33c7d230aa2a3ecd88551a123be678b1145d3bb51bc2688c3e0"
+    },
+    {
+      "path": "ess/domains/standing_approvals.yaml",
+      "sha256": "477726479f4a82f28b35f8dca209e41163493efa5f3445f11f1843a7078edce9"
+    },
+    {
+      "path": "ess/domains/tool_contracts.yaml",
+      "sha256": "d80f3f71546359a1601489c0ee4488fb6cf56afda59ed85b3aafbbb18ac8d775"
+    },
+    {
+      "path": "ess/domains/transport.yaml",
+      "sha256": "6a7424f64f47181de417dd8e2d1fc306d1549eba30f1a1ad5754388c13a1e354"
+    },
+    {
+      "path": "ess/domains/websearch.yaml",
+      "sha256": "bf04868233e9b1a8157f56a24cb8125dbbe6857199c718caa5a3f3bcdf697ad5"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "fb328097fbd7a9b49ac875c960c550b42791ffc41dd9772074fc72d4f0088d09"
+    }
+  ],
+  "format": "connectors-metadata-emissions/1",
+  "regenerate": "cargo run --locked -p connectors-build -- metadata-conformance emissions"
+}

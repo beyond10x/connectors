@@ -33,6 +33,25 @@
   `initialize_state` (run `connectors setup init`), exit 1. Before, it was refused as
   `metadata_unavailable` with `retry_status`, and a retry never helped. A store that exists and
   cannot be used still answers `metadata_unavailable` (#268).
+- The gate runs the workspace tests under cargo-nextest with `.config/nextest.toml`: each test
+  runs in its own process, a test still running at 60 s is killed and fails, and the gate prints
+  the ten slowest tests and the test step's time. Doctests still run under `cargo test --doc`. CI
+  installs cargo-nextest 0.9.143 from its release archive, checked against a pinned SHA-256.
+- The manifests of the local metadata authority's precedence-swap emission and of the all-class
+  emissions of `connectors.oauth2` and `connectors.approval_issuers` are committed under
+  `crates/connectors-build/generated/metadata-emissions` with the digest of their inputs (the ESS
+  crates, the `ess` pin, `ess/` and the generator). Tests read them instead of running the
+  emissions, which took over 60 s each; a test fails when the digest is stale.
+  `connectors-build metadata-conformance emissions` regenerates them, and the new `slow` workflow
+  runs it with `--check` when an input changes. The synthesized baseline suite a test runs is
+  made once per digest into `target/metadata-emissions/`.
+- `.cargo/config.toml` sets `debug = false` for the dev and test profiles, so a host-wide Cargo
+  configuration cannot add debug info to this repository's builds.
+- `connectors-build`, `connectors-catalog`, `connectors-core`, `connectors-docs`,
+  `connectors-spec`, `connectors-tool-contracts` and `connectors-tavily` build their integration
+  tests into one binary each (`tests/main.rs`, one module per file): 84 files in 7 binaries, 77 test binaries fewer. A
+  test of `connectors-build` fails when a package with `autotests = false` has a `tests/*.rs`
+  file no test binary declares.
 
 ### Fixed
 

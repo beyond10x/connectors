@@ -1,4 +1,5 @@
 [package]
+autotests = false
 name = "connectors-build"
 description = "Repository build tool: the gate, generation and drift checks, catalog bundles, source projections and the website examples."
 version.workspace = true
@@ -35,3 +36,7 @@ async-trait.workspace = true
 connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-oauth2 = { path = "../connectors-oauth2" }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

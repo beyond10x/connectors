@@ -1,4 +1,5 @@
 [package]
+autotests = false
 name = "connectors-spec"
 description = "The adapter specification kind: compiles adapter specifications to descriptors and pins the ESS release used for generation."
 version.workspace = true
@@ -16,3 +17,7 @@ hex.workspace = true
 tempfile.workspace = true
 
 connectors-host = { workspace = true, features = ["schema"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

@@ -26,6 +26,7 @@ mod jira_feed_conformance;
 mod live_read_loop;
 mod mcp;
 mod metadata_conformance;
+mod metadata_emissions;
 mod metadata_entities;
 mod ownership;
 mod platform_gated;
@@ -221,6 +222,17 @@ enum MetadataConformanceAction {
         #[arg(long)]
         dir: PathBuf,
     },
+    /// Regenerate the committed component and per-domain emission manifests under
+    /// `crates/connectors-build/generated/metadata-emissions` with the digest of their inputs;
+    /// with `--check`, compare them byte for byte and write nothing. Takes minutes.
+    Emissions {
+        #[arg(long)]
+        check: bool,
+        /// Only this part (`component`, `connectors.oauth2`, `connectors.approval_issuers`);
+        /// repeatable. Default: every part.
+        #[arg(long = "part")]
+        parts: Vec<String>,
+    },
 }
 fn save_json(path: &Path, value: &Value) -> Result<()> {
     Ok(write(path, &json_bytes(value)?)?)
@@ -272,6 +284,12 @@ fn execute(args: Args) -> Result<()> {
             MetadataConformanceAction::RunEmission { dir } => {
                 metadata_conformance::run_emission(&root, &dir)
             }
+            MetadataConformanceAction::Emissions { check, parts } => metadata_emissions::run(
+                &root,
+                &connectors_spec::toolchain::resolve(args.ess.as_deref())?,
+                check,
+                &parts,
+            ),
         };
     }
     if let Action::MetadataEntities { check } = args.command {

@@ -1,4 +1,5 @@
 [package]
+autotests = false
 name = "connectors-tavily"
 description = "Tavily adapter: web search, page fetch and site crawl through the shared websearch family."
 version.workspace = true
@@ -30,3 +31,7 @@ tokio = { workspace = true, optional = true }
 [dev-dependencies]
 connectors-host.workspace = true
 tokio.workspace = true
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
