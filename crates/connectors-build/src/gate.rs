@@ -397,7 +397,22 @@ fn test_step(
 ) -> Result<()> {
     let nextest = |extra: &[&str]| -> Result<Command> {
         let mut cmd = command()?;
-        cmd.args(["nextest", "run", "--workspace", "--locked", "--offline"])
+        // cargo-nextest resolves target runners itself and does not see a `--config` given
+        // to cargo before the subcommand, so the TMPDIR runner is repeated after `run`.
+        // Without it every test that writes a state directory ran under `/tmp` and was
+        // refused `invalid_configuration` (PR #271, 1,337 of 4,230 tests).
+        let runner: Vec<_> = cmd
+            .get_args()
+            .collect::<Vec<_>>()
+            .windows(2)
+            .filter(|pair| pair[0] == "--config")
+            .map(|pair| pair[1].to_owned())
+            .collect();
+        cmd.args(["nextest", "run"]);
+        for config in runner {
+            cmd.arg("--config").arg(config);
+        }
+        cmd.args(["--workspace", "--locked", "--offline"])
             .args(extra);
         Ok(cmd)
     };
@@ -795,7 +810,7 @@ mod authored_execution_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::{cargo, docs_check};
+    use super::{Result, cargo, docs_check, test_step};
     use std::{ffi::OsStr, path::Path};
 
     const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
@@ -852,6 +867,38 @@ mod tests {
             args,
             [OsStr::new("--config"), OsStr::new(&expected)],
             "gate cargo arguments"
+        );
+    }
+
+    /// cargo-nextest does not read a `--config` given to cargo before the subcommand, so
+    /// the test step repeats the runner after `nextest run`; otherwise the test binaries
+    /// keep the caller's `TMPDIR`.
+    #[test]
+    fn the_test_step_hands_the_runner_to_nextest_itself() {
+        let commands = std::cell::RefCell::new(Vec::new());
+        let execute = |cmd: &mut std::process::Command| -> Result<()> {
+            commands
+                .borrow_mut()
+                .push(cmd.get_args().map(OsStr::to_owned).collect::<Vec<_>>());
+            Err("stop after the first command".into())
+        };
+        let _ = test_step(Path::new("/checkout"), &|| Ok(build(None)), &execute);
+        let commands = commands.into_inner();
+        let first = commands.first().expect("the test step runs nextest");
+        let run = first
+            .windows(2)
+            .position(|pair| pair[0] == "nextest" && pair[1] == "run")
+            .expect("nextest run");
+        let after = &first[run + 2..];
+        let host = rustc_host();
+        let expected = format!(
+            r#"target."{host}".runner=["sh","-c","export TMPDIR=\"$0\"; exec \"$@\"","{ROOT}"]"#
+        );
+        assert!(
+            after
+                .windows(2)
+                .any(|pair| pair[0] == "--config" && pair[1] == OsStr::new(&expected)),
+            "nextest run carries no runner: {first:?}"
         );
     }
 
