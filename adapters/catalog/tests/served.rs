@@ -1802,3 +1802,583 @@ async fn a_served_merge_the_provider_refuses_answers_refused_with_its_message() 
         );
     }
 }
+
+/// The parent message of the thread the uploads go into, and the one file id
+/// the upload fixture issues per slot.
+const UPLOAD_THREAD: &str = "1780001000.000100";
+
+/// One request the upload fixture answered: method, path, query, `Content-Type`,
+/// the byte length and SHA-256 of its body, and the body as JSON when it is.
+#[derive(Clone, Debug)]
+struct UploadSeen {
+    method: String,
+    path: String,
+    query: String,
+    content_type: Option<String>,
+    length: usize,
+    sha256: String,
+    json: Value,
+}
+
+/// A Slack Web API below `/api` and its file upload host on one loopback
+/// origin, `https://localhost:<port>`: `auth.test` answers `ok: true`;
+/// `files.getUploadURLExternal` answers a new `file_id` and an `upload_url`
+/// under `/upload/v1/` on `upload_origin` (the fixture's own origin unless a
+/// test names another); a POST there takes the bytes; `files.completeUploadExternal`
+/// shares each uploaded file into [`SLACK_CHANNEL`], in the thread it names;
+/// and `conversations.replies` lists [`UPLOAD_THREAD`]'s parent and one reply
+/// per file shared into it. Every request is recorded.
+struct UploadSlack {
+    port: u16,
+    pem: String,
+    seen: Arc<Mutex<Vec<UploadSeen>>>,
+    upload_origin: Arc<Mutex<Option<String>>>,
+    stop: Option<oneshot::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Rooted for UploadSlack {
+    fn pem(&self) -> &str {
+        &self.pem
+    }
+}
+
+impl UploadSlack {
+    fn new() -> Self {
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into(), "127.0.0.1".into()])
+            .unwrap();
+        let pem = cert.cert.pem();
+        let tls = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+        )
+        .unwrap();
+        let (address_tx, address_rx) = mpsc::channel();
+        let (stop, mut stopped) = oneshot::channel();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let upload_origin: Arc<Mutex<Option<String>>> = Arc::default();
+        let (observed, issuing) = (seen.clone(), upload_origin.clone());
+        let thread = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let port = listener.local_addr().unwrap().port();
+                address_tx.send(port).unwrap();
+                let acceptor = TlsAcceptor::from(Arc::new(tls));
+                // Issued file ids with whether their bytes arrived, and the
+                // files shared into the thread, in order.
+                let mut issued: Vec<(String, bool)> = Vec::new();
+                let mut shared: Vec<Value> = Vec::new();
+                loop {
+                    let stream = tokio::select! {
+                        _ = &mut stopped => break,
+                        accepted = listener.accept() => accepted.unwrap().0,
+                    };
+                    let Ok(mut stream) = acceptor.accept(stream).await else {
+                        continue;
+                    };
+                    let mut head = Vec::new();
+                    while !head.ends_with(b"\r\n\r\n") && head.len() < 16384 {
+                        match stream.read_u8().await {
+                            Ok(byte) => head.push(byte),
+                            Err(_) => break,
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&head).into_owned();
+                    let mut words = head.split_whitespace();
+                    let method = words.next().unwrap_or_default().to_owned();
+                    let target = words.next().unwrap_or_default().to_owned();
+                    let (path, query) = target.split_once('?').unwrap_or((&target, ""));
+                    let (path, query) = (path.to_owned(), query.to_owned());
+                    let header = |wanted: &str| {
+                        head.lines().find_map(|line| {
+                            line.split_once(':')
+                                .filter(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                                .map(|(_, value)| value.trim().to_owned())
+                        })
+                    };
+                    let length: usize = header("content-length")
+                        .and_then(|value| value.parse().ok())
+                        .unwrap_or(0);
+                    let mut body = vec![0; length.min(4 * 1024 * 1024)];
+                    if stream.read_exact(&mut body).await.is_err() {
+                        continue;
+                    }
+                    let json: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+                    let pair = |name: &str| {
+                        query.split('&').find_map(|pair| {
+                            pair.split_once('=')
+                                .filter(|(key, _)| *key == name)
+                                .map(|(_, value)| value.to_owned())
+                        })
+                    };
+                    let (status, kind, answer): (u16, &str, Vec<u8>) = match (
+                        method.as_str(),
+                        path.as_str(),
+                    ) {
+                        ("GET", "/api/auth.test") => (
+                            200,
+                            "application/json",
+                            serde_json::to_vec(&json!({"ok": true, "user_id": "U0FIXTURE01",
+                                "user": "fixture-bot", "team_id": "T0FIXTURE01", "bot_id": "B0FIXTURE01"}))
+                            .unwrap(),
+                        ),
+                        ("POST", "/api/files.getUploadURLExternal") => {
+                            let id = format!("F0UPLOAD{:02}", issued.len() + 1);
+                            issued.push((id.clone(), false));
+                            let origin = issuing
+                                .lock()
+                                .unwrap()
+                                .clone()
+                                .unwrap_or_else(|| format!("https://localhost:{port}"));
+                            let answer = if pair("filename").is_some() && pair("length").is_some() {
+                                json!({"ok": true, "file_id": id,
+                                       "upload_url": format!("{origin}/upload/v1/{id}")})
+                            } else {
+                                json!({"ok": false, "error": "invalid_arguments"})
+                            };
+                            (200, "application/json", serde_json::to_vec(&answer).unwrap())
+                        }
+                        ("POST", upload) if upload.starts_with("/upload/v1/") => {
+                            let id = &upload["/upload/v1/".len()..];
+                            match issued.iter_mut().find(|(issued, _)| issued == id) {
+                                Some(entry) => {
+                                    entry.1 = true;
+                                    (200, "text/plain", format!("OK - {length}").into_bytes())
+                                }
+                                None => (404, "text/plain", b"no upload".to_vec()),
+                            }
+                        }
+                        ("POST", "/api/files.completeUploadExternal") => {
+                            let file = &json["files"][0];
+                            let uploaded = issued
+                                .iter()
+                                .any(|(id, arrived)| *arrived && file["id"] == id.as_str());
+                            let answer = if json["channel_id"] != SLACK_CHANNEL {
+                                json!({"ok": false, "error": "channel_not_found"})
+                            } else if !uploaded {
+                                json!({"ok": false, "error": "file_not_found"})
+                            } else {
+                                shared.push(json!({"id": file["id"], "title": file["title"],
+                                                   "thread_ts": json["thread_ts"]}));
+                                json!({"ok": true, "files": [{"id": file["id"], "title": file["title"]}]})
+                            };
+                            (200, "application/json", serde_json::to_vec(&answer).unwrap())
+                        }
+                        ("GET", "/api/conversations.replies") => {
+                            let mut messages = vec![json!({"type": "message", "ts": UPLOAD_THREAD,
+                                                           "thread_ts": UPLOAD_THREAD, "text": "release review"})];
+                            for (n, file) in shared
+                                .iter()
+                                .filter(|file| file["thread_ts"] == UPLOAD_THREAD)
+                                .enumerate()
+                            {
+                                messages.push(json!({"type": "message", "ts": format!("1780001001.{n:06}"),
+                                    "thread_ts": UPLOAD_THREAD, "user": "U0FIXTURE01",
+                                    "files": [{"id": file["id"], "title": file["title"]}]}));
+                            }
+                            let answer = json!({"ok": true, "messages": messages, "has_more": false,
+                                                "response_metadata": {"next_cursor": ""}});
+                            (200, "application/json", serde_json::to_vec(&answer).unwrap())
+                        }
+                        _ => (
+                            404,
+                            "application/json",
+                            serde_json::to_vec(&json!({"ok": false, "error": "unknown_method"})).unwrap(),
+                        ),
+                    };
+                    observed.lock().unwrap().push(UploadSeen {
+                        method,
+                        path,
+                        query,
+                        content_type: header("content-type"),
+                        length,
+                        sha256: hex::encode(Sha256::digest(&body)),
+                        json,
+                    });
+                    let head = format!(
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        answer.len()
+                    );
+                    let _ = stream.write_all(head.as_bytes()).await;
+                    let _ = stream.write_all(&answer).await;
+                    let _ = stream.shutdown().await;
+                }
+            });
+        });
+        let port = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        Self {
+            port,
+            pem,
+            seen,
+            upload_origin,
+            stop: Some(stop),
+            thread: Some(thread),
+        }
+    }
+
+    fn origin(&self) -> String {
+        format!("https://localhost:{}", self.port)
+    }
+
+    /// The same listener under another origin, which the instance does not admit.
+    fn other_origin(&self) -> String {
+        format!("https://127.0.0.1:{}", self.port)
+    }
+
+    fn seen(&self) -> Vec<UploadSeen> {
+        self.seen.lock().unwrap().clone()
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.seen().into_iter().map(|seen| seen.path).collect()
+    }
+}
+
+impl Drop for UploadSlack {
+    fn drop(&mut self) {
+        let _ = self.stop.take().map(|stop| stop.send(()));
+        let _ = self.thread.take().map(std::thread::JoinHandle::join);
+    }
+}
+
+/// A Slack bot instance `slack.fixture` on the served host, configured from
+/// the shipped bundle and selection set (copied into the jail), with a
+/// standing grant for `file.upload` in [`SLACK_CHANNEL`] alone. The fixture
+/// cannot serve `files.slack.com`, so `file.upload` reaches the fixture's
+/// origin and the one beside it instead, and the connection admits only the
+/// fixture's own; nothing else of the shipped selection changes.
+async fn upload_served(slack: &UploadSlack) -> (Served, String) {
+    let grants = json!({
+        "format": "connectors.standing-grants/1",
+        "grants": [{
+            "id": "g-fixture-upload", "instance": "slack.fixture", "operation": "file.upload",
+            "target": [{"pointer": "/body/channel_id", "value": SLACK_CHANNEL}],
+            "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 10
+        }],
+        "revoked": []
+    });
+    let mut served = Served::granted(
+        slack,
+        "slack.fixture",
+        "slack.bot",
+        json!({"local_config": "/srv/catalog.json"}),
+        &grants,
+    );
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    served.jail.directory("/srv/bundles", 0o755);
+    for entry in fs::read_dir(crate_root.join("generated/bundles")).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(
+            entry.path(),
+            served.path("/srv/bundles").join(entry.file_name()),
+        )
+        .unwrap();
+    }
+    let mut operations: Value = serde_json::from_slice(
+        &fs::read(crate_root.join("providers/slack/operations.json")).unwrap(),
+    )
+    .unwrap();
+    for selection in operations["operations"].as_array_mut().unwrap() {
+        if selection["id"] == "file.upload" {
+            selection["binary"]["hosts"] = json!([slack.origin(), slack.other_origin()]);
+        }
+    }
+    let config = json!({
+        "format": "connectors-catalog-local/2",
+        "instance": "slack.fixture",
+        "provider": "slack",
+        "bundle_directory": "/srv/bundles",
+        "api_base": format!("{}/api", slack.origin()),
+        "ca_file": "/srv/catalog-ca.pem",
+        "hosts": [{"origin": slack.origin()}],
+        "auth": {
+            "profile": "slack.bot",
+            "header": "Authorization",
+            "bearer": true,
+            "label": "Slack bot token",
+            "identity": {"path": "auth.test", "kind": "slack.user", "subject_pointer": "/user_id"}
+        },
+        "operations_file": "/srv/operations.json"
+    });
+    // The local configuration reads its trust root as a private file.
+    for (inside, bytes) in [
+        (
+            "/srv/operations.json",
+            serde_json::to_vec(&operations).unwrap(),
+        ),
+        ("/srv/catalog.json", serde_json::to_vec(&config).unwrap()),
+        ("/srv/catalog-ca.pem", slack.pem().as_bytes().to_vec()),
+    ] {
+        fs::write(served.path(inside), bytes).unwrap();
+        fs::set_permissions(served.path(inside), fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    served.deliver(
+        "..2026_10_30_00_00_00.000000001",
+        &document(SLACK_TOKEN),
+        0o400,
+    );
+    served.start().expect("the served binary starts");
+    let descriptor = served.describe().await;
+    let upload = descriptor["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|operation| operation["id"] == "file.upload")
+        .unwrap_or_else(|| panic!("file.upload is not described: {descriptor}"));
+    assert_eq!(upload["profile"], "mutation", "{upload}");
+    let revision = descriptor["revision"].as_str().unwrap().to_owned();
+    (served, revision)
+}
+
+/// `bytes` as an upload's `content`: standard base64 and the SHA-256.
+fn content(bytes: &[u8]) -> Value {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    json!({"base64": STANDARD.encode(bytes), "sha256": hex::encode(Sha256::digest(bytes)),
+           "media_type": "application/pdf"})
+}
+
+/// A keyed `file.upload` of `bytes` into [`UPLOAD_THREAD`] in `channel`.
+fn upload_request(
+    revision: &str,
+    request_id: &str,
+    key: &str,
+    channel: &str,
+    bytes: &[u8],
+) -> Value {
+    json!({
+        "version": "v1alpha2", "request_id": request_id, "operation": "file.upload",
+        "revision": revision, "idempotency_key": key,
+        "input": {
+            "body": {"channel_id": channel, "thread_ts": UPLOAD_THREAD,
+                     "filename": "rollback-plan.pdf", "title": "Rollback plan",
+                     "initial_comment": "rollback plan for the release"},
+            "content": content(bytes),
+        },
+    })
+}
+
+/// File bytes of exactly `length`, not all alike.
+fn file_bytes(length: usize) -> Vec<u8> {
+    (0..length).map(|n| (n % 251) as u8).collect()
+}
+
+/// issue #269: a served Slack bot instance with a standing grant for one
+/// channel uploads a file of 2 MiB, the most it takes, into a thread with one
+/// operation: `auth.test`, then the slot, the bytes and the completing write,
+/// and the file is listed in that thread afterwards. The same key with other
+/// bytes is `idempotency_conflict` and sends nothing, and a channel the grant
+/// does not name is `approval_required` before any request.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_slack_bot_uploads_a_file_into_a_thread_under_a_one_channel_grant() {
+    let slack = UploadSlack::new();
+    let (served, revision) = upload_served(&slack).await;
+    let route = "/v1alpha2/invoke";
+    let bytes = file_bytes(2 * 1024 * 1024);
+
+    let first = upload_request(&revision, "upload-1", "k-upload", SLACK_CHANNEL, &bytes);
+    let (status, uploaded) = served
+        .send(reqwest::Method::POST, route, Some(&first))
+        .await;
+    let trace: Vec<_> = slack
+        .seen()
+        .into_iter()
+        .map(|s| (s.method, s.path, s.query, s.length, s.json))
+        .collect();
+    assert_eq!(status, 200, "{uploaded}\n{trace:?}\n{}", served.log());
+    assert_eq!(
+        uploaded["mutation"]["classification"], "applied",
+        "{uploaded}"
+    );
+    assert_eq!(uploaded["result"]["body"]["ok"], true, "{uploaded}");
+    let file = uploaded["result"]["body"]["files"][0]["id"].clone();
+    assert_eq!(file, "F0UPLOAD01", "{uploaded}");
+    let sent = slack.seen();
+    assert_eq!(
+        sent.iter()
+            .map(|seen| seen.path.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "/api/auth.test",
+            "/api/files.getUploadURLExternal",
+            "/upload/v1/F0UPLOAD01",
+            "/api/files.completeUploadExternal"
+        ]
+    );
+    assert_eq!(sent[1].method, "POST");
+    assert_eq!(sent[1].query, "filename=rollback-plan.pdf&length=2097152");
+    assert_eq!(sent[1].length, 0, "the slot carries no body");
+    assert_eq!(sent[2].method, "POST");
+    assert_eq!(sent[2].length, bytes.len());
+    assert_eq!(sent[2].sha256, hex::encode(Sha256::digest(&bytes)));
+    assert_eq!(sent[2].content_type.as_deref(), Some("application/pdf"));
+    assert_eq!(
+        sent[3].json,
+        json!({"files": [{"id": "F0UPLOAD01", "title": "Rollback plan"}],
+               "channel_id": SLACK_CHANNEL, "thread_ts": UPLOAD_THREAD,
+               "initial_comment": "rollback plan for the release"})
+    );
+
+    // The file is listed in the thread.
+    let (status, thread) = served
+        .invoke(
+            &revision,
+            "replies-1",
+            "conversations.replies",
+            json!({"channel": SLACK_CHANNEL, "ts": UPLOAD_THREAD}),
+        )
+        .await;
+    assert_eq!(status, 200, "{thread}\n{}", served.log());
+    let listed: Vec<&Value> = thread["result"]["body"]["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|message| message["files"].as_array().into_iter().flatten())
+        .map(|file| &file["id"])
+        .collect();
+    assert_eq!(listed, [&file], "{thread}");
+
+    // The same key with other bytes: refused before the anchor, nothing sent.
+    let mark = slack.seen().len();
+    let mut changed = bytes.clone();
+    changed[0] ^= 1;
+    let (status, conflict) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&upload_request(
+                &revision,
+                "upload-2",
+                "k-upload",
+                SLACK_CHANNEL,
+                &changed,
+            )),
+        )
+        .await;
+    assert_eq!(status, 409, "{conflict}\n{}", served.log());
+    assert_eq!(
+        conflict["error"]["code"], "idempotency_conflict",
+        "{conflict}"
+    );
+    assert!(conflict["mutation"].is_null(), "{conflict}");
+
+    // A channel the grant does not name: refused before any request.
+    let (status, refused) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&upload_request(
+                &revision,
+                "upload-3",
+                "k-upload-other",
+                SLACK_OTHER_CHANNEL,
+                b"x",
+            )),
+        )
+        .await;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["error"]["code"], "approval_required", "{refused}");
+    assert_eq!(slack.paths()[mark..], [] as [&str; 0]);
+}
+
+/// issue #269: an `upload_url` on an origin the upload reaches but the
+/// connection does not admit is refused, the write classified `refused`,
+/// after the slot and before any byte is sent; and content of one byte more
+/// than 2 MiB is `invalid_input` before the anchor, with no request at all.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_upload_is_refused_before_its_bytes_on_an_unadmitted_host_or_over_2_mib() {
+    let slack = UploadSlack::new();
+    let (served, revision) = upload_served(&slack).await;
+    let route = "/v1alpha2/invoke";
+
+    *slack.upload_origin.lock().unwrap() = Some(slack.other_origin());
+    let (status, refused) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&upload_request(
+                &revision,
+                "upload-elsewhere",
+                "k-elsewhere",
+                SLACK_CHANNEL,
+                b"%PDF-1.7 fixture",
+            )),
+        )
+        .await;
+    assert_eq!(status, 403, "{refused}\n{}", served.log());
+    assert_eq!(refused["error"]["code"], "forbidden", "{refused}");
+    assert!(
+        refused["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("does not admit")),
+        "{refused}"
+    );
+    assert_eq!(
+        refused["mutation"]["classification"], "refused",
+        "{refused}"
+    );
+    assert_eq!(
+        slack.paths(),
+        ["/api/auth.test", "/api/files.getUploadURLExternal"],
+        "no byte was sent anywhere"
+    );
+
+    // Bytes that are not those their digest names: refused before any request.
+    let mark = slack.seen().len();
+    let mut forged = upload_request(
+        &revision,
+        "upload-forged",
+        "k-forged",
+        SLACK_CHANNEL,
+        b"approved",
+    );
+    forged["input"]["content"]["base64"] = content(b"swapped")["base64"].clone();
+    let (status, refused) = served
+        .send(reqwest::Method::POST, route, Some(&forged))
+        .await;
+    assert_eq!(status, 400, "{refused}\n{}", served.log());
+    assert_eq!(refused["error"]["code"], "invalid_input", "{refused}");
+    assert!(refused["mutation"].is_null(), "{refused}");
+    assert_eq!(slack.paths()[mark..], [] as [&str; 0], "nothing was sent");
+
+    let (status, oversized) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&upload_request(
+                &revision,
+                "upload-oversized",
+                "k-oversized",
+                SLACK_CHANNEL,
+                &file_bytes(2 * 1024 * 1024 + 1),
+            )),
+        )
+        .await;
+    assert_eq!(status, 400, "{oversized}\n{}", served.log());
+    assert_eq!(oversized["error"]["code"], "invalid_input", "{oversized}");
+    assert!(oversized["mutation"].is_null(), "{oversized}");
+    assert_eq!(slack.paths()[mark..], [] as [&str; 0], "nothing was sent");
+
+    // The larger limit is the upload's alone: another operation of the same
+    // descriptor keeps 64 KiB.
+    let (status, large) = served
+        .invoke(
+            &revision,
+            "post-large",
+            "chat.postMessage",
+            json!({"body": {"channel": SLACK_CHANNEL, "text": "x".repeat(100 * 1024)}}),
+        )
+        .await;
+    assert_eq!(status, 413, "{large}");
+    assert_eq!(large["error"]["code"], "capacity", "{large}");
+    assert_eq!(slack.paths()[mark..], [] as [&str; 0], "nothing was sent");
+}

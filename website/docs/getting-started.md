@@ -8,11 +8,12 @@ description: Build Connectors from source, start one connector as a standalone s
 
 Build the workspace, start the Kubernetes connector as a standalone service and ask it over HTTP
 what it offers. No Kubernetes cluster and no real credential are needed: the service answers its
-descriptor without contacting its provider, and the invocation that would need the provider is
-refused by name. Every command below was run in a checkout of the repository, starting at its
-root, and the output under it is what that run printed. The `connectors` command itself runs
-configured instances on your machine and does not call a standalone service;
-[Set up the local CLI](./guides/set-up-the-local-cli.md) starts there.
+descriptor without contacting its provider, and the invocation that would need the provider
+answers `unavailable`. Every command below was run in a checkout of the repository, starting at its
+root, and the output under it is what that run printed.
+
+The `connectors` command itself runs configured instances on your machine and does not call a
+standalone service. [Set up the local CLI](./guides/set-up-the-local-cli.md) starts there.
 
 ## Build
 
@@ -25,7 +26,7 @@ target/debug/connectors --version
 ```
 
 ```text
-connectors 0.73.0
+connectors 0.74.0
 ```
 
 Ordinary builds read checked-in generated Rust and need no ESS. Cargo downloads dependencies on
@@ -36,16 +37,19 @@ the first build. Package distribution is not configured.
 The walkthrough below builds from source because it also needs the Kubernetes service. For the
 `connectors` command alone, each release page carries `connectors-<version>-<target>.tar.gz` for
 `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
-`aarch64-apple-darwin`, with a `SHA256SUMS` file; releases cut before the binaries workflow
+`aarch64-apple-darwin`, with a `SHA256SUMS` file. Releases cut before the binaries workflow
 existed
 ([`release-binaries.yml`](https://github.com/beyond10x/connectors/blob/main/.github/workflows/release-binaries.yml))
-carry source archives only, and there is no Windows binary. Each archive holds a directory with
-`connectors`, the catalog provider `connectors-catalog-provider`, the provider programs
-`connectors-kubernetes`, `connectors-grafana`, `connectors-prometheus` and `connectors-loki`, and
-`README.md` and `CHANGELOG.md` (archives of 0.64.0 and earlier hold `connectors` and
-`connectors-catalog-provider` only, those of 0.50.0 and earlier `connectors` alone); the other
-connectors are built from source, as their guides show. A catalog instance
-that pins nothing is served by the `connectors-catalog-provider` next to `connectors`, so keep the
+carry source archives only, and there is no Windows binary.
+
+Each archive holds a directory with `connectors`, the catalog provider
+`connectors-catalog-provider`, the provider programs `connectors-kubernetes`,
+`connectors-grafana`, `connectors-prometheus` and `connectors-loki`, and `README.md` and
+`CHANGELOG.md`. Archives of 0.64.0 and earlier hold `connectors` and
+`connectors-catalog-provider` only, those of 0.50.0 and earlier `connectors` alone. The other
+connectors are built from source, as their guides show.
+
+A catalog instance that pins nothing is served by the `connectors-catalog-provider` next to `connectors`, so keep the
 two binaries in one directory. The Linux binaries are built on Ubuntu 24.04 and need its glibc or
 a newer one.
 
@@ -76,16 +80,18 @@ connectors-catalog-provider 0.56.0
 ```
 
 On macOS, use `target=aarch64-apple-darwin` (Apple silicon) or `x86_64-apple-darwin` (Intel),
-and check the archive with `shasum -a 256 -c -` in place of `sha256sum -c -`; the other commands
-are the same. The macOS binaries are not signed yet. A binary downloaded with `curl` runs as is;
-one downloaded through a browser carries Gatekeeper's quarantine attribute and is refused until
+and check the archive with `shasum -a 256 -c -` in place of `sha256sum -c -`. The other commands
+are the same.
+
+The macOS binaries are not signed yet. A binary downloaded with `curl` runs as is. One
+downloaded through a browser carries Gatekeeper's quarantine attribute and is refused until
 you remove it, from the extracted directory, with
 `xattr -d com.apple.quarantine connectors connectors-catalog-provider`. An unsigned binary also
 cannot read login keychain items that an earlier build of `connectors` wrote, so credentials are
 stored again after an upgrade.
 
 On Windows, build `connectors` from the release tag's source. The CLI and its local host build and
-run on macOS and Windows, each under its own CI job; the guarantees each platform holds only in a
+run on macOS and Windows, each under its own CI job. The guarantees each platform holds only in a
 weaker form are listed under [macOS](./reference/contracts/cli.md#macos-platform-guarantees) and
 [Windows](./reference/contracts/cli.md#windows-platform-guarantees) platform guarantees.
 
@@ -173,8 +179,8 @@ curl -s -H "$token" http://127.0.0.1:17102/v1/describe \
 ```
 
 The full descriptor also carries each operation's input and output schema. The revision changes
-when the descriptor does; an invocation names the revision it was built against. The service
-listens on loopback HTTP here; anywhere else it belongs behind TLS.
+when the descriptor does, and an invocation carries the revision it was built against. The
+service listens on loopback HTTP here. Anywhere else it belongs behind TLS.
 
 ## Invoke, and read the refusals
 
@@ -211,7 +217,7 @@ curl -s -w '\nHTTP %{http_code}\n' -H "$token" -H 'content-type: application/jso
 HTTP 400
 ```
 
-A request built against another revision is refused as stale, never re-resolved:
+A request built against another revision is refused as stale and not re-resolved:
 
 ```sh
 jq -n '{version: "v1alpha1", request_id: "try-3",

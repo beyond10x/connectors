@@ -10,27 +10,26 @@ source: contracts/README.md, contracts/service/v1alpha1/semantics.md, contracts/
 
 A contract describes the shared meaning of an interaction: its types, access requirements,
 lifecycle, limits and failure behaviour. A connector binds those guarantees to its provider. Shared
-contracts live in the repository's `contracts/` directory and never name a provider; native
-profiles (Kubernetes selectors, LogQL, PostgreSQL's text representation) live with their connector.
+contracts live in the repository's `contracts/` directory and do not name a provider. Native
+profiles, such as Kubernetes selectors, LogQL and PostgreSQL's text representation, live with
+their connector.
 
 ## Follow an interaction
 
-**Discover, select access, invoke, interpret.**
-
 1. **Discover.** The caller reads the service's descriptor: each operation's id, input and output
    schema, the contract family and native profile it implements, and the descriptor's revision.
-   Discovery reports observations; an endpoint the Kubernetes connector discovers is information, not
-   a connection.
-2. **Select access.** A connection binds a selected target and a credential. Selecting it is a
-   deliberate act of the host or the operator, never a side effect of discovery.
-3. **Invoke.** The request names the operation and the descriptor revision it was built against.
+   Discovery reports observations, and an endpoint the Kubernetes connector discovers is information,
+   not a connection.
+2. **Select access.** A connection binds a selected target and a credential. The host or the
+   operator selects it, and discovery does not.
+3. **Invoke.** The request carries the operation and the descriptor revision it was built against.
    Admission decides whether this request may proceed: the caller's credential, the revision
    and the input schema, and for a write its approval, all before anything is dispatched.
 4. **Interpret.** The operation and its data profile define the result, including incomplete
    pages, truncation and provenance, or a typed refusal, or an explicitly unknown outcome.
 
 The [service contract](../reference/contracts/service.md) states the describe and invoke wire
-exactly, with its limits; [Getting started](../getting-started.md) shows each step against a
+exactly, with its limits, and [Getting started](../getting-started.md) shows each step against a
 running service.
 
 ## What a refusal promises
@@ -44,7 +43,7 @@ a positive answer.
 
 ## Versions are independent
 
-Three things carry versions, and none implies another:
+Each of these carries its own version, and none implies another:
 
 | Version | Example | Owner |
 |---|---|---|
@@ -52,7 +51,7 @@ Three things carry versions, and none implies another:
 | Service wire binding | `POST /v1/invoke`, `POST /v1alpha2/invoke` | the [compatibility contract](../reference/contracts/compatibility.md) |
 | Implementation specification and native profile | `kubernetes-list`, `gitlab-merge-requests/1` | the connector's implementation under `adapters/` |
 
-A broader implementation specification never implies that its runtime supports every operation it
+A broader implementation specification does not imply that its runtime supports every operation it
 describes. Each page in the [contract reference](../reference/contracts/index.md) states its own
 support status.
 
@@ -60,10 +59,10 @@ support status.
 
 Each contract has a textual semantics document and a typed model. The models are written in
 [ESS](https://beyond10x.github.io/ess/) ([GitHub](https://github.com/beyond10x/ess)) under
-`ess/` for shared contracts and `adapters/<owner>/spec/ess/` for native ones; the reference
+`ess/` for shared contracts and `adapters/<owner>/spec/ess/` for native ones, and the reference
 renders them as the [ESS model](../reference/contracts/model/index.md) pages. Structural
-validation establishes that the model is consistent. Behaviour, storage and cross-record
-predicates remain obligations each implementation discharges and its tests hold.
+validation establishes that the model is consistent, while behaviour, storage and cross-record
+predicates remain obligations that each implementation meets and its tests check.
 
 ## Families at a glance
 

@@ -1,0 +1,59 @@
+name: Slow
+
+on:
+  pull_request:
+    paths:
+      - ess/**
+      - Cargo.lock
+      - crates/connectors-spec/toolchain.json
+      - crates/connectors-build/src/metadata_emissions.rs
+      - crates/connectors-build/src/metadata_entities.rs
+      - crates/connectors-build/generated/metadata-emissions/**
+      - .github/workflows/slow.yml
+  push:
+    branches: [main]
+    paths:
+      - ess/**
+      - Cargo.lock
+      - crates/connectors-spec/toolchain.json
+      - crates/connectors-build/src/metadata_emissions.rs
+      - crates/connectors-build/src/metadata_entities.rs
+      - crates/connectors-build/generated/metadata-emissions/**
+      - .github/workflows/slow.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slow-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  slow:
+    name: slow
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+          rustc --version
+      - name: Install the pinned ess release
+        working-directory: ${{ runner.temp }}
+        run: |
+          version="$(jq -r .ess "$GITHUB_WORKSPACE/crates/connectors-spec/toolchain.json")"
+          archive="ess-$version-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/beyond10x/ess/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSL -o ess-SHA256SUMS "$base/SHA256SUMS"
+          grep " $archive\$" ess-SHA256SUMS | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$PWD/ess-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Regenerate the metadata emissions and compare them byte for byte
+        run: cargo run --locked --offline -p connectors-build -- metadata-conformance emissions --check

@@ -43,6 +43,7 @@ fn binding() -> Binding {
             declaration: None,
             oauth2: None,
         },
+        token_recipient: None,
     }
 }
 

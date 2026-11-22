@@ -378,7 +378,13 @@ when the configuration has a fourth member, `git`:
 ```
 
 - `upstream` is the forge's git base over `https`. A repository is
-  `<upstream>/<owner>/<repo>.git`. `ca_file`, when set, is the only root of its TLS.
+  `<upstream>/<owner>/<repo>.git`. `ca_file`, when set, is the only root of its TLS. Its
+  origin (scheme, host and port) is the origin of the instance's API base, which its credential
+  was provisioned for, or the Git origin the relay's reviewed mapping names for that API origin:
+  `https://github.com` for `https://api.github.com`. GitLab and GitHub Enterprise Server serve
+  Git on their API's origin. Start refuses any other origin before the credential is read, and
+  every forge request, the mirror's fetch included, is checked against it again before the
+  token is read.
 - `repositories` lists the relayed repositories as `<owner>/<repo>`. Any other repository is
   `404`, and nothing is sent to the forge. The relay reads this list only; operations read
   [`catalog.repositories`](#catalog-instances), and neither list is read for the other. To
@@ -445,8 +451,8 @@ docker run --rm --entrypoint /usr/local/bin/connectors-kubernetes "ghcr.io/beyon
 ```
 
 ```text
-connectors-catalog-provider 0.73.0
-connectors-kubernetes 0.73.0
+connectors-catalog-provider 0.74.0
+connectors-kubernetes 0.74.0
 ```
 
 The image carries no configuration and no credential. Mount the configuration file, give the

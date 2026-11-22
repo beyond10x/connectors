@@ -1080,6 +1080,7 @@ pub fn admit_launch(
         profile: recorded.profile,
         credential_revision: adapter.credential_revision.clone(),
         executable: None,
+        token_recipient: recorded.token_recipient,
     };
     let now = connectors_sdk::now_ms();
     match registry.admit_read(&binding, connection, &Default::default(), now) {

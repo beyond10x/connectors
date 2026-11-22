@@ -46,6 +46,30 @@
       },
       "cite": "https://api.slack.com/web#posting_json",
       "reason": "Slack's Web API reference accepts a JSON body with a bearer token for write methods, and the pinned document's own consumes for files.delete lists application/json beside the form type; the Swagger projection keeps only the form type because the parameters are written as formData."
+    },
+    {
+      "operation_id": "files_getUploadURLExternal",
+      "add_operation": {
+        "method": "post",
+        "path": "/api/files.getUploadURLExternal",
+        "parameters": [
+          {"name": "filename", "location": "query", "required": true, "type": "string"},
+          {"name": "length", "location": "query", "required": true, "type": "integer"}
+        ]
+      },
+      "cite": "https://docs.slack.dev/reference/methods/files.getUploadURLExternal",
+      "reason": "Slack's reference documents files.getUploadURLExternal, the first step of an external file upload, which answers upload_url and file_id for the filename and the length in bytes given; the pinned document predates the method."
+    },
+    {
+      "operation_id": "files_completeUploadExternal",
+      "add_operation": {
+        "method": "post",
+        "path": "/api/files.completeUploadExternal",
+        "parameters": [],
+        "request_media_type": "application/json"
+      },
+      "cite": "https://docs.slack.dev/reference/methods/files.completeUploadExternal",
+      "reason": "Slack's reference documents files.completeUploadExternal, the last step of an external file upload, which shares the uploaded files (files, each id and title) into channel_id, in the thread thread_ts, with an optional initial_comment, and accepts a JSON body; the pinned document predates the method."
     }
   ]
 }

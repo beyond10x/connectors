@@ -93,6 +93,9 @@ fn reusable(
         || !configured.current(&row.binding)
         || row.binding.provider_authority != target.provider_authority
         || !row.binding.profile.same_authentication(&target.profile)
+        // A copy is sent where the target exchanges it: only to the token
+        // recipient the source connection was admitted under.
+        || row.binding.token_recipient != target.token_recipient
     {
         return Ok(false);
     }

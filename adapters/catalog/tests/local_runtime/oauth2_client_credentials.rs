@@ -244,3 +244,109 @@ fn a_client_credentials_answer_that_is_an_array_is_a_protocol_failure() {
         result.map(|_| "used")
     );
 }
+
+/// The configured binding the provider prints for `config`.
+fn printed_binding(
+    provider: &OAuthProvider,
+    config: &Value,
+) -> connectors_host::local::registry::Binding {
+    provider.write_config(config);
+    let bootstrap: Bootstrap =
+        serde_json::from_value(print_bootstrap(&provider.config).unwrap()).unwrap();
+    bootstrap.binding(CLIENT_PROFILE).unwrap()
+}
+
+/// Security review 2026-11-22, finding 1: the token endpoint a client secret
+/// is exchanged at is bound to the connection. A configuration that moves its
+/// scheme, host, port or path, or the trust roots it is verified under, prints
+/// another `token_recipient`, and the host's in-place rule
+/// (`Binding::follows_in_place`, which admission and capture of a
+/// revalidation ask before custody is opened) refuses it: the composed
+/// revalidation reads no secret and sends no exchange. An operation-only
+/// change keeps the recipient and still revalidates, exchanging once at the
+/// unchanged endpoint. Every request goes to the loopback fixture.
+#[test]
+fn security_client_credentials_a_moved_token_endpoint_is_not_revalidated_in_place() {
+    let provider = client_provider();
+    let saved = printed_binding(&provider, &client_config(&provider));
+    assert!(saved.token_recipient.is_some());
+    let other_ca = provider.root.path().join("private/other-ca.pem");
+    private(
+        &other_ca,
+        rcgen::generate_simple_self_signed(vec!["localhost".into()])
+            .unwrap()
+            .cert
+            .pem()
+            .as_bytes(),
+    );
+    let port = provider.port;
+    let other_port = if port == 8443 { 8444 } else { 8443 };
+    let moves: [(&str, Value); 4] = [
+        ("path", json!(format!("https://localhost:{port}/token/v2"))),
+        (
+            "port",
+            json!(format!("https://localhost:{other_port}/token")),
+        ),
+        ("host", json!(format!("https://127.0.0.1:{port}/token"))),
+        ("trust", json!(null)),
+    ];
+    // What a revalidation of `saved` under `configured` does: only one the
+    // host follows in place reads the entry and validates it (the exchange).
+    let revalidate = |configured: &connectors_host::local::registry::Binding| {
+        if saved.follows_in_place(configured) {
+            let mut child = spawn(&provider);
+            child
+                .validate(CLIENT_PROFILE, &client_entry(), deadline())
+                .unwrap_or_else(|failure| panic!("validation {failure:?}"));
+        }
+    };
+    for (name, token_url) in moves {
+        let mut config = client_config(&provider);
+        if name == "trust" {
+            config["auth"]["token_ca_file"] = json!(other_ca);
+        } else {
+            config["auth"]["token_url"] = token_url;
+        }
+        let configured = printed_binding(&provider, &config);
+        assert_ne!(
+            configured.token_recipient, saved.token_recipient,
+            "{name}: the recipient did not move"
+        );
+        assert!(
+            !saved.follows_in_place(&configured),
+            "{name}: the saved client secret would be sent to the moved token endpoint"
+        );
+        revalidate(&configured);
+    }
+    assert_eq!(provider.token_requests(), 0, "a moved endpoint was sent to");
+
+    // Operation-only: another selection of the same instance.
+    let operations = provider.root.path().join("private/operations.json");
+    let mut shipped: Value = serde_json::from_slice(
+        &fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("providers/gitlab/operations.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    shipped["operations"] = json!(
+        shipped["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|operation| operation["id"] == "project.get")
+            .cloned()
+            .collect::<Vec<_>>()
+    );
+    private(&operations, &serde_json::to_vec(&shipped).unwrap());
+    let mut config = client_config(&provider);
+    config["operations_file"] = json!(operations);
+    let configured = printed_binding(&provider, &config);
+    assert_ne!(
+        configured.configuration_revision,
+        saved.configuration_revision
+    );
+    assert_eq!(configured.credential_revision, saved.credential_revision);
+    assert_eq!(configured.token_recipient, saved.token_recipient);
+    assert!(saved.follows_in_place(&configured));
+    revalidate(&configured);
+    assert_eq!(provider.token_requests(), 1);
+}

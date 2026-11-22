@@ -78,12 +78,19 @@ const RECEIVE_RESULT: &str = "application/x-git-receive-pack-result";
 const UPLOAD_REQUEST: &str = "application/x-git-upload-pack-request";
 const UPLOAD_RESULT: &str = "application/x-git-upload-pack-result";
 
+/// The API origins whose forge serves Git from another origin, each with
+/// that Git origin. Reviewed here, never configured: beside the origin of the
+/// instance's own API base, these are the only origins the instance's token
+/// is sent to by the relay ([`approved_origin`]).
+const GIT_ORIGINS: &[(&str, &str)] = &[("https://api.github.com", "https://github.com")];
+
 /// The `git` member of a served configuration.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GitConfig {
     /// The forge's git base, such as `https://github.com`: a repository is
-    /// `<upstream>/<owner>/<repo>.git`.
+    /// `<upstream>/<owner>/<repo>.git`. Its origin is the instance's API
+    /// origin, or the Git origin [`GIT_ORIGINS`] maps that API origin to.
     upstream: String,
     /// The CA bundle that alone roots the forge's TLS; the system roots
     /// otherwise.
@@ -142,6 +149,9 @@ impl Repository {
 /// The relay of one served instance.
 pub struct Relay {
     upstream: url::Url,
+    /// The one origin the instance's token is sent to ([`approved_origin`]),
+    /// checked again before each forge request reads the token.
+    origin: url::Origin,
     ca_file: Option<PathBuf>,
     client: reqwest::Client,
     repositories: Vec<Repository>,
@@ -193,24 +203,63 @@ fn locate(program: &str, path: &std::ffi::OsStr) -> Option<PathBuf> {
         })
 }
 
+/// The configured upstream, an https URL without credentials, query or
+/// fragment.
+fn upstream_url(config: &GitConfig) -> Result<url::Url> {
+    let upstream = url::Url::parse(config.upstream.trim_end_matches('/'))
+        .map_err(|_| invalid("upstream must be an https URL"))?;
+    if upstream.scheme() != "https"
+        || upstream.host_str().is_none()
+        || !upstream.username().is_empty()
+        || upstream.password().is_some()
+        || upstream.query().is_some()
+        || upstream.fragment().is_some()
+    {
+        return Err(invalid(
+            "upstream must be an https URL without credentials, query or fragment",
+        ));
+    }
+    Ok(upstream)
+}
+
+/// The origin `upstream` is approved for, given the instance's API base
+/// (`provider_authority`): the API's own origin, or the Git origin
+/// [`GIT_ORIGINS`] maps that API origin to. Any other origin is refused: the
+/// instance's credential was provisioned for its API, and the relay sends it
+/// nowhere else.
+fn approved_origin(upstream: &url::Url, api_base: &str) -> Result<url::Origin> {
+    let api = url::Url::parse(api_base)
+        .map_err(|_| invalid("the instance's API base is not a URL"))?
+        .origin();
+    let mut mapped = GIT_ORIGINS
+        .iter()
+        .filter(|(from, _)| url::Url::parse(from).is_ok_and(|from| from.origin() == api))
+        .filter_map(|(_, to)| url::Url::parse(to).ok().map(|to| to.origin()));
+    let origin = upstream.origin();
+    if origin == api || mapped.any(|mapped| mapped == origin) {
+        return Ok(origin);
+    }
+    Err(invalid(
+        "upstream is not the origin of the instance's API, nor the Git origin reviewed for it; \
+         the instance's token is sent to no other host",
+    ))
+}
+
+/// Start's first check of the relay, before the instance's credential is
+/// read: its upstream is an https URL on the origin the instance's
+/// credential is approved for ([`approved_origin`]).
+pub fn admit_upstream(config: &GitConfig, local: &crate::local::Local) -> Result<()> {
+    approved_origin(&upstream_url(config)?, local.provider_authority()).map(|_| ())
+}
+
 impl Relay {
     /// Checks the configuration and prepares the work directory. Start is
-    /// refused when the profile has no forge token, when `git` is not on
-    /// `PATH`, or when any member is out of bounds.
+    /// refused when the upstream is not on the origin the instance's
+    /// credential is approved for, when the profile has no forge token, when
+    /// `git` is not on `PATH`, or when any member is out of bounds.
     pub fn new(config: GitConfig, token: Arc<Upstream>) -> Result<Self> {
-        let upstream = url::Url::parse(config.upstream.trim_end_matches('/'))
-            .map_err(|_| invalid("upstream must be an https URL"))?;
-        if upstream.scheme() != "https"
-            || upstream.host_str().is_none()
-            || !upstream.username().is_empty()
-            || upstream.password().is_some()
-            || upstream.query().is_some()
-            || upstream.fragment().is_some()
-        {
-            return Err(invalid(
-                "upstream must be an https URL without credentials, query or fragment",
-            ));
-        }
+        let upstream = upstream_url(&config)?;
+        let origin = approved_origin(&upstream, token.local.provider_authority())?;
         let repositories = super::repositories(&config.repositories).map_err(invalid)?;
         if config.ref_prefixes.is_empty()
             || !config
@@ -278,6 +327,7 @@ impl Relay {
         }
         Ok(Self {
             upstream,
+            origin,
             ca_file: config.ca_file,
             client: client.build().map_err(|_| Error::internal())?,
             repositories,
@@ -308,9 +358,17 @@ impl Relay {
         )
     }
 
-    /// `Authorization: Basic` for the forge, built from the token now.
-    async fn authorization(&self) -> Result<HeaderValue> {
+    /// `Authorization: Basic` for a forge request to `target`, built from the
+    /// token now. Every transport asks for it, the mirror's fetch too, and a
+    /// target off the approved origin is refused before the token is read.
+    async fn authorization(&self, target: &str) -> Result<HeaderValue> {
         use base64::{Engine as _, engine::general_purpose::STANDARD};
+        if url::Url::parse(target).map(|target| target.origin()).ok() != Some(self.origin.clone()) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "git: the forge request is not on the approved origin",
+            ));
+        }
         let token = self.token.token().await?;
         let mut pair = Zeroizing::new(Vec::with_capacity(token.0.len() + 16));
         pair.extend_from_slice(TOKEN_USER.as_bytes());
@@ -500,13 +558,14 @@ async fn advertise(
         }
     };
     let relay = &routes.relay;
-    let authorization = match relay.authorization().await {
+    let target = relay.url(&repository, &format!("/info/refs?service={service}"));
+    let authorization = match relay.authorization(&target).await {
         Ok(value) => value,
         Err(error) => return refusal(&error),
     };
     let request = relay
         .client
-        .get(relay.url(&repository, &format!("/info/refs?service={service}")))
+        .get(target)
         .header(header::AUTHORIZATION, authorization);
     let request = forwarded(request, &headers, &[git_protocol()]);
     match request.send().await {
@@ -546,13 +605,14 @@ async fn upload_pack(
         );
     };
     let relay = &routes.relay;
-    let authorization = match relay.authorization().await {
+    let target = relay.url(&repository, "/git-upload-pack");
+    let authorization = match relay.authorization(&target).await {
         Ok(value) => value,
         Err(error) => return refusal(&error),
     };
     let request = relay
         .client
-        .post(relay.url(&repository, "/git-upload-pack"))
+        .post(target)
         .header(header::AUTHORIZATION, authorization)
         .header(header::CONTENT_TYPE, UPLOAD_REQUEST)
         .header(header::ACCEPT, UPLOAD_RESULT)
@@ -1032,7 +1092,11 @@ impl Relay {
                 self.run(config, None).await.ok_or_else(unavailable)?;
             }
         }
-        let authorization = self.authorization().await.map_err(|_| unavailable())?;
+        let target = self.url(repository, "");
+        let authorization = self
+            .authorization(&target)
+            .await
+            .map_err(|_| unavailable())?;
         let header = Zeroizing::new(format!(
             "Authorization: {}",
             authorization.to_str().map_err(|_| unavailable())?
@@ -1067,7 +1131,7 @@ impl Relay {
                 "--prune",
                 "--no-write-fetch-head",
             ])
-            .arg(self.url(repository, ""))
+            .arg(&target)
             .args(["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"]);
         self.run(fetch, None).await.ok_or_else(unavailable)?;
         Ok(mirror)
@@ -1405,7 +1469,8 @@ impl Relay {
         request: &PushRequest,
         body: Bytes,
     ) -> Response {
-        let authorization = match self.authorization().await {
+        let target = self.url(repository, "/git-receive-pack");
+        let authorization = match self.authorization(&target).await {
             Ok(value) => value,
             Err(_) => {
                 return report(request, "ok", "the instance's credential is not available");
@@ -1413,7 +1478,7 @@ impl Relay {
         };
         let send = self
             .client
-            .post(self.url(repository, "/git-receive-pack"))
+            .post(target)
             .header(header::AUTHORIZATION, authorization)
             .header(header::CONTENT_TYPE, RECEIVE_REQUEST)
             .header(header::ACCEPT, RECEIVE_RESULT)
@@ -1531,6 +1596,50 @@ mod tests {
     const OLD: &str = "1111111111111111111111111111111111111111";
     const NEW: &str = "2222222222222222222222222222222222222222";
     const ZERO: &str = "0000000000000000000000000000000000000000";
+
+    /// Security review 2026-11-22, finding 2: the relay's upstream is
+    /// approved only on the origin of the instance's API base, or on the Git
+    /// origin reviewed for it (GitHub's `api.github.com` serves Git from
+    /// `github.com`). Any other origin, a look-alike host, another port or
+    /// plain http included, is refused.
+    #[test]
+    fn security_the_upstream_is_approved_only_on_the_api_origin_or_its_reviewed_git_origin() {
+        let approved = |upstream: &str, api: &str| {
+            approved_origin(&url::Url::parse(upstream).unwrap(), api).is_ok()
+        };
+        // Same origin: a self-hosted forge, GitHub Enterprise Server, a path under it.
+        assert!(approved(
+            "https://forge.example.com",
+            "https://forge.example.com/api/v4/"
+        ));
+        assert!(approved(
+            "https://ghe.example.com/scm",
+            "https://ghe.example.com/api/v3/"
+        ));
+        // The reviewed mapping.
+        assert!(approved("https://github.com", "https://api.github.com/"));
+        for upstream in [
+            "https://forge.example.org",
+            "https://github.com.example.net",
+            "https://github.com:8443",
+            "http://github.com",
+            "https://api.github.com.example.net",
+        ] {
+            assert!(
+                !approved(upstream, "https://api.github.com/"),
+                "{upstream} approved for api.github.com"
+            );
+        }
+        // A mapping is for its own API origin only.
+        assert!(!approved(
+            "https://github.com",
+            "https://forge.example.com/api/v4/"
+        ));
+        assert!(!approved(
+            "https://elsewhere.example.com",
+            "https://forge.example.com/api/v4/"
+        ));
+    }
 
     fn request(lines: &[&str], tail: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::new();

@@ -59,7 +59,6 @@ fn view_of(metadata: &Metadata) -> View {
             .unwrap();
         let names = statement
             .column_names()
-            .into_iter()
             .map(str::to_owned)
             .collect::<Vec<_>>();
         let mut rows = statement

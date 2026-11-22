@@ -9,7 +9,7 @@ source: docs/local-approvals.md, docs/local-clock.md, docs/local-gitlab-merge.md
 # A guarded write
 
 Every write is a required-approval mutation. A provider page gives its policy line, its example
-input and what its guard refuses; the steps are the same for every provider. The examples use
+input and what its guard refuses. The steps are the same for every provider. The examples use
 shell variables, so set them first:
 
 ```sh
@@ -25,7 +25,7 @@ Create the instance's signing key and add an `[approval_clock]` table to the con
 connectors approvals key-init --connector "$connector" --instance "$instance"
 ```
 
-Then publish a policy naming the writes you use. The page gives its policy line, which goes in
+Then publish a policy that lists the writes you use. The page gives its policy line, which goes in
 `policy.json`:
 
 ```sh
@@ -63,6 +63,6 @@ connectors invoke "$connector/$instance" "$operation" \
 `--input-json '<input>'` takes the input in place of `--input-file` in all three commands.
 
 `mutation.classification` in the answer is `not_attempted`, `refused`, `applied` or `unknown`. A
-write whose answer is lost is `unknown` and is never sent again; repeating the same
+write whose answer is lost is `unknown` and is never sent again. Repeating the same
 `--idempotency-key` observes the original attempt. A write is never sent again after a `429`
 either.

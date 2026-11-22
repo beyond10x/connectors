@@ -461,3 +461,210 @@ fn the_installer_depends_on_no_connectors_crate() {
     }
     assert!(!std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/build.rs")).exists());
 }
+
+/// Paths that are relative on Linux and not on Windows, or that Windows maps
+/// to another file or a device: a drive prefix (`C:foo`, `C:\`, `C:/x`), a UNC
+/// or verbatim prefix, a backslash separator or a root-relative `\x`, an
+/// alternate data stream, a reserved device name in any case and with any
+/// extension, a trailing dot or space, a NUL or other control character, and
+/// the other characters Windows refuses in a name.
+const HOSTILE: &[&str] = &[
+    "C:foo",
+    "c:foo",
+    "C:\\",
+    "C:\\foo",
+    "C:/foo",
+    "C:",
+    "connectors/C:a.yaml",
+    "\\\\server\\share\\x",
+    "\\\\?\\C:\\x",
+    "\\\\.\\pipe\\x",
+    "\\x",
+    "a\\b",
+    "a.yaml:stream",
+    "CON",
+    "con",
+    "Con.yaml",
+    "connectors/NUL",
+    "nul.txt",
+    "NUL .txt",
+    "PRN.json",
+    "AUX",
+    "COM1",
+    "com9.yaml",
+    "COM0",
+    "LPT1",
+    "lpt9.tar.gz",
+    "COM\u{b9}",
+    "LPT\u{b3}.yaml",
+    "CONIN$",
+    "conout$.txt",
+    "x.",
+    "x ",
+    "connectors/a./b.yaml",
+    "connectors/a /b.yaml",
+    "a\u{0}b",
+    "a\u{1}b",
+    "a\u{1f}b",
+    "a\u{7f}b",
+    "a\nb",
+    "a<b",
+    "a>b",
+    "a\"b",
+    "a|b",
+    "a?b",
+    "a*b",
+];
+
+/// Names a portable path still admits: a device name as part of a longer
+/// segment, a dot inside a segment, and non-ASCII text.
+const PORTABLE: &[&str] = &[
+    "connectors/a.yaml",
+    "connectors/console.yaml",
+    "connectors/com10.yaml",
+    "connectors/lpt.yaml",
+    "connectors/nullable.yaml",
+    "connectors/.hidden",
+    "auth/a b.yaml",
+    "auth/zürich.yaml",
+];
+
+#[test]
+fn a_windows_prefixed_or_reserved_path_is_not_a_portable_relative_path() {
+    for path in HOSTILE {
+        assert!(!index::relative_path(path), "{path:?} was admitted");
+    }
+    for path in PORTABLE {
+        assert!(index::relative_path(path), "{path:?} was refused");
+    }
+}
+
+/// finding 9 of the 2026-11-22 review: the index validator refuses every
+/// hostile name as a file path and as the asset name.
+#[test]
+fn the_index_validator_refuses_every_windows_hostile_path() {
+    // The index is read before the asset, so the asset need not hold the
+    // path (a tar name cannot hold NUL).
+    let asset = archive("p", FILES);
+    for path in HOSTILE {
+        let files: &[(&str, &[u8])] = &[(path, b"x\n")];
+        let index = index_of("0.3.1", &asset, files);
+        assert_eq!(
+            read(&index, "0.3.1"),
+            Err(Refusal::ReleaseInvalid(
+                "a file path is not a portable relative path".to_owned()
+            )),
+            "{path:?}"
+        );
+        if !path.contains('/') {
+            let mut index = index_of("0.3.1", &asset, FILES);
+            index["asset"]["name"] = json!(path);
+            assert!(
+                matches!(read(&index, "0.3.1"), Err(Refusal::ReleaseInvalid(_))),
+                "asset {path:?}"
+            );
+        }
+    }
+    for path in PORTABLE {
+        let files: &[(&str, &[u8])] = &[(path, b"x\n")];
+        let asset = archive("p", files);
+        assert!(
+            read(&index_of("0.3.1", &asset, files), "0.3.1").is_ok(),
+            "{path:?}"
+        );
+    }
+}
+
+/// An index built past [`Index::read`] that names `path`, and an asset holding
+/// it under `prefix/`.
+fn unchecked(prefix: &str, path: &str) -> (Index, Vec<u8>) {
+    let files: &[(&str, &[u8])] = &[(path, b"x\n")];
+    let asset = archive(prefix, files);
+    let index: Index = serde_json::from_value(index_of("0.3.1", &asset, files)).unwrap();
+    (index, asset)
+}
+
+/// finding 9: the archive verifier refuses a member with a hostile name even
+/// when its index names it, and a hostile top directory. NUL cannot be
+/// carried in a tar name, so it is left to the index check above.
+#[test]
+fn the_archive_verifier_refuses_every_windows_hostile_member() {
+    for path in HOSTILE.iter().filter(|path| !path.contains('\0')) {
+        let (index, asset) = unchecked("p", path);
+        assert!(
+            matches!(
+                archive::verify(&index, &asset),
+                Err(Refusal::ReleaseInvalid(_))
+            ),
+            "member {path:?}"
+        );
+        if !path.contains('/') {
+            let (index, asset) = unchecked(path, "a.yaml");
+            assert!(
+                matches!(
+                    archive::verify(&index, &asset),
+                    Err(Refusal::ReleaseInvalid(_))
+                ),
+                "top directory {path:?}"
+            );
+        }
+    }
+    let (index, asset) = unchecked("p", "connectors/a.yaml");
+    assert!(archive::verify(&index, &asset).is_ok());
+}
+
+/// finding 9: an install whose release holds one hostile member beside good
+/// ones creates no file: no cache root, no entry, no lock.
+#[test]
+fn an_install_with_one_hostile_member_creates_no_file() {
+    for path in ["C:evil.yaml", "connectors/CON.yaml", "a\\..\\..\\evil"] {
+        let roots = Roots::new();
+        let files: &[(&str, &[u8])] = &[FILES[0], (path, b"evil\n"), FILES[1]];
+        let mut sorted = files.to_vec();
+        sorted.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+        let asset = archive("p", &sorted);
+        publish(
+            &roots.releases(),
+            "0.3.1",
+            &index_of("0.3.1", &asset, &sorted),
+            &asset,
+        );
+        let outcome = roots.install("0.3.1");
+        assert!(
+            matches!(outcome, Err(Refusal::ReleaseInvalid(_))),
+            "{path:?}: {outcome:?}"
+        );
+        assert!(!roots.cache().exists(), "{path:?} created the cache root");
+        assert!(!roots.lock().exists(), "{path:?} wrote the lock");
+        assert!(!roots.root.path().join("state").exists(), "{path:?}");
+    }
+}
+
+/// finding 9: the writer checks that every path it would create resolves
+/// under the staging directory before it creates anything, so a path that
+/// reached it past the index check creates no file either.
+#[test]
+fn the_writer_creates_nothing_for_a_path_outside_its_staging_directory() {
+    for path in HOSTILE
+        .iter()
+        .chain(&["/etc/evil", "../evil", "a/../../evil", ""])
+    {
+        let root = tempfile::tempdir().unwrap();
+        let cache = root.path().join(CACHE_DIRECTORY);
+        let (index, _) = unchecked("p", "connectors/a.yaml");
+        let files = BTreeMap::from([
+            ("auth/token.yaml".to_owned(), b"profile: token\n".to_vec()),
+            ((*path).to_owned(), b"evil\n".to_vec()),
+        ]);
+        let outcome = store::cache(&cache, &"0".repeat(64), b"{}", &index, &files);
+        assert!(
+            matches!(outcome, Err(Refusal::ReleaseInvalid(_))),
+            "{path:?}: {outcome:?}"
+        );
+        assert_eq!(
+            fs::read_dir(root.path()).unwrap().count(),
+            0,
+            "{path:?} created a file"
+        );
+    }
+}

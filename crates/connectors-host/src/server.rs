@@ -313,11 +313,18 @@ pub fn router_with_admission(
     if let Some(state) = &state {
         ServiceState::spawn_recovery(state);
     }
+    // Only `/v1alpha2/invoke` reads past REQUEST_LIMIT, and only as far as the
+    // largest operation the description states it for; the request of every
+    // other operation is held to REQUEST_LIMIT there once it is named.
+    let invoke_limit = adapter.descriptor().request_limit();
     Router::new()
         .route("/healthz", get(|| async { StatusCode::NO_CONTENT }))
         .route("/v1/describe", get(describe))
         .route("/v1/invoke", post(invoke))
-        .route("/v1alpha2/invoke", post(v1alpha2::invoke))
+        .route(
+            "/v1alpha2/invoke",
+            post(v1alpha2::invoke).layer(DefaultBodyLimit::max(invoke_limit)),
+        )
         .layer(DefaultBodyLimit::max(REQUEST_LIMIT))
         .with_state(Service {
             adapter,

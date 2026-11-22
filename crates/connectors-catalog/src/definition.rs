@@ -434,6 +434,37 @@ pub struct Download {
     pub path_prefix: String,
 }
 
+/// `connectors_definitions.definition.Upload`, the engine's
+/// `connectors_catalog.binary.Upload`: a write whose bytes go to a URL the
+/// provider issues for them. `slot` is the request that issues the URL,
+/// `path_prefix` the path the URL must lie under, and `send` the write's own
+/// JSON body, carried as written (`{"input": <reference>}`, with `"optional":
+/// true` left out when absent, and `{"slot": <pointer>}` read from the slot's
+/// answer).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Upload {
+    pub slot: UploadSlot,
+    pub path_prefix: String,
+    pub send: Value,
+}
+
+/// `connectors_definitions.definition.UploadSlot`, the engine's
+/// `connectors_catalog.binary.Slot`: `op` is an `operationId` of the source,
+/// `with` binds its parameters to input references, `expect` holds its answer
+/// as a guard's `expect` does, and `url` is the pointer of the issued URL in
+/// that answer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UploadSlot {
+    pub op: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub with: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expect: Option<IndexMap<String, String>>,
+    pub url: String,
+}
+
 /// `connectors_definitions.definition.EnvelopeCode`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -788,9 +819,9 @@ pub struct Datasource {
 }
 
 /// `connectors_definitions.definition.Operation`. `op` is absent only for a
-/// `download`. The fields from `required` to `custody`, and
+/// `download`. The fields from `required` to `custody` but `upload`, and
 /// `rate_limit_headers`, reach the engine as written, and each takes its value
-/// from `defaults` when not set. `query_fixed`, `query_folds` and
+/// from `defaults` when not set. `upload`, `query_fixed`, `query_folds` and
 /// `embedded_text` reach it as written and have no default.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -818,6 +849,10 @@ pub struct Operation {
     pub binary: Option<Binary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<Download>,
+    /// A write whose bytes go to a URL the provider issues, the engine's
+    /// `upload`. Only on a write, and with no default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload: Option<Upload>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub envelope: Option<Envelope>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1563,6 +1598,8 @@ pub struct SelectionEntry {
     pub binary: Option<Binary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<Download>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upload: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub envelope: Option<Envelope>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -3553,6 +3590,42 @@ fn guard(
     Ok(value)
 }
 
+/// The engine's upload for one write's `upload`: its slot names an operation of
+/// the bundle, its checks are a guard's, and the rest is carried as written.
+fn upload(
+    inventory: &crate::inventory::Inventory,
+    key: &str,
+    effect: Effect,
+    upload: &Upload,
+) -> Result<Value, Refusal> {
+    if effect != Effect::Write {
+        return Err(Refusal::Malformed(format!(
+            "operation `{key}` declares upload; only a write uploads"
+        )));
+    }
+    let slot = &upload.slot;
+    if !inventory
+        .operations
+        .iter()
+        .any(|candidate| candidate.operation_id.as_deref() == Some(slot.op.as_str()))
+    {
+        return Err(Refusal::UnknownOperation {
+            key: key.to_owned(),
+            op: slot.op.clone(),
+        });
+    }
+    Ok(serde_json::json!({
+        "slot": {
+            "operation_id": slot.op,
+            "values": slot.with.clone().unwrap_or_default(),
+            "checks": checks(slot.expect.as_ref()),
+            "url": slot.url,
+        },
+        "path_prefix": upload.path_prefix,
+        "send": upload.send,
+    }))
+}
+
 /// Every input a lowered guard reads: a check's `input` and each bound value.
 fn guard_inputs<'a>(value: &'a Value, found: &mut Vec<&'a str>) {
     match value {
@@ -3792,6 +3865,11 @@ pub fn select(
         if let Some(guard) = &guard {
             guard_body_reads(key, &declared_body, guard)?;
         }
+        let upload = operation
+            .upload
+            .as_ref()
+            .map(|declared| upload(inventory, key, effect, declared))
+            .transpose()?;
         operations.push(SelectionEntry {
             id: key.clone(),
             operation_id: operation.op.clone(),
@@ -3803,6 +3881,7 @@ pub fn select(
             response: carried.response,
             binary: carried.binary,
             download: carried.download,
+            upload,
             envelope: carried.envelope,
             bounds,
             required: carried.required,

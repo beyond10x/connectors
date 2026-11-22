@@ -359,8 +359,14 @@ owner-only state directory and initialises its metadata database, leaves the
 configuration byte-for-byte unchanged and returns `state_initialized`. An
 existing configuration with an existing metadata database, or one that does not
 load, returns `configuration_exists`; an existing database is never opened,
-migrated or recreated by `setup init`. The metadata database `setup init`
-creates, on `created` and `state_initialized` alike, has Entity Runtime durable
+migrated or recreated by `setup init`. Any other command that reads the
+metadata database and finds no `metadata.sqlite3` in the selected state
+directory, whatever else the directory still holds (`metadata.lock`,
+`registry-clock.floor`), refuses `metadata_missing` (`kind = operational`, exit 1,
+`stage = observation`, `next_action = initialize_state`: run `connectors setup
+init`), because running the same command again cannot create the database; a
+database that exists and cannot be used stays `metadata_unavailable`. The
+metadata database `setup init` creates, on `created` and `state_initialized` alike, has Entity Runtime durable
 open checkpoints enabled before `setup init` returns, so its opens start from a
 persisted checkpoint instead of verifying the whole history, and connectors
 0.32.0 and earlier cannot open it. `setup init` never enables a database that
@@ -1114,15 +1120,15 @@ It checks, in this order, before it writes anything:
 
 1. `index.json`'s `schema` is a format version this build reads
    (`urn:beyond10x:connectors-definitions-index:1`), else `unknown_format_version`.
-2. The rest of the index is that format, with no other member: `tag` equals
-   `--tag`, `commit` is 40 or 64 and every digest 64 lower-case hexadecimal digits,
-   the asset's name is one path segment, every file path is relative with no empty,
-   `.` or `..` segment, no segment over 255 bytes and no backslash, no file path is
-   another's directory, the files are sorted by path in byte order with no path
-   twice, no two paths differ only in case (a case-insensitive file system holds them
-   as one), at most 16,384 files and 512 MiB in all, and every feature is 1 to 64
-   bytes of `[a-z0-9_]`, sorted in byte order with none twice. Else
-   `release_invalid`.
+2. The rest of the index is that format, with no other member: `tag` equals `--tag`, `commit` is
+   40 or 64 and every digest 64 lower-case hexadecimal digits, the asset's name is one path segment,
+   every file path is relative with `/`-separated segments, none empty, `.`, `..`, over 255 bytes,
+   ending in a dot or space, holding `\`, `:`, `<>"|?*`, NUL or another control character, or a
+   Windows device name in any case and with any extension (`CON`, `NUL`, `COM1`, `LPT1`), so no
+   drive, UNC or root-relative prefix passes on any platform, no file path is another's directory,
+   the files are sorted by path in byte order with no path twice, no two paths differ only in case
+   (a case-insensitive file system holds them as one), at most 16,384 files and 512 MiB in all, and
+   every feature is 1 to 64 bytes of `[a-z0-9_]`, sorted in byte order with none twice. Else `release_invalid`.
 3. Every name in `features` is a feature this build supports (`embedded_text`,
    `query_fixed`, `query_folds`, `rate_limit_headers`), else `unmet_feature`, with
    `feature` naming the first unsupported one. These are exactly the members the
@@ -1277,7 +1283,8 @@ other command's.
 `setup custody-orphans [--mode list|remove] [--authority ID]` works on the custody items in
 the Secret Service (`docs/local-secret-service.md`) whose `connectors.authority` is not the
 authority of the store in the selected state directory. The store must exist
-(`metadata_unavailable` otherwise). Item attributes are read, never a secret value.
+(`metadata_missing` when there is none, §3; `metadata_unavailable` when it cannot be
+opened). Item attributes are read, never a secret value.
 
 `list`, the default, answers `groups`, one row per authority and purpose with its item
 count, and a `notice` saying that a listed authority may belong to another store on this
@@ -1319,7 +1326,8 @@ starts no local host or adapter and runs in this order:
 3. It opens the store as an admitted mutating open under `metadata.lock`, within
    the usual 30-second wait. As every mutating open does, it first migrates a
    level 1–8 database to level 9 ([local metadata](../../../docs/local-er-metadata.md#compatible-migration-from-levels-18)).
-   It never creates a database. A missing, unreadable, foreign-owned,
+   It never creates a database; a missing one is `metadata_missing`
+   (`next_action = initialize_state`, §3). An unreadable, foreign-owned,
    unrecognised or integrity-refused store, a `metadata.lock` not released within
    the wait, and Eventlog's refusal to enable (a trigger or continuity table the
    provider did not create) are `metadata_unavailable` (`stage = observation`,
@@ -1677,6 +1685,7 @@ never replay a possible write after interruption, timeout or lost response.
 | a read-only custody binding refused a write it would need (a refresh-rotating profile, an approval-signing key; stage = custody, next_action = check_configuration) | `custody_read_only` | 1 |
 | the read-only binding's item no longer holds the bytes its version pinned (stage = custody, next_action = revalidate_connection) | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
+| no `metadata.sqlite3` in the selected state directory (`stage = observation`, `next_action = initialize_state`: run `connectors setup init`, §3) | `metadata_missing` | 1 |
 | store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain, or an owner that failed or answered none (`owner_log` names its [log](owner.md#owner-log) and `owner_error` the code it logged, when it logged one) | `outcome_unknown` | 1 |
@@ -1988,9 +1997,21 @@ read on `invoke`, an approval naming it and a consumer launch refuse
 it as `code = lifecycle_conflict` at `stage = admission`, never with
 `next_action = retry_status`. The next action is `revalidate_connection` only
 when a revalidation can follow the configuration upgrade: its provider
-authority and profile declaration are unchanged, its credential is neither
-known invalid nor expired, and the new provider has not already refused it
-under the configured revision. The connection's identity is the instance,
+authority and profile declaration are unchanged, so is the token recipient its
+profile exchanges the stored material at (`token_recipient`, below), its
+credential is neither known invalid nor expired, and the new provider has not
+already refused it under the configured revision. The token recipient is the
+implementation's digest of the token endpoint's scheme, host, port and path and
+the trust roots it is verified under, stated by a profile that exchanges its
+material there (the catalog's `oauth2_client_credentials` and `oauth2_refresh`).
+A configuration that moves it is never followed by revalidation, which would
+read the stored material and send it to the new endpoint before any identity
+answers: admission and capture refuse the revalidation before custody is
+opened, and the next action is `create_connection`, a connection authorized
+afresh. A connection saved before the recipient was recorded follows only a
+configuration whose credential side is unchanged (its credential-side digest,
+or without one its configuration revision), and its revalidation records the
+recipient. The connection's identity is the instance,
 adapter, provider authority and the profile's authentication, which is the
 profile declaration apart from its evidence lifetime. A configuration that
 changes only `evidence_lifetime_ms` leaves the identity unchanged, but the

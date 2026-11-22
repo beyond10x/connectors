@@ -348,6 +348,17 @@ impl Metadata {
             .unwrap_or_default()
     }
 
+    /// Whether the state directory `path` holds no metadata database: no
+    /// `metadata.sqlite3` entry, or no directory at all. Only `setup init`
+    /// creates one, so a refusal of such a directory names it (issue #268);
+    /// an entry that exists, whatever it holds, is not missing.
+    pub fn missing(path: &Path) -> bool {
+        matches!(
+            std::fs::symlink_metadata(path.join(NAME)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound
+        )
+    }
+
     pub fn initialize(path: &Path) -> Result<Self> {
         let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
         match fs::publish_new(&dir, OsStr::new(LOCK), &[]) {
@@ -1108,7 +1119,7 @@ impl Metadata {
         } else {
             OpenFlags::SQLITE_OPEN_READ_WRITE
         };
-        let connection = Connection::open_with_flags(
+        let mut connection = Connection::open_with_flags(
             path.join(NAME),
             access | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -1116,7 +1127,7 @@ impl Metadata {
         // SQLite's own write lock is waited on for the same bound as the lifecycle
         // lock; see `WAIT_BOUND` for why neither is two seconds. Inside a
         // bounded admission (`deadline::within`) the wait ends at its cutoff.
-        deadline::configure(&connection)?;
+        deadline::configure(&mut connection)?;
         connection
             .pragma_update(None, "trusted_schema", false)
             .map_err(unavailable)?;

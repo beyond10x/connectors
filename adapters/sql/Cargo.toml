@@ -31,7 +31,7 @@ futures-util.workspace = true
 bytes = "1"
 tokio-postgres-rustls = "0.14"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-webpki-roots = "1"
+webpki-roots = "1.0.10"
 base64.workspace = true
 # MySQL wire binding: rustls on ring only, the Rust flate2 backend, no native-tls/OpenSSL
 # and no second async runtime.

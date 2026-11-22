@@ -44,8 +44,17 @@ an existing capability. There is no service activation, unlock, or prompt.
 Only the collection behind the Secret Service `default` alias (`ReadAlias("default")`;
 `login` on a stock GNOME Keyring), already unlocked, receives writes. The alias is read, never
 set. Items already stored under `/org/freedesktop/secrets/collection/login` stay readable and
-deletable when the alias resolves elsewhere; nothing is moved. The collection name must be
-alphanumeric or `_`, and its file is `<name>.keyring`. `items_at`, `remove_authority_at` and
+deletable when the alias resolves elsewhere; nothing is moved. The collection's file is
+`<identifier>.keyring`, the identifier decoded from the object path the way GNOME Keyring
+encodes it (`gkd_secret_util_build_path`: every byte but an ASCII letter or digit as `_` and two
+lower-case hex digits, so `Standard_2dSchl_c3_bcsselbund` is `Standard-Schlüsselbund.keyring`).
+Any other escape, a name that is not UTF-8 and a name with `/`, NUL, a control character, `.`
+or `..` are refused. The default collection's identifier must equal the one the keyrings
+directory's `default` file names (`login` when it is missing or empty), which the daemon
+rereads on each client connection. A second keyring of one label is filed as `<label>_1.keyring`
+and named `<label>_1` (path `<label>_5f1`), so the decoded name still names its file. An item is
+read only while its own collection's file, the legacy `login` one included, is encrypted.
+`items_at`, `remove_authority_at` and
 `orphans_at` list and delete custody items by authority, reading attributes only. Test builds
 refuse to open the session bus's Secret Service: they panic naming
 `DBUS_SESSION_BUS_ADDRESS` (or the missing `secret_service_socket`) before any write. That guard covers

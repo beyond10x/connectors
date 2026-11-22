@@ -20,14 +20,14 @@ other connector's so that each says what exists and what does not.
 :::
 
 The words connector, instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+[README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [MCP guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mcp-cli.md) records the
 selected intent in full.
 
 ## What it reads and writes
 
 As a connector, nothing yet. Once a binding exists, an MCP server's tools, resources and prompts
-are to be projected as operations; mutation advertisement stays withheld until the mutation and
+are to be projected as operations. Mutation advertisement stays withheld until the mutation and
 replay binding, with its approval source and business key, exists.
 
 As a local MCP server, connectors offers the admitted reads of one configured instance as
@@ -39,8 +39,8 @@ eleven reads: `attachment.content`, `issue.changelog`, `issue.comments`, `issue.
 ## Prerequisites at the provider
 
 As a connector, none can be stated until a binding exists. The two questions that withheld it
-are decided: an inbound MCP caller is the configured owner, one principal, so no
-caller-to-connection assignment is modelled; and Connectors owns one pinned, supervised outbound
+are decided. An inbound MCP caller is the configured owner, one principal, so no
+caller-to-connection assignment is modelled. Connectors owns one pinned, supervised outbound
 stdio server process per session. Neither decision is implemented.
 
 As a local MCP server, the prerequisites are those of the instance it serves, such as the
@@ -49,7 +49,7 @@ As a local MCP server, the prerequisites are those of the instance it serves, su
 ## Enable the connector and add an instance
 
 Not possible yet. An MCP instance would take the pinned form `[connectors.mcp.instances.<instance>]`
-of the other connectors served by their own executables, but none can be configured; do not add
+of the other connectors served by their own executables, but none can be configured. Do not add
 one to a working configuration.
 
 ## Connect
@@ -64,9 +64,11 @@ As a connector, not available: reading from an MCP server is not implemented.
 As a local MCP server, on Linux, connectors offers admitted read-only operations of a configured
 instance as tools, with no resources, prompts, writes or outbound MCP. The macOS and Windows builds
 compile and run their lease-clock and launch tests in CI, with a serving scenario against each
-platform's own credential store; that scenario has passed on Linux only so far, so serving on macOS
-and Windows is not yet shown. The instance needs a connection, and beside the configuration the
-tools it exposes (`CONFIG.mcp-stdio.json`) and the declarations of their operations
+platform's own credential store. That scenario has passed on Linux only so far, so serving on
+macOS and Windows is not yet shown.
+
+The instance needs a connection. Beside the configuration it needs the tools it exposes
+(`CONFIG.mcp-stdio.json`) and the declarations of their operations
 (`CONFIG.operation-curation.json`), as the
 [stdio guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mcp-stdio.md) shows.
 
@@ -90,7 +92,7 @@ wrapper's path and the capture directory:
 }
 ```
 
-The user form, the entry a user writes, names `connectors` itself; `CONFIG` and `STATE_DIR`
+The user form, the entry a user writes, runs `connectors` itself. `CONFIG` and `STATE_DIR`
 stand for the absolute paths of the configuration and the state directory:
 
 ```json
@@ -113,7 +115,7 @@ claude -p "List my open Jira issues. Use the connectors tool to search Jira, the
 
 Claude Code started the wrapper as its child and spoke MCP with the server through it, over
 standard input and output. Its answer listed DEMO-1, DEMO-2 and DEMO-3, each with its key, summary and status.
-`claude mcp add` was recorded separately; see [Register with `claude mcp add`](#register-with-claude-mcp-add).
+`claude mcp add` was recorded separately, under [Register with `claude mcp add`](#register-with-claude-mcp-add).
 
 The session's frames are replayed against the server by
 [`claude_mcp_journey.rs`](https://github.com/beyond10x/connectors/blob/main/apps/connectors/tests/claude_mcp_journey.rs)
@@ -190,16 +192,16 @@ Not available: no MCP operation, read or write, is bound.
 
 As a connector, not available. The requirements are specified: a reconnect must keep the
 identity, and an uncertain rotating refresh cannot be exchanged again. The local MCP server
-uses the instance's own connection; reconnect it as that connector's page says.
+uses the instance's own connection. Reconnect it as that connector's page says.
 
 ## Limits
 
 - MCP as a connector: no runtime, no configuration schema and no conformance scenarios. The two
   decision blockers that withheld review of its contracts, on caller-to-connection assignment and
   on outbound stdio process ownership, are cleared in the planning store (2026-10-06 and
-  2026-10-03); the contracts epic is still a draft.
+  2026-10-03). The contracts epic is still a draft.
 - The local MCP server serves one instance and one connection per process, with one request at
-  a time. It is shown serving on Linux only; the macOS and Windows jobs run a serving scenario
+  a time. It is shown serving on Linux only. The macOS and Windows jobs run a serving scenario
   that has not yet passed there.
-- The recorded session read a local fixture site, not a live Jira; its replay serves the same
+- The recorded session read a local fixture site, not a live Jira. Its replay serves the same
   instance description and answers from a fixture, not the catalog provider's HTTPS transport.

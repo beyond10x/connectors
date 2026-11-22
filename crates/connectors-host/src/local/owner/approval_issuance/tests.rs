@@ -163,6 +163,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
                 max_bytes: 1024,
             }],
             acquisition: None,
+            token_recipient: None,
         }],
         requirements: vec![
             runtime::Requirement {

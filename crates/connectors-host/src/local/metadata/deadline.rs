@@ -38,7 +38,7 @@ pub(super) fn check() -> Result<()> {
     }
 }
 
-pub(super) fn configure(connection: &rusqlite::Connection) -> Result<()> {
+pub(super) fn configure(connection: &mut rusqlite::Connection) -> Result<()> {
     check()?;
     if CURRENT.with(|slot| slot.get().is_some()) {
         connection
@@ -148,14 +148,14 @@ mod tests {
         holder
             .execute_batch("CREATE TABLE fixture (value); BEGIN EXCLUSIVE")
             .unwrap();
-        let connection = rusqlite::Connection::open(&path).unwrap();
+        let mut connection = rusqlite::Connection::open(&path).unwrap();
         let release = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(600));
             holder.execute_batch("ROLLBACK").unwrap();
         });
         let started = Instant::now();
         let result = within(started + Duration::from_secs(10), || {
-            configure(&connection)?;
+            configure(&mut connection)?;
             // The already-open connection must observe the inner cutoff too.
             within(started + Duration::from_millis(100), || {
                 connection

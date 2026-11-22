@@ -136,94 +136,45 @@ fn a_reserved_attempt_records_the_source_generation_its_reservation_names() {
     assert_eq!(counts["passed"], 1, "{counts}");
 }
 
-fn copy_tree(from: &Path, to: &Path) {
-    std::fs::create_dir_all(to).unwrap();
-    for entry in std::fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let target = to.join(entry.file_name());
-        if entry.file_type().unwrap().is_dir() {
-            copy_tree(&entry.path(), &target);
-        } else {
-            std::fs::copy(entry.path(), &target).unwrap();
-        }
-    }
-}
-
-/// A copy of `ess/` whose `local-metadata-authority` owns only `domain` and accepts only its
-/// commands, so `emit` visits that domain's mutants alone. The mutants are the ones the real
-/// component's emission visits for `domain`: `mutate::mutants` reads the documents, not the
-/// component.
-fn scoped_root(domain: &str) -> tempfile::TempDir {
-    let dir = tempfile::tempdir().unwrap();
-    copy_tree(&root().join("ess"), &dir.path().join("ess"));
-    let path = dir.path().join("ess/components.yaml");
-    let mut components: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let component = components["components"]
-        .as_sequence_mut()
-        .unwrap()
-        .iter_mut()
-        .find(|component| component["component"].as_str() == Some("local-metadata-authority"))
-        .unwrap();
-    component["owns"]["domains"] = serde_yaml_ng::to_value(vec![domain]).unwrap();
-    let prefix = format!("{domain}.");
-    let commands: Vec<serde_yaml_ng::Value> = component["accepts"]["commands"]
-        .as_sequence()
-        .unwrap()
-        .iter()
-        .filter(|command| {
-            command
-                .as_str()
-                .is_some_and(|name| name.starts_with(&prefix))
-        })
-        .cloned()
-        .collect();
-    assert!(!commands.is_empty(), "{domain} has no accepted command");
-    component["accepts"]["commands"] = serde_yaml_ng::Value::Sequence(commands);
-    std::fs::write(&path, serde_yaml_ng::to_string(&components).unwrap()).unwrap();
-    dir
-}
-
-/// Runs `metadata-conformance emit` over `root`; returns whether it exited 0, and its output.
-fn emit(root: &Path) -> (bool, String) {
-    let out = root.join("emission");
-    let output = Command::new(env!("CARGO_BIN_EXE_connectors-build"))
-        .arg("--root")
-        .arg(root)
-        .args(["metadata-conformance", "emit", "--out"])
-        .arg(&out)
-        .output()
-        .unwrap();
-    (
-        output.status.success(),
-        format!(
-            "stdout {} stderr {}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ),
-    )
+/// The emission of the component scoped to `domain` (its `local-metadata-authority` owns only
+/// `domain` and accepts only its commands, every mutant class), as
+/// `connectors-build metadata-conformance emissions` committed it. Emitting it takes ESS minutes,
+/// so it is made once; the unit test `the_committed_metadata_emissions_are_current` holds it to
+/// the current `ess/`, ESS crates and pin, and the `slow` workflow regenerates it byte for byte.
+fn admitted_scoped_manifest(domain: &str) -> ess_conformance::mutate::Manifest {
+    let path = root().join(format!(
+        "crates/connectors-build/generated/metadata-emissions/{domain}/manifest.json"
+    ));
+    let text = std::fs::read_to_string(&path).unwrap();
+    let manifest = ess_conformance::mutate::Manifest::from_json(&text)
+        .unwrap_or_else(|error| panic!("the pinned ESS refuses {}: {error}", path.display()));
+    assert_eq!(
+        manifest.component.as_deref(),
+        Some("local-metadata-authority")
+    );
+    assert!(
+        !manifest.mutants.is_empty(),
+        "{domain}: the emission holds no mutant"
+    );
+    manifest
 }
 
 /// The acceptance names `metadata_conformance::emit` as the emission `mutate --collect` scores
-/// for `connectors.refresh` and `connectors.oauth2`. `emit` writes `ess-mutation-manifest/2`
-/// (`metadata_conformance.rs:918`), and the pinned ESS 0.87.0 reader refuses a `/2` manifest
-/// holding a `sets-drop`, `precedence-swap` or `emit-swap` mutant (`ess-conformance`
-/// `mutate.rs:185-193`). `IssueAccessToken`'s four precedence swaps are such mutants.
+/// for `connectors.refresh` and `connectors.oauth2`. `emit` wrote `ess-mutation-manifest/2`, and
+/// the pinned ESS 0.87.0 reader refuses a `/2` manifest holding a `sets-drop`, `precedence-swap`
+/// or `emit-swap` mutant (`ess-conformance` `mutate.rs:185-193`). `IssueAccessToken`'s four
+/// precedence swaps are such mutants.
 #[test]
 fn emit_writes_a_manifest_for_the_oauth2_domain_that_the_pinned_ess_admits() {
-    let scoped = scoped_root("connectors.oauth2");
-    let (ok, output) = emit(scoped.path());
-    assert!(ok, "emit refused its own manifest: {output}");
+    admitted_scoped_manifest("connectors.oauth2");
 }
 
 /// The same refusal over `connectors.approval_issuers`, which the component owned before this
-/// unit and whose source is unchanged since d2842557d: `emit` fails there too, so the defect
-/// predates the unit.
+/// unit and whose source is unchanged since d2842557d: `emit` failed there too, so the defect
+/// predated the unit.
 #[test]
 fn emit_writes_a_manifest_for_the_approval_issuers_domain_that_the_pinned_ess_admits() {
-    let scoped = scoped_root("connectors.approval_issuers");
-    let (ok, output) = emit(scoped.path());
-    assert!(ok, "emit refused its own manifest: {output}");
+    admitted_scoped_manifest("connectors.approval_issuers");
 }
 
 #[derive(serde::Deserialize)]

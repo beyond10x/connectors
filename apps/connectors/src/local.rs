@@ -152,9 +152,35 @@ fn is_root_help(args: &[OsString]) -> bool {
 
 struct LocalHandler(session::Shared);
 impl Handler for LocalHandler {
+    fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
+        missing_store(call, self.answer(call))
+    }
+}
+
+/// A `metadata_unavailable` refusal of a state directory that holds no
+/// `metadata.sqlite3` is `metadata_missing` with `next_action =
+/// initialize_state` (semantics.md §3, issue #268): only `setup init` creates
+/// the store, so `retry_status` would never help. A store that exists keeps
+/// `metadata_unavailable`.
+fn missing_store(call: &Invocation<'_>, mut reply: HandlerReply) -> HandlerReply {
+    if let HandlerReply::Error { data, .. } = &mut reply
+        && data["code"] == "metadata_unavailable"
+        && Paths::resolve(
+            call.context.config.as_deref(),
+            call.context.state_dir.as_deref(),
+        )
+        .is_ok_and(|paths| Metadata::missing(&paths.state))
+    {
+        data["code"] = json!("metadata_missing");
+        data["next_action"] = json!("initialize_state");
+    }
+    reply
+}
+
+impl LocalHandler {
     /// Every handler reads the selected alias in `adapter`, whichever selector
     /// named it; a result names its connector and instance beside it.
-    fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
+    fn answer(&mut self, call: &Invocation<'_>) -> HandlerReply {
         // `invoke` selects by its target and names the connector and instance
         // itself (story:connectors-do-short-invocation).
         if call.callable == "invoke" {

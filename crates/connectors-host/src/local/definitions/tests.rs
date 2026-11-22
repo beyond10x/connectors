@@ -323,6 +323,7 @@ fn declared(lifetime: u64, header: &str) -> registry::StaticProfile {
         evidence_lifetime_ms: lifetime,
         fields: Vec::new(),
         acquisition: None,
+        token_recipient: None,
     };
     profile.revision = connectors_core::digest(&serde_json::to_value(&profile).unwrap());
     profile.registry_profile()
@@ -337,6 +338,7 @@ fn bound(authority: &str, profile: registry::StaticProfile) -> registry::Binding
         profile,
         credential_revision: Some("credential-1".into()),
         executable: None,
+        token_recipient: None,
     }
 }
 
@@ -421,6 +423,7 @@ fn security_review_a_moved_instance_is_shared_exactly_by_bindings_the_registry_a
                                     evidence_lifetime_ms: lifetime,
                                     fields: Vec::new(),
                                     acquisition: None,
+                                    token_recipient: None,
                                 };
                                 profile.revision = connectors_core::digest(
                                     &serde_json::to_value(&profile).unwrap(),

@@ -1243,6 +1243,44 @@ mod session_keyring_review {
             path.as_str().to_owned()
         }
 
+        /// Change a collection's master password; an empty one makes GNOME
+        /// Keyring rewrite its file in the unencrypted textual form.
+        fn change_password(&self, collection: &str, original: &[u8], master: &[u8]) {
+            let secret = |value: &[u8]| {
+                (
+                    self.session.clone(),
+                    Vec::<u8>::new(),
+                    value.to_vec(),
+                    "text/plain".to_owned(),
+                )
+            };
+            self.connection
+                .call_method(
+                    Some("org.freedesktop.secrets"),
+                    "/org/freedesktop/secrets",
+                    Some("org.gnome.keyring.InternalUnsupportedGuiltRiddenInterface"),
+                    "ChangeWithMasterPassword",
+                    &(
+                        OwnedObjectPath::try_from(collection).unwrap(),
+                        secret(original),
+                        secret(master),
+                    ),
+                )
+                .unwrap();
+        }
+
+        fn collections(&self) -> Vec<String> {
+            let proxy = zbus::blocking::Proxy::new(
+                &self.connection,
+                "org.freedesktop.secrets",
+                "/org/freedesktop/secrets",
+                "org.freedesktop.Secret.Service",
+            )
+            .unwrap();
+            let paths: Vec<OwnedObjectPath> = proxy.get_property("Collections").unwrap();
+            paths.iter().map(|p| p.as_str().to_owned()).collect()
+        }
+
         fn set_alias(&self, alias: &str, collection: &str) {
             self.connection
                 .call_method(
@@ -1457,6 +1495,104 @@ mod session_keyring_review {
         for (collection, item) in &keep {
             assert!(raw.holds(collection, item), "{item} was deleted");
         }
+    }
+
+    /// A keyring labelled beyond ASCII letters and digits, as GNOME names the
+    /// default keyring in German: the object path escapes the label
+    /// (`Standard_2dSchl_c3_bcsselbund`), the file keeps it
+    /// (`Standard-Schlüsselbund.keyring`). Custody writes behind the alias and
+    /// reads the item back.
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn a_default_collection_with_an_escaped_name_holds_the_write() {
+        let fixture = Fixture::new();
+        let raw = Raw::new(&fixture);
+        let named = raw.create_collection("Standard-Schlüsselbund");
+        assert_eq!(
+            named,
+            "/org/freedesktop/secrets/collection/Standard_2dSchl_c3_bcsselbund"
+        );
+        raw.set_alias("default", &named);
+        let keyrings = fixture.data.join("keyrings");
+        assert!(keyrings.join("Standard-Schlüsselbund.keyring").is_file());
+        assert_eq!(
+            std::fs::read(keyrings.join("default")).unwrap(),
+            "Standard-Schlüsselbund".as_bytes()
+        );
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        let version = write(&fixture, scope, 4);
+        let items = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(items.len(), 1, "{items:?}");
+        assert_eq!(items[0].collection, named);
+        let read = fixture.backend(scope).unwrap().read(version).unwrap();
+        assert!(read.ct_eq(&[4u8; 16]));
+    }
+
+    /// Review finding 11: with the alias moved off `login`, an item still in
+    /// `login` is read only while `login`'s own file is encrypted. The default
+    /// collection's file stays encrypted throughout.
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn a_legacy_login_item_reads_only_while_its_own_collection_is_encrypted() {
+        let fixture = Fixture::new();
+        let raw = Raw::new(&fixture);
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        let old = write(&fixture, scope, 6);
+        let elsewhere = raw.create_collection("elsewhere");
+        raw.set_alias("default", &elsewhere);
+        let backend = fixture.backend(scope).unwrap();
+        assert!(backend.read(old).unwrap().ct_eq(&[6u8; 16]));
+
+        let header = |name: &str| {
+            let mut head = [0u8; 12];
+            std::io::Read::read_exact(
+                &mut std::fs::File::open(fixture.data.join("keyrings").join(name)).unwrap(),
+                &mut head,
+            )
+            .unwrap();
+            head
+        };
+        raw.change_password(LOGIN, b"connectors-disposable-keyring-password", b"");
+        assert_ne!(&header("login.keyring"), b"GnomeKeyring");
+        assert_eq!(&header("elsewhere.keyring"), b"GnomeKeyring");
+        assert_eq!(fixture.alias_target("default"), elsewhere);
+        assert!(raw.collections().contains(&LOGIN.to_owned()));
+
+        assert_eq!(backend.read(old).err(), Some(Failure::Unavailable));
+        let reopened = fixture.backend(scope).unwrap();
+        assert_eq!(reopened.read(old).err(), Some(Failure::Unavailable));
+        // A new write still lands behind the encrypted alias and reads back.
+        let new = write(&fixture, scope, 8);
+        assert!(reopened.read(new).unwrap().ct_eq(&[8u8; 16]));
+    }
+
+    /// A second keyring of one label: GNOME files it as `twin_1.keyring` and
+    /// names it `twin_1` (path `twin_5f1`), one path per collection. Custody
+    /// writes behind the alias on it and reads the item back.
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn a_second_keyring_of_one_label_is_its_own_suffixed_file() {
+        let fixture = Fixture::new();
+        let raw = Raw::new(&fixture);
+        let first = raw.create_collection("twin");
+        let second = raw.create_collection("twin");
+        assert_eq!(first, "/org/freedesktop/secrets/collection/twin");
+        assert_eq!(second, "/org/freedesktop/secrets/collection/twin_5f1");
+        let collections = raw.collections();
+        for path in [&first, &second] {
+            assert_eq!(collections.iter().filter(|c| *c == path).count(), 1);
+        }
+        let keyrings = fixture.data.join("keyrings");
+        assert!(keyrings.join("twin.keyring").is_file());
+        assert!(keyrings.join("twin_1.keyring").is_file());
+        raw.set_alias("default", &second);
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        let version = write(&fixture, scope, 2);
+        let items = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(items.len(), 1, "{items:?}");
+        assert_eq!(items[0].collection, second);
+        let read = fixture.backend(scope).unwrap().read(version).unwrap();
+        assert!(read.ct_eq(&[2u8; 16]));
     }
 
     /// Acceptance 3, literally: a private daemon that serves only the alias's

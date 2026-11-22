@@ -1,5 +1,131 @@
 # Changelog
 
+## 0.74.0 — 2026-11-22
+
+### Added
+
+- The Slack bot connection uploads a file: `file.upload` takes the bytes (at most 2 MiB) as
+  `content` (`base64`, `sha256`, optional `media_type`) and `body.channel_id`, `body.filename`,
+  `body.title`, optional `body.thread_ts` and `body.initial_comment`, and under one approval or
+  standing grant sends `files.getUploadURLExternal`, the bytes to the `upload_url` it answers and
+  `files.completeUploadExternal`. The `upload_url` must be `https` on `files.slack.com` under
+  `/upload/` and admitted by the connection's `hosts`, or nothing is sent there. Content that is
+  not base64, is empty, is over 2 MiB or does not match its `sha256` is refused before any
+  request, so an approval binds the bytes' digest (issue #269).
+- A catalog selection can declare `upload`: a slot request, a POST of the bytes to the URL it
+  answers, and the selection's own write whose body reads values from the slot's answer. A
+  source amendment `add_operation` can add a `post` with an `application/json` body
+  (`request_media_type`).
+- A `connectors-definition/1` write can declare the same `upload` (`slot` with `op`, `with`,
+  `expect` and `url`, `path_prefix`, `send`), so `connectors-build definition import` imports the
+  Slack selection with `file.upload` and the definition lowers back to it.
+- An operation can raise its own request limit with `x-connectors-input-bytes` in its input
+  schema, at most 3 MiB. The served host reads `/v1alpha2/invoke` up to the largest operation's
+  limit and refuses a request over the named operation's limit as `capacity`; every other route
+  and operation keeps 64 KiB.
+- `AuthenticatedWrite::send_bytes` sends a raw body with its media type; a write port that does
+  not implement it refuses as `unsupported`.
+- A private composition can refuse an input from itself alone (`runtime::Adapter::admit`, by
+  default none); the served catalog host answers that refusal before it records an attempt, as
+  it answers a repository the instance does not list. The catalog uses it for upload content.
+
+### Changed
+
+- A state directory with no `metadata.sqlite3`, because it was never initialised or its store was
+  moved aside, is refused as `metadata_missing` at stage `observation` with the new `next_action`
+  `initialize_state` (run `connectors setup init`), exit 1. Before, it was refused as
+  `metadata_unavailable` with `retry_status`, and a retry never helped. A store that exists and
+  cannot be used still answers `metadata_unavailable` (#268).
+- The gate runs the workspace tests under cargo-nextest with `.config/nextest.toml`: each test
+  runs in its own process, a test still running at 60 s is killed and fails, and the gate prints
+  the ten slowest tests and the test step's time. Doctests still run under `cargo test --doc`. CI
+  installs cargo-nextest 0.9.143 from its release archive, checked against a pinned SHA-256.
+- The manifests of the local metadata authority's precedence-swap emission and of the all-class
+  emissions of `connectors.oauth2` and `connectors.approval_issuers` are committed under
+  `crates/connectors-build/generated/metadata-emissions` with the digest of their inputs (the ESS
+  crates, the `ess` pin, `ess/` and the generator). Tests read them instead of running the
+  emissions, which took over 60 s each; a test fails when the digest is stale.
+  `connectors-build metadata-conformance emissions` regenerates them, and the new `slow` workflow
+  runs it with `--check` when an input changes. The synthesized baseline suite a test runs is
+  made once per digest into `target/metadata-emissions/`.
+- `.cargo/config.toml` sets `debug = false` for the dev and test profiles, so a host-wide Cargo
+  configuration cannot add debug info to this repository's builds.
+- `connectors-build`, `connectors-catalog`, `connectors-core`, `connectors-docs`,
+  `connectors-spec`, `connectors-tool-contracts` and `connectors-tavily` build their integration
+  tests into one binary each (`tests/main.rs`, one module per file): 84 files in 7 binaries, 77 test binaries fewer. A
+  test of `connectors-build` fails when a package with `autotests = false` has a `tests/*.rs`
+  file no test binary declares.
+
+### Fixed
+
+- Linux Secret Service custody finds the file of a default collection whose name is not plain
+  ASCII letters and digits, such as GNOME's German `Standard-Schlüsselbund`: it decodes the
+  collection's object path (`Standard_2dSchl_c3_bcsselbund`) the way GNOME Keyring encodes it
+  and qualifies `Standard-Schlüsselbund.keyring`. In 0.73.0 every stored credential answered
+  `custody_unavailable` on such a host. A malformed escape, a name that is not UTF-8 and a name
+  with `/`, NUL, a control character, `.` or `..` are refused, and the decoded name must equal
+  the one the keyrings directory's `default` file holds.
+
+### Security
+
+- An open `connectors server --transport stdio` session keeps the instance, connection and owner
+  it was admitted with. Every request checks them against the current configuration when it lists
+  or describes, again before it reaches the owner, and again before its reply is delivered, and
+  the read names the admitted connection. Once a connection is replaced under the same owner, a
+  `tools/list` or `tools/call` of the open session is refused `forbidden` with no provider request,
+  also before lease renewal ends the session. Before, each request took the replacement connection
+  from the current configuration in the up to 500 ms until renewal noticed (review finding 6).
+- `definitions install` admits only portable relative paths in a release on every platform: `/`
+  separated segments with no backslash, `:`, NUL or other control character, none of `<>"|?*`, no
+  trailing dot or space and no Windows device name (`CON`, `NUL`, `COM1`, `LPT1`, ... in any case,
+  with any extension). A drive prefix (`C:foo`, `C:\`), a UNC or verbatim prefix (`\\server`,
+  `\\?\`) or a root-relative `\x` in the index, the asset name or an archive member is
+  `release_invalid`, and the writer checks that every path it would create lies under its staging
+  directory before it creates anything. Before, Windows could join such a path outside the cache
+  (review finding 9, high on Windows).
+- Linux Secret Service custody reads an item of the legacy `login` collection only while
+  `login`'s own file is encrypted. In 0.73.0, with the `default` alias on another collection,
+  only that collection's file was checked, so an item in an unencrypted `login` collection was
+  still read (security review finding 11).
+- A saved client secret is no longer sent to a token endpoint the connection was not admitted
+  under. A profile that exchanges its material at a token endpoint (the catalog's
+  `oauth2_client_credentials`, which Zendesk ships, and `oauth2_refresh`) prints `token_recipient`
+  in its bootstrap profile: the digest of the endpoint's scheme, host, port and path and of its
+  token CA. The connection records it (`Connection.token_recipient`). A configuration that moves
+  it is no longer followed by `connections revalidate`: admission and capture refuse it as a
+  changed binding before custody is opened, so no secret is read and no exchange is sent, and the
+  next action is a new connection. An operation-only change still revalidates in place, and a
+  change of the API CA, admitted hosts or request prefix still follows D12. Before, the token URL
+  moved only the credential-side digest, which an in-place upgrade accepted (security review
+  2026-11-22, finding 1).
+- The git relay sends the instance's token only to the origin its credential was provisioned
+  for: `git.upstream` must be on the origin of the instance's API base, or on the Git origin a
+  reviewed mapping names for it (`https://github.com` for `https://api.github.com`). Start refuses
+  any other origin before the mounted credential is read, and every forge request, the mirror's
+  fetch included, is checked against it before the token is read. Before, the upstream and the
+  token-capable profile were accepted independently (security review 2026-11-22, finding 2).
+
+### Documentation
+
+- [Set up the local CLI](website/docs/guides/set-up-the-local-cli.md#reset-a-grown-metadata-store)
+  describes how to reset a grown metadata store: `setup owner-stop`, move `metadata.sqlite3*`
+  aside, `setup init`, then connect again (#268, until the store has retention, #267).
+
+### Compatibility
+
+- A definitions release with a file path the portable grammar refuses no longer installs, on any
+  platform.
+- A caller that matched `metadata_unavailable` for a missing store matches `metadata_missing`, or
+  `next_action` `initialize_state`, instead.
+- A connection of a token-exchanging profile saved before this release records no recipient. It
+  follows a configuration whose credential side (without one, its configuration revision) is
+  unchanged, and its next revalidation records the recipient; any other change needs a new
+  connection. A provider executable from before this release states no recipient and keeps the
+  earlier rule. A bootstrap with `token_recipient` is refused by a host from before this release:
+  update the CLI and the provider together.
+- A served instance whose `git.upstream` is on another origin than its API base, other than the
+  reviewed GitHub mapping, no longer starts.
+
 ## 0.73.0 — 2026-11-14
 
 ### Added

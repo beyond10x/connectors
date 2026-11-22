@@ -22,16 +22,18 @@ connection are those of the
 A **local owner** process starts on demand, holds the metadata store and starts the process that
 serves each instance as a child over a private protocol. It starts only the exact executable the
 configuration pins or derives, refuses a changed executable or configuration before any provider
-work, and stops exact incarnations. A CLI built differently from the running owner is refused
-rather than served. [Set up the local CLI](../guides/set-up-the-local-cli.md) creates the
+work, and stops exact incarnations. A CLI built differently from the running owner is refused.
+[Set up the local CLI](../guides/set-up-the-local-cli.md) creates the
 configuration and the store.
 
 ## Saved connections
 
 Each instance holds at most one connection. `connections connect --connector <connector>
---instance <instance> --profile <profile>` runs the named auth profile's identity probe (and,
-where the profile declares them, its scope and access reads) and saves the credential in custody. The credential enters
-through a hidden prompt or a protected file, never as an argument. A connect on an instance that
+--instance <instance> --profile <profile>` runs the named auth profile's identity probe and saves
+the credential in custody. Where the profile declares scope and access reads, it runs them too.
+The credential enters through a hidden prompt or a protected file, never as an argument.
+
+A connect on an instance that
 already holds a Live or Stale connection is refused before any credential entry, as
 `lifecycle_conflict` with the next action that helps: reconnect, revalidate or revoke. A second
 account is a second instance.
@@ -42,11 +44,11 @@ account is a second instance.
 | `Stale` | the provider refused the stored credential: an expired or revoked refresh token, a changed password, a revoked token. No retry can succeed | `connections reconnect` publishing a new credential (`Live`), or `connections revoke` |
 | `Revoked` | local use ended | nothing; it stays as history |
 
-Refreshing an OAuth access token is not a state change; only a refused refresh token makes a
+Refreshing an OAuth access token is not a state change. Only a refused refresh token makes a
 connection Stale. Then:
 
 - `connections revalidate` renews the validation evidence without asking for the credential
-  again. Evidence lasts 60 seconds; an invoke on lapsed evidence answers with the next action
+  again. Evidence lasts 60 seconds, and an invoke on lapsed evidence answers with the next action
   `revalidate_connection`.
 - `connections reconnect` replaces the credential of the instance's connection, keeps its
   reference and refuses a credential that names a different identity. An invoke on a Stale
@@ -56,11 +58,11 @@ connection Stale. Then:
   configuration, on file descriptor 3, and to nothing else.
 - `connections token` issues a current access token of an OAuth2 grant connection. The owner
   issues the stored token while it stays valid for longer than the profile's refresh lead, and
-  refreshes it once first otherwise. Each issue is recorded with its delivery, never the token.
+  refreshes it once first otherwise. Each issue is recorded with its delivery, not the token.
 
 `connections describe`, `reconnect`, `revalidate`, `launch`, `token` and `revoke` select the
-instance's one connection when `--connection` is left out. A revalidation whose answer never arrives
-is `outcome_unknown`, not a failure.
+instance's one connection when `--connection` is left out. A revalidation whose answer does not
+arrive is `outcome_unknown`, not a failure.
 
 ### Get an access token
 
@@ -83,9 +85,9 @@ fixture-grant-access-1
 ```
 
 A Stale connection, and a refresh the provider refuses, answer `repair_connection`, which names
-`connections reconnect`; a connection whose profile is not an OAuth2 grant is `forbidden`. A Rust
-program calls `connectors_host::local::access_token::access_token` instead; its value prints no
-token in `Debug` or `Display`. The
+`connections reconnect`. A connection whose profile is not an OAuth2 grant is `forbidden`. A Rust
+program calls `connectors_host::local::access_token::access_token` instead, and its value prints
+no token in `Debug` or `Display`. The
 [CLI contract](https://github.com/beyond10x/connectors/blob/main/contracts/cli/v1alpha1/semantics.md#access-token-issue)
 lists every refusal.
 
@@ -102,7 +104,7 @@ A write runs through private protocol two, under the same rules for every provid
 
 Approval-signing keys are created, rotated, recovered, revoked and retired with
 `approvals key-init`, `key-rotate`, `key-recover`, `key-revoke` and `key-retire`. Issuing a proof
-also requires a configured bounded clock; the
+also requires a configured bounded clock. The
 [clock guide](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md) configures
 its sources and `approvals clock-check` checks them.
 Reads need no approval and no clock.

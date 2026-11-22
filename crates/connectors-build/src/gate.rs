@@ -191,7 +191,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     }
     // Generation fixtures verify the full pinned bundle, reproducibility and refusals.
     execute(command(None)?.args(["build", "--workspace", "--locked", "--offline"]))?;
-    execute(command(None)?.args(["test", "--workspace", "--locked", "--offline"]))?;
+    test_step(root, &|| command(None), &execute)?;
     // Each adapter's committed tool contract (contracts/tools/v1alpha1) from its descriptor
     // and the tool profiles authored beside it.
     execute(command(None)?.args([
@@ -376,6 +376,112 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     execute(planning.args(["plan", "artifact", "validate"]))?;
     println!("gate: all checks passed");
     Ok(())
+}
+
+/// The JUnit report `.config/nextest.toml` has nextest write, relative to the repository root.
+const JUNIT: &str = "target/nextest/default/junit.xml";
+
+/// The test step's wall-time budget (`~/beyond10x/AGENTS.md`, "Tests stay fast").
+const TEST_STEP_BUDGET: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// The gate's test step. cargo-nextest runs each test in its own process under
+/// `.config/nextest.toml`, which kills a test at 60 s (`slow-timeout` 30 s, `terminate-after`
+/// 2) and fails it. The build and the shared fixtures run first, so the printed time is the
+/// tests' own. The ten slowest
+/// tests are printed from nextest's JUnit report whether the run passed or not. nextest runs no
+/// doctests; `cargo test --doc` runs them after.
+fn test_step(
+    root: &Path,
+    command: &dyn Fn() -> Result<Command>,
+    execute: &dyn Fn(&mut Command) -> Result<()>,
+) -> Result<()> {
+    let nextest = |extra: &[&str]| -> Result<Command> {
+        let mut cmd = command()?;
+        // cargo-nextest resolves target runners itself and does not see a `--config` given
+        // to cargo before the subcommand, so the TMPDIR runner is repeated after `run`.
+        // Without it every test that writes a state directory ran under `/tmp` and was
+        // refused `invalid_configuration` (PR #271, 1,337 of 4,230 tests).
+        let runner: Vec<_> = cmd
+            .get_args()
+            .collect::<Vec<_>>()
+            .windows(2)
+            .filter(|pair| pair[0] == "--config")
+            .map(|pair| pair[1].to_owned())
+            .collect();
+        cmd.args(["nextest", "run"]);
+        for config in runner {
+            cmd.arg("--config").arg(config);
+        }
+        cmd.args(["--workspace", "--locked", "--offline"])
+            .args(extra);
+        Ok(cmd)
+    };
+    execute(&mut nextest(&["--no-run"])?)?;
+    // The setup step: the metadata authority's baseline suite is synthesized once into its
+    // digest-keyed cache under `target/`, so no test pays for it.
+    let synthesis = std::time::Instant::now();
+    super::metadata_emissions::baseline_suite(root)?;
+    println!(
+        "gate: metadata baseline suite ready in {:.1} s; exit=0",
+        synthesis.elapsed().as_secs_f64()
+    );
+    let junit = root.join(JUNIT);
+    match std::fs::remove_file(&junit) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => return Err(error.into()),
+        _ => {}
+    }
+    let started = std::time::Instant::now();
+    let outcome = execute(&mut nextest(&[])?);
+    let elapsed = started.elapsed();
+    match std::fs::read_to_string(&junit) {
+        Ok(report) => {
+            println!("gate: ten slowest tests");
+            for (seconds, name) in slowest(&report, 10) {
+                println!("gate: {seconds:>8.1} s  {name}");
+            }
+        }
+        Err(error) => println!("gate: no nextest report at {}: {error}", junit.display()),
+    }
+    println!(
+        "gate: test step ran {:.1} s (budget {} s)",
+        elapsed.as_secs_f64(),
+        TEST_STEP_BUDGET.as_secs()
+    );
+    outcome?;
+    execute(command()?.args(["test", "--workspace", "--doc", "--locked", "--offline"]))
+}
+
+/// The `limit` slowest test cases of a nextest JUnit report, slowest first, as
+/// `(seconds, "<binary> <test>")`.
+fn slowest(junit: &str, limit: usize) -> Vec<(f64, String)> {
+    let attribute = |tag: &str, name: &str| -> Option<String> {
+        let start = tag.find(&format!(" {name}=\""))? + name.len() + 3;
+        let end = start + tag[start..].find('"')?;
+        Some(
+            tag[start..end]
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'")
+                .replace("&amp;", "&"),
+        )
+    };
+    let mut cases: Vec<(f64, String)> = junit
+        .split("<testcase")
+        .skip(1)
+        .filter_map(|rest| {
+            let tag = &rest[..rest.find('>')?];
+            let seconds = attribute(tag, "time")?.parse().ok()?;
+            let name = attribute(tag, "name")?;
+            Some(match attribute(tag, "classname") {
+                Some(class) => (seconds, format!("{class} {name}")),
+                None => (seconds, name),
+            })
+        })
+        .collect();
+    cases.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    cases.truncate(limit);
+    cases
 }
 
 /// The authored scenario directories the gate compiles and executes.
@@ -704,7 +810,7 @@ mod authored_execution_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::{cargo, docs_check};
+    use super::{Result, cargo, docs_check, test_step};
     use std::{ffi::OsStr, path::Path};
 
     const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
@@ -764,6 +870,38 @@ mod tests {
         );
     }
 
+    /// cargo-nextest does not read a `--config` given to cargo before the subcommand, so
+    /// the test step repeats the runner after `nextest run`; otherwise the test binaries
+    /// keep the caller's `TMPDIR`.
+    #[test]
+    fn the_test_step_hands_the_runner_to_nextest_itself() {
+        let commands = std::cell::RefCell::new(Vec::new());
+        let execute = |cmd: &mut std::process::Command| -> Result<()> {
+            commands
+                .borrow_mut()
+                .push(cmd.get_args().map(OsStr::to_owned).collect::<Vec<_>>());
+            Err("stop after the first command".into())
+        };
+        let _ = test_step(Path::new("/checkout"), &|| Ok(build(None)), &execute);
+        let commands = commands.into_inner();
+        let first = commands.first().expect("the test step runs nextest");
+        let run = first
+            .windows(2)
+            .position(|pair| pair[0] == "nextest" && pair[1] == "run")
+            .expect("nextest run");
+        let after = &first[run + 2..];
+        let host = rustc_host();
+        let expected = format!(
+            r#"target."{host}".runner=["sh","-c","export TMPDIR=\"$0\"; exec \"$@\"","{ROOT}"]"#
+        );
+        assert!(
+            after
+                .windows(2)
+                .any(|pair| pair[0] == "--config" && pair[1] == OsStr::new(&expected)),
+            "nextest run carries no runner: {first:?}"
+        );
+    }
+
     /// The runner is keyed to the host triple, so it outranks a user's
     /// `[target.<triple>] runner` and `CARGO_TARGET_<TRIPLE>_RUNNER`; a `cfg(...)` key
     /// would lose to either.
@@ -811,6 +949,107 @@ mod tests {
             "documentation check arguments"
         );
         assert_eq!(command.get_current_dir(), Some(Path::new("/checkout")));
+    }
+
+    /// The ten slowest come from nextest's JUnit report, slowest first, named by binary and test.
+    #[test]
+    fn the_slowest_tests_are_read_from_the_junit_report() {
+        let mut report = String::from(r#"<?xml version="1.0"?><testsuites><testsuite name="a">"#);
+        for index in 0..12 {
+            report.push_str(&format!(
+                r#"<testcase name="t{index}" classname="connectors-build::bin/connectors-build" timestamp="2026-11-22T00:00:00Z" time="{index}.5"></testcase>"#
+            ));
+        }
+        report.push_str(r#"<testcase name="a &amp; b" classname="x" time="99.25"/></testsuite>"#);
+        let slowest = super::slowest(&report, 10);
+        assert_eq!(slowest.len(), 10);
+        assert_eq!(slowest[0], (99.25, "x a & b".to_owned()));
+        assert_eq!(
+            slowest[1],
+            (
+                11.5,
+                "connectors-build::bin/connectors-build t11".to_owned()
+            )
+        );
+        assert_eq!(slowest[9].0, 3.5);
+    }
+
+    /// `.config/nextest.toml` kills a test at 60 s and fails it, and writes the JUnit report the
+    /// gate reads.
+    #[test]
+    fn nextest_kills_a_test_at_sixty_seconds_and_writes_the_report_the_gate_reads() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let config: toml::Table =
+            toml::from_str(&std::fs::read_to_string(root.join(".config/nextest.toml")).unwrap())
+                .unwrap();
+        let profile = &config["profile"]["default"];
+        assert_eq!(profile["slow-timeout"]["period"].as_str(), Some("30s"));
+        assert_eq!(
+            profile["slow-timeout"]["terminate-after"].as_integer(),
+            Some(2)
+        );
+        let junit = format!(
+            "{}/{}/{}",
+            config["store"]["dir"].as_str().unwrap(),
+            "default",
+            profile["junit"]["path"].as_str().unwrap()
+        );
+        assert_eq!(junit, super::JUNIT);
+    }
+
+    /// A package that builds its integration tests into one binary (`autotests = false`) builds
+    /// only what its manifest names, so a file added under `tests/` and declared nowhere would
+    /// never run. Every top-level `tests/*.rs` file is a `[[test]]` root or a module one declares.
+    #[test]
+    fn every_integration_test_file_is_built() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut checked = 0;
+        for group in ["crates", "adapters", "apps"] {
+            for package in std::fs::read_dir(root.join(group)).unwrap() {
+                let package = package.unwrap().path();
+                let Ok(text) = std::fs::read_to_string(package.join("Cargo.toml")) else {
+                    continue;
+                };
+                let manifest: toml::Table = toml::from_str(&text).unwrap();
+                if manifest["package"]
+                    .get("autotests")
+                    .and_then(toml::Value::as_bool)
+                    != Some(false)
+                {
+                    continue;
+                }
+                let roots: Vec<String> = manifest
+                    .get("test")
+                    .and_then(toml::Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|test| test.get("path")?.as_str().map(str::to_owned))
+                    .collect();
+                let declared: String = roots
+                    .iter()
+                    .map(|path| std::fs::read_to_string(package.join(path)).unwrap())
+                    .collect();
+                for file in std::fs::read_dir(package.join("tests")).unwrap() {
+                    let file = file.unwrap().path();
+                    if file.extension().is_none_or(|extension| extension != "rs") {
+                        continue;
+                    }
+                    let name = file.file_name().unwrap().to_str().unwrap();
+                    let stem = name.strip_suffix(".rs").unwrap();
+                    assert!(
+                        roots.iter().any(|path| path == &format!("tests/{name}"))
+                            || declared.lines().any(|line| {
+                                line.trim() == format!("mod {stem};")
+                                    || line.contains(&format!("#[path = \"{name}\"]"))
+                            }),
+                        "{} is built into no test binary",
+                        file.display()
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "no package builds its tests into one binary");
     }
 
     /// A rustup toolchain selector must stay the first argument for the proxy to see it.

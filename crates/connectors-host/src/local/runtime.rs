@@ -558,6 +558,14 @@ pub struct Profile {
     /// omitted otherwise, so every other profile keeps its bytes and revision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acquisition: Option<Acquisition>,
+    /// The implementation's digest of the canonical recipient this profile's
+    /// material is sent to in a token exchange: the token endpoint's scheme,
+    /// host, port and path and the trust roots it is verified under
+    /// (`registry::Binding::token_recipient`). Present only for a profile
+    /// that exchanges its material at a token endpoint. It is not part of the
+    /// declaration `revision` digests, so a profile keeps its revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_recipient: Option<String>,
 }
 /// How a CLI obtains an OAuth profile's protected entry. Nonsecret metadata
 /// only. Each shape is the object it always was, so a profile keeps its bytes
@@ -656,8 +664,13 @@ impl Profile {
             minimum_scopes: self.minimum_scopes.clone(),
             evidence_lifetime_ms: self.evidence_lifetime_ms,
             // What the adapter digested into `revision`, so a lifetime-only
-            // change can be proved (`StaticProfile::same_authentication`).
-            declaration: serde_json::to_value(self).ok(),
+            // change can be proved (`StaticProfile::same_authentication`); the
+            // token recipient is bound beside it, never digested into it.
+            declaration: serde_json::to_value(Self {
+                token_recipient: None,
+                ..self.clone()
+            })
+            .ok(),
             oauth2: self.grant().cloned(),
         }
     }
@@ -827,14 +840,16 @@ impl Bootstrap {
         self.executable = Some(adapter.executable.sha256.clone());
     }
     pub fn binding(&self, id: &str) -> Result<registry::Binding> {
+        let profile = self.profile(id)?;
         Ok(registry::Binding {
             instance_id: self.instance.clone(),
             adapter_id: self.adapter.clone(),
             configuration_revision: self.configuration_revision.clone(),
             provider_authority: self.provider_authority.clone(),
-            profile: self.profile(id)?.registry_profile(),
+            profile: profile.registry_profile(),
             credential_revision: self.credential_revision.clone(),
             executable: self.executable.clone(),
+            token_recipient: profile.token_recipient.clone(),
         })
     }
     pub fn validate(&self) -> Result<()> {
@@ -887,6 +902,10 @@ impl Bootstrap {
                     .as_ref()
                     .is_some_and(|acquisition| !acquisition.bounded())
                 || (profile.grant().is_some() && profile.scheme != "http_bearer")
+                || profile
+                    .token_recipient
+                    .as_deref()
+                    .is_some_and(|recipient| !connectors_core::valid_id(recipient))
             {
                 return Err(Failure::Protocol);
             }

@@ -1,7 +1,9 @@
-/* Docs System lays `.markdown table` out as a table and keeps identifiers in its cells on one
-   line, so a wide reference table (the CLI arguments, the crate list) pushes the whole page
-   sideways on mid-size screens. Let such a table scroll inside the content column instead. */
-article .markdown table {
+/* Docs System wraps a Markdown table in `.b10x-table-wrap`, which scrolls a wide table inside the
+   content column and, when it overflows, takes keyboard focus and names the region. A table
+   outside that wrapper (none today) would push the whole page sideways on mid-size screens; let
+   such a table scroll on its own. Never make the wrapped table itself the scroller: a scrolling
+   box without focus cannot be scrolled by keyboard (UXF-004, axe scrollable-region-focusable). */
+article .markdown :not(.b10x-table-wrap) > table {
   display: block;
   max-inline-size: 100%;
   overflow-x: auto;

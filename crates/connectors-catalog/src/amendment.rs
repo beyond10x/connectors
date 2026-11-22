@@ -84,15 +84,19 @@ struct MediaTypeCorrection {
     to: String,
 }
 
-/// A read the vendor's reference documents and its published document leaves
-/// out: its method, which can only be `get`, its path template and its path
-/// and query parameters. It declares no body and no response.
+/// An operation the vendor's reference documents and its published document
+/// leaves out: its method, `get` for a read or `post` for a write, its path
+/// template and its path and query parameters. A `post` may declare that it
+/// takes a JSON body (`request_media_type`, only `application/json`); a `get`
+/// takes none. It declares no response.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AddedOperation {
     method: String,
     path: String,
     parameters: Vec<Parameter>,
+    #[serde(default)]
+    request_media_type: Option<String>,
 }
 
 /// The only request media type a correction may name: the body the engine
@@ -233,10 +237,11 @@ fn add_parameter(id: &str, parameter: &Parameter, operation: &mut Operation) -> 
     Ok(())
 }
 
-/// The read `added` describes, as an inventory operation named `id`, after
-/// checking it adds a read and changes nothing the source declares: its method
-/// is GET; `id` names no operation in `operations`, the source's with any
-/// amendment before it applied; no GET there has its path; the path starts
+/// The operation `added` describes, as an inventory operation named `id`, after
+/// checking it changes nothing the source declares: its method is GET or POST,
+/// and only a POST declares a request media type, `application/json`; `id`
+/// names no operation in `operations`, the source's with any amendment before
+/// it applied; no operation of its method there has its path; the path starts
 /// with `/` and holds no parenthesised group, query or fragment; its path
 /// parameters are exactly the placeholders of its path, each required and
 /// unrepeated; every other parameter is a named query parameter; no
@@ -249,12 +254,21 @@ fn add_operation(
     added: &AddedOperation,
     operations: &[Operation],
 ) -> Result<Operation, Error> {
-    if added.method != "get" {
+    if added.method != "get" && added.method != "post" {
         return Err(invalid(format!(
-            "`{id}`: an added operation is a read, `get`, not `{}`",
+            "`{id}`: an added operation is a read, `get`, or a write, `post`, not `{}`",
             added.method
         )));
     }
+    let request_media_types = match (added.method.as_str(), added.request_media_type.as_deref()) {
+        (_, None) => Vec::new(),
+        ("post", Some(JSON)) => vec![JSON.to_owned()],
+        (_, Some(other)) => {
+            return Err(invalid(format!(
+                "`{id}`: only an added `post` declares a request media type, and only `{JSON}`, not `{other}`"
+            )));
+        }
+    };
     if operations
         .iter()
         .any(|operation| operation.operation_id.as_deref() == Some(id))
@@ -271,10 +285,11 @@ fn add_operation(
     }
     if operations
         .iter()
-        .any(|operation| operation.method == "get" && operation.path == *path)
+        .any(|operation| operation.method == added.method && operation.path == *path)
     {
         return Err(invalid(format!(
-            "`{id}`: the source already has a GET at `{path}`; an added operation never shadows one"
+            "`{id}`: the source already has a {} at `{path}`; an added operation never shadows one",
+            added.method.to_uppercase()
         )));
     }
     let placeholders = placeholders(path).ok_or_else(|| {
@@ -327,7 +342,7 @@ fn add_operation(
         path: path.clone(),
         operation_id: Some(id.to_owned()),
         parameters: added.parameters.clone(),
-        request_media_types: Vec::new(),
+        request_media_types,
         responses: Vec::new(),
     })
 }
@@ -878,8 +893,61 @@ mod tests {
         assert_eq!(inventory, expected);
     }
 
-    /// An added operation can only be a new read: a method other than GET, an
-    /// `operation_id` the source declares, a path a GET of the source already
+    /// An added POST is a write the source lacks: with `request_media_type`
+    /// `application/json` it takes a JSON body, without one it takes none.
+    /// Another media type, a media type on a GET, and a POST at the path of a
+    /// POST the source already has are refused, and nothing is applied.
+    #[test]
+    fn an_added_post_takes_a_json_body_or_none() {
+        let source = source();
+        let sha = source.source_sha256.clone();
+        let post = |media_type: &str, path: &str, method: &str| {
+            String::from_utf8(added(&sha, &[("UploadSlot", method, path, "[]")]))
+                .unwrap()
+                .replace(
+                    r#""parameters":[]"#,
+                    &format!(r#""parameters":[]{media_type}"#),
+                )
+                .into_bytes()
+        };
+        let json = r#","request_media_type":"application/json""#;
+        for (media_type, posted) in [
+            ("", Vec::new()),
+            (json, vec!["application/json".to_owned()]),
+        ] {
+            let mut inventory = inventory();
+            apply(
+                "amendments.json",
+                &post(media_type, "/v1/uploads", "post"),
+                &source,
+                &mut inventory,
+            )
+            .unwrap();
+            let added = inventory.operations.last().unwrap();
+            assert_eq!(added.method, "post");
+            assert_eq!(added.operation_id.as_deref(), Some("UploadSlot"));
+            assert_eq!(added.request_media_types, posted);
+        }
+        for refused in [
+            post(
+                r#","request_media_type":"multipart/form-data""#,
+                "/v1/uploads",
+                "post",
+            ),
+            post(json, "/v1/uploads", "get"),
+        ] {
+            let mut inventory = inventory();
+            assert!(
+                apply("amendments.json", &refused, &source, &mut inventory).is_err(),
+                "{}",
+                String::from_utf8_lossy(&refused)
+            );
+            assert_eq!(inventory, self::inventory());
+        }
+    }
+
+    /// An added operation can only be a new read or POST: a method other than
+    /// GET or POST, an `operation_id` the source declares, a path a GET of the source already
     /// has, a path without a leading `/` or with a parenthesised group, query
     /// or fragment, a path parameter its template does not name, a
     /// placeholder no path parameter declares, an optional or repeated path
@@ -893,7 +961,7 @@ mod tests {
         let op = "GetAssociatedAlertIds";
         let identifier = r#"{"name":"identifier","location":"path","required":true}"#;
         let mut refused: Vec<Vec<u8>> = [
-            (op, "post", LINK, LINK_PARAMETERS),
+            (op, "put", LINK, LINK_PARAMETERS),
             (op, "delete", LINK, LINK_PARAMETERS),
             ("IncrementalTicketExportCursor", "get", LINK, LINK_PARAMETERS),
             (op, "get", "/api/v2/incremental/tickets/cursor", "[]"),

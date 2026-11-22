@@ -16,7 +16,7 @@ signs in to, value by value, each with the source line it was read from
 ([declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/chatgpt/connector.json)).
 Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
 
-The profile ships no client id. An instance names the one it signs in as in its own configuration
+The profile ships no client id. An instance sets the one it signs in as in its own configuration
 (`oauth2_client_id`), so the instance cannot be derived from the declaration: it pins its
 executable, that executable's SHA-256 and its configuration revision.
 
@@ -40,8 +40,8 @@ The Codex CLI sends the token as `Authorization: Bearer <token>` and the account
   ([Sign in with ChatGPT](https://developers.openai.com/siwc/quickstart)).
 - A client id registered with OpenAI for this sign-in, with `http://127.0.0.1:1455/auth/callback`
   as its redirect. Connectors ships none. The Codex CLI's own client id is in
-  [its source](https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/auth/manager.rs#L1784);
-  whether you may use it is OpenAI's terms' question, not this guide's.
+  [its source](https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/auth/manager.rs#L1784).
+  Whether you may use it is a question for OpenAI's terms.
 - For the device sign-in, device code sign-in switched on in the account's ChatGPT security
   settings.
 
@@ -147,7 +147,7 @@ connectors connections connect --connector chatgpt --instance personal \
   --profile chatgpt.subscription
 ```
 
-Port 1455 must be free; a running Codex CLI sign-in holds it.
+Port 1455 must be free, and a running Codex CLI sign-in holds it.
 
 Without a browser on this machine, sign in with a device code instead. Switch device code sign-in
 on in ChatGPT's security settings before you run the command: the sign-in window starts when the
@@ -158,20 +158,22 @@ connectors connections connect --connector chatgpt --instance personal \
   --profile chatgpt.subscription --device
 ```
 
-The CLI shows a user code and `https://auth.openai.com/codex/device`; enter the code there from
+The CLI shows a user code and `https://auth.openai.com/codex/device`. Enter the code there from
 any browser within about 4 minutes. The CLI waits 240 s, inside the owner's 300 s window for a new
-entry, not the 15 minutes the Codex CLI waits; after that the connect ends as `timeout` and stores
-nothing. Without a terminal it writes the single line
+entry, not the 15 minutes the Codex CLI waits. After that the connect ends as `timeout` and stores
+nothing.
+
+Without a terminal it writes the single line
 `connectors: device-code <code> https://auth.openai.com/codex/device` on standard error. This is
 the ChatGPT device sign-in, not RFC 8628: the code and verifier it ends in are exchanged at the
 token endpoint as the browser's code is.
 
 A server that asks to be polled less often than once inside that window is refused at once as
-`unsupported`, with `next_action: none`, before any poll: running the command again does not help,
-and nothing is stored.
+`unsupported`, with `next_action: none`, before any poll. Running the command again does not
+help, and nothing is stored.
 
 `connections describe` shows the connection `ready`, its `external_identity` the ChatGPT account
-id, the granted scopes and the access token's expiry, never a token.
+id, the granted scopes and the access token's expiry. It does not show a token.
 
 ## A first read
 
@@ -200,8 +202,8 @@ Connectors' approvals and ledger.
 
 ## Reconnect when the connection is Stale
 
-A refresh the server refuses (a revoked sign-in, a spent refresh token) makes the connection
-`stale`; `connections token` and an invoke answer `next_action: repair_connection`. Sign in again
+A refresh the server refuses, after a revoked sign-in or with a spent refresh token, makes the connection
+`stale`, and `connections token` and an invoke answer `next_action: repair_connection`. Sign in again
 on the same connection, by browser or with `--device`. [Reconnect](../guides/reconnect-a-connection.md) `chatgpt/personal`.
 
 A sign-in to another ChatGPT account is refused as an identity mismatch.
@@ -210,16 +212,16 @@ A sign-in to another ChatGPT account is refused as an identity mismatch.
 
 - Verified against a local HTTPS fixture only (`adapters/catalog/tests/local_runtime/chatgpt.rs`
   and `chatgpt_journey.rs`), which answers the shapes of the Codex CLI's source at the pinned
-  commit; no sign-in has run against OpenAI.
-- The core requires the token answer's `token_type` and a positive `expires_in`; the Codex CLI
+  commit. No sign-in has run against OpenAI.
+- The core requires the token answer's `token_type` and a positive `expires_in`. The Codex CLI
   reads the expiry from the token itself, so whether OpenAI's answer carries both is unverified.
-- The redirect port is 1455 only; the Codex CLI's fallback to 1457 is not taken.
+- The redirect port is 1455 only. The Codex CLI's fallback to 1457 is not taken.
 - The device sign-in waits 240 s, not the Codex CLI's 15 minutes, and ends at least 45 s
-  before a new entry's window closes, so the owner can validate and store the entry; that
+  before a new entry's window closes, so the owner can validate and store the entry. That
   window is at most 300 s
   ([acquisition contract, section 5](https://github.com/beyond10x/connectors/blob/main/contracts/auth/acquisition/v1alpha1/semantics.md#5-ordering-limits)).
-- `models.list` sends no `ChatGPT-Account-ID` header, which the Codex CLI sends; whether the
+- `models.list` sends no `ChatGPT-Account-ID` header, which the Codex CLI sends. Whether the
   backend needs it there is unverified.
-- The identity is read from the sign-in's `id_token`; a refresh keeps it and does not read it
+- The identity is read from the sign-in's `id_token`. A refresh keeps it and does not read it
   again.
 - `connections revoke` ends local use and does not sign out at OpenAI.

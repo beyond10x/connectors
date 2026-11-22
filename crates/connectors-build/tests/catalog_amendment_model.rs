@@ -71,10 +71,10 @@ fn every_committed_amendment_file_is_a_value_of_the_catalog_amendment_model() {
             && invariants.contains("defined(add_operation)"),
         "the model no longer requires exactly one change per amendment: {invariants}"
     );
-    // An added operation is a read: the model admits `get` alone.
+    // An added operation is a read or a POST: the model admits `get` and `post` alone.
     assert_eq!(
-        schema["$defs"]["connectors_catalog.amendment.ReadMethod"]["enum"],
-        serde_json::json!(["get"])
+        schema["$defs"]["connectors_catalog.amendment.AddedMethod"]["enum"],
+        serde_json::json!(["get", "post"])
     );
     let validator = jsonschema::validator_for(&schema).unwrap();
     let files = committed();

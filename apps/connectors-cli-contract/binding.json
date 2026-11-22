@@ -304,7 +304,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -568,6 +569,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -957,7 +959,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -1221,6 +1224,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -1577,7 +1581,8 @@
                           "digest_mismatch",
                           "unknown_format_version",
                           "unmet_feature",
-                          "release_invalid"
+                          "release_invalid",
+                          "metadata_missing"
                         ]
                       },
                       "configuration_bytes": {
@@ -1841,6 +1846,7 @@
                           "stop_owner",
                           "upgrade",
                           "choose_clock_source",
+                          "initialize_state",
                           "none"
                         ]
                       },
@@ -2204,7 +2210,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -2468,6 +2475,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -2833,7 +2841,8 @@
                           "digest_mismatch",
                           "unknown_format_version",
                           "unmet_feature",
-                          "release_invalid"
+                          "release_invalid",
+                          "metadata_missing"
                         ]
                       },
                       "configuration_bytes": {
@@ -3097,6 +3106,7 @@
                           "stop_owner",
                           "upgrade",
                           "choose_clock_source",
+                          "initialize_state",
                           "none"
                         ]
                       },
@@ -3460,7 +3470,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -3724,6 +3735,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -4119,7 +4131,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -4383,6 +4396,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -4767,7 +4781,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -5031,6 +5046,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -5429,7 +5445,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -5693,6 +5710,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -6091,7 +6109,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -6355,6 +6374,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -6753,7 +6773,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -7017,6 +7038,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -7415,7 +7437,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -7679,6 +7702,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -8077,7 +8101,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -8341,6 +8366,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -8733,7 +8759,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -8997,6 +9024,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -9403,7 +9431,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -9667,6 +9696,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -10064,7 +10094,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -10328,6 +10359,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -10906,7 +10938,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -11170,6 +11203,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -11659,7 +11693,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -11923,6 +11958,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -12379,7 +12415,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -12643,6 +12680,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -13006,7 +13044,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -13270,6 +13309,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -13704,7 +13744,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -13968,6 +14009,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -14451,7 +14493,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -14715,6 +14758,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -15188,7 +15232,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -15452,6 +15497,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -15830,7 +15876,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -16094,6 +16141,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -16347,6 +16395,7 @@
                       "stop_owner",
                       "upgrade",
                       "choose_clock_source",
+                      "initialize_state",
                       "none"
                     ]
                   },
@@ -16624,7 +16673,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -16888,6 +16938,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -17260,7 +17311,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -17524,6 +17576,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -17864,7 +17917,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -18128,6 +18182,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -18492,7 +18547,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -18756,6 +18812,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -19294,7 +19351,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -19558,6 +19616,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -19958,7 +20017,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -20222,6 +20282,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -20637,7 +20698,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -20901,6 +20963,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -21147,6 +21210,7 @@
                       "stop_owner",
                       "upgrade",
                       "choose_clock_source",
+                      "initialize_state",
                       "none"
                     ]
                   },
@@ -21302,7 +21366,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -21566,6 +21631,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -21918,7 +21984,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -22182,6 +22249,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -22589,7 +22657,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -22853,6 +22922,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -23191,7 +23261,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -23455,6 +23526,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -23979,7 +24051,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -24243,6 +24316,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },
@@ -24576,7 +24650,8 @@
                   "digest_mismatch",
                   "unknown_format_version",
                   "unmet_feature",
-                  "release_invalid"
+                  "release_invalid",
+                  "metadata_missing"
                 ]
               },
               "configuration_bytes": {
@@ -24840,6 +24915,7 @@
                   "stop_owner",
                   "upgrade",
                   "choose_clock_source",
+                  "initialize_state",
                   "none"
                 ]
               },

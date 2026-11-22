@@ -10,7 +10,7 @@ connectors: "gmail"
 # Gmail
 
 The `gmail` connector of the provider Google is served by the catalog provider from the pinned
-Gmail API v1 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Gmail API v1 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Gmail guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-gmail.md)
 has every parameter, paging rule and refusal.
 
@@ -37,7 +37,7 @@ Every list returns one page per call.
 ## Enable the connector and add an instance
 
 Enable `gmail` in a `connectors-local/5` configuration and name one instance per account. The
-instance needs no endpoint (Gmail's default, `https://gmail.googleapis.com`, applies) and no
+instance needs no endpoint, since Gmail's default `https://gmail.googleapis.com` applies, and no
 pin: everything else comes from the declaration shipped with `connectors-catalog-provider`.
 
 ```toml
@@ -51,7 +51,12 @@ profile = "google.oauth"
 
 An instance that names no profile is read-only: it uses `google.oauth.readonly`, requests
 `https://www.googleapis.com/auth/gmail.readonly` alone and offers no draft write. The `profile = "google.oauth"` above
-adds the write scope; connect it with `--profile google.oauth`. A connection saved before this default is under `google.oauth` and is never rebound: keep that profile named to keep it, or `connections revoke` it and connect again. To admit only a company's accounts,
+adds the write scope, and you connect it with `--profile google.oauth`.
+
+A connection saved before this default is under `google.oauth` and is never rebound. Keep that
+profile set to keep the connection, or `connections revoke` it and connect again.
+
+To admit only a company's accounts,
 add `allowed_domains = ["example.org"]` to the table (one to eight domains): a connect, reconnect or
 revalidation whose Google account has another domain, or none, is refused as `insufficient_scope`
 before anything is stored.
@@ -63,7 +68,7 @@ consent of its own.
 
 Hand the client file to `connections connect`. It listens on `127.0.0.1`, prints the consent
 address, and after you consent in a browser on the same machine stores the refresh token in
-custody; the client file itself is not kept. Consent has 240 seconds.
+custody. The client file itself is not kept. Consent has 240 seconds.
 
 ```sh
 connectors connections connect --connector gmail --instance private \
@@ -102,7 +107,7 @@ Create a draft. `draft.json` holds the whole message, RFC 5322 text encoded base
 
 The approval binds the whole
 input by digest, so decode `body.message.raw` and read it before approving. The answer carries the
-draft's `id` and `message.id`. Send it the same way with `users.drafts.send` and this input; a
+draft's `id` and `message.id`. Send it the same way with `users.drafts.send` and this input. A
 draft whose content changed since carries another `message.id`, and the send is refused with
 nothing sent:
 
@@ -112,18 +117,18 @@ nothing sent:
 
 ## Reconnect when the connection is Stale
 
-When Google stops honouring the refresh token (revoked, password changed, or the seven-day
-*Testing* expiry), the connection turns `stale`. [Reconnect](../guides/reconnect-a-connection.md) `gmail/private` with `--credential-file ~/Downloads/client_secret_1234.json`.
+When Google stops honouring the refresh token, after a revocation, a password change or the
+seven-day *Testing* expiry, the connection turns `stale`. [Reconnect](../guides/reconnect-a-connection.md) `gmail/private` with `--credential-file ~/Downloads/client_secret_1234.json`.
 
 Reconnect runs the consent again and replaces the token on the same connection. Another
 account's consent is refused as `identity_mismatch`, and the connection keeps its entry.
 
 ## Limits
 
-- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_gmail.rs`); no live
+- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_gmail.rs`). No live
   mailbox has been read and no live draft created or sent.
-- An answer over 4 MiB is refused as `capacity`; a part over about 3 MiB cannot be read.
-- The provider does not walk pages; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
+- An answer over 4 MiB is refused as `capacity`, and a part over about 3 MiB cannot be read.
+- The provider does not walk pages. [A read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
 - The approval input is capped at 256 KiB, which bounds the size of a draft created under approval.
 - The send's preflight and its POST are two requests: a draft edited between them is sent as
   edited.

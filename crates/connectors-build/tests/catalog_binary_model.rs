@@ -66,7 +66,7 @@ fn compiled(name: &str) -> Value {
     .unwrap()
 }
 
-const MEMBERS: [&str; 4] = ["operation_id", "response", "binary", "download"];
+const MEMBERS: [&str; 5] = ["operation_id", "response", "binary", "download", "upload"];
 
 fn projection(raw: &Value) -> Value {
     Value::Object(
@@ -90,7 +90,7 @@ fn every_shipped_selection_is_a_value_of_the_catalog_binary_model() {
     );
     let validator = jsonschema::validator_for(&schema).unwrap();
     let shipped = shipped();
-    for member in ["binary", "download"] {
+    for member in ["binary", "download", "upload"] {
         assert!(
             shipped.iter().any(|(_, s)| s.get(member).is_some()),
             "no shipped selection declares `{member}`, so this check would not cover it"

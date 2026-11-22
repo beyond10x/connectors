@@ -411,6 +411,11 @@ types:
       - {name: evidence_lifetime_ms, type: Integer}
       - {name: fields, type: "List<connectors.cli.PrivateEntryField>"}
       - {name: acquisition, type: "Optional<connectors.cli.PrivateProfileAcquisition>"}
+      # The digest of the canonical token-exchange recipient
+      # (connectors.auth_bindings.Connection.token_recipient); present only for a
+      # profile that exchanges its material at a token endpoint, and not part of
+      # the declaration the revision digests.
+      - {name: token_recipient, type: "Optional<String>"}
   # Present only for a profile whose entry is acquired by OAuth, in exactly one of
   # two forms, all nonsecret: OAuth consent for a static entry names the authorize
   # and token endpoints and the requested scopes; an oauth2_grant profile names only
@@ -707,13 +712,13 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, authentication_changed, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, authentication_changed, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid, metadata_missing]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop, installed_provider]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, revoke_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, revoke_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, initialize_state, none]
   # Which transient class a `connections revalidate` failure at stage dispatch ended on,
   # after the owner's bounded retries within the revalidation deadline
   # (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). provider_unavailable:
@@ -1938,7 +1943,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1483, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1491, docs/local-connection-registry.md:235-236;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -2098,8 +2103,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1487) and the host
-    # removal path (er.rs:4747-4749) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1495) and the host
+    # removal path (er.rs:4751-4753) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

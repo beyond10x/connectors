@@ -78,9 +78,52 @@ types:
     invariants:
       - path_prefix.count >= 2
 
-  # The members of a selection that make it a binary read. `binary` is declared exactly when the
-  # response is `binary`. A `download` selection is a binary read that reaches at least one host
-  # and names no `operation_id`; every other selection names one.
+  # The request an upload sends first, to the API base: the bundle operation `operation_id`, a
+  # POST with no body, its parameters (by name) bound from references the upload reads
+  # (`body.<key>` of the caller's body, or `content.length`, `content.sha256`,
+  # `content.media_type`, never the bytes), every required one bound. Its answer must hold every
+  # check (one to sixteen, against a literal, a boolean or presence, never an input), and `url`
+  # is the RFC 6901 pointer of the URL the bytes go to. An answer outside 2xx, or one that fails a
+  # check or names no URL, is refused with no byte sent.
+  - name: connectors_catalog.binary.Slot
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      - {name: values, type: "Map<String, String>"}
+      - {name: checks, type: "List<connectors_catalog.guard.Check>"}
+      - {name: url, type: String}
+    invariants:
+      - operation_id.count >= 1
+      - checks.count >= 1
+      - checks.count <= 16
+      - url.count >= 1
+
+  # A write that sends a file's bytes, up to `binary.max_bytes`, under one approval: the `slot`
+  # request, then the bytes as they are in one POST to the slot's URL, and then the selection's
+  # own operation, the completing write, whose JSON body is `send` with each reference replaced.
+  # The caller gives the bytes as `content` (`base64`, standard with padding, `sha256`, their
+  # lower-case hex SHA-256, and an optional `media_type`), so an approval of the input binds the
+  # bytes' digest; content that is not base64, is empty, is longer than `max_bytes` or does not
+  # equal its `sha256` is refused as `invalid_input` before any request. The URL must be `https`
+  # on an origin in `binary.hosts` that the connection admits, under `path_prefix`, or the write
+  # is refused as `forbidden` before any byte is sent. In `send`, an object `{"input": <ref>}`,
+  # with `"optional": true` beside it only as an object member, is replaced by what the
+  # reference names (an absent optional one drops its member), and `{"slot": <pointer>}` by the
+  # value at that pointer of the slot's answer; at least one reference reads the slot. Nothing
+  # is shared before the completing write, so only that write is classified as a write is.
+  - name: connectors_catalog.binary.Upload
+    kind: struct
+    fields:
+      - {name: slot, type: connectors_catalog.binary.Slot}
+      - {name: path_prefix, type: String}
+      - {name: send, type: Json}
+    invariants:
+      - path_prefix.count >= 2
+
+  # The members of a selection that make it a binary read or an upload. `binary` is declared
+  # exactly when the response is `binary`, or on an upload, whose response is not. A `download`
+  # selection is a binary read that reaches at least one host and names no `operation_id`; every
+  # other selection names one. An upload reaches at least one host and is no download.
   - name: connectors_catalog.binary.BinarySelection
     kind: struct
     fields:
@@ -88,13 +131,17 @@ types:
       - {name: response, type: "Optional<connectors_catalog.binary.ResponseKind>"}
       - {name: binary, type: "Optional<connectors_catalog.binary.Binary>"}
       - {name: download, type: "Optional<connectors_catalog.binary.Download>"}
+      - {name: upload, type: "Optional<connectors_catalog.binary.Upload>"}
     invariants:
-      - any: [{not: defined(binary)}, {response: binary}]
+      - any: [{not: defined(binary)}, {response: binary}, defined(upload)]
       - any: [{not: {response: binary}}, defined(binary)]
       - any: [{not: defined(download)}, {response: binary}]
       - any: [{not: defined(download)}, defined(binary.hosts)]
       - any: [{not: defined(download)}, {not: defined(operation_id)}]
       - any: [defined(download), defined(operation_id)]
+      - any: [{not: defined(upload)}, defined(binary.hosts)]
+      - any: [{not: defined(upload)}, {not: {response: binary}}]
+      - any: [{not: defined(upload)}, {not: defined(download)}]
 
   # One origin a connection admits besides its API base. `credential`, when `true`, sends the
   # connection's credential header to it, as Slack's file host requires; otherwise requests to

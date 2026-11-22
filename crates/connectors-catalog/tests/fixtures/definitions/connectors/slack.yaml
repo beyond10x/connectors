@@ -148,3 +148,34 @@ operations:
           - {pointer: /error, values: [file_not_found, file_deleted], code: not_found}
           - {pointer: /error, values: [cant_delete_file], code: forbidden}
     description: Delete one file, the one body.file names, a file id (F…) from files.list or files.info. Answers ok alone. Needs files:write. The token's auth.test is read first and must answer ok true, then files.info on body.file must answer ok true and the same file id, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. file_not_found and file_deleted are refused as not_found, cant_delete_file as forbidden, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied. A second delete of a deleted file is refused before the write, since files.info no longer answers ok true
+  file.upload:
+    op: files_completeUploadExternal
+    effect: write
+    credential: [token]
+    binary: {max_bytes: 2097152, hosts: ["https://files.slack.com"]}
+    upload:
+      slot:
+        op: files_getUploadURLExternal
+        with: {filename: body.filename, length: content.length}
+        expect: {/ok: =true, /file_id: "?"}
+        url: /upload_url
+      path_prefix: /upload/
+      send:
+        channel_id: {input: body.channel_id}
+        files: [{id: {slot: /file_id}, title: {input: body.title}}]
+        initial_comment: {input: body.initial_comment, optional: true}
+        thread_ts: {input: body.thread_ts, optional: true}
+    body:
+      channel_id: string+!
+      thread_ts: string+
+      filename: string+!
+      title: string+!
+      initial_comment: string+
+    guard:
+      before: {read: auth.test, expect: {/ok: =true}}
+      after:
+        expect: {/ok: =true}
+        refusals:
+          - {pointer: /error, values: [channel_not_found], code: not_found}
+          - {pointer: /error, values: [not_in_channel], code: forbidden}
+    description: "Upload one file of at most 2 MiB and share it into the conversation body.channel_id, as a reply in the thread body.thread_ts when given, under body.title, with body.initial_comment as its message when given. content.base64 carries the bytes in standard base64 and content.sha256 their lower-case hex SHA-256, content.media_type optionally their type; body.filename names the file. One write of three requests: files.getUploadURLExternal with filename and length answers upload_url and file_id, the bytes are POSTed to upload_url, which must be an https URL on files.slack.com under /upload/ that the connection admits, and files.completeUploadExternal shares the file. Content that is not base64, empty, over 2 MiB or not equal to its sha256 is refused before any request, and an upload_url the connection does not admit before any byte is sent. The token's auth.test is read first and must answer ok true, or nothing is sent. Nothing is shared before the last request, so every refusal before it shares nothing. Needs files:write, and the bot in the channel. The last answer must carry ok true to be applied; channel_not_found and not_in_channel are refused as not_found and forbidden, each with Slack's error as its reason; any other refusal there is outcome_unknown, never applied"

@@ -10,7 +10,7 @@ connectors: "kubernetes"
 # Kubernetes
 
 The `kubernetes` connector is served by its own executable, `connectors-kubernetes`, not by the
-catalog provider. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+catalog provider. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Kubernetes guide](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md)
 has every field, operation and refusal.
 
@@ -23,13 +23,13 @@ It is a [pinned instance](../guides/pinned-instances.md). Commands that need a c
 | `resources.list`, `resources.get`, `namespaces.list`, `deployments.history`, `endpoints.discover`; when switched on in the native file: `hosts.discover`, `pods.logs`, `contexts.list`, `nodes.list`, `custom_resources.list` and the release reads `helm_releases.history`, `helm_releases.status`, `helm_releases.values`, `helm_releases.manifest` | `pods.exec`, when `pod_exec` is on: one argument vector in one named container, bounded in time and output |
 
 Reads cover only the configured namespaces and the kinds `pods`, `services`, `deployments`,
-`endpointslices`, `replicasets`, `statefulsets` and `events`; there is no wildcard.
+`endpointslices`, `replicasets`, `statefulsets` and `events`, with no wildcard.
 
 ## Prerequisites at the provider
 
 A bearer token for an identity the cluster accepts, such as a service account's token, allowed
-to create a SelfSubjectReview (connecting runs one; a cluster that forbids it refuses the
-connection) and to `list` and `get` the kinds you configure. `pods.exec` needs the cluster's
+to create a SelfSubjectReview and to `list` and `get` the kinds you configure. Connecting runs a
+SelfSubjectReview, and a cluster that forbids it refuses the connection. `pods.exec` needs the cluster's
 permission on the `pods/exec` subresource. Build the executable:
 
 ```sh
@@ -83,7 +83,7 @@ sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/kubernetes.json"]
 ```
 
-Copy `configuration_revision` from the bootstrap verbatim; it is not the SHA-256 of any file. An
+Copy `configuration_revision` from the bootstrap verbatim. It is not the SHA-256 of any file. An
 operation left out of `operations` is refused. In the guide's run:
 
 ```console
@@ -122,7 +122,7 @@ configuration revision, select `private_protocol = "connectors-private/2"` and a
 printf '{"operations":["pods.exec"]}\n' > policy.json
 ```
 
-`exec.json` names the pod, the container and the argument vector; no shell is added:
+`exec.json` holds the pod, the container and the argument vector, and no shell is added:
 
 ```json
 {"namespace":"default","pod":"api-7d4b9c","container":"api","command":["cat","/etc/os-release"],"timeout_seconds":10}
@@ -141,12 +141,13 @@ A token of a different username is refused as an identity mismatch and the saved
 
 ## Limits
 
-- Real-cluster acceptance ran against k3s on 2026-10-02 (the [full guide](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md#run-the-bounded-real-provider-acceptance) shows how to run it):
-  selected reads, an RBAC refusal and the local lifecycle; `pods.logs`, `contexts.list`
-  and `pods.exec` are verified against recorded answers and streams, not a live cluster.
+- Real-cluster acceptance ran against k3s on 2026-10-02 and covered selected reads, an RBAC
+  refusal and the local lifecycle. The [full guide](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md#run-the-bounded-real-provider-acceptance)
+  shows how to run it. `pods.logs`, `contexts.list` and `pods.exec` are verified against
+  recorded answers and streams, not a live cluster.
 - No per-operation permission pre-check: the cluster's own RBAC decision is reported.
-- No watch, log following, interactive exec, port forwarding or other mutation; of Helm, only
-  release-state reads.
-- The token's expiry is not observed; an expired token is reported when next used.
+- No watch, log following, interactive exec, port forwarding or other mutation. Of Helm, only
+  release-state reads are offered.
+- The token's expiry is not observed, and an expired token is reported when next used.
 - After rebuilding the executable, update `sha256` and stop the running process before the next
   command.

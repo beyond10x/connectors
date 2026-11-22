@@ -9,11 +9,11 @@ description: What Connectors is, what it is not, and where it sits among its nei
 
 Connectors gives applications and agents one way to discover and use integrations. A connector
 exposes the typed operations of one provider's API through shared, versioned contracts. You
-configure an instance of it, connect that instance once, and invoke its operations; a caller can
-also reach a connector's service directly or several through an optional federation host.
+configure an instance of it, connect that instance once, and invoke its operations. A caller can
+also reach a connector's service directly, or several through an optional federation host.
 
 The words provider, connector, auth profile, instance, connection and operation are defined once,
-in the [repository README](https://github.com/beyond10x/connectors#vocabulary); this site uses
+in the [repository README](https://github.com/beyond10x/connectors#vocabulary), and this site uses
 them in that sense.
 
 ```mermaid
@@ -25,16 +25,14 @@ flowchart LR
     host --> sql[PostgreSQL service]
 ```
 
-Three ideas carry the rest of this documentation:
-
 - **Contracts describe guarantees.** Inputs and outputs are part of a contract, and so are access,
   lifecycle, partial results, retries and failures. See [Contracts and guarantees](./concepts/contracts.md).
 - **Each connector keeps its provider's meaning.** Kubernetes selectors and PostgreSQL query rules
-  belong to their connector's implementation; shared contracts stay independent of every
+  belong to their connector's implementation. Shared contracts stay independent of every
   provider.
   [Adapters and ownership](./concepts/adapters.md) describes these internal implementations.
 - **Composition connects explicit boundaries.** Discovering a database endpoint does not create a
-  connection or grant access. A host binds its target, credential and authority deliberately.
+  connection or grant access. A host binds its target, credential and authority explicitly.
 
 ## What runs today
 
@@ -51,22 +49,22 @@ Every release is a source release with `connectors` binaries for Linux and macOS
 - The **local `connectors` CLI** keeps connection metadata in Entity Runtime over an Eventlog SQLite
   store and credentials in the platform's keyring, starts the process that serves each configured
   instance and runs approved writes ([local runtime](./concepts/local-runtime.md)).
-- **Standalone services** answer `describe` and `invoke` over HTTP ([getting started](./getting-started.md));
-  a Rust program can put one federation host in front of several
+- **Standalone services** answer `describe` and `invoke` over HTTP ([getting started](./getting-started.md)).
+  A Rust program can put one federation host in front of several
   ([federate services](./guides/federate-adapter-services.md), a host for internal services).
 
 ## What it is not
 
-- Not a hosted service. Nothing here deploys anything; release pages carry Linux and macOS
+- Not a hosted service. Nothing here deploys anything, and release pages carry Linux and macOS
   binaries of the `connectors` command, and package distribution is not configured.
 - Not a credential vault. Custody is the platform's keyring, or a read-only mounted directory in a
-  container; a credential never travels in operation input, and the federation host never holds
+  container. A credential never travels in operation input, and the federation host never holds
   a provider credential.
-- Not a retry layer. No host retries a provider request on its own; an uncertain write stays
+- Not a retry layer. No host retries a provider request on its own. An uncertain write stays
   uncertain and is never sent twice.
 - Not an agent runtime or an MCP server. MCP contracts are specified, and no MCP runtime exists.
 - Not a list of every API it could call. A contract or a specified connector is not an installed
-  capability; the [status page](./status.md) separates the two.
+  capability, and the [status page](./status.md) separates the two.
 
 ## Neighbours
 

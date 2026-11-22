@@ -10,7 +10,7 @@ connectors: "openrouter"
 # OpenRouter
 
 The `openrouter` connector of the provider OpenRouter is served by the catalog provider from the
-pinned OpenRouter OpenAPI document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+pinned OpenRouter OpenAPI document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full OpenRouter guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-openrouter.md)
 has every parameter, refusal and the fixture run its outputs come from.
 
@@ -25,13 +25,13 @@ derived: each pins its executable, that executable's SHA-256 and its configurati
 | management key, instance `router` | `key.get`, `workspaces.list`, `keys.list` | `key.create`, unguarded, under approval; the created key goes into custody and is never returned |
 | created keys, instance `inference` | `key.get` | none |
 
-`keys.list` lists keys by hash, label, limits and usage, never their secrets. Every list returns
+`keys.list` lists keys by hash, label, limits and usage, and not their secrets. Every list returns
 one page per call.
 
 ## Prerequisites at the provider
 
 Create a management key in the OpenRouter settings. It is sent as `Authorization: Bearer <key>`
-under the profile `openrouter.api-key`; the connection's identity is the key record
+under the profile `openrouter.api-key`. The connection's identity is the key record
 `GET /api/v1/key` answers, kind `openrouter.key`, subject its `label`.
 
 ## Enable the connector and add an instance
@@ -65,13 +65,12 @@ sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/catalog.json"]
 ```
 
-The connector name `openrouter` of a pinned instance is a name only; it is not checked against a
-declaration.
+The connector name `openrouter` of a pinned instance is not checked against a declaration.
 
 ## Connect
 
-Enter the management key at the hidden prompt on your terminal; it never goes in an argument or
-the environment:
+Enter the management key at the hidden prompt on your terminal. The key never goes in an argument
+or the environment:
 
 ```sh
 connectors connections connect --connector openrouter --instance router \
@@ -87,19 +86,21 @@ connectors invoke openrouter/router workspaces.list --input-json '{}'
 ## A first guarded write
 
 `key.create` creates an OpenRouter API key with the management key. OpenRouter answers the new key
-once; Connectors puts it straight into custody as a new connection of a second instance and
-returns only that connection's reference and the key's `hash`. The management instance needs
-`key.create` in its operations, a custody table naming the instance and profile that hold created
-keys, a second pinned instance `inference` granted only `key.get`, a [signing key and clock](../guides/guarded-write.md#once-per-instance) and a policy naming the write; the
+once. Connectors puts it straight into custody as a new connection of a second instance and
+returns only that connection's reference and the key's `hash`.
+
+The management instance needs `key.create` in its operations, a custody table that sets the
+instance and profile that hold created keys, a second pinned instance `inference` granted only
+`key.get`, a [signing key and clock](../guides/guarded-write.md#once-per-instance) and a policy that lists the write. The
 [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-openrouter.md#creating-a-key)
-shows each table. Then [prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `key.create` on `openrouter/router` with the input below and `--idempotency-key agent-inference-1`; the input goes in with `--input-json` instead of `--input-file`:
+shows each table. Then [prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `key.create` on `openrouter/router` with the input below and `--idempotency-key agent-inference-1`. The input goes in with `--input-json` instead of `--input-file`:
 
 ```json
 {"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}
 ```
 
 The body is closed to `name`, `limit`, `limit_reset`, `include_byok_in_limit`, `expires_at` and
-`workspace_id`; any other key is refused as `invalid_input` before any request. A second approved
+`workspace_id`. Any other key is refused as `invalid_input` before any request. A second approved
 create makes a second key.
 
 ## Reconnect when the connection is Stale
@@ -109,7 +110,7 @@ A management key OpenRouter refuses makes the connection `stale`. Publish a new 
 ## Limits
 
 - Verified against a local HTTPS fixture only (`adapters/catalog/tests/openrouter.rs`), with
-  synthetic records; nothing has run against a live OpenRouter account.
+  synthetic records. Nothing has run against a live OpenRouter account.
 - Two pinned instances until an OpenRouter connector declaration ships.
 - The provider does not walk pages and does not bound `limit`.
 - Created keys are read only through `key.get`: the management reads answer a created key `403`.

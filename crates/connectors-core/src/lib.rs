@@ -100,6 +100,30 @@ pub struct Operation {
     pub output_schema: Value,
 }
 
+/// The input-schema annotation, no validator asserts it, by which an operation
+/// states that one invocation of it may carry more than [`REQUEST_LIMIT`]
+/// bytes: an integer, at most [`INPUT_BYTES_CEILING`]. A served host reads a
+/// request of that operation up to it, and every other request up to
+/// [`REQUEST_LIMIT`] (contracts/service/compatibility.md § 2.1).
+pub const INPUT_BYTES_KEYWORD: &str = "x-connectors-input-bytes";
+/// The most bytes [`INPUT_BYTES_KEYWORD`] may raise one request to.
+pub const INPUT_BYTES_CEILING: usize = 3 * 1024 * 1024;
+
+impl Operation {
+    /// The most bytes one request of this operation may carry:
+    /// [`REQUEST_LIMIT`], or the larger value its input schema states under
+    /// [`INPUT_BYTES_KEYWORD`], at most [`INPUT_BYTES_CEILING`].
+    pub fn request_limit(&self) -> usize {
+        self.input_schema
+            .get(INPUT_BYTES_KEYWORD)
+            .and_then(Value::as_u64)
+            .and_then(|bytes| usize::try_from(bytes).ok())
+            .map_or(REQUEST_LIMIT, |bytes| {
+                bytes.clamp(REQUEST_LIMIT, INPUT_BYTES_CEILING)
+            })
+    }
+}
+
 /// Whether `value` is a self-contained schema: no reference, identifier or
 /// anchor keyword at any depth. Nesting a schema in another document changes
 /// root-relative reference resolution, so the MCP projection advertises a
@@ -136,6 +160,15 @@ pub struct Descriptor {
 }
 
 impl Descriptor {
+    /// The largest [`Operation::request_limit`] of the operations it lists,
+    /// [`REQUEST_LIMIT`] when none states more.
+    pub fn request_limit(&self) -> usize {
+        self.operations
+            .iter()
+            .map(Operation::request_limit)
+            .fold(REQUEST_LIMIT, usize::max)
+    }
+
     pub fn operation(&self, id: &str) -> Result<&Operation> {
         self.operations
             .iter()

@@ -133,6 +133,7 @@ fn profile() -> runtime::Profile {
             },
         ],
         acquisition: None,
+        token_recipient: None,
     }
 }
 

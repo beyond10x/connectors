@@ -134,6 +134,11 @@ pub(super) async fn invoke(
         Ok(operation) => operation.clone(),
         Err(error) => return refuse(code(error.code), &error.message),
     };
+    // The route read up to the largest operation's limit; this one's own
+    // limit holds now that it is named, before its input is validated.
+    if bytes.len() > operation.request_limit() {
+        return refuse(ErrorCode::Capacity, "request exceeds byte limit");
+    }
     if let Err(error) = validate(&operation.input_schema, &request.input) {
         return refuse(code(error.code), &error.message);
     }

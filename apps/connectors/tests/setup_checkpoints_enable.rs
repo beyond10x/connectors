@@ -254,7 +254,9 @@ fn a_missing_store_is_not_created() {
         ),
         1,
     );
-    assert_eq!(refused["code"], "metadata_unavailable", "{refused}");
+    // Only `setup init` creates a store (issue #268).
+    assert_eq!(refused["code"], "metadata_missing", "{refused}");
     assert_eq!(refused["stage"], "observation", "{refused}");
+    assert_eq!(refused["next_action"], "initialize_state", "{refused}");
     assert!(!root.path().join("state").join(NAME).exists());
 }

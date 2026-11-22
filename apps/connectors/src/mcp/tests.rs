@@ -82,6 +82,7 @@ impl Fixture {
                     max_bytes: 1024,
                 }],
                 acquisition: None,
+                token_recipient: None,
             }],
             requirements: vec![runtime::Requirement {
                 operation: "read".into(),

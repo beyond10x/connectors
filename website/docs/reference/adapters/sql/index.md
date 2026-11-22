@@ -11,7 +11,7 @@ Read relational data and its catalogue with explicit bounds, on PostgreSQL or My
 ## Current capabilities
 
 The SQL adapter serves PostgreSQL and MySQL, chosen per connection by the `engine` member of its
-configuration; a configuration without one is PostgreSQL. Both engines implement the same six
+configuration. A configuration without one is PostgreSQL. Both engines implement the same six
 reads:
 
 | Operation | Reads |
@@ -26,32 +26,38 @@ reads:
 The four catalogue reads each run one fixed statement with the schema and table bound as
 parameters, never written into the statement. Every request uses a fresh connection and a
 read-only transaction (PostgreSQL) or a `READ ONLY` session (MySQL), with fixed statement and
-lock timeouts and an execution deadline. A deadline or a dropped invocation sends PostgreSQL's
+lock timeouts and an execution deadline.
+
+A deadline or a dropped invocation sends PostgreSQL's
 cancel request, or `KILL QUERY` on MySQL, and closes the connection. Under the local CLI the
 session itself is the credential check, and the saved identity is the role or user and the
 database.
 
 Results preserve column names, native type names and values as text or JSON null, under the
-`postgresql-native-text` or `mysql-native-text` profile. On MySQL the catalogue reads (table and
-index reads) and `schema.list` read only the configured database and refuse any other schema as
-`invalid_input`; `query.read` follows the configured user's grants, so a statement may read
-another database the user is granted. `table.describe` of a table that does not exist is `not_found`, and on MySQL
-so is `table.describe` or `index.list` of a table name MySQL cannot hold. The catalogue reads
-hide what the role or user cannot see as the engine's `information_schema` does; on PostgreSQL
-that includes foreign keys into schemas, tables or columns the role cannot see and indexes
-built on hidden columns (a whole-row reference counts as every column). SQLSTATE `0A000` returns `unsupported`.
+`postgresql-native-text` or `mysql-native-text` profile.
+
+On MySQL the catalogue reads (table and index reads) and `schema.list` read only the configured
+database and refuse any other schema as `invalid_input`. `query.read` follows the configured
+user's grants, so a statement may read another database the user is granted. `table.describe` of
+a table that does not exist is `not_found`, and on MySQL so is `table.describe` or `index.list`
+of a table name MySQL cannot hold.
+
+The catalogue reads hide what the role or user cannot see as the engine's `information_schema`
+does. On PostgreSQL that includes foreign keys into schemas, tables or columns the role cannot
+see, and indexes built on hidden columns. A whole-row reference counts as every column. SQLSTATE
+`0A000` returns `unsupported`.
 
 Six real PostgreSQL 17.6 acceptance cases passed on 2026-10-02, covering saved-credential
 restart, joins and UTC boundaries, result bounds, read-only refusals, native invocation-drop
 cancellation and local lifecycle controls. The plaintext loopback fixture does not establish TLS
 or a universal remote cancellation deadline. MySQL and the catalogue reads are verified against
-scripted wire fixtures; the catalogue reads' visibility and name rules were also run against
+scripted wire fixtures. The catalogue reads' visibility and name rules were also run against
 disposable PostgreSQL 17 and MySQL 8.0 servers on 2026-10-09.
 
 ## Access and limits
 
 Configure a restricted database role or user. PostgreSQL queries begin with
-`search_path = pg_catalog, public`; qualify relations in other schemas. Read-only transactions
+`search_path = pg_catalog, public`. Qualify relations in other schemas. Read-only transactions
 and sessions and deadlines are explicit boundaries, not a SQL sandbox for unrestricted
 credentials. The repository's
 [PostgreSQL CLI guide](https://github.com/beyond10x/connectors/blob/main/docs/local-postgres-cli.md)

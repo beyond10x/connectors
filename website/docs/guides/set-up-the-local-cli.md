@@ -3,7 +3,7 @@ title: Set up the local CLI
 sidebar_position: 2
 description: Create the local CLI's private configuration and metadata store, check its prerequisites and configure the instances you will connect.
 lede: setup init creates a private configuration and an Entity Runtime metadata store; setup check says whether this machine can hold credentials before anything asks for one, and an instance needs only a name.
-source: apps/connectors/tests/local_cli.rs, apps/connectors/tests/derived_instance.rs, crates/connectors-host/tests/local_foundation.rs, crates/connectors-host/src/local/config.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
+source: apps/connectors/tests/local_cli.rs, apps/connectors/tests/setup_missing_state.rs, apps/connectors/tests/derived_instance.rs, crates/connectors-host/tests/local_foundation.rs, crates/connectors-host/src/local/config.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
 ---
 
 # Set up the local CLI
@@ -20,7 +20,7 @@ and connection are those of the [README vocabulary](https://github.com/beyond10x
 
 `--config` and `--state-dir` select where they live. Without `--config` the CLI uses
 `$XDG_CONFIG_HOME/connectors/config.toml`, or `~/.config/connectors/config.toml` when
-`XDG_CONFIG_HOME` is unset or empty; without `--state-dir` it uses `$XDG_STATE_HOME/connectors`,
+`XDG_CONFIG_HOME` is unset or empty. Without `--state-dir` it uses `$XDG_STATE_HOME/connectors`,
 or `~/.local/state/connectors` when `XDG_STATE_HOME` is unset or empty. Both must be absolute
 paths:
 
@@ -32,7 +32,7 @@ paths:
 {"error":{"code":"failure","data":{"code":"invalid_configuration","configuration_rule":"config_path_unresolved","kind":"usage","next_action":"check_configuration","stage":"configuration"}},"ok":false}
 ```
 
-With absolute paths it creates them. The answer also names both paths; `jq` keeps the rest:
+With absolute paths it creates them. The answer also carries both paths, and `jq` keeps the rest:
 
 ```sh
 ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
@@ -47,9 +47,9 @@ With absolute paths it creates them. The answer also names both paths; `jq` keep
 }
 ```
 
-The configuration names its owner and no credential. The state directory holds the metadata
+The configuration holds its owner and no credential. The state directory holds the metadata
 store: Entity Runtime records over an Eventlog SQLite database. `setup init` creates it with
-durable open checkpoints, which shorten the provider's own open; every fresh open still verifies
+durable open checkpoints, which shorten the provider's own open. Every fresh open still verifies
 the whole store, so an edit that bypasses SQLite is refused by the next command.
 
 ## Check the prerequisites
@@ -76,21 +76,24 @@ the whole store, so an edit that bypasses SQLite is refused by the next command.
 ```
 
 `setup check` authenticates nowhere. `keyring` is the Linux Secret Service that will hold saved
-credentials; a machine without one cannot save a connection, and the check says so before any
-connect asks for a credential. `custody_backend` names the store custody uses, fixed when the
-binary is built: `secret_service` on Linux, `macos_keychain` on macOS and
-`windows_credential_manager` on Windows. `installed_provider` is the `connectors-catalog-provider`
-in the directory of `connectors`, which derives every instance that pins nothing: it is `ready`
-when it prints its version, and otherwise `failed` with `installed_provider_failure` naming why
-(`missing`, `not_executable`, `killed`, `exited`, `deadline` or `unreadable_output`).
+credentials. A machine without one cannot save a connection, and the check says so before any
+connect asks for a credential.
+
+`custody_backend` is the store custody uses, fixed when the binary is built: `secret_service` on
+Linux, `macos_keychain` on macOS and `windows_credential_manager` on Windows.
+
+`installed_provider` is the `connectors-catalog-provider` in the directory of `connectors`, which
+derives every instance that pins nothing. It is `ready` when it prints its version. Otherwise it
+is `failed`, and `installed_provider_failure` gives the reason: `missing`, `not_executable`,
+`killed`, `exited`, `deadline` or `unreadable_output`.
 
 A headless host or a container has no Secret Service. There, a `connectors-local/4` or
 `connectors-local/5` configuration can select the read-only `mounted_secret` binding with a
-`[custody]` table: it
-reads each credential from a read-only mounted directory, such as a Kubernetes Secret volume,
-and writes nothing. It is never chosen on its own; without the table an unusable Secret Service
-still refuses with `custody_unavailable`. Under it `setup check` reports
+`[custody]` table. The binding reads each credential from a read-only mounted directory, such as
+a Kubernetes Secret volume, and writes nothing. Only that table selects it. Without the table, an
+unusable Secret Service still refuses with `custody_unavailable`. Under it `setup check` reports
 `custody_backend: mounted_secret` and a `mounted_custody` prerequisite.
+
 [Mounted-secret custody](https://github.com/beyond10x/connectors/blob/main/docs/local-mounted-secret-custody.md)
 describes the binding and its threat model, and
 [running in a container](https://github.com/beyond10x/connectors/blob/main/docs/local-container.md)
@@ -122,13 +125,14 @@ endpoint = "https://gitlab.example.com"
 EOF
 ```
 
-`gmail/private` uses Gmail's default endpoint; `gitlab/work` names a self-hosted GitLab host.
+`gmail/private` uses Gmail's default endpoint. `gitlab/work` points at a self-hosted GitLab host.
 Neither pins anything else: `connectors` derives each instance from the
-`connectors-catalog-provider` in its own directory and the connector declaration shipped with it,
-which give the executable and its SHA-256, the configuration revision and every operation. A
-connector that declares more than one auth profile (Zendesk) also takes `profile` on the
-instance. `default_instance` selects an instance for a command that names none; `invoke` always
-names its connector and does not read it.
+`connectors-catalog-provider` in its own directory and the connector declaration shipped with it.
+These give the executable and its SHA-256, the configuration revision and every operation.
+
+A connector that declares more than one auth profile (Zendesk) also takes `profile` on the
+instance. `default_instance` selects an instance for a command that names none. `invoke` takes
+its connector in every call and does not read `default_instance`.
 
 ```sh
 ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list \
@@ -140,8 +144,8 @@ names its connector and does not read it.
 {"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}
 ```
 
-Each item names its instance by connector and instance only. A command that acts on one instance
-names it with `--connector` and `--instance`; no connection exists yet:
+Each item identifies its instance by connector and instance only. A command that acts on one
+instance takes `--connector` and `--instance`. Here no connection exists yet:
 
 ```sh
 ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
@@ -156,7 +160,7 @@ names it with `--connector` and `--instance`; no connection exists yet:
 
 `invoke` takes the connector and, after a `/`, the instance, then the operation. The instance may
 be left out while the connector has only one, and the input is read from standard input when no
-input flag is given. The connection, schema and revision default to the instance's own; without a
+input flag is given. The connection, schema and revision default to the instance's own. Without a
 connection the call is refused before anything is started:
 
 ```sh
@@ -187,20 +191,85 @@ connection.
 ```
 
 A configuration with legacy pinned entries keeps working, and `setup migrate` moves them to
-instances; the [README](https://github.com/beyond10x/connectors#move-a-legacy-configuration)
-shows it.
+instances, as the [README](https://github.com/beyond10x/connectors#move-a-legacy-configuration)
+shows.
+
+## Reset a grown metadata store
+
+The store keeps every record it is given, and nothing prunes it yet: each read adds about 35 KB
+([#267](https://github.com/beyond10x/connectors/issues/267)), and every fresh open verifies the
+whole store, so commands slow down as it grows. Until the store has retention, the remedy is a
+new store in the same state directory. The configuration stays as it is. Everything the old store
+recorded is gone from the new one: connections, list cursors, approvals and cached descriptions.
+Each instance connects again afterwards.
+
+First stop the owner, so that no process holds the store:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  --output json setup owner-stop | jq '{ok, disposition: .result.disposition}'
+```
+
+```json
+{
+  "ok": true,
+  "disposition": "no_owner"
+}
+```
+
+Move the store aside: `metadata.sqlite3` and, where they exist, its `metadata.sqlite3-wal` and
+`metadata.sqlite3-shm` files. Leave every other file in the state directory where it is,
+`metadata.lock` and `registry-clock.floor` included. Do not replace the whole directory.
+
+```sh
+mkdir "$PWD/cli/store-aside" && mv "$PWD"/cli/state/metadata.sqlite3* "$PWD/cli/store-aside/"
+```
+
+A command that reads the store now names the missing store and the command that creates it:
+`metadata_missing` with `next_action` `initialize_state`, exit status 1. Running the command again
+does not change that answer:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  connections list --connector gitlab --instance work
+```
+
+```text
+failure: {"code":"metadata_missing","kind":"operational","next_action":"initialize_state","stage":"observation"}
+```
+
+`setup init` with the existing configuration creates the new store and leaves the configuration
+unchanged:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  --output json setup init | jq '{ok, disposition: .result.disposition}'
+```
+
+```json
+{
+  "ok": true,
+  "disposition": "state_initialized"
+}
+```
+
+Then connect each instance again with `connections connect` (see [Next](#next)). With Secret
+Service custody, the old connections' items stay in the keyring under the old store's authority:
+`setup custody-orphans` lists them, and `setup custody-orphans --mode remove --authority <id>`
+deletes them once you no longer need the store you moved aside.
 
 ## After an upgrade
 
 An owner the previous binary started keeps running after an upgrade, and commands that need it
-are refused as `owner_build_mismatch`; [Upgrade the CLI](./upgrade-the-cli.md#after-an-upgrade)
+are refused as `owner_build_mismatch`. [Upgrade the CLI](./upgrade-the-cli.md#after-an-upgrade)
 shows how `setup owner-stop` retires it, and what a state directory admits across versions.
 
 ## Next
 
 `connections connect --connector <connector> --instance <instance> --profile <profile>`
-validates a credential through the named auth profile (`gitlab.pat` for GitLab; each connector's
-page names its profiles) and saves it in custody; each instance holds one connection.
+validates a credential through the named auth profile and saves it in custody. The profile is
+`gitlab.pat` for GitLab, and each connector's page lists its profiles. Each instance holds one
+connection.
 [The local runtime](../concepts/local-runtime.md) explains what the owner, custody and the
 metadata store guarantee, the
 [runtime binding](https://github.com/beyond10x/connectors/blob/main/docs/local-runtime-foundation.md)

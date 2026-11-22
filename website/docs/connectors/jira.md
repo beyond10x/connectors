@@ -10,7 +10,7 @@ connectors: "jira"
 # Jira
 
 The `jira` connector of the provider Atlassian is served by the catalog provider from the pinned
-Jira Cloud platform REST v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Jira Cloud platform REST v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Jira guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) has
 every parameter, paging rule and refusal.
 
@@ -30,13 +30,13 @@ email and the token, sent as HTTP basic. Atlassian API tokens expose no scope li
 connecting checks the identity, not scopes.
 
 A service-account token or an OAuth access token works only through the Atlassian API gateway,
-which a derived instance cannot express; the
+which a derived instance cannot express. The
 [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md#through-the-api-gateway)
 shows that pinned form and why.
 
 ## Enable the connector and add an instance
 
-The connector has no default endpoint: the instance names its site's REST v3 root.
+The connector has no default endpoint: the instance sets its site's REST v3 root.
 
 ```toml
 [connectors.jira]
@@ -94,7 +94,7 @@ refused as `conflict` with nothing sent:
 {"issueIdOrKey":"PROJ-1","updated_stamp":"2026-10-01T09:00:00.000+0000","body":{"fields":{"summary":"Edited summary"}}}
 ```
 
-A description or comment is an Atlassian Document Format value you write; plain text is not
+A description or comment is an Atlassian Document Format value you write, and plain text is not
 converted. The [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md#issue-writes)
 lists each write's input and guard.
 
@@ -105,11 +105,11 @@ connection. [Reconnect](../guides/reconnect-a-connection.md) `jira/work` with `-
 
 ## Limits
 
-- Live, only the gateway form with a service-account token has run (`issues.search` returned
-  issues on 2026-09-30); the site form, the other reads and the six writes are checked against
+- Live, only the gateway form with a service-account token has run: `issues.search` returned
+  issues on 2026-09-30. The site form, the other reads and the six writes are checked against
   local fixtures in the pinned document's shapes.
-- A create or comment approved and sent twice is made twice; a link is not read back.
-- The provider does not walk pages or bound `maxResults`; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
+- A create or comment approved and sent twice is made twice. A link is not read back.
+- The provider does not walk pages or bound `maxResults`. [A read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
 - `attachment.content` reads at most 2 MiB.
 - The OAuth gateway form is not verified live, and the provider does not refresh an OAuth token.
 - The issue feed (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), profile `jira-issues/1`,

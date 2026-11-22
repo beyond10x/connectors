@@ -75,6 +75,7 @@ fn profile(id: &str, acquisition: Option<runtime::Acquisition>) -> runtime::Prof
             max_bytes: 1024,
         }],
         acquisition,
+        token_recipient: None,
     }
 }
 

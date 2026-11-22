@@ -872,11 +872,13 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     );
     let error: Value = serde_json::from_slice(&stale.stderr).unwrap();
     assert_eq!(error["error"]["data"]["code"], "stale_cursor");
-    // Authority loss must not become a successful empty list or recreate state.
+    // Authority loss must not become a successful empty list or recreate state;
+    // a store that is gone names `setup init` (issue #268).
     fs::remove_file(root.path().join("state/metadata.sqlite3")).unwrap();
     let unavailable = command(&root, &["connections", "list", "--adapter", "forge"]);
     let error: Value = serde_json::from_slice(&unavailable.stderr).unwrap();
-    assert_eq!(error["error"]["data"]["code"], "metadata_unavailable");
+    assert_eq!(error["error"]["data"]["code"], "metadata_missing");
+    assert_eq!(error["error"]["data"]["next_action"], "initialize_state");
     assert!(!root.path().join("state/metadata.sqlite3").exists());
     // Unix only: a configuration readable by group and other is refused.
     #[cfg(unix)]

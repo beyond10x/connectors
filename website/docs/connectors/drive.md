@@ -10,7 +10,7 @@ connectors: "drive"
 # Google Drive
 
 The `drive` connector of the provider Google is served by the catalog provider from the pinned
-Drive API v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Drive API v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Drive guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-drive.md)
 has every parameter, paging rule and refusal.
 
@@ -24,11 +24,11 @@ has every parameter, paging rule and refusal.
 
 `files.getMedia` reads an uploaded file's content, such as a PDF, under the read-only Drive scope.
 It answers the bytes as base64 with their media type, length and SHA-256, and refuses a file over
-2 MiB as `capacity`; the printed refusal carries no size, so read `size` with `files.get` to learn
+2 MiB as `capacity`. The printed refusal carries no size, so read `size` with `files.get` to learn
 it. A Google Docs, Sheets or Slides file has no bytes to download and is refused as forbidden, with
 a reason telling you to read it with `files.export`.
 
-The writes carry metadata only; no write uploads file content. A metadata write can still move,
+The writes carry metadata only, and no write uploads file content. A metadata write can still move,
 trash, lock or re-share a file, so read the whole input before approving.
 
 ## Prerequisites at the provider
@@ -52,7 +52,12 @@ profile = "google.oauth"
 
 An instance that names no profile is read-only: it uses `google.oauth.readonly`, requests
 `https://www.googleapis.com/auth/drive.readonly` alone and offers no file write. The `profile = "google.oauth"` above
-adds the write scope; connect it with `--profile google.oauth`. A connection saved before this default is under `google.oauth` and is never rebound: keep that profile named to keep it, or `connections revoke` it and connect again. To admit only a company's accounts,
+adds the write scope, and you connect it with `--profile google.oauth`.
+
+A connection saved before this default is under `google.oauth` and is never rebound. Keep that
+profile set to keep the connection, or `connections revoke` it and connect again.
+
+To admit only a company's accounts,
 add `allowed_domains = ["example.org"]` to the table (one to eight domains): a connect, reconnect or
 revalidation whose Google account has another domain, or none, is refused as `insufficient_scope`
 before anything is stored.
@@ -67,7 +72,7 @@ connectors connections connect --connector drive --instance private \
   --profile google.oauth --credential-file ~/Downloads/client_secret_1234.json
 ```
 
-The command prints a consent address; consent in a browser on the same machine within 240
+The command prints a consent address. Consent in a browser on the same machine within 240
 seconds. A consent granting only one of the two Drive scopes fails validation as insufficient
 scope. `gmail.private` and `drive.private` are two instances and two consents.
 
@@ -113,10 +118,10 @@ Google no longer honours the refresh token and the connection turns `stale`. [Re
 
 ## Limits
 
-- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_drive.rs`); no live
+- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_drive.rs`). No live
   Drive account has been read and no live file written.
 - `files.update` cannot update a shared-drive file yet: its preflight read does not carry
   `supportsAllDrives`.
-- The `version` pin is checked before the PATCH only; Drive offers no precondition on it.
+- The `version` pin is checked before the PATCH only, because Drive offers no precondition on it.
 - What `drive.file` lets a token write is Google's stated scope semantics, not observed here.
-- The provider does not walk pages; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
+- The provider does not walk pages. [A read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).

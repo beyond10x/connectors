@@ -10,7 +10,7 @@ connectors: "slides"
 # Google Slides
 
 The `slides` connector of the provider Google is served by the catalog provider from the pinned
-Slides API v1 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Slides API v1 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Slides guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-slides.md)
 has every parameter and refusal.
 
@@ -59,7 +59,7 @@ connectors invoke slides/private presentations.get \
   --input-json '{"presentationId":"<id>","fields":"revisionId,slides(objectId)"}'
 ```
 
-`fields` narrows the answer, which matters because any answer over 4 MiB is refused.
+`fields` narrows the answer, and any answer over 4 MiB is refused.
 
 ## A first guarded write
 
@@ -77,7 +77,7 @@ Add a slide at the revision the read above answered, in `slide.json`:
 
 [Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `presentations.batchUpdate` on `slides/private` with `slide.json`, `--idempotency-key slide-1`.
 
-A deck edited since you read it is refused with no POST; Google checks the pinned revision again
+A deck edited since you read it is refused with no POST. Google checks the pinned revision again
 and applies the requests all or none.
 
 ## Reconnect when the connection is Stale
@@ -86,13 +86,13 @@ Google no longer honours the refresh token and the connection turns `stale`. [Re
 
 ## Limits
 
-- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_slides.rs`); no live
+- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_slides.rs`), and no live
   presentation has been read, created or changed.
 - The preflight reads the whole presentation: a deck whose full answer exceeds 4 MiB cannot be
   updated through this connector.
 - A view-only account cannot update: its preflight gets no `revisionId` and fails as
   `upstream_protocol`.
-- An image URL in a request is published with the image; never use a thumbnail `contentUrl` as
+- An image URL in a request is published with the image, so do not use a thumbnail `contentUrl` as
   one.
-- Comment requests are Developer Preview and can fail inside a `200`; read
+- Comment requests are Developer Preview and can fail inside a `200`, so read
   `commentUpdateState` in the answer.

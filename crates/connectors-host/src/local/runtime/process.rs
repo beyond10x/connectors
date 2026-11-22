@@ -1412,6 +1412,7 @@ executable: None,
                 minimum_scopes:BTreeSet::new(),evidence_lifetime_ms:60_000,
                 fields:vec![EntryField{name:"token".into(),label:"Fictional credential".into(),max_bytes:100}],
                 acquisition:None,
+                token_recipient: None,
             }],
             requirements:vec![Requirement{operation:"read".into(),custody:false,profile:"fixture".into(),scopes:BTreeSet::new(),effect:Effect::Read}],
         }

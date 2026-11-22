@@ -38,6 +38,11 @@ pub trait Adapter: Send + Sync {
     ) -> Result<Box<dyn PreparedWrite>> {
         Err(Failure::Unsupported)
     }
+    /// The refusal an input earns from itself alone, which a host answers
+    /// before it records or sends anything. By default none.
+    fn admit(&self, _operation: &str, _input: &Value) -> connectors_core::Result<()> {
+        Ok(())
+    }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline>;
     /// [`Adapter::validate`] with the reason beside `insufficient_scope` when
     /// every alternative binding was refused (private-adapter.md,

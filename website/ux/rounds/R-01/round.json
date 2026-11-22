@@ -1,0 +1,2080 @@
+{
+ "round": "R-01",
+ "generated_by": "npm run ux:round",
+ "gates": {
+  "1366x768": {
+   "light": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 1,
+    "gate4": 1,
+    "gate5": 77,
+    "gate5_rules": [
+     "link-in-text-block",
+     "scrollable-region-focusable"
+    ],
+    "axe_lesser": 0,
+    "pages": 171,
+    "held": 168,
+    "axeRan": true,
+    "botRan": true
+   },
+   "dark": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 1,
+    "gate4": 0,
+    "gate5": 78,
+    "gate5_rules": [
+     "link-in-text-block",
+     "scrollable-region-focusable"
+    ],
+    "axe_lesser": 0,
+    "pages": 171,
+    "held": 170,
+    "axeRan": true,
+    "botRan": true
+   }
+  },
+  "1280x720": {
+   "light": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 1,
+    "gate4": 0,
+    "gate5": 81,
+    "gate5_rules": [
+     "link-in-text-block",
+     "scrollable-region-focusable"
+    ],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 14,
+    "axeRan": true,
+    "botRan": true
+   },
+   "dark": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 0,
+    "gate5_rules": [],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 14,
+    "axeRan": false,
+    "botRan": false
+   }
+  },
+  "1440x900": {
+   "light": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 33,
+    "gate5_rules": [
+     "link-in-text-block"
+    ],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 14,
+    "axeRan": true,
+    "botRan": true
+   },
+   "dark": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 0,
+    "gate5_rules": [],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 14,
+    "axeRan": false,
+    "botRan": false
+   }
+  },
+  "1024x768": {
+   "light": {
+    "gate1": 2,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 33,
+    "gate5_rules": [
+     "link-in-text-block"
+    ],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 14,
+    "axeRan": true,
+    "botRan": true
+   },
+   "dark": {
+    "gate1": 2,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 0,
+    "gate5_rules": [],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 14,
+    "axeRan": false,
+    "botRan": false
+   }
+  },
+  "768x1024": {
+   "light": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 5,
+    "gate5": 34,
+    "gate5_rules": [
+     "link-in-text-block"
+    ],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 0,
+    "axeRan": true,
+    "botRan": true
+   },
+   "dark": {
+    "gate1": 0,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 0,
+    "gate5_rules": [],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 0,
+    "axeRan": false,
+    "botRan": false
+   }
+  },
+  "390x844": {
+   "light": {
+    "gate1": 3,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 5,
+    "gate5": 33,
+    "gate5_rules": [
+     "link-in-text-block",
+     "scrollable-region-focusable"
+    ],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 0,
+    "axeRan": true,
+    "botRan": true
+   },
+   "dark": {
+    "gate1": 3,
+    "gate2": 0,
+    "gate3": 0,
+    "gate4": 0,
+    "gate5": 0,
+    "gate5_rules": [],
+    "axe_lesser": 0,
+    "pages": 15,
+    "held": 0,
+    "axeRan": false,
+    "botRan": false
+   }
+  }
+ },
+ "tasks": {
+  "cli-invoke": {
+   "screen_only.actions": 13,
+   "screen_only.looks": 10,
+   "screen_only.steers": 0,
+   "screen_only.time_to_act_steps.max": 3,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 3,
+   "reading_load.max": 248,
+   "reading_load.median": 221,
+   "layout_shift.score": 0.028,
+   "completion_miss": 0,
+   "false_complete": 0,
+   "keyboard.presses": 72
+  },
+  "exit-code-walk": {
+   "screen_only.actions": 6,
+   "screen_only.looks": 3,
+   "screen_only.steers": 0,
+   "screen_only.time_to_act_steps.max": 0,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 2,
+   "reading_load.max": 505,
+   "reading_load.median": 290,
+   "layout_shift.score": 0.005,
+   "completion_miss": 0,
+   "false_complete": 0
+  },
+  "exit-status-older-binary": {
+   "screen_only.actions": 30,
+   "screen_only.looks": 23,
+   "screen_only.steers": 3,
+   "screen_only.time_to_act_steps.max": 5,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 3,
+   "reading_load.max": 344,
+   "reading_load.median": 225,
+   "layout_shift.score": 0.028,
+   "completion_miss": 1,
+   "false_complete": 0,
+   "keyboard.presses": 56
+  },
+  "install-command": {
+   "screen_only.actions": 4,
+   "screen_only.looks": 2,
+   "screen_only.steers": 0,
+   "screen_only.time_to_act_steps.max": 1,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 3,
+   "reading_load.max": 257,
+   "reading_load.median": 195,
+   "layout_shift.score": 0,
+   "completion_miss": 0,
+   "false_complete": 0,
+   "keyboard.presses": 7
+  },
+  "onboarding-gitlab": {
+   "screen_only.actions": 27,
+   "screen_only.looks": 23,
+   "screen_only.steers": 2,
+   "screen_only.time_to_act_steps.max": 8,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 3,
+   "reading_load.max": 426,
+   "reading_load.median": 208,
+   "layout_shift.score": 0,
+   "completion_miss": 0,
+   "false_complete": 1,
+   "keyboard.presses": 61
+  },
+  "onboarding-slack": {
+   "screen_only.actions": 2,
+   "screen_only.looks": 0,
+   "screen_only.steers": 0,
+   "screen_only.time_to_act_steps.max": 0,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 2,
+   "reading_load.max": 221,
+   "reading_load.median": 195,
+   "layout_shift.score": 0,
+   "completion_miss": 0,
+   "false_complete": 0,
+   "keyboard.presses": 30
+  },
+  "status-pod-exec": {
+   "screen_only.actions": 16,
+   "screen_only.looks": 15,
+   "screen_only.steers": 0,
+   "screen_only.time_to_act_steps.max": 0,
+   "glance_cost.median": 2,
+   "glance_cost.p95": 2,
+   "reading_load.max": 403,
+   "reading_load.median": 297,
+   "layout_shift.score": 0,
+   "completion_miss": 0,
+   "false_complete": 0,
+   "keyboard.presses": 23
+  }
+ },
+ "runs": [
+  {
+   "task": "cli-invoke",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 12,
+    "screen_only.looks": 9,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 224,
+    "reading_load.median": 195,
+    "layout_shift.score": 0.016,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "cli-invoke",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 13,
+    "screen_only.looks": 10,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 3,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 223,
+    "reading_load.median": 208,
+    "layout_shift.score": 0.024,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "cli-invoke",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 11,
+    "screen_only.looks": 8,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 248,
+    "reading_load.median": 221,
+    "layout_shift.score": 0.028,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "cli-invoke",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 11,
+    "screen_only.looks": 8,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 248,
+    "reading_load.median": 221,
+    "layout_shift.score": 0.028,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "cli-invoke",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 11,
+    "screen_only.looks": 8,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 317,
+    "reading_load.median": 267,
+    "layout_shift.score": 0.037,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "cli-invoke",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 24,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 3,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 195,
+    "reading_load.median": 138,
+    "layout_shift.score": 0.018,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "cli-invoke",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 27,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 247,
+    "reading_load.median": 234,
+    "layout_shift.score": 0.075,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 7,
+    "screen_only.looks": 4,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 358,
+    "reading_load.median": 216,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 6,
+    "screen_only.looks": 3,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 449,
+    "reading_load.median": 276,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 5,
+    "screen_only.looks": 2,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 505,
+    "reading_load.median": 290,
+    "layout_shift.score": 0.005,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 5,
+    "screen_only.looks": 2,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 505,
+    "reading_load.median": 290,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 5,
+    "screen_only.looks": 2,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 545,
+    "reading_load.median": 337,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 25,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 3,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 146,
+    "reading_load.median": 140,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-code-walk",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 26,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 276,
+    "reading_load.median": 276,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 5,
+    "screen_only.looks": 3,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 222,
+    "reading_load.median": 190,
+    "layout_shift.score": 0.016,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 5,
+    "screen_only.looks": 3,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 243,
+    "reading_load.median": 220,
+    "layout_shift.score": 0.024,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 6,
+    "screen_only.looks": 4,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 246,
+    "reading_load.median": 225,
+    "layout_shift.score": 0.028,
+    "completion_miss": 1,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 23,
+    "screen_only.steers": 3,
+    "screen_only.time_to_act_steps.max": 5,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 344,
+    "reading_load.median": 224,
+    "layout_shift.score": 0.028,
+    "completion_miss": 1,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 3,
+    "screen_only.looks": 1,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 1,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 317,
+    "reading_load.median": 291,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 25,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 2,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 191,
+    "reading_load.median": 139,
+    "layout_shift.score": 0.018,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "exit-status-older-binary",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 27,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 247,
+    "reading_load.median": 234,
+    "layout_shift.score": 0.075,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 3,
+    "screen_only.looks": 1,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 232,
+    "reading_load.median": 177,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 4,
+    "screen_only.looks": 2,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 1,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 254,
+    "reading_load.median": 175,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 3,
+    "screen_only.looks": 1,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 257,
+    "reading_load.median": 195,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 3,
+    "screen_only.looks": 1,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 257,
+    "reading_load.median": 195,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 4,
+    "screen_only.looks": 2,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 1,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 310,
+    "reading_load.median": 234,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 27,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 180,
+    "reading_load.median": 180,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "install-command",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 27,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 194,
+    "reading_load.median": 191,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 196,
+    "reading_load.median": 160,
+    "layout_shift.score": 0.112,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 27,
+    "screen_only.looks": 23,
+    "screen_only.steers": 2,
+    "screen_only.time_to_act_steps.max": 8,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 426,
+    "reading_load.median": 208,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 1
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 3,
+    "screen_only.looks": 1,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 1,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 221,
+    "reading_load.median": 195,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 221,
+    "reading_load.median": 195,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 234,
+    "reading_load.median": 234,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 4,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 167,
+    "reading_load.median": 98,
+    "layout_shift.score": 0.018,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-gitlab",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 4,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 247,
+    "reading_load.median": 194,
+    "layout_shift.score": 0.075,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 196,
+    "reading_load.median": 160,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 220,
+    "reading_load.median": 175,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 221,
+    "reading_load.median": 195,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 221,
+    "reading_load.median": 195,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 2,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 291,
+    "reading_load.median": 234,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 5,
+    "screen_only.looks": 1,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 1,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 3,
+    "reading_load.max": 161,
+    "reading_load.median": 129,
+    "layout_shift.score": 0.018,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "onboarding-slack",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 4,
+    "screen_only.looks": 0,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 247,
+    "reading_load.median": 194,
+    "layout_shift.score": 0.075,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "1024x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 22,
+    "screen_only.looks": 21,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 322,
+    "reading_load.median": 216,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "1280x720",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 16,
+    "screen_only.looks": 15,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 353,
+    "reading_load.median": 273,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "1366x768",
+   "theme": "dark",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 14,
+    "screen_only.looks": 13,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 403,
+    "reading_load.median": 297,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "1366x768",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 14,
+    "screen_only.looks": 13,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 403,
+    "reading_load.median": 297,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "1440x900",
+   "theme": "light",
+   "done": true,
+   "metrics": {
+    "screen_only.actions": 12,
+    "screen_only.looks": 11,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 436,
+    "reading_load.median": 357,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "390x844",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 27,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 163,
+    "reading_load.median": 163,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  },
+  {
+   "task": "status-pod-exec",
+   "viewport": "768x1024",
+   "theme": "light",
+   "done": false,
+   "metrics": {
+    "screen_only.actions": 30,
+    "screen_only.looks": 27,
+    "screen_only.steers": 0,
+    "screen_only.time_to_act_steps.max": 0,
+    "glance_cost.median": 2,
+    "glance_cost.p95": 2,
+    "reading_load.max": 229,
+    "reading_load.median": 229,
+    "layout_shift.score": 0,
+    "completion_miss": 0,
+    "false_complete": 0
+   }
+  }
+ ],
+ "keyboard": [
+  {
+   "task": "cli-invoke",
+   "done": true,
+   "presses": 72,
+   "path": [
+    "Documentation",
+    "REFERENCE",
+    "connectors CLI"
+   ],
+   "focusVisible": true,
+   "drift": 0
+  },
+  {
+   "task": "exit-status-older-binary",
+   "done": true,
+   "presses": 56,
+   "path": [
+    "Documentation",
+    "Upgrade the CLI"
+   ],
+   "focusVisible": true,
+   "drift": 0
+  },
+  {
+   "task": "install-command",
+   "done": true,
+   "presses": 7,
+   "path": [
+    "Get started"
+   ],
+   "focusVisible": true,
+   "drift": 0
+  },
+  {
+   "task": "onboarding-gitlab",
+   "done": true,
+   "presses": 61,
+   "path": [
+    "Documentation",
+    "GitLab"
+   ],
+   "focusVisible": true,
+   "drift": 1
+  },
+  {
+   "task": "onboarding-slack",
+   "done": true,
+   "presses": 30,
+   "path": [
+    "Documentation",
+    "Slack"
+   ],
+   "focusVisible": true,
+   "drift": 0
+  },
+  {
+   "task": "status-pod-exec",
+   "done": true,
+   "presses": 23,
+   "path": [
+    "Status"
+   ],
+   "focusVisible": true,
+   "drift": 0
+  }
+ ],
+ "violation_groups": [
+  {
+   "gate": 2,
+   "what": "sidebar",
+   "detail": "outside the viewport [0,-309,300,385]; covered at centre",
+   "count": 392,
+   "viewports": [
+    "1024x768",
+    "1280x720",
+    "1366x768"
+   ],
+   "themes": [
+    "light",
+    "dark"
+   ],
+   "routes": [
+    "/docs",
+    "/docs/concepts/governed-invocation",
+    "/docs/connectors",
+    "/docs/connectors/gitlab",
+    "/docs/reference/adapters/kubernetes",
+    "/docs/reference/cli",
+    "/docs/reference/contracts/cli",
+    "/docs/reference/contracts/model/domains/connectors-mutations",
+    "/docs/status",
+    "/docs/connectors/slack",
+    "/docs/examples/contract-exercises",
+    "/docs/examples/follow-a-request"
+   ],
+   "route_count": 170
+  },
+  {
+   "gate": 2,
+   "what": "sidebar",
+   "detail": "outside the viewport [0,-273,300,421]",
+   "count": 29,
+   "viewports": [
+    "1366x768",
+    "1440x900"
+   ],
+   "themes": [
+    "light",
+    "dark"
+   ],
+   "routes": [
+    "/docs/reference/contracts/model/domains/connectors-tool_contracts",
+    "/docs",
+    "/docs/concepts/governed-invocation",
+    "/docs/connectors",
+    "/docs/connectors/gitlab",
+    "/docs/reference/adapters/kubernetes",
+    "/docs/reference/cli",
+    "/docs/reference/contracts/cli",
+    "/docs/reference/contracts/model/domains/connectors-mutations",
+    "/docs/status",
+    "/docs/connectors/slack",
+    "/docs/examples/contract-exercises"
+   ],
+   "route_count": 15
+  },
+  {
+   "gate": 1,
+   "what": "clipped div.b10x-hero-art.b10x-hero-art--terminal > figure.b10x-terminal.b10x-terminal--tilt > div.b10x-terminal__bar > span.b10x-terminal__title",
+   "detail": "scrollWidth 259 > clientWidth 209, overflow hidden, ellipsis without its full value",
+   "count": 4,
+   "viewports": [
+    "1024x768",
+    "390x844"
+   ],
+   "themes": [
+    "light",
+    "dark"
+   ],
+   "routes": [
+    "/"
+   ],
+   "route_count": 1
+  },
+  {
+   "gate": 1,
+   "what": "runs-past article > div.theme-doc-markdown.markdown > header.b10x-doc-header > p",
+   "detail": "span.b10x-doc-header__source past the box (scrollWidth 313 > clientWidth 302)",
+   "count": 4,
+   "viewports": [
+    "390x844"
+   ],
+   "themes": [
+    "light",
+    "dark"
+   ],
+   "routes": [
+    "/docs/connectors/gitlab",
+    "/docs/connectors/slack"
+   ],
+   "route_count": 2
+  },
+  {
+   "gate": 1,
+   "what": "runs-past div > article > div.theme-doc-markdown.markdown > p",
+   "detail": "code past the box (scrollWidth 515 > clientWidth 511)",
+   "count": 2,
+   "viewports": [
+    "1024x768"
+   ],
+   "themes": [
+    "light",
+    "dark"
+   ],
+   "routes": [
+    "/docs/reference/contracts/cli"
+   ],
+   "route_count": 1
+  },
+  {
+   "gate": 2,
+   "what": "sidebar",
+   "detail": "outside the viewport [0,-461,300,234]; covered at bottom-left, bottom-right",
+   "count": 1,
+   "viewports": [
+    "1366x768"
+   ],
+   "themes": [
+    "light"
+   ],
+   "routes": [
+    "/docs/reference/contracts/model/domains/connectors-oauth2"
+   ],
+   "route_count": 1
+  }
+ ],
+ "axe": [
+  {
+   "viewport": "1024x768",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "1024x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 15
+    }
+   ]
+  },
+  {
+   "viewport": "1024x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    }
+   ]
+  },
+  {
+   "viewport": "1024x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 10
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 16
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/concepts/governed-invocation",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/examples/contract-exercises",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/examples/follow-a-request",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 10
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/guides/upgrade-the-cli",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/adapters/kubernetes",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 4
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/cli",
+     "id": "scrollable-region-focusable",
+     "impact": "serious",
+     "nodes": 3
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/contracts/cli",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 29
+    },
+    {
+     "route": "/docs/reference/contracts/cli",
+     "id": "scrollable-region-focusable",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/contracts/model/domains/connectors-mutations",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1280x720",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/status",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": []
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 16
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/concepts/governed-invocation",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/connectors",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/examples/contract-exercises",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/examples/follow-a-request",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 10
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/guides/upgrade-the-cli",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/reference/adapters/kubernetes",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 4
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": []
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/reference/contracts/cli",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 30
+    },
+    {
+     "route": "/docs/reference/contracts/cli",
+     "id": "scrollable-region-focusable",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/reference/contracts/model/domains/connectors-mutations",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "dark",
+   "hits": [
+    {
+     "route": "/docs/status",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 15
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/concepts/governed-invocation",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/examples/contract-exercises",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/examples/follow-a-request",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 2
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 10
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/guides/upgrade-the-cli",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/adapters/kubernetes",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 4
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/contracts/cli",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 30
+    },
+    {
+     "route": "/docs/reference/contracts/cli",
+     "id": "scrollable-region-focusable",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/reference/contracts/model/domains/connectors-mutations",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1366x768",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/status",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "1440x900",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "1440x900",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 15
+    }
+   ]
+  },
+  {
+   "viewport": "1440x900",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    }
+   ]
+  },
+  {
+   "viewport": "1440x900",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 10
+    }
+   ]
+  },
+  {
+   "viewport": "390x844",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "390x844",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 15
+    }
+   ]
+  },
+  {
+   "viewport": "390x844",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    },
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "scrollable-region-focusable",
+     "impact": "serious",
+     "nodes": 1
+    }
+   ]
+  },
+  {
+   "viewport": "390x844",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 9
+    }
+   ]
+  },
+  {
+   "viewport": "768x1024",
+   "theme": "light",
+   "hits": []
+  },
+  {
+   "viewport": "768x1024",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 16
+    }
+   ]
+  },
+  {
+   "viewport": "768x1024",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/connectors/gitlab",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 8
+    }
+   ]
+  },
+  {
+   "viewport": "768x1024",
+   "theme": "light",
+   "hits": [
+    {
+     "route": "/docs/getting-started",
+     "id": "link-in-text-block",
+     "impact": "serious",
+     "nodes": 10
+    }
+   ]
+  }
+ ]
+}

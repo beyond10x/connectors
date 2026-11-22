@@ -18,6 +18,7 @@
 //! implementation in this repository answers for it. `run-emission` runs every suite against the
 //! committed definitions, and `ess verify conform mutate --collect` scores the result.
 use super::Result;
+use crate::metadata_emissions::{emit_classes, emit_suite};
 use crate::metadata_entities;
 use entity_core::{
     EntityInstance, Evaluation, FieldDefinition, FieldKind, LoadedDecision, OperationFieldAction,
@@ -25,7 +26,7 @@ use entity_core::{
 };
 use ess_conformance::{
     AdmittedSuite, CountReport, CountRun, CountStatus, Runner,
-    mutate::{self, EmittedMutant, EmittedSuite, Manifest, MutantClass, RefusalKey},
+    mutate::{self, EmittedMutant, Manifest, MutantClass},
     scenario::{CommandRef, ErrorRef, EventRef, OutcomeRef},
     target::*,
 };
@@ -889,71 +890,6 @@ pub fn run_emission(root: &Path, dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The gate's suite: this component's synthesis of `ir`, written under `out/dir`.
-fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<EmittedSuite> {
-    let synthesis = ess_conformance::synthesize::synthesize_for(ir, metadata_entities::COMPONENT)
-        .map_err(|error| error.to_string())?;
-    let json = synthesis.suite.to_canonical_json()?;
-    let mut refused: Vec<RefusalKey> = synthesis.refusals.iter().map(RefusalKey::of).collect();
-    refused.sort();
-    AdmittedSuite::from_json(&json)?;
-    let target = out.join(dir);
-    std::fs::create_dir_all(&target)?;
-    std::fs::write(target.join(mutate::SUITE_FILE), &json)?;
-    std::fs::write(
-        target.join(mutate::MODEL_FILE),
-        format!("{}\n", ir.to_compact_json()),
-    )?;
-    Ok(EmittedSuite {
-        dir: dir.to_owned(),
-        refusals: refused.len(),
-        refused: Some(refused),
-        scenarios: synthesis.suite.len(),
-        spec_digest: synthesis.suite.provenance.spec_digest.to_string(),
-        // A manifest field; the gate writes no manifest.
-        suite_digest: None,
-    })
-}
-
-/// Writes ESS's own mutation emission of `classes`, scoped to the component the host implements,
-/// under `out` (which must be absent or empty), and returns its manifest.
-///
-/// `mutate::emit_for` is what `ess verify conform mutate --emit --component` runs: it decides the
-/// manifest format from the mutants it writes, records each suite's digest, which guard mutants
-/// left their outcome unsatisfiable, which answer identically and which overlap, and marks the
-/// mutants and unavailable sites of other components out of scope. Writing its files unchanged
-/// keeps every claim in the manifest one the pinned ESS made itself.
-fn emit_classes(root: &Path, out: &Path, classes: &[MutantClass]) -> Result<Manifest> {
-    if out.exists() && std::fs::read_dir(out)?.next().is_some() {
-        return Err(format!("{} is not empty", out.display()).into());
-    }
-    let loaded = metadata_entities::load(root)?;
-    let emission = mutate::emit_for(
-        &loaded.documents,
-        &loaded.sources,
-        classes,
-        Some(metadata_entities::COMPONENT),
-    )?;
-    for (relative, contents) in &emission.files {
-        let relative = Path::new(relative);
-        if !relative
-            .components()
-            .all(|part| matches!(part, std::path::Component::Normal(_)))
-        {
-            return Err(format!("emission file {} leaves the output", relative.display()).into());
-        }
-        let file = out.join(relative);
-        if let Some(parent) = file.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&file, contents)?;
-    }
-    // What `mutate --collect` reads back, read back the same way.
-    Ok(Manifest::from_json(&std::fs::read_to_string(
-        out.join(mutate::MANIFEST_FILE),
-    )?)?)
-}
-
 /// `mutate --emit`, scoped to the component the host implements.
 pub fn emit(root: &Path, out: &Path) -> Result<()> {
     let manifest = emit_classes(root, out, MutantClass::ALL)?;
@@ -1005,6 +941,7 @@ pub fn gate(root: &Path, out: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metadata_emissions;
     use std::collections::BTreeSet;
 
     fn contract(name: &str) -> ess_conformance::fixtures::Contract {
@@ -1015,110 +952,60 @@ mod tests {
         .unwrap()
     }
 
+    fn committed(relative: &str) -> String {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        std::fs::read_to_string(root.join(metadata_emissions::DIRECTORY).join(relative))
+            .unwrap_or_else(|error| panic!("{relative}: {error}"))
+    }
+
+    /// The committed emissions are made from the sources as they are now: the digest of the ESS
+    /// crates, the `ess` pin, `ess/` and the generator recorded beside them is the current one.
+    /// `connectors-build metadata-conformance emissions` regenerates them (minutes; the `slow`
+    /// workflow checks them byte for byte when a source changes).
+    #[test]
+    fn the_committed_metadata_emissions_are_current() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let recorded: Value =
+            serde_json::from_str(&committed(metadata_emissions::INPUTS_FILE)).unwrap();
+        let current = metadata_emissions::inputs(&root).unwrap();
+        if recorded["digest"] != current["digest"] {
+            let files = |record: &Value| -> BTreeSet<String> {
+                record["files"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|file| format!("{} {}", file["sha256"], file["path"]))
+                    .chain(
+                        record["ess_crates"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|line| format!("crate {line}")),
+                    )
+                    .collect()
+            };
+            let (recorded, current) = (files(&recorded), files(&current));
+            panic!(
+                "the committed metadata emissions are stale; run `cargo run --locked -p \
+                 connectors-build -- metadata-conformance emissions`.\nchanged: {:#?}",
+                current.symmetric_difference(&recorded).collect::<Vec<_>>()
+            );
+        }
+    }
+
     /// `mutate --collect` reads what `emit` writes, so the manifest must be one the pinned ESS
     /// admits: its format for the mutants it holds, and each suite's refusals as that format
     /// requires them. Its mutants are precedence swaps, a class `ess-mutation-manifest/2` and `/3`
-    /// cannot hold (the six of this component take ESS about 20 s; emit-swap takes minutes, and
-    /// the full-class emission is the mutation audit's), so a manifest in a format too old for
-    /// its mutants is refused here.
+    /// cannot hold, so a manifest in a format too old for its mutants is refused here. The
+    /// emission is committed (it takes ESS minutes); `metadata-conformance emissions` made it and
+    /// checked that each mutant suite has its recorded digest, that a separate synthesis reports
+    /// the same refusals, that no refused scenario is in its baseline suite, and that the pinned
+    /// `ess` reads it.
     #[test]
     fn emitted_manifest_is_admitted_by_the_pinned_ess() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let classes = [MutantClass::PrecedenceSwap];
-        let out = tempfile::tempdir().unwrap();
-        let admitted = emit_classes(&root, out.path(), &classes).unwrap();
-        assert!(
-            [
-                mutate::MANIFEST_FORMAT_4,
-                mutate::MANIFEST_FORMAT_5,
-                mutate::MANIFEST_FORMAT_6,
-            ]
-            .contains(&admitted.format.as_str()),
-            "{} is not a format that holds these classes",
-            admitted.format
-        );
-        assert_eq!(
-            admitted.component.as_deref(),
-            Some(metadata_entities::COMPONENT)
-        );
-        for class in classes {
-            assert!(
-                admitted
-                    .mutants
-                    .iter()
-                    .any(|mutant| mutant.class == class && mutant.dir.is_some()),
-                "no {class:?} mutant with a suite"
-            );
-        }
-        for mutant in &admitted.mutants {
-            if let Some(dir) = &mutant.dir {
-                let text =
-                    std::fs::read_to_string(out.path().join(dir).join(mutate::SUITE_FILE)).unwrap();
-                let suite = AdmittedSuite::from_json(&text).unwrap();
-                assert_eq!(
-                    mutant.suite_digest.as_deref(),
-                    Some(suite.digest()),
-                    "{} records another suite's digest",
-                    mutant.id
-                );
-            }
-        }
-
-        let loaded = metadata_entities::load(&root).unwrap();
-        let ir = mutate::compile(loaded.documents.clone(), &loaded.sources).unwrap();
-        // The refusals a synthesis run separate from `emit` reports for the same model.
-        let independent =
-            ess_conformance::synthesize::synthesize_for(&ir, metadata_entities::COMPONENT).unwrap();
-        let mut expected: Vec<RefusalKey> =
-            independent.refusals.iter().map(RefusalKey::of).collect();
-        expected.sort();
-        assert!(
-            !expected.is_empty(),
-            "the model synthesizes with no refusals"
-        );
-        assert_eq!(admitted.baseline.refused.as_ref(), Some(&expected));
-        assert_eq!(admitted.baseline.refusals, expected.len());
-
-        // No refused scenario is in the suite the manifest points at.
-        let suite: Value = serde_json::from_slice(
-            &std::fs::read(
-                out.path()
-                    .join(&admitted.baseline.dir)
-                    .join(mutate::SUITE_FILE),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        let scenarios = suite["scenarios"].as_object().unwrap();
-        for key in &expected {
-            if let Some(scenario) = &key.scenario {
-                assert!(
-                    !scenarios.contains_key(scenario),
-                    "{scenario} is refused and emitted"
-                );
-            }
-        }
-
-        // The pinned `ess` reads the emission itself. No report is written, so nothing is
-        // scored (exit 3 at the most); a refused manifest is exit 2 and names its file.
-        let ess = connectors_spec::toolchain::resolve(None).unwrap();
-        let collect = std::process::Command::new(ess)
-            .current_dir(&root)
-            .args(["verify", "conform", "mutate", "--collect"])
-            .arg(out.path())
-            .args(["--component", metadata_entities::COMPONENT])
-            .output()
-            .unwrap();
-        let text = format!(
-            "{}{}",
-            String::from_utf8_lossy(&collect.stdout),
-            String::from_utf8_lossy(&collect.stderr)
-        );
-        assert!(
-            !text.contains("manifest.json:") && collect.status.code() != Some(2),
-            "the pinned ess refuses the manifest ({:?}):\n{text}",
-            collect.status
-        );
+        let admitted = Manifest::from_json(&committed(metadata_emissions::COMPONENT_MANIFEST))
+            .expect("the pinned ESS reads the committed manifest");
+        metadata_emissions::check_component_manifest(&admitted).unwrap();
     }
 
     /// `story:oauth2-refresh-metadata-authority`: the local metadata authority owns
@@ -1157,10 +1044,8 @@ mod tests {
             })
             .collect();
 
-        let out = tempfile::tempdir().unwrap();
-        let suite = emit_suite(&ir, mutate::BASELINE_DIR, out.path()).unwrap();
-        let text =
-            std::fs::read_to_string(out.path().join(&suite.dir).join(mutate::SUITE_FILE)).unwrap();
+        // The suite the gate synthesizes, made once per digest of its sources into `target/`.
+        let text = metadata_emissions::baseline_suite(&root).unwrap();
         let authority = Authority::load(&root).unwrap();
         let (report, _) = run_suite(&authority, &text).unwrap();
         let statuses = report.statuses();

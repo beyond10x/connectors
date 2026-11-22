@@ -120,6 +120,31 @@
        "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}],
                       "refusals": [
                         {"pointer": "/error", "values": ["file_not_found", "file_deleted"], "code": "not_found"},
-                        {"pointer": "/error", "values": ["cant_delete_file"], "code": "forbidden"}]}}}
+                        {"pointer": "/error", "values": ["cant_delete_file"], "code": "forbidden"}]}}},
+    {"id": "file.upload", "operation_id": "files_completeUploadExternal", "effect": "write",
+     "description": "Upload one file of at most 2 MiB and share it into the conversation body.channel_id, as a reply in the thread body.thread_ts when given, under body.title, with body.initial_comment as its message when given. content.base64 carries the bytes in standard base64 and content.sha256 their lower-case hex SHA-256, content.media_type optionally their type; body.filename names the file. One write of three requests: files.getUploadURLExternal with filename and length answers upload_url and file_id, the bytes are POSTed to upload_url, which must be an https URL on files.slack.com under /upload/ that the connection admits, and files.completeUploadExternal shares the file. Content that is not base64, empty, over 2 MiB or not equal to its sha256 is refused before any request, and an upload_url the connection does not admit before any byte is sent. The token's auth.test is read first and must answer ok true, or nothing is sent. Nothing is shared before the last request, so every refusal before it shares nothing. Needs files:write, and the bot in the channel. The last answer must carry ok true to be applied; channel_not_found and not_in_channel are refused as not_found and forbidden, each with Slack's error as its reason; any other refusal there is outcome_unknown, never applied",
+     "credential": ["token"],
+     "binary": {"max_bytes": 2097152, "hosts": ["https://files.slack.com"]},
+     "upload": {
+       "slot": {"operation_id": "files_getUploadURLExternal",
+                "values": {"filename": "body.filename", "length": "content.length"},
+                "checks": [{"pointer": "/ok", "expect": {"boolean": true}}, {"pointer": "/file_id", "expect": {"present": true}}],
+                "url": "/upload_url"},
+       "path_prefix": "/upload/",
+       "send": {"files": [{"id": {"slot": "/file_id"}, "title": {"input": "body.title"}}],
+                "channel_id": {"input": "body.channel_id"},
+                "thread_ts": {"input": "body.thread_ts", "optional": true},
+                "initial_comment": {"input": "body.initial_comment", "optional": true}}},
+     "body_keys": ["channel_id", "thread_ts", "filename", "title", "initial_comment"],
+     "body_types": {"channel_id": "string", "thread_ts": "string", "filename": "string", "title": "string", "initial_comment": "string"},
+     "body_required": ["channel_id", "filename", "title"],
+     "body_nonempty": ["channel_id", "thread_ts", "filename", "title", "initial_comment"],
+     "guard": {
+       "preflight": {"operation_id": "auth_test", "values": {},
+                     "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
+       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}],
+                      "refusals": [
+                        {"pointer": "/error", "values": ["channel_not_found"], "code": "not_found"},
+                        {"pointer": "/error", "values": ["not_in_channel"], "code": "forbidden"}]}}}
   ]
 }

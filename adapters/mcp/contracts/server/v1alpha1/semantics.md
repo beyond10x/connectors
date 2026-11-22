@@ -89,6 +89,12 @@ then `ready` (`Establishing` → `Ready`). The session's `connectors.sessions.Bi
 coordinates in this placement are the configured instance (`instance_ref`), the single
 configured owner's connection coordinate (`connection_ref`), the admitted configuration
 revision (`admitted_revision`) and the owner authority (`authority_ref`).
+The instance, the connection and the owner incarnation are fixed for the session: every
+request checks that the current configuration still selects them when it discovers its
+tools, again before its read reaches the owner, and again before its reply is delivered,
+and its read names the admitted connection. A request that finds another connection or
+instance selected is refused `forbidden` with no provider request; it never runs under the
+replacement, also in the time before lease renewal ends the session on the same change.
 
 **Data rides a lease, and the lease is short.** Reusing `connectors.sessions.Session`
 inherits its timing obligations, not only its states.

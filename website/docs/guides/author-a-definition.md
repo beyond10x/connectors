@@ -8,13 +8,15 @@ source: crates/connectors-catalog/src/definition.rs, spec/domains/definition.yam
 
 # Author a definition for an API that ships no catalog
 
-When Connectors ships no catalog for an HTTP API, a `connectors-definition/1` file can still
-reach it. The file names the API's own OpenAPI document, vendored beside it, and says which of
-its operations to expose, under which local names, with which auth profile and which checks
-around a write. Everything the document already states (methods, paths, parameters, response
-shapes) stays in the document. The reference lowerer, `crates/connectors-catalog/src/definition.rs`,
-reads both and writes what the catalog provider runs, so a run of the file goes through the same
-admission, approval and audit as a configured instance.
+A `connectors-definition/1` file reaches an HTTP API that Connectors ships no catalog for. The
+file points at the API's own OpenAPI document, vendored beside it. It says which operations to
+expose, under which local names, with which auth profile and which checks around a write.
+Methods, paths, parameters and response shapes stay in the document.
+
+The reference lowerer,
+`crates/connectors-catalog/src/definition.rs`, reads both and writes what the catalog provider
+runs. A run of the file goes through the same admission, approval and audit as a configured
+instance.
 
 The format is defined in the
 [definitions repository](https://github.com/beyond10x/connectors-definitions), in
@@ -41,21 +43,21 @@ upstream/gitlab-reads/LICENSE
 upstream/gitlab-reads/README.md
 ```
 
-- `connectors/<id>.yaml` is the definition. The file stem is the connector id, unless the file
-  sets `id:`, and it names the bundle the lowerer builds. The stem, the `id` and a `catalog` are
-  plain names: ASCII letters, digits, `-` and `_`.
-- `auth/<name>.yaml` holds auth profiles that several connectors share (schema
-  `urn:beyond10x:connectors-auth:1`). A profile takes one with `use: <name>`, and every field it
+- `connectors/<id>.yaml` is the definition. The file stem is the connector id unless the file
+  sets `id:`, and the bundle the lowerer builds takes that id. The stem, the `id` and a `catalog`
+  are plain names: ASCII letters, digits, `-` and `_`.
+- `auth/<name>.yaml` holds auth profiles that several connectors share, in the schema
+  `urn:beyond10x:connectors-auth:1`. A profile takes one with `use: <name>`, and every field it
   sets replaces the shared one. A definition with its own profile needs nothing here.
 - `upstream/<id>/` holds the vendored API document, gzipped, and what records where it came from.
 
 The definitions repository's rules for `upstream/<id>/` apply to a tree of your own as well:
 
-- the document is a gzip copy of the unmodified file, named `<name>.gz`;
-- `source.sha256` in the definition is the SHA-256 of the decompressed bytes;
+- The document is a gzip copy of the unmodified file, named `<name>.gz`.
+- `source.sha256` in the definition is the SHA-256 of the decompressed bytes.
 - `upstream/<id>/README.md` records the file, the URL it was taken from, the retrieval date, the
-  size and the license;
-- the license text sits beside it as `LICENSE` where the document declares one.
+  size and the license.
+- The license text sits beside it as `LICENSE` where the document declares one.
 
 The `README.md` of the definitions repository's `upstream/gitlab/` is a model for that record.
 Vendor the document and take its digest:
@@ -69,13 +71,14 @@ gunzip -c upstream/gitlab-reads/openapi_v3.yaml.gz | sha256sum
 Run in a tree; output pasted in a later revision.
 
 A Swagger 2.0 document is named with `swagger:` and a Google Discovery document with
-`discovery:`; either also names `projection:`, the file name its OpenAPI projection is recorded
-under. An OpenAPI document names neither. `amendments:` is optional. When
-named, the file must exist under the tree, be a `connectors-source-amendments/1` document whose
-`source_sha256` is the digest of the decompressed document, and list at least one cited
-correction; a missing file is refused as `unreadable`, a wrong digest or an empty list as
-`invalid_input`. Leave the line and the file out of the worked example if the document needs no
-correction.
+`discovery:`. Either one also sets `projection:`, the file name its OpenAPI projection is
+recorded under. An OpenAPI document sets neither.
+
+`amendments:` is optional. When set, the file must exist under the tree and be a
+`connectors-source-amendments/1` document. Its `source_sha256` must be the digest of the
+decompressed document, and it must list at least one cited correction. A missing file is refused
+as `unreadable`, a wrong digest or an empty list as `invalid_input`. Leave the line and the file
+out of the worked example if the document needs no correction.
 
 ## Write the file
 
@@ -111,26 +114,28 @@ operations:
 ```
 
 The hand-written trial also carried `catalog: gitlab`. That key reuses an existing catalog
-bundle for a second selection; for an API with no catalog, leave it out.
+bundle for a second selection. Leave it out for an API with no catalog.
 
 ### Base URL and its variables
 
 `base_url` may name variables in braces, here `hostname`, and `config` declares each one. A
-variable `config` does not declare is refused as `undeclared_variable`. Config values are strings;
-`values` lists the allowed ones.
+variable `config` does not declare is refused as `undeclared_variable`. Config values are strings,
+and `values` lists the allowed ones.
 
 A base URL whose path ends in a variable `config` declares, such as
 `https://3.basecampapi.com/{accountId}`, is the path every operation starts with
 (`/{accountId}/projects.json`). The lowerer drops that path and its parameter from each operation
-that starts with it, so no caller passes `accountId`: the instance's endpoint names the account
-(`https://3.basecampapi.com/12345`), or the variable's `default` does, and an endpoint without
-that path is refused when the instance is configured. An operation or a guard read of the file
-whose path does not start with it is refused as `outside_base_path`.
+that starts with it, so no caller passes `accountId`.
 
-Give every variable a `default`, and make the base URL `https://`.
-`invoke --definition` takes the instance's endpoint from the lowered declaration, and
-refuses a file whose endpoint is not stated in full or is not `https://` as `invalid_input` at
-`arguments`. The instance trusts the platform's roots.
+The instance's endpoint carries the account
+(`https://3.basecampapi.com/12345`), or the variable's `default` does. An endpoint without that
+path is refused when the instance is configured. An operation or a guard read of the file whose
+path does not start with it is refused as `outside_base_path`.
+
+Give every variable a `default`, and make the base URL `https://`. `invoke --definition` takes
+the instance's endpoint from the lowered declaration. It refuses a file whose endpoint is not
+stated in full or is not `https://` as `invalid_input` at `arguments`. The instance trusts the
+platform's roots.
 
 ### One auth profile
 
@@ -146,22 +151,22 @@ profile has:
   example above, with the input hidden.
 - `identity`: the read that proves the credential and names who holds it. `path` is the read
   under `base_url`, `kind` the subject's kind, `subject` a JSON pointer into the answer.
-  `source: configuration` names the connection itself after the read proves the key, for a key
-  that belongs to no user.
+  `source: configuration` makes the connection itself the subject after the read proves the key,
+  for a key that belongs to no user.
 - `scopes` (optional): a read and pointer that list the granted scopes, and the `minimum` the
   connection must hold.
 - `read_only: true` (optional): an instance on the profile is offered the selection's reads and
   none of its writes.
 
 The profile marked `default: true` is the one the bundle records. With more than one profile, an
-instance names the one it takes, unless the file names one at its top level as
+instance states the profile it takes, unless the file sets one at its top level as
 `default_profile: <profile id>`, such as a read-only profile beside a write-capable one. A
 `default_profile` that names none of the file's profiles is refused as `malformed`.
 
 An OAuth profile is `scheme: oauth2_refresh`, with `authorize_url` and `token_url`, or
 `scheme: oauth2_client_credentials`, with `token_url` only. Take both URLs from the vendor's own
-documentation of its OAuth flow, never from another provider's profile, and list the scopes the
-consent asks for in `scopes.requested`:
+documentation of its OAuth flow, not from another provider's profile. List the scopes the consent
+asks for in `scopes.requested`:
 
 ```yaml
 auth:
@@ -175,8 +180,8 @@ auth:
 ```
 
 The definitions repository requires each profile to cite that documentation. The format has no
-field for the citation (a key the schema does not name is refused as `unknown_field`), so give it
-in the change that adds the file. No client id, secret or token is ever in the file: for an
+field for the citation, so give it in the change that adds the file. A key the schema does not
+name is refused as `unknown_field`. The file holds no client id, secret or token. For an
 `oauth2_refresh` profile, connecting reads the OAuth client from the file `--credential-file`
 names.
 
@@ -188,19 +193,20 @@ auth:
 ```
 
 Its stored entry holds the App id, the installation id and the App's private key. The instance
-signs a short-lived JWT with the key, exchanges it under `base_url` for an installation token and
-sends that token as `Authorization: Bearer`; the token stays in the instance's memory. It needs no
-`identity`: the connection is the installation, proven by the exchange and by a read of
+signs a short-lived JWT with the key and exchanges it under `base_url` for an installation token.
+It sends that token as `Authorization: Bearer` and keeps the token in memory. The profile needs
+no `identity`: the connection is the installation, proven by the exchange and by a read of
 `installation/repositories`. An `identity` may replace that read's `path` or the `kind`
-(`github.installation`). An identity `source` other than `configuration`, a `subject`, a
-`header`, a `prefix`, an `account_label`, a `token_url` or `scopes.requested` is refused as
-`auth_misplaced`.
+(`github.installation`).
+
+An identity `source` other than `configuration`, a `subject`, a `header`, a `prefix`, an
+`account_label`, a `token_url` or `scopes.requested` is refused as `auth_misplaced`.
 
 ### Operations
 
-Each key under `operations` is the local name a caller invokes; `op` is the document's
-`operationId`. Nothing the document states is repeated. `description` is written only where it
-says more than the document's summary, which is the description otherwise.
+Each key under `operations` is the local name a caller invokes, and `op` is the document's
+`operationId`. The file repeats nothing the document states. `description` is written only where
+it says more than the document's summary, which is the description otherwise.
 
 - `effect`: an operation whose method is not `GET` must say `read` or `write`, or it is refused as
   `effect_required`. A `write` on a `GET` operation, or on a download with no `op`, is refused as
@@ -245,7 +251,7 @@ A `guard` checks the write before and after it is sent. The definitions reposito
     description: Resolve (body.resolved true) or unresolve (false) one resolvable discussion
 ```
 
-- `before.read` names the read to run first: an operation key of the file, or an `operationId`
+- `before.read` is the read to run first: an operation key of the file, or an `operationId`
   of the document (`unknown_guard_read` otherwise). Its path parameters take the write's input
   of the same name.
 - `with` binds a parameter of that read to another input, for example
@@ -255,10 +261,13 @@ A `guard` checks the write before and after it is sent. The definitions reposito
   `body.resolved`), a literal (`=opened`), a boolean (`=true`) or `"?"`, which holds when the
   member exists and is not `null`, whatever its value. If one comparison fails, the write is
   refused before anything is sent.
-- `after.expect` compares the write's answer the same way; `"?"` there requires what a create
-  names, such as Jira's `{/id: "?", /key: "?"}` after `issue.create`. `after.read` reads again instead,
-  `after.absent: true` wants that read to answer 404, and `also` lists further reads before the
-  write. When the answer does not match, the outcome is unknown: the provider may have applied the write, so read the target before any retry.
+- `after.expect` compares the write's answer the same way. `"?"` there requires the members a
+  create returns, such as Jira's `{/id: "?", /key: "?"}` after `issue.create`.
+- `after.read` reads again instead, and `after.absent: true` wants that read to answer 404.
+- `also` lists further reads before the write.
+
+When the answer does not match, the outcome is unknown: the provider may have applied the write.
+Read the target before any retry.
 
 ## Check it
 
@@ -271,10 +280,10 @@ task check
 
 Run in a tree; output pasted in a later revision.
 
-`task check` validates shape only. That each `op` exists in the document, that each variable is
-declared, and the rest of this page's rules are the lowerer's. From a Connectors checkout,
-`connectors-build definition` runs the lowerer alone, writes the bundle, its index, the
-selection and the declaration into `--out`, and names the first refusal:
+`task check` validates shape only. The lowerer checks the rest of this page's rules, such as
+that each `op` exists in the document and that each variable is declared. From a Connectors
+checkout, `connectors-build definition` runs the lowerer alone. It writes the bundle, its index,
+the selection and the declaration into `--out`, and reports the first refusal:
 
 ```sh
 cargo run --locked -p connectors-build -- definition \
@@ -284,8 +293,8 @@ cargo run --locked -p connectors-build -- definition \
 Run in a tree; output pasted in a later revision.
 
 A refused definition writes nothing. The error starts with the refusal's name and a colon, then
-says what it found: `unknown_operation` names the operation key and the `op` the document lacks.
-The names a hand-written file meets most:
+says what it found: `unknown_operation` gives the operation key and the `op` the document lacks.
+The refusals a hand-written file meets most:
 
 | Refusal | Cause |
 |---|---|
@@ -323,8 +332,8 @@ connectors invoke --definition defs/connectors/gitlab-reads.yaml project.get \
 Run in a tree; output pasted in a later revision.
 
 The definitions root defaults to the parent of the directory holding the file, so a file in
-`defs/connectors/` reads `defs/upstream/` and `defs/auth/`. A file kept anywhere else names its
-tree:
+`defs/connectors/` reads `defs/upstream/` and `defs/auth/`. For a file kept anywhere else, give
+its tree:
 
 ```sh
 connectors invoke --definition drafts/gitlab-reads.yaml --definitions-root defs me.get
@@ -333,24 +342,16 @@ connectors invoke --definition drafts/gitlab-reads.yaml --definitions-root defs 
 Run in a tree; output pasted in a later revision.
 
 A file the lowerer refuses is `invalid_input` at `arguments` and leaves nothing behind. The
-instance is `gitlab-reads/definition`; the [definition file guide](invoke-a-definition-file.md)
+instance is `gitlab-reads/definition`. The [definition file guide](invoke-a-definition-file.md)
 covers the connect question, credential reuse, the cache and a file moved to another host.
 
 ## What the format cannot express today
 
-- **Composed writes.** One operation is one request, with its guard reads around it. A write
-  that takes two requests, such as an upload address followed by a completion, is two
-  operations, each invoked and approved on its own.
-- **Login exchange.** The schemes are `basic`, `bearer`, `header`, `oauth2_refresh`,
-  `oauth2_client_credentials` and `github_app`. An API that trades a password or key for a
-  session token at a login endpoint cannot be described, GitHub's App installation token aside.
-- **Fixed values beyond scalars.** `=value` is a string, an integer or a boolean. A fixed array,
-  object or null cannot be written.
-- **A fixed document with a caller's member.** A nested document cannot be fixed with one member
-  left to the caller. Without `body`, a document body is sent as given; nothing types its
-  members.
-- **A host without a default.** A `base_url` variable without a `default` lowers, but
-  `--definition` cannot invoke it.
-- **A `User-Agent` of its own.** Every request, the token exchanges included, carries
-  `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`, which names the
-  client and a contact, as Basecamp requires. A definition cannot set or replace it.
+| Case | Limit |
+|---|---|
+| Composed writes | One operation is one request, with its guard reads around it. A write that takes two requests, such as an upload address followed by a completion, is two operations, each invoked and approved on its own. |
+| Login exchange | The schemes are `basic`, `bearer`, `header`, `oauth2_refresh`, `oauth2_client_credentials` and `github_app`. An API that trades a password or key for a session token at a login endpoint cannot be described, GitHub's App installation token aside. |
+| Fixed values beyond scalars | `=value` is a string, an integer or a boolean. A fixed array, object or null cannot be written. |
+| A fixed document with a caller's member | A nested document cannot be fixed with one member left to the caller. Without `body`, a document body is sent as given, and its members are not typed. |
+| A host without a default | A `base_url` variable without a `default` lowers, but `--definition` cannot invoke it. |
+| A `User-Agent` of its own | Every request, the token exchanges included, carries `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`, which identifies the client and a contact, as Basecamp requires. A definition cannot set or replace it. |

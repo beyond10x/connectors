@@ -425,6 +425,7 @@ mod json_value_tests {
                     max_bytes: 1024,
                 }],
                 acquisition: None,
+                token_recipient: None,
             }],
             requirements: vec![
                 requirement(READ, runtime::Effect::Read),

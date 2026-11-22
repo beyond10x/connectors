@@ -58,6 +58,7 @@ fn profile(token: &str) -> Profile {
             token_url: token.into(),
             scopes: ["https://www.googleapis.com/auth/drive.readonly".to_owned()].into(),
         })),
+        token_recipient: None,
     }
 }
 

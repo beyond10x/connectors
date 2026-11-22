@@ -91,6 +91,11 @@ pub(crate) fn verify(index: &Index, asset: &[u8]) -> Result<BTreeMap<String, Vec
             Some(_) => {}
             None => top = Some(head.to_owned()),
         }
+        // Every member is a portable relative path itself, whatever the index
+        // names: the index is not the only check between a member and a file.
+        if rest.is_some_and(|rest| !relative_path(rest)) {
+            return Err(invalid("an entry path is not a portable relative path"));
+        }
         if kind.is_dir() {
             continue;
         }

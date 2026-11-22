@@ -16,6 +16,9 @@
     "test:browser": "node tests/smoke.mjs",
     "test:ui": "node tests/overhaul.mjs",
     "test:sidebar": "node tests/sidebar.mjs",
+    "test:ux": "playwright test --project=gate --project=ratchet --workers=2",
+    "ux:baseline": "UX_UPDATE_BASELINE=1 playwright test --project=gate --project=ratchet --workers=2",
+    "ux:round": "playwright test --project=round --workers=2",
     "audit:public": "cd .. && cargo run --locked -p connectors-build -- docs-audit"
   },
   "dependencies": {
@@ -35,6 +38,7 @@
     "@docusaurus/tsconfig": "3.10.2",
     "@docusaurus/types": "3.10.2",
     "@types/react": "19.2.14",
+    "axe-core": "4.14.1",
     "playwright": "1.62.1",
     "typescript": "5.9.3"
   },

@@ -756,6 +756,7 @@ mod tests {
                 token_url: TOKEN.into(),
                 scopes: [SCOPE.to_owned()].into(),
             })),
+            token_recipient: None,
         }
     }
 

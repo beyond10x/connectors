@@ -242,6 +242,7 @@ fn bootstrap(instance: &str, adapter: &str, declared: &[Declared]) -> runtime::B
                 max_bytes: 1024,
             }],
             acquisition: None,
+            token_recipient: None,
         }],
         requirements: declared
             .iter()
