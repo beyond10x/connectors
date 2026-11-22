@@ -176,7 +176,14 @@ fn a_revision_conflict_reaches_the_cli_as_revision_conflict() {
 #[test]
 fn an_unreadable_store_still_answers_metadata_unavailable() {
     let root = configured();
-    fs::remove_file(root.path().join("state/metadata.sqlite3")).unwrap();
+    // A store that exists and cannot be read; a removed one is
+    // `metadata_missing` (issue #268, tests/setup_missing_state.rs).
+    // Without its WAL, whose first page would still answer for the main file.
+    let store = root.path().join("state/metadata.sqlite3");
+    for suffix in ["-wal", "-shm"] {
+        let _ = fs::remove_file(root.path().join(format!("state/metadata.sqlite3{suffix}")));
+    }
+    fs::write(&store, b"not a database").unwrap();
     let data = failure(&command(
         &root,
         &["connections", "list", "--adapter", "forge"],
@@ -184,5 +191,5 @@ fn an_unreadable_store_still_answers_metadata_unavailable() {
     assert_eq!(data["code"], "metadata_unavailable", "{data}");
     assert_eq!(data["stage"], "observation", "{data}");
     assert_eq!(data["next_action"], "retry_status", "{data}");
-    assert!(!root.path().join("state/metadata.sqlite3").exists());
+    assert_eq!(fs::read(&store).unwrap(), b"not a database");
 }

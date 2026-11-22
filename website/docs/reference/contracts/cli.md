@@ -374,8 +374,14 @@ owner-only state directory and initialises its metadata database, leaves the
 configuration byte-for-byte unchanged and returns `state_initialized`. An
 existing configuration with an existing metadata database, or one that does not
 load, returns `configuration_exists`; an existing database is never opened,
-migrated or recreated by `setup init`. The metadata database `setup init`
-creates, on `created` and `state_initialized` alike, has Entity Runtime durable
+migrated or recreated by `setup init`. Any other command that reads the
+metadata database and finds no `metadata.sqlite3` in the selected state
+directory, whatever else the directory still holds (`metadata.lock`,
+`registry-clock.floor`), refuses `metadata_missing` (`kind = operational`, exit 1,
+`stage = observation`, `next_action = initialize_state`: run `connectors setup
+init`), because running the same command again cannot create the database; a
+database that exists and cannot be used stays `metadata_unavailable`. The
+metadata database `setup init` creates, on `created` and `state_initialized` alike, has Entity Runtime durable
 open checkpoints enabled before `setup init` returns, so its opens start from a
 persisted checkpoint instead of verifying the whole history, and connectors
 0.32.0 and earlier cannot open it. `setup init` never enables a database that
@@ -1292,7 +1298,8 @@ other command's.
 `setup custody-orphans [--mode list|remove] [--authority ID]` works on the custody items in
 the Secret Service (`docs/local-secret-service.md`) whose `connectors.authority` is not the
 authority of the store in the selected state directory. The store must exist
-(`metadata_unavailable` otherwise). Item attributes are read, never a secret value.
+(`metadata_missing` when there is none, §3; `metadata_unavailable` when it cannot be
+opened). Item attributes are read, never a secret value.
 
 `list`, the default, answers `groups`, one row per authority and purpose with its item
 count, and a `notice` saying that a listed authority may belong to another store on this
@@ -1334,7 +1341,8 @@ starts no local host or adapter and runs in this order:
 3. It opens the store as an admitted mutating open under `metadata.lock`, within
    the usual 30-second wait. As every mutating open does, it first migrates a
    level 1–8 database to level 9 (local metadata).
-   It never creates a database. A missing, unreadable, foreign-owned,
+   It never creates a database; a missing one is `metadata_missing`
+   (`next_action = initialize_state`, §3). An unreadable, foreign-owned,
    unrecognised or integrity-refused store, a `metadata.lock` not released within
    the wait, and Eventlog's refusal to enable (a trigger or continuity table the
    provider did not create) are `metadata_unavailable` (`stage = observation`,
@@ -1692,6 +1700,7 @@ never replay a possible write after interruption, timeout or lost response.
 | a read-only custody binding refused a write it would need (a refresh-rotating profile, an approval-signing key; stage = custody, next_action = check_configuration) | `custody_read_only` | 1 |
 | the read-only binding's item no longer holds the bytes its version pinned (stage = custody, next_action = revalidate_connection) | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
+| no `metadata.sqlite3` in the selected state directory (`stage = observation`, `next_action = initialize_state`: run `connectors setup init`, §3) | `metadata_missing` | 1 |
 | store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain, or an owner that failed or answered none (`owner_log` names its log and `owner_error` the code it logged, when it logged one) | `outcome_unknown` | 1 |

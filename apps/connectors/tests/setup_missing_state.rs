@@ -99,7 +99,7 @@ fn initialises_state_for(root: &tempfile::TempDir, before: &[u8]) {
     let read = command(root, &["connections", "list", "--adapter", "forge"]);
     assert_eq!(
         refusal(&read, 1)["code"],
-        "metadata_unavailable",
+        "metadata_missing",
         "precondition: reads find no metadata store"
     );
     let init = success(&command(root, &["setup", "init"]));
@@ -157,6 +157,54 @@ fn state_directory_without_a_metadata_store_is_initialised() {
     )
     .unwrap();
     initialises_state_for(&root, &before);
+}
+
+/// Issue #268: a store moved aside, with `metadata.lock` and
+/// `registry-clock.floor` left in place, is named `metadata_missing` with
+/// `next_action = initialize_state`, never `metadata_unavailable` /
+/// `retry_status`; `setup init` then answers `state_initialized` and reads
+/// succeed again.
+#[test]
+fn a_moved_aside_store_names_setup_init_not_retry_status() {
+    // 1. `setup init`, then a successful `connections list` (`configured`).
+    let (root, before) = configured();
+    // 2. Move `metadata.sqlite3*` aside; the lock and the clock floor stay.
+    let state = state_path(&root);
+    let aside = root.path().join("aside");
+    fs::create_dir(&aside).unwrap();
+    let mut moved = 0;
+    for entry in fs::read_dir(&state).unwrap() {
+        let name = entry.unwrap().file_name();
+        if name.to_string_lossy().starts_with("metadata.sqlite3") {
+            fs::rename(state.join(&name), aside.join(&name)).unwrap();
+            moved += 1;
+        }
+    }
+    assert!(moved >= 1, "precondition: the store existed");
+    for kept in ["metadata.lock", "registry-clock.floor"] {
+        assert!(state.join(kept).exists(), "precondition: {kept} stays");
+    }
+    // 3. A read names the missing store and `setup init`.
+    let read = command(&root, &["connections", "list", "--adapter", "forge"]);
+    let data = refusal(&read, 1);
+    assert_eq!(data["code"], "metadata_missing", "{data}");
+    assert_eq!(data["next_action"], "initialize_state", "{data}");
+    assert_eq!(data["kind"], "operational", "{data}");
+    assert_eq!(data["stage"], "observation", "{data}");
+    // 4. `setup init` initialises the state.
+    let init = success(&command(&root, &["setup", "init"]));
+    assert_eq!(init["disposition"], "state_initialized", "{init}");
+    assert_eq!(fs::read(config_path(&root)).unwrap(), before);
+    // 5. The read succeeds.
+    let listed = success(&command(
+        &root,
+        &["connections", "list", "--adapter", "forge"],
+    ));
+    assert_eq!(
+        listed["connections"].as_array().map(Vec::len),
+        Some(0),
+        "{listed}"
+    );
 }
 
 #[test]

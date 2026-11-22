@@ -3,7 +3,7 @@ title: Set up the local CLI
 sidebar_position: 2
 description: Create the local CLI's private configuration and metadata store, check its prerequisites and configure the instances you will connect.
 lede: setup init creates a private configuration and an Entity Runtime metadata store; setup check says whether this machine can hold credentials before anything asks for one, and an instance needs only a name.
-source: apps/connectors/tests/local_cli.rs, apps/connectors/tests/derived_instance.rs, crates/connectors-host/tests/local_foundation.rs, crates/connectors-host/src/local/config.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
+source: apps/connectors/tests/local_cli.rs, apps/connectors/tests/setup_missing_state.rs, apps/connectors/tests/derived_instance.rs, crates/connectors-host/tests/local_foundation.rs, crates/connectors-host/src/local/config.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
 ---
 
 # Set up the local CLI
@@ -193,6 +193,70 @@ connection.
 A configuration with legacy pinned entries keeps working, and `setup migrate` moves them to
 instances, as the [README](https://github.com/beyond10x/connectors#move-a-legacy-configuration)
 shows.
+
+## Reset a grown metadata store
+
+The store keeps every record it is given, and nothing prunes it yet: each read adds about 35 KB
+([#267](https://github.com/beyond10x/connectors/issues/267)), and every fresh open verifies the
+whole store, so commands slow down as it grows. Until the store has retention, the remedy is a
+new store in the same state directory. The configuration stays as it is. Everything the old store
+recorded is gone from the new one: connections, list cursors, approvals and cached descriptions.
+Each instance connects again afterwards.
+
+First stop the owner, so that no process holds the store:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  --output json setup owner-stop | jq '{ok, disposition: .result.disposition}'
+```
+
+```json
+{
+  "ok": true,
+  "disposition": "no_owner"
+}
+```
+
+Move the store aside: `metadata.sqlite3` and, where they exist, its `metadata.sqlite3-wal` and
+`metadata.sqlite3-shm` files. Leave every other file in the state directory where it is,
+`metadata.lock` and `registry-clock.floor` included. Do not replace the whole directory.
+
+```sh
+mkdir "$PWD/cli/store-aside" && mv "$PWD"/cli/state/metadata.sqlite3* "$PWD/cli/store-aside/"
+```
+
+A command that reads the store now names the missing store and the command that creates it:
+`metadata_missing` with `next_action` `initialize_state`, exit status 1. Running the command again
+does not change that answer:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  connections list --connector gitlab --instance work
+```
+
+```text
+failure: {"code":"metadata_missing","kind":"operational","next_action":"initialize_state","stage":"observation"}
+```
+
+`setup init` with the existing configuration creates the new store and leaves the configuration
+unchanged:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  --output json setup init | jq '{ok, disposition: .result.disposition}'
+```
+
+```json
+{
+  "ok": true,
+  "disposition": "state_initialized"
+}
+```
+
+Then connect each instance again with `connections connect` (see [Next](#next)). With Secret
+Service custody, the old connections' items stay in the keyring under the old store's authority:
+`setup custody-orphans` lists them, and `setup custody-orphans --mode remove --authority <id>`
+deletes them once you no longer need the store you moved aside.
 
 ## After an upgrade
 

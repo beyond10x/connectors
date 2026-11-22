@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- A state directory with no `metadata.sqlite3`, because it was never initialised or its store was
+  moved aside, is refused as `metadata_missing` at stage `observation` with the new `next_action`
+  `initialize_state` (run `connectors setup init`), exit 1. Before, it was refused as
+  `metadata_unavailable` with `retry_status`, and a retry never helped. A store that exists and
+  cannot be used still answers `metadata_unavailable` (#268).
+
 ### Fixed
 
 - Linux Secret Service custody finds the file of a default collection whose name is not plain
@@ -34,10 +42,18 @@
   only that collection's file was checked, so an item in an unencrypted `login` collection was
   still read (security review finding 11).
 
+### Documentation
+
+- [Set up the local CLI](website/docs/guides/set-up-the-local-cli.md#reset-a-grown-metadata-store)
+  describes how to reset a grown metadata store: `setup owner-stop`, move `metadata.sqlite3*`
+  aside, `setup init`, then connect again (#268, until the store has retention, #267).
+
 ### Compatibility
 
 - A definitions release with a file path the portable grammar refuses no longer installs, on any
   platform.
+- A caller that matched `metadata_unavailable` for a missing store matches `metadata_missing`, or
+  `next_action` `initialize_state`, instead.
 
 ## 0.73.0 — 2026-11-14
 
