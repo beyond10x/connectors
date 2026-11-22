@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- Linux Secret Service custody finds the file of a default collection whose name is not plain
+  ASCII letters and digits, such as GNOME's German `Standard-Schlüsselbund`: it decodes the
+  collection's object path (`Standard_2dSchl_c3_bcsselbund`) the way GNOME Keyring encodes it
+  and qualifies `Standard-Schlüsselbund.keyring`. In 0.73.0 every stored credential answered
+  `custody_unavailable` on such a host. A malformed escape, a name that is not UTF-8 and a name
+  with `/`, NUL, a control character, `.` or `..` are refused, and the decoded name must equal
+  the one the keyrings directory's `default` file holds.
+
 ### Security
 
 - An open `connectors server --transport stdio` session keeps the instance, connection and owner
@@ -19,6 +29,10 @@
   `release_invalid`, and the writer checks that every path it would create lies under its staging
   directory before it creates anything. Before, Windows could join such a path outside the cache
   (review finding 9, high on Windows).
+- Linux Secret Service custody reads an item of the legacy `login` collection only while
+  `login`'s own file is encrypted. In 0.73.0, with the `default` alias on another collection,
+  only that collection's file was checked, so an item in an unencrypted `login` collection was
+  still read (security review finding 11).
 
 ### Compatibility
 

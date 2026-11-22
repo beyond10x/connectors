@@ -28,6 +28,11 @@ fn name(value: &OsStr) -> Result<CString> {
 }
 
 fn open_at(parent: &File, name: &OsStr, flags: i32) -> Result<File> {
+    open_or_missing(parent, name, flags)?.ok_or(Refused)
+}
+
+/// `None` when the name does not exist; any other failure is refused.
+fn open_or_missing(parent: &File, name: &OsStr, flags: i32) -> Result<Option<File>> {
     let name = self::name(name)?;
     // SAFETY: parent and name remain live; successful ownership passes to File.
     let fd = unsafe {
@@ -39,10 +44,13 @@ fn open_at(parent: &File, name: &OsStr, flags: i32) -> Result<File> {
         )
     };
     if fd < 0 {
-        return Err(Refused);
+        return match std::io::Error::last_os_error().raw_os_error() {
+            Some(libc::ENOENT) => Ok(None),
+            _ => Err(Refused),
+        };
     }
     // SAFETY: openat returned a new, owned descriptor.
-    Ok(unsafe { File::from_raw_fd(fd) })
+    Ok(Some(unsafe { File::from_raw_fd(fd) }))
 }
 
 fn admitted_directory(file: &File, private: bool) -> Result<()> {
@@ -84,6 +92,20 @@ pub(crate) fn directory(path: &Path, private: bool) -> Result<File> {
     }
     admitted_directory(&current, private)?;
     Ok(current)
+}
+
+/// An existing regular file of this user that no one else can write, or
+/// `None` when it does not exist. For nonsecret files a daemon reads, such as
+/// GNOME Keyring's `default` alias file (mode 0644).
+pub(crate) fn owned_file_at(parent: &File, child: &OsStr) -> Result<Option<File>> {
+    let Some(file) = open_or_missing(parent, child, libc::O_RDONLY)? else {
+        return Ok(None);
+    };
+    let stat = file.metadata().map_err(|_| Refused)?;
+    if !stat.is_file() || stat.uid() != uid() || stat.mode() & 0o022 != 0 || stat.nlink() != 1 {
+        return Err(Refused);
+    }
+    Ok(Some(file))
 }
 
 pub(crate) fn private_file_at(parent: &File, child: &OsStr) -> Result<File> {

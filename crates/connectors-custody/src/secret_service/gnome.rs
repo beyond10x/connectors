@@ -49,6 +49,7 @@ impl Persistence {
         }
     }
     pub(super) fn admit(service: &Service) -> Result<Self> {
+        let name = collection_name(service.collection.as_str())?;
         let file = collection_file(service.collection.as_str())?;
         let bus = zbus::blocking::fdo::DBusProxy::new(&service.connection).map_err(unavailable)?;
         let pid = bus
@@ -105,6 +106,9 @@ impl Persistence {
         let directory = store_directory(&environment)?;
         drop(environment);
         let directory_file = fs::directory(&directory, true).map_err(unavailable)?;
+        // The collection behind the alias is the one this directory's `default`
+        // file names; a decoded name the daemon would not read there is refused.
+        check_default_alias(&directory_file, &name)?;
         // A successful fsync on a RAM filesystem is not persistent custody.
         // This initial receipt qualifies the local ext filesystem family only.
         let mut kind = std::mem::MaybeUninit::<libc::statfs>::uninit();
@@ -173,6 +177,13 @@ impl Persistence {
 
     pub(super) fn check_encrypted(&self) -> Result<()> {
         self.encrypted_file().map(|_| ())
+    }
+
+    /// Qualify the file behind `collection`, which may be another than the one
+    /// custody writes to: the legacy `login` collection an item was found in.
+    pub(super) fn check_encrypted_collection(&self, collection: &str) -> Result<()> {
+        self.encrypted_file_named(&collection_file(collection)?)
+            .map(|_| ())
     }
 
     pub(super) fn synchronize(&self) -> Result<()> {
@@ -282,14 +293,99 @@ fn proc_file(proc: &File, name: &str) -> Result<File> {
     // SAFETY: openat returned a new owned descriptor.
     Ok(unsafe { File::from_raw_fd(fd) })
 }
-/// The encrypted file behind a collection: `<name>.keyring` for a plain
-/// collection name. Any other name is refused, never guessed.
-fn collection_file(collection: &str) -> Result<String> {
-    let name = collection
+/// The identifier GNOME Keyring gave the collection at `collection`. Its
+/// object path segment is the identifier as `gkd_secret_util_build_path`
+/// writes it: an ASCII letter or digit as itself, every other byte as `_` and
+/// two lower-case hex digits. Only that exact form is decoded; anything the
+/// encoder never writes is refused, never guessed.
+fn collection_name(collection: &str) -> Result<String> {
+    let encoded = collection
         .strip_prefix(COLLECTIONS)
-        .filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'))
-        .ok_or(Failure::Unavailable)?;
-    Ok(format!("{name}.keyring"))
+        .ok_or(Failure::Unavailable)?
+        .as_bytes();
+    let hex = |b: u8| match b {
+        b'0'..=b'9' => Ok(b - b'0'),
+        b'a'..=b'f' => Ok(b - b'a' + 10),
+        _ => Err(Failure::Unavailable),
+    };
+    let mut decoded = Vec::with_capacity(encoded.len());
+    let mut rest = encoded;
+    while let Some((&byte, tail)) = rest.split_first() {
+        if byte.is_ascii_alphanumeric() {
+            decoded.push(byte);
+            rest = tail;
+            continue;
+        }
+        let [b'_', high, low, ..] = *rest else {
+            return Err(Failure::Unavailable);
+        };
+        let value = hex(high)? << 4 | hex(low)?;
+        if value.is_ascii_alphanumeric() {
+            return Err(Failure::Unavailable);
+        }
+        decoded.push(value);
+        rest = &rest[3..];
+    }
+    let name = String::from_utf8(decoded).map_err(unavailable)?;
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.contains('/')
+        || name.chars().any(char::is_control)
+    {
+        return Err(Failure::Unavailable);
+    }
+    Ok(name)
+}
+
+/// The encrypted file behind a collection: `<identifier>.keyring`, the name
+/// gkm-secret-module gives it and reads its identifier back from. A second
+/// keyring of one label is `<label>_1.keyring` and named `<label>_1`.
+fn collection_file(collection: &str) -> Result<String> {
+    let file = format!("{}.keyring", collection_name(collection)?);
+    // NAME_MAX: a longer name cannot be a file in the directory.
+    if file.len() > 255 {
+        return Err(Failure::Unavailable);
+    }
+    Ok(file)
+}
+
+/// The identifier gkd-secret-service reads behind the `default` alias from the
+/// keyrings directory's `default` file on each client connection: its contents
+/// with surrounding whitespace stripped, or `login` when it is missing or empty.
+fn alias_identifier(contents: Option<&[u8]>) -> Vec<u8> {
+    // g_strstrip strips C isspace, which includes \v, unlike trim_ascii.
+    let space = |b: &u8| matches!(b, b' ' | b'\t' | b'\n' | b'\x0b' | b'\x0c' | b'\r');
+    let stripped = contents
+        .and_then(|c| {
+            let start = c.iter().position(|b| !space(b))?;
+            let end = c.iter().rposition(|b| !space(b))?;
+            Some(&c[start..=end])
+        })
+        .unwrap_or(b"login");
+    stripped.to_vec()
+}
+
+/// Cross-check the decoded default identifier with the `default` file the
+/// daemon reads it from. The file holds no secret; it is read bounded.
+fn check_default_alias(directory: &File, name: &str) -> Result<()> {
+    let contents = match fs::owned_file_at(directory, OsStr::new("default")).map_err(unavailable)? {
+        Some(file) => {
+            let mut contents = Vec::new();
+            file.take(4097)
+                .read_to_end(&mut contents)
+                .map_err(unavailable)?;
+            if contents.len() > 4096 {
+                return Err(Failure::Unavailable);
+            }
+            Some(contents)
+        }
+        None => None,
+    };
+    if alias_identifier(contents.as_deref()) != name.as_bytes() {
+        return Err(Failure::Unavailable);
+    }
+    Ok(())
 }
 
 fn unavailable<T>(_: T) -> Failure {
@@ -316,5 +412,107 @@ mod tests {
             store_directory(b"HOME=/nonexistent-connectors-test\0").unwrap(),
             std::path::Path::new("/nonexistent-connectors-test/.local/share/keyrings")
         );
+    }
+
+    fn file_of(segment: &str) -> Result<String> {
+        collection_file(&format!("{COLLECTIONS}{segment}"))
+    }
+
+    /// gkd_secret_util_build_path writes every byte that is not an ASCII letter
+    /// or digit as `_%02x`; the file is the decoded identifier plus `.keyring`.
+    #[test]
+    fn an_escaped_collection_path_names_the_file_of_its_decoded_identifier() {
+        for (segment, file) in [
+            ("login", "login.keyring"),
+            (
+                "Standard_2dSchl_c3_bcsselbund",
+                "Standard-Schlüsselbund.keyring",
+            ),
+            // A second keyring of one label gets `<label>_1.keyring` and, once
+            // loaded from it, the identifier `<label>_1`.
+            ("login_5f1", "login_1.keyring"),
+            ("my_2ering", "my.ring.keyring"),
+            ("_2e_2e_2e", "....keyring"),
+            ("a_20b", "a b.keyring"),
+        ] {
+            assert_eq!(file_of(segment).as_deref(), Ok(file), "{segment}");
+        }
+    }
+
+    #[test]
+    fn a_malformed_or_hostile_collection_path_is_refused() {
+        let long = "a".repeat(256 - ".keyring".len());
+        for segment in [
+            "",
+            "_",
+            "a_",
+            "a_2",
+            "a_2g",
+            "a_g2",
+            // Upper-case hex and an escaped letter or digit are never written.
+            "a_2F",
+            "a_2D",
+            "_41",
+            "a_30",
+            // A bare `_` is always written as `_5f`.
+            "a_b",
+            "login_1",
+            // Separator, NUL, dot names and control characters.
+            "_2f",
+            "a_2fb",
+            "_2e_2e_2fetc",
+            "_00",
+            "a_00b",
+            "_2e",
+            "_2e_2e",
+            "a_0ab",
+            "a_09",
+            "_1f",
+            "_7f",
+            "_c2_85",
+            // Not UTF-8: a lone lead byte, a lone continuation, an overlong form.
+            "_c3",
+            "a_bc",
+            "_c0_af",
+            "_ff",
+            // Not one segment, or not a D-Bus path character.
+            "a/b",
+            "/a",
+            "a-b",
+            "a.b",
+            "Schlüssel",
+            &long,
+        ] {
+            assert_eq!(file_of(segment), Err(Failure::Unavailable), "{segment:?}");
+        }
+        assert_eq!(file_of(&long[1..]).map(|f| f.len()), Ok(255));
+        for path in [
+            "/org/freedesktop/secrets/aliases/default",
+            "/org/freedesktop/secrets/collection",
+            "/org/freedesktop/secrets/collectionlogin",
+            "login",
+        ] {
+            assert_eq!(collection_file(path), Err(Failure::Unavailable), "{path}");
+        }
+    }
+
+    /// gkd-secret-service's update_default: the `default` file's contents,
+    /// whitespace-stripped, name the default identifier; none or empty is `login`.
+    #[test]
+    fn the_default_alias_file_names_the_identifier_the_daemon_reads() {
+        for (contents, identifier) in [
+            (None, b"login".as_slice()),
+            (Some(b"".as_slice()), b"login"),
+            (Some(b" \t\n\r\x0b\x0c"), b"login"),
+            (Some(b"login"), b"login"),
+            (
+                Some("Standard-Schlüsselbund".as_bytes()),
+                "Standard-Schlüsselbund".as_bytes(),
+            ),
+            (Some(b"\n elsewhere \n"), b"elsewhere"),
+            (Some(b"two words"), b"two words"),
+        ] {
+            assert_eq!(alias_identifier(contents), identifier, "{contents:?}");
+        }
     }
 }

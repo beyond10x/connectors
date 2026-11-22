@@ -225,6 +225,9 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "tests::session_keyring::orphans_are_listed_and_removed_only_on_the_flag"
             | "tests::session_keyring::removing_an_authority_leaves_no_item_carrying_it"
             | "tests::session_keyring_review::a_daemon_without_login_receives_the_write_behind_the_alias"
+            | "tests::session_keyring_review::a_default_collection_with_an_escaped_name_holds_the_write"
+            | "tests::session_keyring_review::a_legacy_login_item_reads_only_while_its_own_collection_is_encrypted"
+            | "tests::session_keyring_review::a_second_keyring_of_one_label_is_its_own_suffixed_file"
             | "tests::session_keyring_review::moved_alias_writes_behind_it_reads_login_and_removal_stays_inside_the_authority",
         ) => Some((Disposable, vec![CUSTODY])),
         (

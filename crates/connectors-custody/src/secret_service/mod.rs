@@ -356,6 +356,15 @@ impl ReadBackend for SecretService {
     fn read(&self, version: Version) -> Result<Material> {
         self.admit(version)?;
         let item = self.find(version)?.ok_or(Failure::Missing)?;
+        // `admit` qualifies the collection custody writes to. The item may be in
+        // the legacy `login` one: qualify the file of the collection holding it.
+        let holder = self
+            .service
+            .collections()
+            .find(|c| is_item_of(&item, c))
+            .ok_or(Failure::Unavailable)?;
+        self.persistence
+            .check_encrypted_collection(holder.as_str())?;
         let proxy = self
             .service
             .proxy(item.as_str(), ITEM_INTERFACE)
@@ -376,6 +385,8 @@ impl ReadBackend for SecretService {
             return Err(Failure::Unavailable);
         }
         self.admit(version)?;
+        self.persistence
+            .check_encrypted_collection(holder.as_str())?;
         Ok(secret)
     }
 }
