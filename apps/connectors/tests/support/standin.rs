@@ -317,10 +317,29 @@ pub fn main(tests: &[(&str, fn())]) {
         let _ = runtime::serve(3, Child(bootstrap(&args), inputs(&args).is_some()));
         return;
     }
-    let filter = args.iter().find(|arg| !arg.starts_with('-'));
+    // cargo-nextest lists a binary with `--list --format terse` (and again with
+    // `--ignored`), then runs each test as `--exact <name> --nocapture`.
+    if args.iter().any(|arg| arg == "--list") {
+        if !args.iter().any(|arg| arg == "--ignored") {
+            for (name, _) in tests {
+                println!("{name}: test");
+            }
+        }
+        return;
+    }
+    let exact = args.iter().any(|arg| arg == "--exact");
+    let filter = args
+        .iter()
+        .find(|arg| !arg.starts_with('-') && arg.as_str() != "terse");
     let (mut passed, mut failed) = (0, Vec::new());
     for (name, test) in tests {
-        if filter.is_some_and(|filter| !name.contains(filter.as_str())) {
+        if filter.is_some_and(|filter| {
+            if exact {
+                *name != filter.as_str()
+            } else {
+                !name.contains(filter.as_str())
+            }
+        }) {
             continue;
         }
         let outcome = std::panic::catch_unwind(test);
