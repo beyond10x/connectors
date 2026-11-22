@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Dependencies: ESS moves from 0.87.0 to 0.97.3, which synthesizes the local metadata authority's
+  suite with less than half the CPU time (5.9 s to 2.4 s for `local-metadata-authority`). The
+  generated MCP and operation types and the generated reference pages lose their `model digest`
+  stamp (ESS 0.89.0). The per-domain metadata emissions list only their own domain's refusals
+  (ESS 0.97.2), and the component emission check admits an `ESS-SYNTH-025` refusal whose
+  `invariant/after` scenario is still emitted (ESS 0.95.0).
+- The specification declares `connectors.declarations.DeclareAdapterSpecification`, which creates
+  an `AdapterSpecification` and is accepted by `local-metadata-authority`. ESS 0.95.0 and later
+  arrange a referenced row through the command that creates it, so without it synthesis refused
+  every scenario that needs a service configuration, auth profile or connection, among them
+  `DeclareAuthorizationServer/declared`, `ReserveRefresh/reserved` and the feed binding's
+  `AddContainer/added`. No host route sends it: an adapter's specification ships as a
+  `connectors.adapter/v1` document.
+- The `datasource.feed/v1alpha1` family's binding suite holds 27 scenarios, not 28:
+  `AddContainer/outcome/added` now arranges its connection through the metadata authority's
+  commands, which a feed binding does not accept, so ESS lists it outside the `feed-binding`
+  component. The Confluence declaration runs all 27, Jira and GitLab 25 of them.
+
 ## 0.74.0 — 2026-11-22
 
 ### Added

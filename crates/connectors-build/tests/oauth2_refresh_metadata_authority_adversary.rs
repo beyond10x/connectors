@@ -161,7 +161,7 @@ fn admitted_scoped_manifest(domain: &str) -> ess_conformance::mutate::Manifest {
 
 /// The acceptance names `metadata_conformance::emit` as the emission `mutate --collect` scores
 /// for `connectors.refresh` and `connectors.oauth2`. `emit` wrote `ess-mutation-manifest/2`, and
-/// the pinned ESS 0.87.0 reader refuses a `/2` manifest holding a `sets-drop`, `precedence-swap`
+/// the pinned ESS 0.97.3 reader refuses a `/2` manifest holding a `sets-drop`, `precedence-swap`
 /// or `emit-swap` mutant (`ess-conformance` `mutate.rs:185-193`). `IssueAccessToken`'s four
 /// precedence swaps are such mutants.
 #[test]

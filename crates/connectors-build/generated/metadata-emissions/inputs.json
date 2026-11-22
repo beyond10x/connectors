@@ -1,5 +1,5 @@
 {
-  "digest": "9a3a64a295422c2c3442ebc4af92e739491d4380a95cd6f51c5eff500d1ddcb4",
+  "digest": "afcabdec3b0532291b9ad03628383156399ee4da598d6a6d57220cb5ad5e4d99",
   "ess_crates": [
     "entity-core 0.28.0",
     "entity-core 0.32.0",
@@ -7,22 +7,22 @@
     "entity-executor 0.32.0",
     "entity-query 0.32.0",
     "entity-store 0.32.0",
-    "ess-compiler 0.87.0",
-    "ess-conformance 0.87.0",
-    "ess-domain 0.87.0",
-    "ess-entity-runtime 0.87.0",
-    "ess-gen 0.87.0",
-    "ess-http 0.87.0",
-    "ess-primitives 0.87.0",
-    "ess-service-contract 0.87.0",
-    "ess-synth 0.87.0",
-    "ess-transport 0.87.0",
-    "ess-yaml 0.87.0"
+    "ess-compiler 0.97.3",
+    "ess-conformance 0.97.3",
+    "ess-domain 0.97.3",
+    "ess-entity-runtime 0.97.3",
+    "ess-gen 0.97.3",
+    "ess-http 0.97.3",
+    "ess-primitives 0.97.3",
+    "ess-service-contract 0.97.3",
+    "ess-synth 0.97.3",
+    "ess-transport 0.97.3",
+    "ess-yaml 0.97.3"
   ],
   "files": [
     {
       "path": "crates/connectors-build/src/metadata_emissions.rs",
-      "sha256": "aff819486e91f9f58ff79b9a28d9208231740b5a0e909f298d0afbf706ae1c24"
+      "sha256": "80b137fe49eaace4e7b72ec6e8a6af4765d753a226dc7303b76635d289b82075"
     },
     {
       "path": "crates/connectors-build/src/metadata_entities.rs",
@@ -30,11 +30,11 @@
     },
     {
       "path": "crates/connectors-spec/toolchain.json",
-      "sha256": "69a3033984076ee8bf2b92569a75ece81da546f684257db69a0c8dcb8419a566"
+      "sha256": "0ddf82125653c558ea6ac6c290551266ca169aff4b6f248d28ceeb6d16f1ad95"
     },
     {
       "path": "ess/components.yaml",
-      "sha256": "ef867e1c465573f9d96fa5764ae0446fd75667478d9cdaae993ed6f9273c2cf3"
+      "sha256": "2aed3ddc50114fcb070e7aea4d62c68d93c9f8acac78a998cbcd1ecee130ab11"
     },
     {
       "path": "ess/domains/approval_issuers.yaml",
@@ -50,7 +50,7 @@
     },
     {
       "path": "ess/domains/auth_bindings.yaml",
-      "sha256": "93ec0bd564c06c5f29f834c5b91512dd0e007b2f2b0ce114591449b1b6add0fb"
+      "sha256": "ae94a4bde79e4e02d4abf9359b5fd5fa9d8123cdf6bd4130c53f334676eda537"
     },
     {
       "path": "ess/domains/cli.yaml",
@@ -74,7 +74,7 @@
     },
     {
       "path": "ess/domains/declarations.yaml",
-      "sha256": "4e98df27a610a35cd45f13f3f8eb6b5f4b1ae6b8523275bcad799358325e92c8"
+      "sha256": "3a7e090a2560449d6279ba93eda6d45b37151fbee42eb68245853c3498ed1a2e"
     },
     {
       "path": "ess/domains/definitions_install.yaml",

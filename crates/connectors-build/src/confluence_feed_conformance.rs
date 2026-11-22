@@ -68,9 +68,9 @@ const EXPAND: &str = "history,version";
 /// The zones the suite runs in, in minutes east of UTC: both ends of the range the
 /// declaration's `utc_offsets` admits, UTC, and one zone on each side off the whole hour.
 const ZONES: [i64; 5] = [-720, -570, 0, 345, 840];
-/// The scenarios the Confluence profile's capabilities select: all 28 the family defines, since an
+/// The scenarios the Confluence profile's capabilities select: all 27 the family defines, since an
 /// opaque revision tells every revision apart.
-const RUN: u64 = 28;
+const RUN: u64 = 27;
 
 fn provider() -> PathBuf {
     feed_conformance::root().join("adapters/catalog")
@@ -689,7 +689,7 @@ impl Binding for Declared {
 
 // ---- the cases -------------------------------------------------------------------------------
 
-/// The declaration passes every scenario its four capabilities select in each zone: all 28 of
+/// The declaration passes every scenario its four capabilities select in each zone: all 27 of
 /// the family's, since an opaque revision leaves none out. The three capabilities weaker than the
 /// family's strongest each changed at least one expectation, so each claim was exercised.
 #[test]
