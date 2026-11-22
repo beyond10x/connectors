@@ -2,10 +2,12 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0740-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: connectors 0.74.0 release scope
 summary: Scope, exclusions and evidence of the 0.74.0 cut
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-22T16:12:27Z", actor: "human:timo", revision: 3}
 ---
 ## Scope of connectors 0.74.0
 
@@ -40,3 +42,23 @@ Released from `release/0.74.0` (pull request beyond10x/connectors#271) on 2026-1
 The release pull request's required checks ("repository gate", "common / Security and
 privacy", "planning validate") on the release commit, and the verification of the tag, the
 release page, its four archives, `SHA256SUMS` and the container image after publication.
+
+## Verified 2026-11-22
+
+- Release commit `356fc31d51a1657421df3c322c3d396a9877a6d6` on `origin/main`, the squash merge of
+  pull request #271, authored by `b10x-bot[bot]`; its tree `d50ccf99770b` equals the tree the
+  repository gate ran on (4,231 tests passed, test step 635 s).
+- Annotated tag `v0.74.0` by `b10x-bot[bot]`, peeled to the release commit, an ancestor of
+  `origin/main`.
+- Release page https://github.com/beyond10x/connectors/releases/tag/v0.74.0, authored by
+  `b10x-bot[bot]`, Latest, notes from the tag.
+- Assets: the four `connectors-0.74.0-<target>.tar.gz` archives and `SHA256SUMS`;
+  `sha256sum -c SHA256SUMS` passes for all four. The first release-binaries run failed on the
+  x86_64-apple-darwin artifact upload (`ENOTFOUND`); the rerun of the failed jobs passed.
+- Image `ghcr.io/beyond10x/connectors:0.74.0`: index `sha256:9c3ccd8a6d4460a3d5991b31cad87a87521d7e4fa7bf5934226aab79c257a2bc`
+  (the digest the job's summary names), `linux/amd64` and `linux/arm64`, revision label the
+  release commit.
+- Known red: "host and CLI on windows-latest" fails with `failed to remove file
+  target\debug\connectors.exe`, as on `main` before this release; not a required check.
+- Workstation: 0.74.0 installed beside 0.65.2 in `~/.local/share/connectors/0.74.0/bin`; only the
+  Slack-only and Tavily-only setups use it (Timo's pick H5 A, 17:00 CET).
