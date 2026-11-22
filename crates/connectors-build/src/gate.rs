@@ -108,6 +108,19 @@ fn oauth2_boundary(root: &Path, temp: &Path, ess: &Path) -> Result<()> {
 }
 
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
+    // The CI's path list for pull requests that change only planning or prose files, both
+    // sides of it, and its guard against a planning file a test reads (`~/beyond10x/AGENTS.md`,
+    // "Planning-only pull requests skip the tests").
+    let scope_test = ".github/ci/changed-scope-test.sh";
+    if !Command::new("sh")
+        .arg(scope_test)
+        .current_dir(root)
+        .status()?
+        .success()
+    {
+        return Err(format!("gate: {scope_test} failed").into());
+    }
+    println!("gate: {scope_test}; exit=0");
     connectors_spec::v2::check_ess(ess)?;
     super::metadata_entities::run(root, true)?;
     let base = root.join(".local/tmp");

@@ -15,8 +15,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  scope:
+    name: change scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Decide whether this change needs the documentation build
+        id: scope
+        run: sh .github/ci/changed-scope.sh github docs
+
   build:
     name: Build documentation
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.run != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
