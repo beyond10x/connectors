@@ -18,7 +18,7 @@
 use super::Result;
 use crate::metadata_entities;
 use ess_conformance::{
-    AdmittedSuite,
+    AdmittedSuite, RefusalCause,
     mutate::{self, EmittedSuite, Manifest, MutantClass, RefusalKey},
 };
 use serde_json::{Value, json};
@@ -301,16 +301,24 @@ fn check_component_emission(
         manifest.baseline.refused.as_ref() == Some(&expected),
         || "the baseline's refusals are not the ones a separate synthesis reports".to_owned(),
     )?;
-    // No refused scenario is in the suite the manifest points at.
+    // No withdrawn scenario is in the suite the manifest points at. A refusal whose scenario
+    // stands (`ESS-SYNTH-025` since ESS 0.95.0: the `invariant/after` scenario is emitted beside
+    // it) withdraws nothing.
     let suite: Value = serde_json::from_slice(&std::fs::read(
         out.join(&manifest.baseline.dir).join(mutate::SUITE_FILE),
     )?)?;
     let scenarios = suite["scenarios"]
         .as_object()
         .ok_or("the baseline suite has no scenarios")?;
-    for key in &expected {
-        if let Some(scenario) = &key.scenario {
-            ensure(!scenarios.contains_key(scenario), || {
+    for refusal in independent.refusals.iter().filter(|refusal| {
+        !refusal.stands
+            && !matches!(
+                refusal.cause,
+                RefusalCause::AbsenceUnwitnessed { .. } | RefusalCause::ChildUnwitnessed { .. }
+            )
+    }) {
+        if let Some(scenario) = RefusalKey::of(refusal).scenario {
+            ensure(!scenarios.contains_key(&scenario), || {
                 format!("{scenario} is refused and emitted")
             })?;
         }

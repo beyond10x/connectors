@@ -1,275 +1,507 @@
 {
   "baseline": {
     "dir": "baseline",
-    "refusals": 11,
+    "refusals": 10,
     "refused": [
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-        "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-        "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-        "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
-      {
-        "code": "ESS-SYNTH-001",
-        "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-        "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-      },
       {
         "code": "ESS-SYNTH-013",
         "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
         "subject": "type connectors.declarations.DeclarationId"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+        "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+        "subject": "entity connectors.cli.ConnectionListCursor"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+        "subject": "entity connectors.clock.LocalClockFloor"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+        "subject": "entity connectors.delegation.ApprovalRedemption"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+        "subject": "entity connectors.execution_audit.AuditRecord"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+        "subject": "entity connectors.idempotency.KeyReservation"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+        "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+        "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+      },
+      {
+        "code": "ESS-SYNTH-025",
+        "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+        "subject": "entity connectors.mutations.AttemptRecord"
       }
     ],
-    "scenarios": 429,
-    "spec_digest": "857570aa82b6c975dd1c19cd720653c3464d44736d91496346d92d01c267ee1a",
-    "suite_digest": "sha256:6eebd80506197b877c51aa6868197df21c058b916fbe6ca4790d757b02f20741"
+    "scenarios": 430,
+    "spec_digest": "261dcb988bf494799f19cc201ff9a2673387693c0cc672e1883e9e853685cdbf",
+    "suite_digest": "sha256:4d4d78ec7aba7450f392a48fa1b715c8bc0816359bd61e1280c12fd470d2fbab"
   },
   "component": "local-metadata-authority",
   "format": "ess-mutation-manifest/4",
   "mutants": [
     {
-      "change": "`name-taken` (`(defined(connector_id) and defined(name) and defined(name_held_by))`) and `endpoint-required` (`(defined(connector_id) and not (defined(endpoint)) and not (defined(connector_default_endpoint)) and (not (defined(name)) or not (defined(name_held_by))))`) change places, so `endpoint-required` answers where both hold",
+      "change": "`revision-conflict` (`revision != input.expected_revision`) and `revision-reused` (`revision == input.revision`) change places, so `revision-reused` answers where both hold",
       "class": "precedence-swap",
-      "dir": "precedence-swap/connectors.declarations.RecordServiceConfiguration/name-taken/endpoint-required",
-      "id": "precedence-swap/connectors.declarations.RecordServiceConfiguration/name-taken/endpoint-required",
-      "refusals": 11,
+      "dir": "precedence-swap/connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict/revision-reused",
+      "id": "precedence-swap/connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict/revision-reused",
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
+      "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict/revision-reused",
+      "spec_digest": "8991123d084710f736d243abc133737a72250692bae072925b9ef389cfcb83ec",
+      "suite_digest": "sha256:ce9bf6bf55f96a40be90e8215ee2ddb5db0eede15bf8a4ebd53bfd641710b8f9"
+    },
+    {
+      "change": "`name-taken` (`(defined(connector_id) and defined(name) and defined(name_held_by))`) and `endpoint-required` (`(defined(connector_id) and not (defined(endpoint)) and not (defined(connector_default_endpoint)) and (not (defined(name)) or not (defined(name_held_by))))`) change places, so `endpoint-required` answers where both hold",
+      "class": "precedence-swap",
+      "dir": "precedence-swap/connectors.declarations.RecordServiceConfiguration/name-taken/endpoint-required",
+      "id": "precedence-swap/connectors.declarations.RecordServiceConfiguration/name-taken/endpoint-required",
+      "refusals": 10,
+      "refused": [
+        {
+          "code": "ESS-SYNTH-013",
+          "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
+          "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
+        }
+      ],
+      "scenarios": 430,
       "site": "connectors.declarations.RecordServiceConfiguration/name-taken/endpoint-required",
-      "spec_digest": "67f324f8d8c28161b9b14a4320b02812f7074ba1414ec0f34a6fc31b518609ec",
-      "suite_digest": "sha256:c622dfabd58edc25becb51e06716d233c0a5d161902a69ed7e60b2103b610046",
+      "spec_digest": "26d7056a744f2d7260e14438e2e830fe25a8f979cd9650a3e1fe11441e8f7fc2",
+      "suite_digest": "sha256:bcb7ada24c33d96956354c56bd7550d835fcd3c5fd3fb685575480d4a5ffe418",
       "unsatisfiable_guard": "((defined(connector_id) and defined(name) and defined(name_held_by)) and (defined(connector_id) and not (defined(endpoint)) and not (defined(connector_default_endpoint)) and (not (defined(name)) or not (defined(name_held_by)))))"
+    },
+    {
+      "change": "`linked-elsewhere` (`(defined(attempt_id) and attempt_id != input.attempt_id)`) and `already-linked` (`(defined(attempt_id) and attempt_id == input.attempt_id)`) change places, so `already-linked` answers where both hold",
+      "class": "precedence-swap",
+      "dir": "precedence-swap/connectors.execution_audit.LinkAnchorAttempt/linked-elsewhere/already-linked",
+      "id": "precedence-swap/connectors.execution_audit.LinkAnchorAttempt/linked-elsewhere/already-linked",
+      "refusals": 10,
+      "refused": [
+        {
+          "code": "ESS-SYNTH-013",
+          "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
+          "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
+        }
+      ],
+      "scenarios": 430,
+      "site": "connectors.execution_audit.LinkAnchorAttempt/linked-elsewhere/already-linked",
+      "spec_digest": "899b62199f213c5cb40b1fd1f1955b2767e927dc3dc6f8ee38493a380ee9be61",
+      "suite_digest": "sha256:83fa6d3e3f609e2bd0405be3869e13002fb923917671ed8f14e7641469d0dbf9"
+    },
+    {
+      "change": "`read-anchor` (`(not (defined(access)) or not (access == write))`) and `linked-elsewhere` (`(defined(attempt_id) and attempt_id != input.attempt_id)`) change places, so `linked-elsewhere` answers where both hold",
+      "class": "precedence-swap",
+      "dir": "precedence-swap/connectors.execution_audit.LinkAnchorAttempt/read-anchor/linked-elsewhere",
+      "id": "precedence-swap/connectors.execution_audit.LinkAnchorAttempt/read-anchor/linked-elsewhere",
+      "refusals": 10,
+      "refused": [
+        {
+          "code": "ESS-SYNTH-013",
+          "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
+          "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
+        }
+      ],
+      "scenarios": 430,
+      "site": "connectors.execution_audit.LinkAnchorAttempt/read-anchor/linked-elsewhere",
+      "spec_digest": "eefce5e978a462b155aec98cf783093adc97a496e537e37319cfecc4f253ff26",
+      "suite_digest": "sha256:17e892d44b7dd2747496352d98a89a3e5b176d49aa0080cb88ea1e29b98c59b8"
     },
     {
       "change": "`nil-identity` (`policy_id in [00000000-0000-0000-0000-000000000000]`) and `too-many-operations` (`operations.count > 256`) change places, so `too-many-operations` answers where both hold",
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/nil-identity/too-many-operations",
       "id": "precedence-swap/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/nil-identity/too-many-operations",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.local_approval_policy.ConfigureLocalApprovalPolicy/nil-identity/too-many-operations",
-      "spec_digest": "ee6a02b3006da92e747b98fe807cf9a0f3b25e4475a833ac549706f2da3c5b55",
-      "suite_digest": "sha256:4785d73501a69eb1e9c518f98e9537137c532d9979ab7ba1092cf03061c6bf19"
+      "spec_digest": "3d22c756690c37a84a48ef7d506d3b8f78faebbce5de2e4bb8c66786b0303dd8",
+      "suite_digest": "sha256:3c4658445be80b0930757b775f4623f31719495c3ab5119155716e7db952273e"
+    },
+    {
+      "change": "`revision-conflict` (`revision != input.expected_revision`) and `exhausted` (`revision >= 9007199254740991`) change places, so `exhausted` answers where both hold",
+      "class": "precedence-swap",
+      "dir": "precedence-swap/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revision-conflict/exhausted",
+      "id": "precedence-swap/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revision-conflict/exhausted",
+      "refusals": 10,
+      "refused": [
+        {
+          "code": "ESS-SYNTH-013",
+          "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
+          "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
+        }
+      ],
+      "scenarios": 430,
+      "site": "connectors.local_approval_policy.ReviseLocalApprovalPolicy/revision-conflict/exhausted",
+      "spec_digest": "08a6d4f56b303352733ff219cf281ebce0a45fc93dd7ab5004732a35f951c77b",
+      "suite_digest": "sha256:befda9a757210c000a9acd4accdef4f6072b8f5967d8ecbdd879e8cc55802916"
     },
     {
       "change": "`issued-current` (`(decision == current and not (defined(refresh_attempt_id)))`) and `issued-refreshed` (`(decision == refreshed and defined(refresh_attempt_id))`) change places, so `issued-refreshed` answers where both hold",
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.oauth2.IssueAccessToken/issued-current/issued-refreshed",
       "id": "precedence-swap/connectors.oauth2.IssueAccessToken/issued-current/issued-refreshed",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/issued-current/issued-refreshed",
-      "spec_digest": "c62c49a83b84737866ef431682bba1075f63a79dbc141a46ff224d8b663d93a3",
-      "suite_digest": "sha256:96d5169156eb883e18740eedde79f2dba5bad4992d4277c21458f77f75661a58",
+      "spec_digest": "8a7ca5a7f7dafa12f2ba1ba0b773827b5865acb662503f0604ea34813c9126bf",
+      "suite_digest": "sha256:96f5b64e2417f567161c81efc0e49946e4a07b61839730ec7656e2d7aba3522b",
       "unsatisfiable_guard": "((decision == current and not (defined(refresh_attempt_id))) and (decision == refreshed and defined(refresh_attempt_id)))"
     },
     {
@@ -277,68 +509,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.oauth2.IssueAccessToken/not-ready/reauthorization-required",
       "id": "precedence-swap/connectors.oauth2.IssueAccessToken/not-ready/reauthorization-required",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/not-ready/reauthorization-required",
-      "spec_digest": "c7300778274b2ddf9125780629aee48a0ef7785d43e47259676ee3a34ec9a781",
-      "suite_digest": "sha256:3c224af84d0a416d0d398776c8436eef8b45faf09677cd318cf43b1821358a65",
+      "spec_digest": "415a15f236158bcd12e8c73ff5d1f9582e1b407d99b3ea84d87bcb1d627de7da",
+      "suite_digest": "sha256:626355981af69df7f901b5ea7c4062d69702cd14a7d7589f33627f1725085c29",
       "unsatisfiable_guard": "(decision == not_ready and decision == reauthorization_required)"
     },
     {
@@ -346,68 +573,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.oauth2.IssueAccessToken/reauthorization-required/refresh-uncertain",
       "id": "precedence-swap/connectors.oauth2.IssueAccessToken/reauthorization-required/refresh-uncertain",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/reauthorization-required/refresh-uncertain",
-      "spec_digest": "633724cad5897e71de54b31aa5e62c796b89a7af0327286ab0694d8ba49119d4",
-      "suite_digest": "sha256:400c907986f203ba6d8b420a75f7acf4b30f2c2dbb5571985bfac1677869c0db",
+      "spec_digest": "89c9e9de4de861bbba199213dca05b9a8a55503fc1811c2d33745993e5fdb092",
+      "suite_digest": "sha256:9fca40551d50921ec7bc4126c784c94be63ca4ecb26f5ba7d256b2d5bb7f7567",
       "unsatisfiable_guard": "(decision == reauthorization_required and decision == refresh_uncertain)"
     },
     {
@@ -415,68 +637,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.oauth2.IssueAccessToken/refresh-uncertain/rate-limited",
       "id": "precedence-swap/connectors.oauth2.IssueAccessToken/refresh-uncertain/rate-limited",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/refresh-uncertain/rate-limited",
-      "spec_digest": "05b356ada3278245d0133bb2ef4d26fa336d7ba77c3458d6c24dae155fd2d25a",
-      "suite_digest": "sha256:3ae42763b3f5b4a8f11d6679685fb31ca13e851091627aa6615c6cabf3f3b8be",
+      "spec_digest": "a46826c002a42f5a2530b4ebf3686033ea4e48a456c63ddad8c810e5f9b580a0",
+      "suite_digest": "sha256:941b2332de5b27dae4b940eadb169b4a2075012bd1071d515bc0fccfcfef78f2",
       "unsatisfiable_guard": "(decision == refresh_uncertain and decision == rate_limited)"
     },
     {
@@ -484,68 +701,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.AuthorizeExchange/ownership-conflict/source-binding-changed",
       "id": "precedence-swap/connectors.refresh.AuthorizeExchange/ownership-conflict/source-binding-changed",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.AuthorizeExchange/ownership-conflict/source-binding-changed",
-      "spec_digest": "b1763beca7ae550a4e243d2ea73e9507148791db87106c29cda1ff855e54493f",
-      "suite_digest": "sha256:5fb36b500512916654df0754dab5a6f81f0a88e0b3cb0e213f6aa122dafc610d",
+      "spec_digest": "2be10eb877653ff900b685a8dc3aa2575dbafb49df1bd99a52683de993d027a2",
+      "suite_digest": "sha256:67452d08e5f5a59b3093bfe2947f7bc4c96847d7de8fbc34c3df88f9091b972c",
       "unsatisfiable_guard": "(decision == ownership_conflict and decision == source_binding_changed)"
     },
     {
@@ -553,68 +765,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.AuthorizeExchange/source-binding-changed/source-revoked",
       "id": "precedence-swap/connectors.refresh.AuthorizeExchange/source-binding-changed/source-revoked",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.AuthorizeExchange/source-binding-changed/source-revoked",
-      "spec_digest": "7282e19e4788d9013768088e8375d85356ba4b7058db50005b99f1c0b35a79b7",
-      "suite_digest": "sha256:cc9ca5e5491406a5d3f1f6d3c9a0229a3212709afc662935ff560aa209c4e9f8",
+      "spec_digest": "85d40fa4216c3a303e59c3bb90e44a3bb5eb65dd3e765fc5fa17d06ebd8ac318",
+      "suite_digest": "sha256:8bfdd88c5326aed54af9033b692cd8d08404f7b1fc3d7082ad264685ad4193ec",
       "unsatisfiable_guard": "(decision == source_binding_changed and decision == source_revoked)"
     },
     {
@@ -622,68 +829,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.PublishRefresh/ownership-conflict/publication-binding-changed",
       "id": "precedence-swap/connectors.refresh.PublishRefresh/ownership-conflict/publication-binding-changed",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/ownership-conflict/publication-binding-changed",
-      "spec_digest": "48ebcd61b8659c7f857cf4ff7087891d92804e2d7196fbccc027d45d815423cb",
-      "suite_digest": "sha256:7a49ea9015edaea86cb32d88e6ff59a0ea77d6ccd3e3ad4bfa68d5b84702d479",
+      "spec_digest": "2b95b327500a0dac0531fa20cbc183f5d7a9accc1b6525672f8f135c61a9e1ae",
+      "suite_digest": "sha256:879b9e82d2b416dcaef436cbb01fc45c3dd221eb527c4da777f1c0bc1505164a",
       "unsatisfiable_guard": "(decision == ownership_conflict and decision == publication_binding_changed)"
     },
     {
@@ -691,68 +893,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.PublishRefresh/publication-binding-changed/publication-revoked",
       "id": "precedence-swap/connectors.refresh.PublishRefresh/publication-binding-changed/publication-revoked",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/publication-binding-changed/publication-revoked",
-      "spec_digest": "bb06cab41b52a7d57deb7328c466d113e226c1d7ba503fff4c277d90d3040610",
-      "suite_digest": "sha256:18ac14d0fc06c8f0e66225231e0c35b0312cf9261f453b4fbbc9c3004abbce76",
+      "spec_digest": "e47bc61f8130b2f2fbaca4efee7523a032a718de57858004a7cd4a506e4588b7",
+      "suite_digest": "sha256:7abe7d275579921f0401f9e5a5e1a0269e6cf09f4b9962b95ceee4a2c9751556",
       "unsatisfiable_guard": "(decision == publication_binding_changed and decision == publication_revoked)"
     },
     {
@@ -760,68 +957,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.PublishRefresh/publication-evidence-invalid/publication-candidate-unavailable",
       "id": "precedence-swap/connectors.refresh.PublishRefresh/publication-evidence-invalid/publication-candidate-unavailable",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/publication-evidence-invalid/publication-candidate-unavailable",
-      "spec_digest": "a5b7898e45dfdd6500b2bb24674ae88358fcb32db730af0fa7a3617bdd404461",
-      "suite_digest": "sha256:4fb79bd9b6ecb8118cbe405321968b30990c409f2d755e76ca4dfb87e83fd234",
+      "spec_digest": "3ac5b3056f03cb1b84f5de046d34c9927caad41b0ea51a1560ad39961506cb07",
+      "suite_digest": "sha256:665e7cbeda575e647e32146028273a061afe9fad2a93665cfe4b7ea832196f52",
       "unsatisfiable_guard": "(decision == publication_evidence_invalid and decision == publication_candidate_unavailable)"
     },
     {
@@ -829,68 +1021,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.PublishRefresh/publication-revoked/publication-evidence-invalid",
       "id": "precedence-swap/connectors.refresh.PublishRefresh/publication-revoked/publication-evidence-invalid",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/publication-revoked/publication-evidence-invalid",
-      "spec_digest": "1cfcea38dac6607ee4e213d107a2effc2a6e2b9319cf022a6a4e756dd157927f",
-      "suite_digest": "sha256:53479c218e5e1c2289120bd5260e0d4e87292e6ea5ea7a787ca918922e9b42f6",
+      "spec_digest": "560fe4ea40844686ef06824744489f46b324dd40b91d945bd9210fd1e70cafa3",
+      "suite_digest": "sha256:c710d2b5aa88176924b6afe47701e1e06981c61fff96c75c874f2aa8dcae544f",
       "unsatisfiable_guard": "(decision == publication_revoked and decision == publication_evidence_invalid)"
     },
     {
@@ -898,68 +1085,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.ReserveRefresh/source-binding-changed/source-revoked",
       "id": "precedence-swap/connectors.refresh.ReserveRefresh/source-binding-changed/source-revoked",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.ReserveRefresh/source-binding-changed/source-revoked",
-      "spec_digest": "1ee64ca10a8725ca21df750aef036c91056ed779d3064f5d595ea795eca66712",
-      "suite_digest": "sha256:75f4d6514c4c013d7bfd4f8dbd2447ab4404a684a9738251e985ce2dce181029",
+      "spec_digest": "cc8f53652085dfe036fea46426b6ca7fbadeefa61e9641bb574d20881e73e3dc",
+      "suite_digest": "sha256:141f5c27eafadd9597a30ba04e6dd1308ee8dd70025e90386e2a446ed3d0579a",
       "unsatisfiable_guard": "(decision == source_binding_changed and decision == source_revoked)"
     },
     {
@@ -967,68 +1149,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.ReserveRefresh/source-exchange-authorized/source-binding-changed",
       "id": "precedence-swap/connectors.refresh.ReserveRefresh/source-exchange-authorized/source-binding-changed",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.ReserveRefresh/source-exchange-authorized/source-binding-changed",
-      "spec_digest": "3d1cff165cc173269157b4f689518ab848e089b163e83d3f1f5aee7a2e26b88e",
-      "suite_digest": "sha256:090a96a538ea0f35d4faba4b5328b8bdf65b88c4b4295451bafed51d6a24f579",
+      "spec_digest": "4b696de4dc22fdb44ce1dfe8672763fabb8b7c042b6fa31ffa7a2b0b1a75501b",
+      "suite_digest": "sha256:a5adee2437c61a94101289c6562f1dc8f567ee4397c3a7d000df816f0b3b9db1",
       "unsatisfiable_guard": "(decision == source_exchange_authorized and decision == source_binding_changed)"
     },
     {
@@ -1036,68 +1213,63 @@
       "class": "precedence-swap",
       "dir": "precedence-swap/connectors.refresh.ReserveRefresh/source-reserved/source-exchange-authorized",
       "id": "precedence-swap/connectors.refresh.ReserveRefresh/source-reserved/source-exchange-authorized",
-      "refusals": 11,
+      "refusals": 10,
       "refused": [
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.PublishView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireCollection",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.DiscoveryCollection/state/Retired/refuses/connectors.discovery_state.RetireView",
-          "subject": "entity connectors.discovery_state.DiscoveryCollection at `connectors.discovery_state.DiscoveryCollection.collection_ref,current_snapshot,definition,instance_id,last_generation,latest_commit,operation_id,publication_revision,retired_at,scope_epoch,source_connection_ref,state`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.RetireObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Retired/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.ObserveEqualIncarnation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.RetainStaleObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
-        {
-          "code": "ESS-SYNTH-001",
-          "scenario": "connectors.discovery_state.ResourceObservation/state/Withdrawn/refuses/connectors.discovery_state.WithdrawObservation",
-          "subject": "entity connectors.discovery_state.ResourceObservation at `connectors.discovery_state.ResourceObservation.collection_ref,last_seen_generation,observation_ref,observed_at,observed_type,partition_ref,private_identity_ref,private_target_ref,public_projection_ref,retire_at,state,valid_until`"
-        },
         {
           "code": "ESS-SYNTH-013",
           "scenario": "connectors.declarations.DeclarationId/invariant-wrapped/at/connectors.declarations.ServiceConfigurations/connector_id/5a5de3e7ecffe323b37c180756920d594f1df48d3d00a5289072b4349e37fef4",
           "subject": "type connectors.declarations.DeclarationId"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.approval_issuers.ApprovalSigningKey/invariant/after/connectors.approval_issuers.StageKey/staged",
+          "subject": "entity connectors.approval_issuers.ApprovalSigningKey"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.cli.ConnectionListCursor/invariant/after/connectors.cli.RecordConnectionListCursor/recorded",
+          "subject": "entity connectors.cli.ConnectionListCursor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.clock.LocalClockFloor/invariant/after/connectors.clock.RecordLocalClockFloor/recorded",
+          "subject": "entity connectors.clock.LocalClockFloor"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.delegation.ApprovalRedemption/invariant/after/connectors.delegation.RecordApprovalRedemption/recorded",
+          "subject": "entity connectors.delegation.ApprovalRedemption"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.execution_audit.AuditRecord/invariant/after/connectors.execution_audit.AcknowledgeAnchor/anchored",
+          "subject": "entity connectors.execution_audit.AuditRecord"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.idempotency.KeyReservation/invariant/after/connectors.idempotency.ReserveKey/reserved",
+          "subject": "entity connectors.idempotency.KeyReservation"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ConfigureLocalApprovalPolicy/configured",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.local_approval_policy.LocalApprovalPolicy/invariant/after/connectors.local_approval_policy.ReviseLocalApprovalPolicy/revised",
+          "subject": "entity connectors.local_approval_policy.LocalApprovalPolicy"
+        },
+        {
+          "code": "ESS-SYNTH-025",
+          "scenario": "connectors.mutations.AttemptRecord/invariant/after/connectors.mutations.PrepareAttempt/prepared",
+          "subject": "entity connectors.mutations.AttemptRecord"
         }
       ],
-      "scenarios": 429,
+      "scenarios": 430,
       "site": "connectors.refresh.ReserveRefresh/source-reserved/source-exchange-authorized",
-      "spec_digest": "46523306193b046ac3623f879859c5920d2843160dc2b6940b47a1fdcaa7e435",
-      "suite_digest": "sha256:2caae15d28df30979ca8b90a0ccae3736bba7eb2ac4d53bd6813ec28169380f2",
+      "spec_digest": "a48533fb8c21b6b5a1204396aea0dc996e6e32294b1a51096a4a06241d6b5a2c",
+      "suite_digest": "sha256:88f24750ddece38115f4965867de036cda42bcdcfa100c721e7418435bbe1e75",
       "unsatisfiable_guard": "(decision == source_reserved and decision == source_exchange_authorized)"
     },
     {
@@ -1122,6 +1294,6 @@
       "site": "connectors.tool_contracts.PublishToolContract/schema-unrepresentable/risk-below-floor"
     }
   ],
-  "spec_digest": "857570aa82b6c975dd1c19cd720653c3464d44736d91496346d92d01c267ee1a",
+  "spec_digest": "261dcb988bf494799f19cc201ff9a2673387693c0cc672e1883e9e853685cdbf",
   "specification": "connectors v1"
 }

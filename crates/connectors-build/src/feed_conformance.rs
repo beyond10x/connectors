@@ -43,10 +43,12 @@ use std::{
 
 const COMPONENT: &str = "feed-binding";
 
-/// The scenarios the family defines today: 22 synthesized and 6 authored. A run executes these
+/// The scenarios the family defines today: 21 synthesized and 6 authored. A run executes these
 /// less the ones its profile's capabilities leave out, and names those; a run that executes
-/// fewer is not running what the specification obliges.
-pub(crate) const EXPECTED_SCENARIOS: u64 = 28;
+/// fewer is not running what the specification obliges. `AddContainer/outcome/added` is not one
+/// of them from ESS 0.95.0 on: it arranges its `connection` through `local-metadata-authority`
+/// commands, which a feed binding does not accept, so the component run lists it as outside.
+pub(crate) const EXPECTED_SCENARIOS: u64 = 27;
 
 const DOMAIN: &str = "connectors.feed";
 
@@ -1462,18 +1464,12 @@ const TOMBSTONES: [&str; 3] = [
     "connectors.feed.RemoveItem/outcome/removed",
     "connectors.feed/authored/deleted-item",
 ];
-const STORED_KIND: [&str; 2] = [
-    "connectors.feed.AddContainer/outcome/added",
-    "connectors.feed.ReadItems/outcome/read",
-];
+const STORED_KIND: [&str; 1] = ["connectors.feed.ReadItems/outcome/read"];
 const RESTORE_AT_A_REUSED_INSTANT: [&str; 2] = [
     "connectors.feed.FeedItem/transition/restore/by/connectors.feed.RestoreItem/restored",
     "connectors.feed.RestoreItem/outcome/restored",
 ];
-const PUBLIC_LISTING: [&str; 2] = [
-    "connectors.feed.AddContainer/outcome/added",
-    "connectors.feed.ReadItems/outcome/read",
-];
+const PUBLIC_LISTING: [&str; 1] = ["connectors.feed.ReadItems/outcome/read"];
 /// Every kept scenario that compares a read item's revision with the scenario's revision word.
 const REVISION_WORDS: [&str; 10] = [
     "connectors.feed.AddItem/outcome/added",
@@ -1596,7 +1592,7 @@ fn an_all_private_profile_is_held_to_listing_every_container_private() {
     assert_eq!(changes(&honest), expected);
     assert!(honest.summary().contains(&format!(
         "held ListedContainers.visibility (contains) to `private` in {} (visibility: all-private)",
-        PUBLIC_LISTING[1]
+        PUBLIC_LISTING[0]
     )));
 
     let lists_public = run(Shaped::declaring(all_private));
@@ -1728,7 +1724,7 @@ fn an_update_time_profile_is_held_to_the_instant_of_each_revision() {
     assert_eq!(failed(&overclaimed), expected, "{}", overclaimed.report);
 }
 
-/// What each capability leaves out of the family's 28 and changes in the rest, and that
+/// What each capability leaves out of the family's 27 and changes in the rest, and that
 /// capabilities combine: a scenario two of them speak about is changed by each.
 #[test]
 fn each_capability_leaves_out_or_changes_exactly_what_it_speaks_about() {
@@ -1818,8 +1814,8 @@ fn each_capability_leaves_out_or_changes_exactly_what_it_speaks_about() {
     expected.extend(fields(&revision_words, "revision"));
     expected.extend(fields(&PUBLIC_LISTING, "visibility"));
     assert_eq!(changed, expected);
-    assert_eq!(changed.len(), 14);
-    assert_eq!(suite(&root, &weakest).admitted.suite().len(), 26);
+    assert_eq!(changed.len(), 12);
+    assert_eq!(suite(&root, &weakest).admitted.suite().len(), 25);
 }
 
 /// The capabilities this harness reads are the shared model's: the same fields, each enum the

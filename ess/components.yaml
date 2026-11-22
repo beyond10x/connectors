@@ -20,6 +20,7 @@ components:
     accepts:
       commands:
         - connectors.declarations.RecordServiceConfiguration
+        - connectors.declarations.DeclareAdapterSpecification
         - connectors.declarations.AdvanceRegistryEpoch
         - connectors.declarations.UpgradeServiceConfiguration
         - connectors.auth_bindings.RecordProfile

@@ -237,7 +237,7 @@ Each is an extension of the catalog declaration (section 3.3), not Confluence co
 `the_confluence_v1_feed_binding_passes_the_scenarios_its_profile_declares_in_every_zone` runs the
 suite this profile's capabilities select against this declaration, the committed `confluence-v1`
 bundle and a simulated Confluence answering in the shapes of `adapters/catalog/tests/feed/confluence/`,
-once in each of the profile zones UTC-12:00, UTC-09:30, UTC, UTC+05:45 and UTC+14:00: all 28 of the
+once in each of the profile zones UTC-12:00, UTC-09:30, UTC, UTC+05:45 and UTC+14:00: all 27 of the
 scenarios the family defines in each, all passing, since an opaque revision leaves none out. The
 suite holds an expected tombstone to the item never being held deleted, each listed `kind` to
 `space`, and each container stored `public` to being listed `private`; the run names each change.

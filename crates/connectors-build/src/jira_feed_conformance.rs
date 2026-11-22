@@ -63,8 +63,8 @@ const ISSUES_A_PAGE: usize = 100;
 /// declaration's `utc_offsets` admits, UTC, and one zone on each side off the whole hour.
 const ZONES: [i64; 5] = [-720, -570, 0, 345, 840];
 
-/// The scenarios the Jira profile's capabilities select, of the 28 the family defines.
-const RUN: u64 = 26;
+/// The scenarios the Jira profile's capabilities select, of the 27 the family defines.
+const RUN: u64 = 25;
 /// The family's scenarios `revision: update-time` leaves out: each restores an item at an
 /// instant it already carried another revision at, which an update-time revision cannot tell
 /// apart.
@@ -609,7 +609,7 @@ impl Binding for Declared {
 
 // ---- the cases -------------------------------------------------------------------------------
 
-/// The declaration passes every scenario its four capabilities select in each profile zone, and the run names the ones it leaves out: 26 of the family's 28, the two left out by
+/// The declaration passes every scenario its four capabilities select in each profile zone, and the run names the ones it leaves out: 25 of the family's 27, the two left out by
 /// `revision: update-time`. Each of the four capabilities changed at least one expectation, so
 /// each claim was exercised.
 #[test]

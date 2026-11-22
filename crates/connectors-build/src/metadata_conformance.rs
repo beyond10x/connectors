@@ -999,7 +999,7 @@ mod tests {
     /// cannot hold, so a manifest in a format too old for its mutants is refused here. The
     /// emission is committed (it takes ESS minutes); `metadata-conformance emissions` made it and
     /// checked that each mutant suite has its recorded digest, that a separate synthesis reports
-    /// the same refusals, that no refused scenario is in its baseline suite, and that the pinned
+    /// the same refusals, that no withdrawn scenario is in its baseline suite, and that the pinned
     /// `ess` reads it.
     #[test]
     fn emitted_manifest_is_admitted_by_the_pinned_ess() {

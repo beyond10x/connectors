@@ -50,8 +50,8 @@ const FIRST_PROJECT: u64 = 1000;
 /// A public project of the instance that the user is not a member of.
 const ELSEWHERE: u64 = 7;
 
-/// The scenarios the GitLab profile's capabilities select, of the 28 the family defines.
-const RUN: u64 = 26;
+/// The scenarios the GitLab profile's capabilities select, of the 27 the family defines.
+const RUN: u64 = 25;
 /// The family's scenarios `revision: update-time` leaves out: each restores an item at an
 /// instant it already carried another revision at, which an update-time revision cannot tell
 /// apart.
@@ -438,7 +438,7 @@ impl Binding for Shipped {
 // ---- the cases -------------------------------------------------------------------------------
 
 /// The shipped declaration passes every scenario its four capabilities select, and the run names
-/// the ones it leaves out: 26 of the family's 28, the two left out by `revision: update-time`.
+/// the ones it leaves out: 25 of the family's 27, the two left out by `revision: update-time`.
 /// Each of the four capabilities changed at least one expectation, so each claim was exercised.
 #[test]
 fn the_gitlab_feed_binding_passes_the_scenarios_its_profile_declares() {

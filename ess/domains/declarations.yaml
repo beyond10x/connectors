@@ -533,7 +533,7 @@ commands:
   # connector_id (`when_related: {via: input.connector_id}`) or the other
   # instances (`when_related: {entity, where}`) needs ess/22, and this
   # specification is ess/18; the pinned Entity Runtime lowering refuses both
-  # for this lowered command (ess-entity-runtime 0.87.0
+  # for this lowered command (ess-entity-runtime 0.97.3
   # RelatedGuardUnsupported, RowSetUnsupported).
   - name: connectors.declarations.RecordServiceConfiguration
     input:
@@ -578,6 +578,33 @@ commands:
           name: input.name
           endpoint: input.endpoint
           description: input.description
+  # An adapter's specification is shipped with the adapter, a
+  # `connectors.adapter/v1` document that connectors_spec::compile
+  # (crates/connectors-spec/src/lib.rs:21) admits into its descriptor, read by
+  # the gate (crates/connectors-build/src/gate.rs:184). No host route and no
+  # metadata table records one (crates/connectors-host/src/local/metadata/er.rs
+  # lists none), so no host sends this command.
+  # ESS-LIMIT: ESS 0.95.0 and later arrange a row an input names through a
+  # command that creates it and refuse a `cardinality: one` reference to an
+  # entity none creates; ServiceConfiguration.adapter and AuthProfile.adapter
+  # are such references, and every scenario that arranges an instance, a
+  # profile or a connection needs this row first.
+  - name: connectors.declarations.DeclareAdapterSpecification
+    input:
+      - {name: adapter_id, type: String}
+      - {name: kind_version, type: String}
+      - {name: implementation_version, type: String}
+    outcomes:
+      - name: declared
+        creates: connectors.declarations.AdapterSpecification
+        instance: adapter_id
+        emits: [connectors.declarations.AdapterSpecificationDeclared]
+        payload:
+          connectors.declarations.AdapterSpecificationDeclared:
+            adapter_id: input.adapter_id
+        sets:
+          kind_version: input.kind_version
+          implementation_version: input.implementation_version
   - name: connectors.declarations.AdvanceRegistryEpoch
     input:
       - {name: instance_id, type: String}
@@ -631,6 +658,8 @@ commands:
           registry_epoch: input.registry_epoch
 
 events:
+  - name: connectors.declarations.AdapterSpecificationDeclared
+    fields: [{name: adapter_id, type: String}]
   - name: connectors.declarations.ServiceConfigurationRecorded
     fields: [{name: instance_id, type: String}]
   - name: connectors.declarations.RegistryEpochAdvanced

@@ -158,7 +158,7 @@ Each is an extension of the catalog declaration (section 3.3), not GitLab code:
 
 `the_gitlab_feed_binding_passes_the_scenarios_its_profile_declares` runs the suite this
 profile's capabilities select against this declaration, the committed bundle and a simulated
-GitLab answering in the recorded shapes of `adapters/catalog/tests/feed/gitlab/`: 26 of the 28
+GitLab answering in the recorded shapes of `adapters/catalog/tests/feed/gitlab/`: 25 of the 27
 scenarios the family defines, all passing. `revision: update-time` leaves out the two that
 restore an item at an instant it already carried another revision at
 (`connectors.feed.FeedItem/transition/restore/by/connectors.feed.RestoreItem/restored`,

@@ -805,7 +805,7 @@ fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
             ("visibility", "contains", "visibility: all-private"),
         ])
     );
-    assert_eq!(run.changed_ids().len(), 5, "{}", run.summary());
+    assert_eq!(run.changed_ids().len(), 4, "{}", run.summary());
 }
 
 /// A declaration whose records carry no word for a container states one, `containers.kind_word`,
