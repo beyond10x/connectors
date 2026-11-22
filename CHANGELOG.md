@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- An open `connectors server --transport stdio` session keeps the instance, connection and owner
+  it was admitted with. Every request checks them against the current configuration when it lists
+  or describes, again before it reaches the owner, and again before its reply is delivered, and
+  the read names the admitted connection. Once a connection is replaced under the same owner, a
+  `tools/list` or `tools/call` of the open session is refused `forbidden` with no provider request,
+  also before lease renewal ends the session. Before, each request took the replacement connection
+  from the current configuration in the up to 500 ms until renewal noticed (review finding 6).
+- `definitions install` admits only portable relative paths in a release on every platform: `/`
+  separated segments with no backslash, `:`, NUL or other control character, none of `<>"|?*`, no
+  trailing dot or space and no Windows device name (`CON`, `NUL`, `COM1`, `LPT1`, ... in any case,
+  with any extension). A drive prefix (`C:foo`, `C:\`), a UNC or verbatim prefix (`\\server`,
+  `\\?\`) or a root-relative `\x` in the index, the asset name or an archive member is
+  `release_invalid`, and the writer checks that every path it would create lies under its staging
+  directory before it creates anything. Before, Windows could join such a path outside the cache
+  (review finding 9, high on Windows).
+
+### Compatibility
+
+- A definitions release with a file path the portable grammar refuses no longer installs, on any
+  platform.
+
 ## 0.73.0 — 2026-11-14
 
 ### Added

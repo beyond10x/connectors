@@ -96,6 +96,16 @@ pub(crate) fn cache(
     index: &Index,
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<(PathBuf, bool), Refusal> {
+    // Before anything is created, the cache root included: every file lies
+    // under the staging directory whatever the platform joins it as.
+    if !files
+        .keys()
+        .all(|path| contained(Path::new("staged"), path))
+    {
+        return Err(Refusal::ReleaseInvalid(
+            "a file path does not resolve under the cache entry".to_owned(),
+        ));
+    }
     let entry = root.join(index_sha256);
     if fs::symlink_metadata(&entry).is_ok() {
         verify_entry(&entry, index_bytes, index)?;
@@ -123,14 +133,40 @@ pub(crate) fn cache(
     }
 }
 
+/// Whether `path`, joined to `base` on this platform, names a file strictly
+/// beneath `base`: a portable relative path whose every component this
+/// platform also reads as one plain name, and whose join keeps `base` as its
+/// prefix with one component per segment.
+fn contained(base: &Path, path: &str) -> bool {
+    use std::path::Component;
+    if !super::index::relative_path(path) {
+        return false;
+    }
+    let relative = Path::new(path);
+    let segments = path.split('/').count();
+    let components = relative.components().collect::<Vec<_>>();
+    if components.len() != segments || !components.iter().all(|c| matches!(c, Component::Normal(_)))
+    {
+        return false;
+    }
+    let joined = base.join(relative);
+    joined.starts_with(base) && joined.components().count() == base.components().count() + segments
+}
+
 fn write_entry(
     staged: &Path,
     index_bytes: &[u8],
     files: &BTreeMap<String, Vec<u8>>,
 ) -> std::io::Result<()> {
+    let base = staged.join("files");
+    // The check `cache` made, repeated at the writer against the real base.
+    if !files.keys().all(|path| contained(&base, path)) {
+        return Err(std::io::Error::other(
+            "a file path leaves the staging directory",
+        ));
+    }
     fs::create_dir(staged)?;
     write_file(&staged.join("index.json"), index_bytes)?;
-    let base = staged.join("files");
     fs::create_dir(&base)?;
     for (path, bytes) in files {
         let file = base.join(path);

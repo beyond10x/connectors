@@ -98,7 +98,8 @@ pub(super) fn serve(
         None,
     )
     .map_err(|_| Code::Unavailable)?;
-    let host = snapshot.host.clone();
+    // The session's selection, fixed here: every worker runs under it.
+    let selection = Arc::new(super::projection::Selection::of(&snapshot));
     let mut session = super::session::Session::admit(&paths, &snapshot)?;
     let paths = Arc::new(paths);
     let mut console = Console::open().map_err(|_| Code::Unavailable)?;
@@ -294,11 +295,11 @@ pub(super) fn serve(
                             input: input_closed.clone(),
                         };
                         let paths = paths.clone();
-                        let host = host.clone();
+                        let selection = selection.clone();
                         let (sender, reply) = mpsc::sync_channel(1);
                         let thread = thread::spawn(move || {
                             let result = super::projection::execute(
-                                &paths, &host, &value, primary, until, &halt,
+                                &paths, &selection, &value, primary, until, &halt,
                             );
                             let _ = sender.send(result);
                         });

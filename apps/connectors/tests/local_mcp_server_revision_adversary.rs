@@ -568,6 +568,37 @@ impl Peer {
     fn finish(self) -> (Vec<String>, Vec<u8>) {
         self.exit(true)
     }
+    /// `request`, or `None` when the server ended the session instead of
+    /// replying: its stdout closed before a reply came.
+    fn request_or_end(&mut self, id: i32, method: &str, mut params: Value) -> Option<Value> {
+        if self.primary {
+            if !params["_meta"].is_object() {
+                params["_meta"] = json!({});
+            }
+            params["_meta"]["io.modelcontextprotocol/protocolVersion"] = json!("2026-07-28");
+            params["_meta"]["io.modelcontextprotocol/clientCapabilities"] = json!({});
+        }
+        let frame = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
+        if let Err(error) = self
+            .child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(format!("{frame}\n").as_bytes())
+        {
+            assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe, "{error}");
+            return None;
+        }
+        match self.frames.recv_timeout(Duration::from_secs(15)) {
+            Ok(Ok(reply)) => {
+                assert_eq!(reply["id"], id, "{reply}");
+                Some(reply)
+            }
+            Ok(Err(line)) => panic!("{line}"),
+            Err(mpsc::RecvTimeoutError::Disconnected) => None,
+            Err(mpsc::RecvTimeoutError::Timeout) => panic!("the server did not reply"),
+        }
+    }
 }
 
 impl Drop for Peer {
@@ -829,6 +860,99 @@ fn an_absent_revision_binds_to_the_current_advertisement_not_the_listed_one() {
         "a call on the withdrawn tool sent a request"
     );
     peer.finish();
+}
+
+/// Finding 6 of the 2026-11-22 security review: an open session keeps the
+/// instance and connection it was admitted with. Once the connection is
+/// replaced under the same owner and the companion names the other one, a
+/// `tools/list` and a `tools/call` of the already-open client are refused
+/// `forbidden` at once, with no provider request, before lease maintenance
+/// notices the change.
+///
+/// Renewal ends the session on that change at most 500 ms after it; a request
+/// that is still at the owner then gets no reply, which is no listing or read
+/// either. A refusal at discovery answers within milliseconds, so it is the
+/// reply the client sees; should renewal still win that race, the session is
+/// opened again on the selected connection and the companion switched back,
+/// at most three times. A session that never answers is the defect: its
+/// request went on to the owner under the other connection.
+#[test]
+fn an_open_session_neither_lists_nor_reads_under_a_replacement_connection() {
+    let mut served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    let (tool, _) = admitted(&served, &mut peer, 1);
+    let name = tool["name"].as_str().unwrap().to_owned();
+    answered(&peer.request(2, "tools/call", params(&name, 5, None)), 5);
+    assert_eq!(served.provider.requests(), 1, "one call, one request");
+
+    // The same owner revokes the admitted connection and connects anew.
+    let admitted_connection = served.connection.clone();
+    let described =
+        success(
+            &served
+                .container
+                .run(&["connections", "describe", "--adapter", ALIAS]),
+        );
+    let revision = described["connection"]["summary"]["revision"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{described}"))
+        .to_owned();
+    success(&served.container.run(&[
+        "connections",
+        "revoke",
+        "--adapter",
+        ALIAS,
+        "--expected-revision",
+        &revision,
+    ]));
+    let connected = success(&served.container.connect(PROFILE));
+    let replacement = connected["connection"]["summary"]["connection"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{connected}"))
+        .to_owned();
+    assert_ne!(replacement, admitted_connection, "{connected}");
+
+    let refused = |reply: &Value| {
+        assert!(
+            reply.get("result").is_none(),
+            "served under another connection: {reply}"
+        );
+        assert_eq!(code(reply), "forbidden", "{reply}");
+    };
+    let mut open = Some(peer);
+    let mut answered_once = false;
+    for attempt in 0..3 {
+        let mut peer = open.take().unwrap_or_else(|| Peer::start(&served, true));
+        let id = 10 * (attempt + 1);
+        // The session is live under the connection the companion names.
+        if peer.request_or_end(id, "ping", json!({})).is_none() {
+            continue;
+        }
+        served.connection = if served.connection == admitted_connection {
+            replacement.clone()
+        } else {
+            admitted_connection.clone()
+        };
+        served.exposures(true);
+        let Some(list) = peer.request_or_end(id + 1, "tools/list", json!({})) else {
+            continue;
+        };
+        refused(&list);
+        if let Some(call) = peer.request_or_end(id + 2, "tools/call", params(&name, 6, None)) {
+            refused(&call);
+        }
+        answered_once = true;
+        break;
+    }
+    assert!(
+        answered_once,
+        "no open session answered after its connection was switched"
+    );
+    assert_eq!(
+        served.provider.requests(),
+        1,
+        "an open session read under another connection"
+    );
 }
 
 /// A client that calls before it ever lists binds to the advertised

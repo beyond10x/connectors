@@ -28,6 +28,55 @@ pub(super) struct Snapshot {
     adapter: connectors_host::local::config::Adapter,
 }
 
+/// What a session was admitted with: its instance entry, connection and owner
+/// incarnation. It never changes for the session. Every request compares the
+/// current configuration with it when it discovers its tools, before its read
+/// reaches the owner and before its reply is delivered, and its read names this
+/// connection; a request that finds another selected is refused `forbidden`,
+/// also before lease maintenance notices the change (review finding 6).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Selection {
+    pub alias: String,
+    pub connection: String,
+    pub instance: String,
+    pub adapter: String,
+    pub host: String,
+}
+
+impl Selection {
+    pub fn of(snapshot: &Snapshot) -> Self {
+        Self {
+            alias: snapshot.alias.clone(),
+            connection: snapshot.connection.clone(),
+            instance: snapshot.bootstrap.instance.clone(),
+            adapter: snapshot.bootstrap.adapter.clone(),
+            host: snapshot.host.clone(),
+        }
+    }
+    /// Whether `configuration`'s exposures and `config`'s entry for the alias
+    /// still select this session's instance and connection.
+    fn selects(&self, configuration: &Configuration, config: &Config) -> Result<(), Value> {
+        if configuration
+            .document()
+            .exposures
+            .iter()
+            .any(|e| e.adapter_alias != self.alias || e.connection_ref != self.connection)
+            || config.adapters.get(&self.alias).is_none_or(|adapter| {
+                adapter.instance_id != self.instance || adapter.adapter_id != self.adapter
+            })
+        {
+            return Err(refusal("forbidden"));
+        }
+        Ok(())
+    }
+    /// [`Self::selects`] against the configuration as it is now.
+    fn current(&self, paths: &Paths) -> Result<(), Value> {
+        let configuration = load(paths).map_err(owner_error)?;
+        let config = Config::load(&paths.config).map_err(|_| refusal("unavailable"))?;
+        self.selects(&configuration, &config)
+    }
+}
+
 pub(super) fn refusal(code: &str) -> Value {
     json!({"code":-32000,"message":"Connectors request refused","data":{
         "version":"v1alpha2","request_id":null,"status":"error",
@@ -106,12 +155,16 @@ fn read_client(
     Ok(client)
 }
 
+/// A fresh owner snapshot. With `admitted`, the session's [`Selection`], it is
+/// refused `forbidden` unless the configuration still selects that instance and
+/// connection, checked before the owner is asked, and taken from that owner.
 pub(super) fn snapshot(
     paths: &Paths,
-    host: Option<&str>,
+    admitted: Option<&Selection>,
     until: Instant,
     halt: Option<&Halt>,
 ) -> Result<Snapshot, Value> {
+    let host = admitted.map(|selection| selection.host.as_str());
     check(until)?;
     let configuration = load(paths).map_err(owner_error)?;
     let first = configuration
@@ -135,6 +188,9 @@ pub(super) fn snapshot(
         .get(&alias)
         .cloned()
         .ok_or_else(|| refusal("not_granted"))?;
+    if let Some(selection) = admitted {
+        selection.selects(&configuration, &config)?;
+    }
     // The request's first owner call: past it the request is at the owner.
     halt.map_or(Ok(()), Halt::admitted)?;
     let owner = client(paths, host, until)?;
@@ -340,6 +396,7 @@ impl Snapshot {
     fn invoke(
         &self,
         paths: &Paths,
+        selection: &Selection,
         params: &Value,
         primary: bool,
         until: Instant,
@@ -391,6 +448,7 @@ impl Snapshot {
         let shaping = Shaping::parse(arguments, operation)?;
         let reader = Reader {
             snapshot: self,
+            selection,
             paths,
             operation: &operation.id,
             revision: &descriptor.revision,
@@ -662,6 +720,9 @@ fn in_memory(
 /// operation: what a single call does once, and a walk once per page.
 struct Reader<'a> {
     snapshot: &'a Snapshot,
+    /// The session's admitted selection: each read is checked against it at
+    /// dispatch and names its alias and connection.
+    selection: &'a Selection,
     paths: &'a Paths,
     operation: &'a str,
     revision: &'a str,
@@ -676,21 +737,25 @@ impl Reader<'_> {
     /// failure the tool-error channel carries; `Err` is an rpc-error.
     fn read(&self, input: &Value) -> Result<Envelope, Value> {
         let (execution, provider, input_limit, result_limit) = self.limits;
-        let (snapshot, until, halt) = (self.snapshot, self.until, self.halt);
+        let (snapshot, selection, until, halt) =
+            (self.snapshot, self.selection, self.until, self.halt);
         let input = input.to_string();
         let budget = runtime::ReadBudget::start(execution, provider, input_limit, result_limit)
             .and_then(|b| b.constrain(until))
             .map_err(|_| refusal("timeout"))?;
         halt.cancelled()?;
-        let owner = read_client(self.paths, Some(&snapshot.host), until)?;
+        let owner = read_client(self.paths, Some(&selection.host), until)?;
+        // Dispatch: the configuration still selects the admitted connection,
+        // which the owner's admission compares the request with again.
+        selection.current(self.paths)?;
         // The last check before the owner read: past it a cancellation only
         // suppresses the reply.
         halt.cancelled()?;
         let bytes = owner
             .bounded_projected_read(
-                &snapshot.alias,
+                &selection.alias,
                 &owner::approval_issuance::Request {
-                    connection: &snapshot.connection,
+                    connection: &selection.connection,
                     operation: self.operation,
                     schema: &self.schema,
                     revision: self.revision,
@@ -718,21 +783,29 @@ impl Reader<'_> {
     }
 }
 
+/// One request of the session admitted with `selection`: discovery under it
+/// ([`snapshot`]), each read checked against it at dispatch ([`Reader::read`]),
+/// and the reply delivered only while the configuration still selects it.
 pub(super) fn execute(
     paths: &Paths,
-    host: &str,
+    selection: &Selection,
     request: &Value,
     primary: bool,
     until: Instant,
     halt: &Halt,
 ) -> Result<Value, Value> {
     halt.admitted()?;
-    let current = snapshot(paths, Some(host), until, Some(halt))?;
-    match request["method"].as_str() {
+    let current = snapshot(paths, Some(selection), until, Some(halt))?;
+    let reply = match request["method"].as_str() {
         Some("tools/list") => current.list(&request["params"], primary),
-        Some("tools/call") => current.invoke(paths, &request["params"], primary, until, halt),
-        _ => Err(protocol::error(-32601, "Method not found")),
-    }
+        Some("tools/call") => {
+            current.invoke(paths, selection, &request["params"], primary, until, halt)
+        }
+        _ => return Err(protocol::error(-32601, "Method not found")),
+    }?;
+    // Result delivery: a change while the request ran withholds its reply.
+    selection.current(paths)?;
+    Ok(reply)
 }
 
 /// Whether every requirement the bootstrap states for `operation` is a read.

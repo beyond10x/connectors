@@ -50,16 +50,46 @@ fn hex_of(text: &str, lengths: &[usize]) -> bool {
 /// binary ships for.
 pub(crate) const SEGMENT_LIMIT: usize = 255;
 
-/// Whether `path` is relative, with no empty, `.` or `..` segment, no segment over
-/// [`SEGMENT_LIMIT`] bytes, no backslash and no NUL, so it names one file beneath
-/// any root on every platform.
+/// Whether `path` is a portable relative path: segments separated by `/` only,
+/// each a [`portable_segment`]. It names one file beneath any root on every
+/// platform, the same one on each, checked on every platform alike: no drive
+/// (`C:foo`, `C:\`), UNC (`\\server`), verbatim (`\\?\`) or root-relative (`\x`)
+/// prefix can reach `Path::join`, which on Windows discards the base for one.
 pub(crate) fn relative_path(path: &str) -> bool {
-    !path.is_empty()
-        && path.len() <= 4096
-        && !path.contains(['\\', '\0'])
-        && path
-            .split('/')
-            .all(|s| !s.is_empty() && s != "." && s != ".." && s.len() <= SEGMENT_LIMIT)
+    !path.is_empty() && path.len() <= 4096 && path.split('/').all(portable_segment)
+}
+
+/// Windows device names, matched against a segment's stem in any case: the
+/// name Windows opens a device by whatever extension follows it.
+const DEVICES: &[&str] = &[
+    "con", "prn", "aux", "nul", "conin$", "conout$", "clock$", "com0", "com1", "com2", "com3",
+    "com4", "com5", "com6", "com7", "com8", "com9", "com¹", "com²", "com³", "lpt0", "lpt1", "lpt2",
+    "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9", "lpt¹", "lpt²", "lpt³",
+];
+
+/// One segment of a [`relative_path`]: not empty, `.` or `..`, at most
+/// [`SEGMENT_LIMIT`] bytes, no backslash, `:` (a drive or an alternate data
+/// stream), NUL or other control character or any of `<>"|?*`, no trailing dot
+/// or space (Windows drops them, so `a.` would be `a`), and not a Windows device
+/// name with or without an extension (`CON`, `nul.txt`, `COM1`).
+fn portable_segment(segment: &str) -> bool {
+    if segment.is_empty()
+        || segment == "."
+        || segment == ".."
+        || segment.len() > SEGMENT_LIMIT
+        || segment.ends_with(['.', ' '])
+        || segment
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*'))
+    {
+        return false;
+    }
+    let stem = segment
+        .split('.')
+        .next()
+        .unwrap_or(segment)
+        .trim_end_matches(' ');
+    !DEVICES.contains(&stem.to_lowercase().as_str())
 }
 
 /// `path` as a case-insensitive file system (the macOS default) compares it.
@@ -108,7 +138,7 @@ impl Index {
         let mut previous: Option<&str> = None;
         for file in &index.files {
             if !relative_path(&file.path) {
-                return Err(invalid("a file path is not a relative path"));
+                return Err(invalid("a file path is not a portable relative path"));
             }
             if !hex_of(&file.sha256, &[64]) {
                 return Err(invalid("a file sha256 is not a SHA-256"));

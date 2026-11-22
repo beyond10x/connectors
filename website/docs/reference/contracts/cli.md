@@ -1129,15 +1129,15 @@ It checks, in this order, before it writes anything:
 
 1. `index.json`'s `schema` is a format version this build reads
    (`urn:beyond10x:connectors-definitions-index:1`), else `unknown_format_version`.
-2. The rest of the index is that format, with no other member: `tag` equals
-   `--tag`, `commit` is 40 or 64 and every digest 64 lower-case hexadecimal digits,
-   the asset's name is one path segment, every file path is relative with no empty,
-   `.` or `..` segment, no segment over 255 bytes and no backslash, no file path is
-   another's directory, the files are sorted by path in byte order with no path
-   twice, no two paths differ only in case (a case-insensitive file system holds them
-   as one), at most 16,384 files and 512 MiB in all, and every feature is 1 to 64
-   bytes of `[a-z0-9_]`, sorted in byte order with none twice. Else
-   `release_invalid`.
+2. The rest of the index is that format, with no other member: `tag` equals `--tag`, `commit` is
+   40 or 64 and every digest 64 lower-case hexadecimal digits, the asset's name is one path segment,
+   every file path is relative with `/`-separated segments, none empty, `.`, `..`, over 255 bytes,
+   ending in a dot or space, holding `\`, `:`, `<>"|?*`, NUL or another control character, or a
+   Windows device name in any case and with any extension (`CON`, `NUL`, `COM1`, `LPT1`), so no
+   drive, UNC or root-relative prefix passes on any platform, no file path is another's directory,
+   the files are sorted by path in byte order with no path twice, no two paths differ only in case
+   (a case-insensitive file system holds them as one), at most 16,384 files and 512 MiB in all, and
+   every feature is 1 to 64 bytes of `[a-z0-9_]`, sorted in byte order with none twice. Else `release_invalid`.
 3. Every name in `features` is a feature this build supports (`embedded_text`,
    `query_fixed`, `query_folds`, `rate_limit_headers`), else `unmet_feature`, with
    `feature` naming the first unsupported one. These are exactly the members the
