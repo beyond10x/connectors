@@ -57,7 +57,7 @@ entity-eventlog.workspace = true
 entity-store.workspace = true
 eventlog-core.workspace = true
 time.workspace = true
-rusqlite = { version = "=0.40.2", features = ["bundled"] }
+rusqlite = { version = "=0.41.0", features = ["bundled"] }
 libc = "0.2"
 ring = "0.17"
 num-bigint = "0.4"

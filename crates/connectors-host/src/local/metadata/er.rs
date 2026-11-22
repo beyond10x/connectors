@@ -2682,14 +2682,14 @@ fn terminal_instance(history: &SubjectHistory) -> Option<&EntityInstance> {
 }
 
 fn feed_connection(path: &Path) -> Result<Connection> {
-    let connection = Connection::open_with_flags(
+    let mut connection = Connection::open_with_flags(
         path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(unavailable)?;
-    super::deadline::configure(&connection)?;
+    super::deadline::configure(&mut connection)?;
     Ok(connection)
 }
 
@@ -2766,14 +2766,14 @@ pub(super) fn advance_projection_level(er: &mut ErAuthority, level: i64) -> Resu
     if level == er.projection_level {
         return Ok(());
     }
-    let connection = Connection::open_with_flags(
+    let mut connection = Connection::open_with_flags(
         &er.durable_path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(unavailable)?;
-    super::deadline::configure(&connection)?;
+    super::deadline::configure(&mut connection)?;
     let changed = connection
         .execute(
             "UPDATE connectors_er_authority SET projection_level=?1 \
@@ -3045,7 +3045,7 @@ pub(super) fn projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<C
 
 fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connection> {
     let level = er.projection_level;
-    let connection = Connection::open_in_memory().map_err(unavailable)?;
+    let mut connection = Connection::open_in_memory().map_err(unavailable)?;
     connection
         .execute_batch(BASE_MIGRATION)
         .map_err(unavailable)?;
@@ -3118,7 +3118,7 @@ fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connec
     connection
         .pragma_update(None, "user_version", level)
         .map_err(unavailable)?;
-    super::deadline::configure(&connection)?;
+    super::deadline::configure(&mut connection)?;
     connection
         .pragma_update(None, "trusted_schema", false)
         .map_err(unavailable)?;

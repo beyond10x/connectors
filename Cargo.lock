@@ -620,7 +620,7 @@ dependencies = [
  "connectors-oauth2",
  "connectors-sdk",
  "connectors-spec",
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "ess-compiler",
  "ess-conformance",
  "ess-domain",
@@ -673,7 +673,7 @@ dependencies = [
  "connectors-host",
  "connectors-oauth2",
  "connectors-sdk",
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "entity-eventlog",
  "entity-store",
  "eventlog-core",
@@ -857,7 +857,7 @@ dependencies = [
  "connectors-custody",
  "connectors-oauth2",
  "connectors-sdk",
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "entity-eventlog",
  "entity-executor",
  "entity-store",
@@ -1349,8 +1349,8 @@ dependencies = [
 
 [[package]]
 name = "entity-core"
-version = "0.30.3"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.3#5fff7eb5230e2bff7112c1921ba63a5a28bcb9f7"
+version = "0.32.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.32.0#48ca07131b8fbf339abcb44e8ed58758bc552ff4"
 dependencies = [
  "serde",
  "serde_json",
@@ -1358,10 +1358,10 @@ dependencies = [
 
 [[package]]
 name = "entity-eventlog"
-version = "0.30.3"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.3#5fff7eb5230e2bff7112c1921ba63a5a28bcb9f7"
+version = "0.32.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.32.0#48ca07131b8fbf339abcb44e8ed58758bc552ff4"
 dependencies = [
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "entity-executor",
  "entity-query",
  "entity-store",
@@ -1376,20 +1376,20 @@ dependencies = [
 
 [[package]]
 name = "entity-executor"
-version = "0.30.3"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.3#5fff7eb5230e2bff7112c1921ba63a5a28bcb9f7"
+version = "0.32.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.32.0#48ca07131b8fbf339abcb44e8ed58758bc552ff4"
 dependencies = [
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "entity-store",
  "serde_json",
 ]
 
 [[package]]
 name = "entity-query"
-version = "0.30.3"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.3#5fff7eb5230e2bff7112c1921ba63a5a28bcb9f7"
+version = "0.32.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.32.0#48ca07131b8fbf339abcb44e8ed58758bc552ff4"
 dependencies = [
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "entity-store",
  "serde",
  "serde_json",
@@ -1397,10 +1397,10 @@ dependencies = [
 
 [[package]]
 name = "entity-store"
-version = "0.30.3"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.3#5fff7eb5230e2bff7112c1921ba63a5a28bcb9f7"
+version = "0.32.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.32.0#48ca07131b8fbf339abcb44e8ed58758bc552ff4"
 dependencies = [
- "entity-core 0.30.3",
+ "entity-core 0.32.0",
  "fs2",
  "serde",
  "serde_json",
@@ -1606,10 +1606,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "eventlog-core"
-version = "0.8.3"
-source = "git+https://github.com/beyond10x/eventlog?tag=0.8.3#2a7e92528893a30a80a16760d8bd4cc9b638727c"
+name = "eventlog-capture-types"
+version = "0.0.0"
+source = "git+https://github.com/beyond10x/eventlog?tag=0.9.4#b8582219f881a7281398b45c534108a01ef151e1"
 dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "eventlog-core"
+version = "0.9.4"
+source = "git+https://github.com/beyond10x/eventlog?tag=0.9.4#b8582219f881a7281398b45c534108a01ef151e1"
+dependencies = [
+ "eventlog-capture-types",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1620,9 +1630,10 @@ dependencies = [
 
 [[package]]
 name = "eventlog-sqlite"
-version = "0.8.3"
-source = "git+https://github.com/beyond10x/eventlog?tag=0.8.3#2a7e92528893a30a80a16760d8bd4cc9b638727c"
+version = "0.9.4"
+source = "git+https://github.com/beyond10x/eventlog?tag=0.9.4#b8582219f881a7281398b45c534108a01ef151e1"
 dependencies = [
+ "eventlog-capture-types",
  "eventlog-core",
  "nix",
  "rusqlite",
@@ -2324,9 +2335,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.38.2"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1d20bef17f513b9b3004532233187769cd072d790971f4e4da0e346eb6401e8"
+checksum = "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3"
 dependencies = [
  "cc",
  "pkg-config",
@@ -3127,9 +3138,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.40.2"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23f2a97da3e3873c73cb2a2e71b35c40ff95e0b1eefa8d72d8499a6928c3b5b3"
+checksum = "9c026b4444579e8d754556c6c75d040d69c4a44283cdb648ab8a8d5965c2cfa8"
 dependencies = [
  "bitflags",
  "fallible-iterator 0.3.0",

@@ -1108,7 +1108,7 @@ impl Metadata {
         } else {
             OpenFlags::SQLITE_OPEN_READ_WRITE
         };
-        let connection = Connection::open_with_flags(
+        let mut connection = Connection::open_with_flags(
             path.join(NAME),
             access | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -1116,7 +1116,7 @@ impl Metadata {
         // SQLite's own write lock is waited on for the same bound as the lifecycle
         // lock; see `WAIT_BOUND` for why neither is two seconds. Inside a
         // bounded admission (`deadline::within`) the wait ends at its cutoff.
-        deadline::configure(&connection)?;
+        deadline::configure(&mut connection)?;
         connection
             .pragma_update(None, "trusted_schema", false)
             .map_err(unavailable)?;
