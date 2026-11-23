@@ -298,6 +298,10 @@ Pull requests merge through the bot (`b10x-gates api`, squash) once the required
 green. GitHub auto-merge does not fire here: `b10x-gates` requires `b10x-bot-branch-authority`
 to cover every branch, main included (gates `src/published_merge.rs`), so only the bot's bypass
 updates main, and auto-merge does not use it. Ruleset changes are the owner's.
+A merge waits until every check of the head has ended, also a check that is not required, and
+a failed one is fixed before the merge. host-operator for Timo, 2026-11-23: "a red run is fixed,
+not lived with, even when the check is not required". From 2026-11-22 to 2026-11-23 the Windows
+host job (not required) was red on 13 runs while merges went through on the required checks.
 The hooks scan the index, names, messages, metadata, tags and every outgoing commit.
 Ordinary commit and publish paths need no Atlas checkout, current Atlas main or
 organization-wide admission. Private policies and enrolled signing keys stay outside

@@ -2,10 +2,12 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0750-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: connectors 0.75.0 release scope
 summary: Scope, exclusions and evidence of the 0.75.0 cut
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-23T08:30:53Z", actor: "human:timo", revision: 3}
 ---
 ## Scope of connectors 0.75.0
 
@@ -37,5 +39,33 @@ if you're done, cut a new release" (`AGENTS.md`, Cutting a release), and host-op
 
 ## Evidence
 
-The release pull request's required checks on the release commit, then the tag, release page,
-archives, `SHA256SUMS` and image, verified after publication.
+Verified 2026-11-23 after publication:
+
+- Release pull request #283 merged at 08:35 CET as `5983a6b950233cfe9e1766e82202861ff5d85289`; its
+  tree `cce27bb37f49` equals the pull request's tree, whose required checks passed.
+- Not green on that pull request: "host and CLI on windows-latest" (run 45124020139), which is
+  not a required check: `failed to remove file target\debug\connectors.exe`, Access is denied,
+  in the MCP step, as on every code change since 2026-11-22. The fix is pull request #284
+  (story:windows-host-job-releases-the-cli-binary). The Windows binary of this release was
+  therefore not shown by that job's MCP steps.
+- Tag `v0.75.0` by `b10x-bot[bot]` at 08:35 CET; it peels to the merge commit, which is the head
+  of `origin/main`.
+- Release page https://github.com/beyond10x/connectors/releases/tag/v0.75.0, author
+  `b10x-bot[bot]`, not a draft, Latest, published 08:37 CET.
+- Release run 45132464036: created 07:37 UTC, ended 08:27 UTC, all 7 jobs succeeded, no rerun.
+- The page has 5 assets: the 4 archives pass `sha256sum -c SHA256SUMS`.
+- Image `ghcr.io/beyond10x/connectors:0.75.0`, index
+  `sha256:b8f89529c29f1ad9a6b3f59213e26b2d9c9a0809c10ef43febeae3cbf3f760ca`, platforms
+  linux/amd64 and linux/arm64, label `org.opencontainers.image.revision`
+  `5983a6b950233cfe9e1766e82202861ff5d85289`.
+- Four main-push runs on the merge commit were cancelled at host-operator's order for the runner
+  queue (Shared source gates 45132211702, Windows host 45132211327, macOS host 45132211328, Rust
+  gate 45132211258): the tag run and the pull request's runs cover the same tree.
+- Acceptance line 11 of story:invoke-admission-queues-under-load, with the released binary at
+  08:28 UTC on the Slack read-only instance of issue #267 (store 5.0 MB, host load 89.5): 16
+  parallel reads with `--deadline-seconds 120`, 16 answered, none refused `timeout`, 9.2 to
+  38.5 s per read, 11 of them over 30 s
+  (https://github.com/beyond10x/connectors/issues/267#issuecomment-7095515304). Baseline on
+  0.74.0: 5 of 16 answered, on a 12 MB store.
+- Both read-only side instances of this workstation run 0.75.0 on their kept stores: the first
+  read after the move answered in 12 s (Slack) and 14 s (Jira).
