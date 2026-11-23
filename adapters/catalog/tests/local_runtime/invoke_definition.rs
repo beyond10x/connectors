@@ -603,8 +603,11 @@ fn a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_witho
     let lowered = journey.cache_entries();
     assert_eq!(lowered.len(), 1, "{lowered:?}");
 
-    // The same file again: the result, nothing asked.
-    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    // The same file again, the read naming its deadline
+    // (story:invoke-admission-queues-under-load): the result, nothing asked.
+    let mut again = invoke(&forge, "project.get");
+    again.extend(["--deadline-seconds", "20"]);
+    let (output, shown) = journey.on_terminal(&again, &[]);
     assert_eq!(success(output)["result"]["body"]["id"], 7);
     assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
     // Unchanged inputs: the same cache entry, not lowered again.
