@@ -7,7 +7,15 @@ title: Five store tests end within 60 s at host load
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-revision: 1
+- depends_on: story:settled-read-uses-leave-the-store
+scope:
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/store_cost_tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/tests.rs
+- confidence: cited
+  path: crates/connectors-host/tests/metadata_reopen_adversary.rs
+revision: 4
 ---
 ## Defect
 
