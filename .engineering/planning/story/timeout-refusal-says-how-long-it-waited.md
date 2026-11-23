@@ -7,6 +7,7 @@ title: A timeout refusal of invoke says how long the call waited (waited_ms)
 relations:
 - decomposes: epic:review-20261123-findings
 - depends_on: story:invoke-admission-queues-under-load
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: apps/connectors-cli-contract
@@ -20,7 +21,7 @@ scope:
   path: website/docs/reference/cli.md
 - confidence: inferred
   path: website/docs/reference/contracts/cli.md
-revision: 7
+revision: 8
 ---
 ## Outcome
 
@@ -46,3 +47,8 @@ Split from story:invoke-admission-queues-under-load on 2026-11-23 by the design 
 ## Out of scope
 
 The owner's wire (`owner::Error` is `deny_unknown_fields`): unchanged.
+
+## Shares files with
+
+story:refusals-name-the-field changes the same `connectors.cli.Failure`; the two are not worked
+at once.

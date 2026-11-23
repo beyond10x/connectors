@@ -2,10 +2,11 @@
 format: aep.planning-md/3
 id: story:invoke-admission-queues-under-load
 kind: story
-status: draft
+status: active
 title: 'A read on invoke names its deadline: --deadline-seconds, 1 to 120, default 30'
 relations:
 - decomposes: epic:review-20261123-findings
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: CHANGELOG.md
@@ -23,6 +24,8 @@ scope:
   path: apps/connectors/src/local/operations.rs
 - confidence: cited
   path: apps/connectors/src/local/session.rs
+- confidence: inferred
+  path: apps/connectors/src/walk.rs
 - confidence: cited
   path: apps/connectors/tests/invoke_short.rs
 - confidence: cited
@@ -39,6 +42,8 @@ scope:
   path: crates/connectors-host/src/local/owner.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/supervisor.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/transport.rs
 - confidence: cited
   path: ess/domains/cli.yaml
 - confidence: cited
@@ -47,7 +52,10 @@ scope:
   path: website/docs/reference/contracts/cli.md
 - confidence: cited
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 27
+revision: 32
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-23T04:15:21Z", actor: "human:timo", revision: 31, decided_on: {"recorded":{"review_outcome":8}}}
+- {from: "proposed", to: "active", at: "2026-11-23T04:15:23Z", actor: "human:timo", revision: 32, decided_on: {"recorded":{"review_outcome":8}}}
 ---
 ## Outcome
 
@@ -99,7 +107,10 @@ Read by the scoper and the design critic on 2026-11-23 at 138b6cf7540:
 - One value: `prepare`, and each page of a walk, takes the cutoff once as absolute epoch
   milliseconds. The owner's start derives its `Instant` from it and `session.rs:600` reads it
   instead of `now_ms() + 30_000`. Without the flag the value is 30 s from that instant. Needed
-  because the flag would otherwise allow two full windows, start then read.
+  because the flag would otherwise allow two full windows, start then read. `prepare` returns
+  rewritten arguments and the runner builds its own `Session` (`local.rs:68-72`), so the value
+  needs a carrier across that boundary; the implementer picks it and names it in the report.
+- The consumer's change: dev-operator passes `--deadline-seconds 120` on its reads.
 - With `--walk` the flag is each page's deadline, as the 30 s is today: a walk of many pages
   could not fit one 120 s cutoff.
 - Reads only, decided from the arguments: beside `--idempotency-key`, `--approval-file` or
@@ -138,34 +149,40 @@ Tests assert on events, not on elapsed time against a bound a loaded runner cros
    reads on one instance, `--deadline-seconds 2`: at least one exits with `timeout` at
    `admission`.
 2. Same run: the line count of `/work/invocations` equals the number of reads that answered.
-3. Same setup with `--deadline-seconds 20`: all 3 answer.
+3. Same setup with `--deadline-seconds 20`: all 3 answer; and one read with `--definition` and
+   `--deadline-seconds 20` answers.
 4. One cutoff: with `--deadline-seconds 2`, an owner start delayed 1.5 s
-   (`CONNECTORS_TEST_OWNER_START_DELAY_MS`) and a read of 1.5 s, the call is refused `timeout`.
-   With two separate windows it would answer.
-5. With `--deadline-seconds 2` and an owner start delayed 20 s, the call exits non-zero with
-   `timeout` before that owner greets.
+   (`CONNECTORS_TEST_OWNER_START_DELAY_MS`) and a read of 1.5 s, the call is refused `timeout`
+   (the test names the stage it observes). With two separate windows it would answer.
+5. With `--deadline-seconds 2` and an owner start delayed 600 s (it never greets within the
+   test), the call exits non-zero with `timeout`. A hang is the runner's 60 s kill, a failure.
 6. `apps/connectors/tests/invoke_short.rs`: `--deadline-seconds 0`, `121` and `x` are each
    refused `invalid_input`, `field = deadline_seconds`, at `arguments`; so is the flag beside
    `--idempotency-key`, beside `--approval-file` and beside `--describe`. In each case no owner
    is started and `/work/invocations` is empty. `1` and `120` are accepted.
 7. A unit test in `apps/connectors/src/local/invoke.rs` asserts that the cutoff built from
-   arguments without the flag is 30,000 ms after its instant, and that the owner start and
-   `session.deadline` are derived from that one value.
+   arguments without the flag is 30,000 ms after its instant. (Line 4 checks that the owner
+   start and the read share it.)
 8. A `--walk` with `--deadline-seconds 2` over 3 pages of 1.5 s each answers every page
-   (`apps/connectors/tests/invoke_walks.rs`).
-9. Executable-changed path, read deadline 60 s, lease 30 s, validation slower than the lease
-   (injectable pause of `revalidate_with_retries`): the read is refused once, by the validation
-   bound, and no validation result is recorded after the lease expired. In the `connectors-host`
-   lib tests.
+   (`apps/connectors/tests/invoke_walks.rs`; its fixture gets a per-page delay). Page 1 follows
+   the owner start of `prepare`, as today.
+9. Executable-changed path: the lease length is a parameter of `follow_executable` (30 s in
+   production). A test in the `connectors-host` lib tests uses a 1 s lease, a 5 s read deadline
+   and a validation that pauses 2 s (the injectable pause of `revalidate_with_retries`): the
+   read is refused once, with the code this path answers for a lapsed lease, which the test
+   names, and the registry holds no validation record dated after the lease expiry.
 10. `connectors invoke --help` and the bash completion contain `--deadline-seconds`, and the help
     names `1` and `120`. `semantics.md` contains `--deadline-seconds`. `owner.md` no longer
-    contains "the read's own 30 seconds". The repository's generated-file checks pass
-    (`AGENTS.md`, the steps after an edit to `ess/domains`).
+    contains "the read's own 30 seconds". The checks `AGENTS.md` lists after an edit to
+    `ess/domains` pass: `connectors-build metadata-entities --check`, `ess-boundary`, `cli
+    --check`, `mcp-bindings --check`, `service-metadata --check`, `connectors-docs generate
+    --check` and `cargo test -p connectors-build --tests`.
 11. Measurement, outside the test step, on the instance of the 2026-11-23 comment: 16 parallel
     reads with `--deadline-seconds 120`. Recorded on issue #267 and as evidence on this story:
     version, store size, host load, and per read the outcome and time. Pass: no read is refused
-    `timeout` before 120 s of its own wall time, and every other read answers or is refused
-    `capacity`. Baseline: 5 of 16 answered on 0.74.0.
+    `timeout` before 120 s of its own wall time; each read answers, is refused `capacity`, or is
+    refused `timeout` at `admission` at 120 s; and more than 5 of the 16 answer (baseline: 5 of
+    16 on 0.74.0). Pass is not 16 of 16 on a large store.
 
 Each new test's time is reported; budget 60 s per test, 120 s for the test step.
 

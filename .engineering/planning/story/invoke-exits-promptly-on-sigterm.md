@@ -6,6 +6,7 @@ status: draft
 title: invoke exits within 5 s of SIGTERM
 relations:
 - decomposes: epic:review-20261123-findings
+- depends_on: story:invoke-admission-queues-under-load
 revision: 1
 ---
 ## Outcome
