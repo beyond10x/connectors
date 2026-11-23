@@ -2,10 +2,12 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0760-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: connectors 0.76.0 release scope
 summary: Scope, exclusions and evidence of the 0.76.0 cut
-revision: 3
+revision: 4
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-23T12:27:12Z", actor: "human:timo", revision: 4}
 ---
 ## Scope of connectors 0.76.0
 
