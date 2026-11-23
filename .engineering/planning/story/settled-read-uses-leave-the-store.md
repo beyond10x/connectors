@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:settled-read-uses-leave-the-store
 kind: story
-status: active
+status: implemented
 title: A read use is held in the owner process and no longer recorded (D5 way A)
 relations:
 - decomposes: epic:review-20261123-findings
@@ -34,10 +34,11 @@ scope:
   path: docs/local-er-metadata.md
 - confidence: cited
   path: website/docs/reference/contracts/cli.md
-revision: 45
+revision: 46
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T10:40:57Z", actor: "human:timo", revision: 44, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T10:40:58Z", actor: "human:timo", revision: 45, decided_on: {"recorded":{"review_outcome":8}}}
+- {from: "active", to: "implemented", at: "2026-11-23T19:56:34Z", actor: "human:timo", revision: 46, decided_on: {"recorded":{"test_result":1,"review_outcome":9}}}
 ---
 ## Outcome
 

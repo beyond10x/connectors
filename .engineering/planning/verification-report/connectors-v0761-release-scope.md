@@ -2,10 +2,12 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0761-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: connectors 0.76.1 release scope
 summary: Scope, exclusions and evidence of the 0.76.1 cut
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-23T19:56:33Z", actor: "human:timo", revision: 4}
 ---
 ## Scope of connectors 0.76.1
 
@@ -23,9 +25,9 @@ recording reads", "connectors only", under his release order of 03:59 CET.
 
 ## Known at the release
 
-- A store written by an earlier release keeps the records it has and does not shrink. Whether
-  such stores get a way to shrink is an open question at host-operator; the default is to
-  leave them, a new state directory being the way to a small store.
+- A store written by an earlier release keeps the records it has and does not shrink. D18,
+  host-operator under Timo's delegation, 2026-11-23 about 21:00 CET: "A": leave old stores as
+  they are; a new state directory plus reconnecting is the way to a small store.
 - Same-load comparison, one run each, host load 97 to 100: the 0.76.0 code (e535fc5f924)
   `median_ms=1039 median_cpu_ms=197 peak_rss_mb=87`; this release `median_ms=780
   median_cpu_ms=153 peak_rss_mb=70`. Not repeated.
@@ -44,3 +46,18 @@ recording reads", "connectors only", under his release order of 03:59 CET.
   0.76.2.
 - Standing grants (0.77.0) and the pattern grant (0.78.0).
 - The working-directory fix of the owner and its providers, and the Windows MCP fix.
+
+## Verified after the release
+
+- Pull request 287 merged 2026-11-23 20:37 CET as c97cb5660d9; tag `v0.76.1` is on that commit.
+- Release page published 20:39 CET; the release-binaries run 45251192789 ended `success`; the
+  four archives match `SHA256SUMS`; the image `ghcr.io/beyond10x/connectors:0.76.1` carries
+  revision c97cb5660d9 for linux/amd64 and linux/arm64.
+- Checks of pull request 287: all passed except "host and CLI on windows-latest", red at its
+  step 10 as at 0.76.0. Three macOS jobs were first cancelled by the forge for lack of a
+  runner and passed on one rerun.
+- A workstation install swapped from 0.76.0 to 0.76.1 (binary only, same store): one read each
+  through three instances answered status 200; three more read invokes left
+  `metadata.sqlite3` at 4,882,432 bytes.
+- Issue #267 holds the measurement report (comment 7112288332); the issue stays open for its
+  other items.
