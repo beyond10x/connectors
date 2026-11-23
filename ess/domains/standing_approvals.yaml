@@ -1,13 +1,17 @@
 domain: connectors.standing_approvals
-summary: Standing write grants an operator mounts for a served instance, and the hourly count of writes admitted under each.
+summary: Standing write grants of an instance, as a file the served host mounts or a file the local owner's approval key signs, and the hourly count of writes admitted under each.
 # Normative owner: contracts/service/compatibility.md § 2.1 (Keyed writes under a
-# standing grant) and contracts/operations/v1alpha1/semantics.md § 4 (the checks
-# that replace steps 5 and 8 under a grant). Decided by
-# architecture-decision-record:standing-scoped-approval (option A of
-# decision-blocker:standing-write-approval-mode), served placement.
+# standing grant), contracts/operations/v1alpha1/semantics.md § 4.2 and § 4.3
+# (the checks that replace steps 5 and 8 under a grant),
+# contracts/service/local-mutations.md "Keyed writes under a standing grant"
+# and contracts/cli/v1alpha1/semantics.md "Standing grants" (the local
+# placement). Decided by architecture-decision-record:standing-scoped-approval
+# (option A of decision-blocker:standing-write-approval-mode).
 #
-# A grant is operator configuration, not caller authority and not a signed
-# token: the served host reads the grant file named by its service
+# Two placements read one grant document (GrantFile):
+#
+# Served. A grant is operator configuration, not caller authority and not a
+# signed token: the served host reads the grant file named by its service
 # configuration (connectors.declarations.ServiceHostConfiguration
 # `standing_grants`) on every write and records nothing about the grant itself.
 # Whoever can change the instance's mounted configuration can widen its grants,
@@ -15,6 +19,18 @@ summary: Standing write grants an operator mounts for a served instance, and the
 # whose configuration has no `standing_grants` reads no grant and counts no
 # use: it dispatches a write unkeyed (connectors.mutations, "The HTTP host's
 # attempt ledger").
+#
+# Local (story:local-invoke-admits-a-keyed-write-under-a-standing-grant). The
+# document is the `document` claim of a file the instance's approval key signs
+# (SignedGrantHeader, SignedGrantClaims), named by the optional member
+# `standing_grants` of the instance's entry in the local configuration. The
+# local owner reads and verifies it on every keyed write that carries no
+# proof; a bare GrantFile at that path admits nothing, and the served host
+# reads no signed file. The boundary is the same-user boundary of the local
+# binding: the file, the signing key and the state directory belong to the
+# owner UID, which can sign a grant as it can issue an approval. One approval
+# is one write of one input; one grant is up to 10,000 writes an hour until a
+# `not_after_unix_ms` with no upper bound.
 types:
   # One target member: a JSON pointer (RFC 6901) into the operation's input and
   # the exact JSON value it must hold. An input whose member at `pointer` is
@@ -29,6 +45,27 @@ types:
   # the host's clock reads before it. `max_per_hour` (1 to 10,000) bounds the
   # writes admitted under this grant in any 3,600-second window; a replay of a
   # key is not admitted again and is not counted.
+  # `input_keys` (story:standing-grant-closes-the-input-to-listed-members)
+  # closes the input: absent, any other member of the input is admitted, as
+  # before the member existed; present (it may be empty, and is never null),
+  # the input may hold nothing outside the grant's `target` and `input_keys`
+  # pointers. It holds at most 16 RFC 6901 pointers of at most 256 bytes each.
+  # On a grant that has it, no pointer of `target` and `input_keys` equals
+  # another or is a prefix of another by reference tokens (`/body` beside
+  # `/body/channel` is refused, `/body/text` beside `/body/text2` is not); a
+  # grant without it keeps the earlier rule, no `target` pointer twice.
+  # The check walks the input from its root: a non-empty object is descended,
+  # a member name becoming a reference token (`~` as `~0`, `/` as `~1`); every
+  # other value (a scalar, null, an array, an empty object) is a leaf. A leaf is
+  # inside the grant when its pointer equals a `target` or `input_keys` pointer
+  # or lies below one by reference tokens, so a listed pointer admits the whole
+  # value under it and a listed array any elements. One leaf outside, or an
+  # input nested deeper than 64 levels of objects and arrays (the root is level
+  # 1), puts the write outside this grant. Arrays are leaves: a pointer into an
+  # array covers nothing. A closed list limits its own grant only: each
+  # covering grant is a sufficient permission, so another grant of the same
+  # instance, operation and target without `input_keys` admits what this one
+  # refuses.
   - name: connectors.standing_approvals.StandingGrant
     kind: struct
     fields:
@@ -36,13 +73,16 @@ types:
       - {name: instance, type: String}
       - {name: operation, type: String}
       - {name: target, type: "List<connectors.standing_approvals.TargetMember>"}
+      - {name: input_keys, type: "Optional<List<String>>"}
       - {name: not_after_unix_ms, type: Integer}
       - {name: max_per_hour, type: Integer}
     invariants:
       - not_after_unix_ms: {gte: 0, lte: 9007199254740991}
       - max_per_hour: {gte: 1, lte: 10000}
-  # The mounted file. A grant whose id is listed in `revoked` admits nothing,
-  # from the next call on; so does a grant the file no longer lists.
+  # The grant document: the served host's mounted file, and the `document`
+  # claim of the local signed file. A grant whose id is listed in `revoked`
+  # admits nothing, from the next call on; so does a grant the file no longer
+  # lists. The local commands write `revoked` empty and remove a revoked grant.
   - name: connectors.standing_approvals.GrantFile
     kind: struct
     fields:
@@ -51,6 +91,44 @@ types:
       - {name: revoked, type: "List<String>"}
     invariants:
       - format == "connectors.standing-grants/1"
+  # The local signed grant file is one compact JWS,
+  # `<header>.<claims>.<signature>`, at most 64 KiB, mode 0600. The header's
+  # `typ` is the grant file's own: a grant file is not an approval proof
+  # (connectors.delegation.ProofHeader lists other types) and a proof is not a
+  # grant file. `kid` is the instance's approval key's.
+  - name: connectors.standing_approvals.SignedGrantHeader
+    kind: struct
+    fields:
+      - {name: alg, type: String}
+      - {name: kid, type: String}
+      - {name: typ, type: String}
+    invariants:
+      - alg == "Ed25519"
+      - typ == "b10x.connectors-standing-grants.v1+jws"
+  # The signed claims: `iss` and `aud` are the issuer and audience of the
+  # instance's approval issuer (connectors.approval_issuers.ApprovalIssuer), so
+  # a file signed for one instance does not verify for another; `document` holds
+  # that instance's grants only.
+  - name: connectors.standing_approvals.SignedGrantClaims
+    kind: struct
+    fields:
+      - {name: iss, type: connectors.approval_issuers.IssuerName}
+      - {name: aud, type: connectors.approval_issuers.AudienceName}
+      - {name: document, type: connectors.standing_approvals.GrantFile}
+  # The document `approvals grant-standing --input-file` reads: a grant without
+  # `id` and `instance`, which the command sets (a new UUID; the selected
+  # instance's id). The command refuses any other member.
+  - name: connectors.standing_approvals.GrantRequest
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: target, type: "List<connectors.standing_approvals.TargetMember>"}
+      - {name: input_keys, type: "Optional<List<String>>"}
+      - {name: not_after_unix_ms, type: Integer}
+      - {name: max_per_hour, type: Integer}
+    invariants:
+      - not_after_unix_ms: {gte: 1, lte: 9007199254740991}
+      - max_per_hour: {gte: 1, lte: 10000}
 
 entities:
   # One write admitted under a grant: the hourly count is the number of uses of
@@ -77,8 +155,10 @@ entities:
         - {name: release, from: [Counted], to: Released}
     # Counted: the slot is taken and counts against the cap. Bound: the write's
     # attempt was prepared and names this use; it keeps counting for its hour.
-    # Released: no attempt was prepared for it (a concurrent winner held the
-    # key, or the store refused), so it no longer counts.
+    # Released: no attempt names it (a concurrent winner held the key, the store
+    # refused, or on the local path a refusal, a failed preflight or a failed
+    # preparation came before BindUse), so it no longer counts. A Bound use stays
+    # Bound when its attempt is aborted before dispatch.
 
 commands:
   - name: connectors.standing_approvals.CountUse
@@ -155,13 +235,23 @@ actors:
       - connectors.standing_approvals.CountUse
       - connectors.standing_approvals.ReleaseUse
 
+  # The local owner on a keyed write of `connectors invoke` that carries no
+  # proof, on an instance whose configuration names a signed grant file.
+  - name: connectors.standing_approvals.LocalOwner
+    may:
+      - connectors.standing_approvals.BindUse
+      - connectors.standing_approvals.CountUse
+      - connectors.standing_approvals.ReleaseUse
+
 # The admission order on POST /v1alpha2/invoke, on a host whose configuration
 # sets `standing_grants`, for an operation whose profile is `mutation`
 # (compatibility.md § 2.1): a missing key is `invalid_input`; a
 # live key with the same fingerprint replays its original attempt, with no grant
 # check and no count; with another fingerprint it is `idempotency_conflict`; a
 # grant file that cannot be read safely is `unavailable`; no grant covering
-# instance, operation, every target member, `not_after` and revocation is
+# instance, operation, every target member, the closed input when the grant
+# lists `input_keys` (checked after the target members and before revocation
+# and `not_after`), `not_after` and revocation is
 # `approval_required`, naming no axis; a covering grant whose count in the last
 # 3,600 seconds has reached `max_per_hour` is `rate_limited` with
 # `retry_after_seconds`. Each refusal is before the audit anchor, makes no
@@ -182,10 +272,69 @@ actors:
 # operator's own deployment, so no trusted-time source is required; a clock that
 # moves backwards shortens no window, because the count reads every use admitted
 # at or after `now - 3,600 s`, later ones included.
+#
+# The admission order of the local owner (LocalOwner), on a write of
+# `connectors invoke` (local-mutations.md, "Keyed writes under a standing
+# grant"; operations § 4.3). The path is chosen from what the owner received:
+# a proof is the per-input path, unchanged, and its refusal never falls back
+# to a grant; no proof and no key, or an instance without `standing_grants`,
+# is `approval_required`; no proof, a key and the member is this order.
+# 1. The keyed lookup stays first: a settled key replays and a key with
+#    another input is `idempotency_conflict`, with no grant check and no
+#    count, also after expiry or revocation and at the cap.
+# 2. In place of the proof check the owner reads and verifies the signed file
+#    (SignedGrantHeader, SignedGrantClaims, the key's window and signature),
+#    finds the grants that cover the input (the served covering rule, on the
+#    value the owner decoded from the bytes it sends) and sends CountUse for
+#    the first covering grant, in file order, with room in its hour. This is
+#    before the audit anchor and before native preflight.
+# 3. A refusal there follows the winner recheck and is `not_attempted`, with
+#    no anchor, no attempt and no provider request: no covering grant, an
+#    absent file and a file that does not verify are `approval_required`,
+#    naming no axis; every covering grant at its cap is `rate_limited` with
+#    `retry_after_seconds` (1 to 3,600); a file that fails the custody checks,
+#    a use store that cannot be kept and a clock with no reading are
+#    `unavailable`.
+# 4. Then the audit anchor and native preflight, PrepareAttempt with
+#    `approval_mode: not_required` and the key, and BindUse naming the attempt.
+#    No approval is spent. OpenDispatch is the gate; commit and settlement are
+#    unchanged.
+# Rechecks: before PrepareAttempt and before OpenDispatch the owner reads the
+# clock fresh, reads and verifies the file again, and requires the grant whose
+# use was counted to be in it still, to cover the input still and not to be
+# expired; it counts no second use. A refusal before PrepareAttempt releases
+# the use (ReleaseUse) and leaves no attempt. A refusal before OpenDispatch
+# aborts the prepared attempt (connectors.mutations.AbortPrepared): the answer
+# is `not_attempted`, its attempt names the grant and the use stays Bound.
+# Nothing reads the grant after that recheck: from it through the dispatch
+# admission and OpenDispatch neither a revocation nor a `not_after` that
+# passes stops the write.
+# Release: a Counted use that is not bound is released on every exit (a
+# refusal, a failed preflight, a failed PrepareAttempt, a failed BindUse).
+# Store: `standing-grants.sqlite3` in the local state directory, one for all
+# its instances; the grant id is bound to the attempt there, and the ledger
+# records `not_required` (connectors.mutations, "The local owner's keyed write
+# under a standing grant").
+# Clock: the approval clock's trusted reading (connectors.clock), never the
+# system clock. `not_after` and the window compare against the upper bound of a
+# fresh reading: a grant is expired once that upper bound reaches
+# `not_after_unix_ms`, and a use counts while its `admitted_at_unix_ms` is at
+# or after the upper bound less 3,600,000 ms. A clock that gives no reading is
+# `unavailable`, never `approval_required`.
+# Revocation: the signed file is the one authority; `approvals
+# revoke-standing` removes the grant and signs again, and nothing is written
+# to the use store. The file carries no sequence, so an older signed file put
+# back at the path admits again until its grants' `not_after` or until the
+# approval key is rotated; only the owner UID can put it back. A rotated or
+# revoked key ends every grant it signed.
 # ESS-LIMIT: reading the grant file, the JSON-pointer match of a target, the
+# closed-input walk and its depth bound, the pointer-prefix rule of a grant
+# with `input_keys`, the bounds of `input_keys` (16 pointers of 256 bytes),
+# the compact JWS framing, canonical form and signature of the local file, the
+# equality of its `iss`, `aud` and `kid` with the instance's approval key, the
 # count of sibling uses in a window, the order across the grant store and the
 # attempt ledger, and the file's custody checks (no symbolic link but a
 # volume's `..data` layout, owner-only writable, at most 64 KiB) are host
 # obligations: ESS has no
-# cross-record count, no file-read or pointer construct and no cross-store
-# transaction.
+# cross-record count, no file-read, pointer or signature construct and no
+# cross-store transaction.

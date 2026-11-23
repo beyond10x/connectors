@@ -1190,3 +1190,41 @@ async fn the_legacy_route_runs_no_write_on_a_host_with_standing_grants() {
     assert_eq!(status, 200, "{written}");
     assert_eq!(plain.requests(), 1);
 }
+
+/// A grant with `input_keys` closes the input to the members it lists
+/// (story:standing-grant-closes-the-input-to-listed-members): a write inside
+/// the list is dispatched once under the grant, and one with a member outside
+/// it is refused as a write to another target is.
+#[tokio::test]
+async fn served_input_keys_close_the_input() {
+    let mut closed = grant("g-widgets", 10, LATER);
+    closed["input_keys"] = json!(["/title"]);
+    let host = host(Some(grant_file(json!([closed]), json!([])))).await;
+    let (status, response) = invoke(
+        &host,
+        &write("issue.create", "w-1", Some("key-1"), widgets("first")),
+    )
+    .await;
+    assert_eq!(status, 200, "{response:?}");
+    assert_eq!(response.status, ResponseStatus::Success);
+    assert_eq!(host.requests(), 1);
+    let attempt = response.mutation.unwrap().attempt.unwrap();
+    assert_eq!(
+        host.state.grant_of(attempt.id.as_str()).unwrap().as_deref(),
+        Some("g-widgets"),
+        "the attempt does not record the grant it was admitted under"
+    );
+    assert_eq!(host.state.attempt_count().unwrap(), 1);
+    // The same target with one member the list does not name.
+    let refused = invoke(
+        &host,
+        &write(
+            "issue.create",
+            "w-2",
+            Some("key-2"),
+            json!({"owner": "acme", "repo": "widgets", "title": "second", "labels": ["bug"]}),
+        ),
+    )
+    .await;
+    assert_refused_before_anything(&host, &refused, ErrorCode::ApprovalRequired, 403, 1, 1);
+}

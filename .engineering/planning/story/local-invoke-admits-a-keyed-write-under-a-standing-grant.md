@@ -100,7 +100,7 @@ scope:
   path: website/docs/guides/guarded-write.md
 - confidence: inferred
   path: website/docs/reference
-revision: 63
+revision: 65
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:03:26Z", actor: "human:timo", revision: 61, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:03:27Z", actor: "human:timo", revision: 62, decided_on: {"recorded":{"review_outcome":8}}}
@@ -464,7 +464,7 @@ CLI without a keyring, new file `apps/connectors/tests/standing_grant.rs` on the
 `approval_field_adversary.rs` (:60, :229); run by `cargo nextest run -p connectors --test
 standing_grant --test invoke_short`:
 
-16. `standing_commands_refuse_without_the_configuration_member`: the three commands exit 1 with
+16. `standing_commands_refuse_without_the_configuration_member`: the three commands exit 2 with
     `.error.data.code` `invalid_configuration`.
 17. `a_write_without_a_key_or_without_the_member_changes_no_byte`: no `--approval-file` in
     either case. With `standing_grants` set and no `--idempotency-key`, and with
@@ -676,3 +676,29 @@ accepted record does today.
   before a new file is written.
 - D10 = A (the operator, 2026-11-23): the attempt records `not_required` and the grant id
   lives in the uses store, as on the served host.
+
+## Settled by run 1, 2026-11-23
+
+Run 1 (the closed input, the ESS documents, the contract text, the four authored traces) is
+committed. Runs 2 and 3 build to `contracts/cli/v1alpha1/semantics.md`, section "Standing
+grants", and `ess/domains/standing_approvals.yaml` and `cli.yaml`. Points the stories left open
+and run 1 fixed there, confirmed in review:
+
+- S1. `revoke-standing` prints `{grant_id, path}`.
+- S2. `grant-standing`'s `invalid_input` names the field `input_file`.
+- S3. The clock and key refusals of the three commands follow `approvals issue`: no
+  `[approval_clock]` is `invalid_configuration`, no reading is `unavailable`.
+- S4. `input_keys` is optional in the `grant-standing` document.
+- S5. `input_keys: null` is malformed.
+- S6. `revoke-standing` removes the grant from the file; the commands write `revoked: []`.
+- `invalid_configuration` exits 2 (`apps/connectors/src/local.rs:418`,
+  `apps/connectors/src/local/session.rs:505-506`); acceptance 16 said 1 and is corrected.
+- The `typ` is `b10x.connectors-standing-grants.v1+jws`; the header is `{alg: "Ed25519", kid,
+  typ}`; the payload is `{iss, aud, document}`.
+- Every command that needs `ess` runs with
+  `CONNECTORS_ESS=$HOME/.cache/ess/toolchains/0.97.4/ess` on this host: the `ess` on PATH
+  is 0.98.0 and the repository pins 0.97.4.
+- A symlinked grant file: the contract refers to the custody rule (the served rule admits the
+  `..data` volume link), not a flat `unavailable`.
+- Not edited by run 1: `contracts/operations/v1alpha1/verification.md:11` says "Nine authored
+  scenarios"; there are 56.

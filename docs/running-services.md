@@ -297,6 +297,39 @@ in the input: the JSON pointer finds that exact value. `max_per_hour` (1 to 10,0
 writes admitted under the grant in any 3,600 seconds. A file holds at most 256 grants, each
 with 1 to 16 target members.
 
+A grant may also close the input with `input_keys`, a list of at most 16 JSON pointers
+(it may be empty) naming the members a caller may set beside the target:
+
+```json
+{
+  "id": "issues-in-widgets",
+  "instance": "gitlab.example-org",
+  "operation": "issue.create",
+  "target": [{"pointer": "/id", "value": "7"}],
+  "input_keys": ["/title", "/description"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 20
+}
+```
+
+- Without `input_keys` a grant admits any input that holds its target, as before.
+- With it, an input that holds a member outside the target and the list is outside that
+  grant: `approval_required`, with nothing recorded or sent. An empty list admits the
+  target members alone.
+- A listed pointer admits everything below it: `"/description"` admits a string, an object
+  or an array there.
+- Pointers do not reach into arrays. An array is admitted or refused whole, by a pointer
+  that names it or a member above it. A pointer into one, such as `"/labels/0"`, covers
+  nothing, so a grant that lists it refuses every input that has `labels`. A `target`
+  pointer into an array does the same on a grant that has `input_keys`.
+- On a grant with `input_keys`, no pointer of `target` and `input_keys` may repeat another
+  or lie below another (`"/body"` beside `"/body/channel"`); such a file is malformed. An
+  input nested more than 64 levels deep is outside the grant.
+- A closed list limits its own grant only. A second grant for the same instance, operation
+  and target without `input_keys`, or with a longer list, admits what the first refuses.
+- A host built before `input_keys` existed refuses a file that has it as malformed and
+  answers every write `unavailable`. Upgrade the host before you mount such a file.
+
 The host reads the file on every write, so an edit, a revocation or a removed grant applies
 from the next call on, without a restart. With no file at the path, no write is admitted.
 The file may be a plain file or a key of a Kubernetes Secret or ConfigMap volume: on Linux

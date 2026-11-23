@@ -25,9 +25,16 @@
 //!   has passed, in batches of at most [`PRUNE_BATCH`] per take; a use that
 //!   names an attempt is kept, as the attempt is.
 //!
+//! A grant may close its input (`input_keys`,
+//! story:standing-grant-closes-the-input-to-listed-members): the input may
+//! then hold nothing outside the grant's `target` and `input_keys` pointers
+//! ([`Grants::covering`]). A grant without the member admits any other input
+//! member, as before the member existed.
+//!
 //! Nothing here grants caller authority: the host checks admission, the key and
 //! the grant, in that order, before any attempt or provider request.
 use super::filesystem as fs;
+use super::runtime::channel::DEPTH;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::Deserialize;
 use serde_json::Value;
@@ -43,6 +50,7 @@ pub const WINDOW_MS: i64 = 3_600_000;
 /// Bounds of one document.
 const GRANTS_LIMIT: usize = 256;
 const TARGET_LIMIT: usize = 16;
+const INPUT_KEYS_LIMIT: usize = 16;
 const POINTER_LIMIT: usize = 256;
 const MAX_PER_HOUR: u32 = 10_000;
 const TIME_LIMIT: i64 = 9_007_199_254_740_991;
@@ -76,6 +84,9 @@ pub enum Uncovered {
     MissingMember,
     /// A grant's target member holds another value.
     OtherTarget,
+    /// The grant lists `input_keys` and the input holds a leaf outside the
+    /// target and that list, or nests deeper than the walk goes.
+    OutsideInput,
     /// The host's clock reads `not_after` or later.
     Expired,
     /// The grant's id is listed in `revoked`.
@@ -99,8 +110,21 @@ pub struct Grant {
     pub instance: String,
     pub operation: String,
     pub target: Vec<TargetMember>,
+    /// Closed input. Absent: any other member of the input is admitted.
+    /// Present (it may be empty, and is never `null`): the input holds nothing
+    /// outside the `target` and `input_keys` pointers.
+    #[serde(default, deserialize_with = "listed")]
+    pub input_keys: Option<Vec<String>>,
     pub not_after_unix_ms: i64,
     pub max_per_hour: u32,
+}
+
+/// `input_keys` where the member is present: a list of strings. `null` is not
+/// one, so it is refused instead of read as an absent member.
+fn listed<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Vec<String>>, D::Error> {
+    Vec::<String>::deserialize(deserializer).map(Some)
 }
 
 /// One target member: an RFC 6901 pointer into the input and its exact value.
@@ -155,6 +179,22 @@ pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
                 return Err(Unreadable::Malformed);
             }
         }
+        // A closed grant: its pointers are distinct and none lies below
+        // another, so each names its own part of the input.
+        if let Some(keys) = &grant.input_keys {
+            if keys.len() > INPUT_KEYS_LIMIT || !keys.iter().all(|key| valid_pointer(key)) {
+                return Err(Unreadable::Malformed);
+            }
+            let all = grant.pointers();
+            let overlaps = all.iter().enumerate().any(|(i, one)| {
+                all.iter()
+                    .enumerate()
+                    .any(|(j, other)| i != j && other.starts_with(one))
+            });
+            if overlaps {
+                return Err(Unreadable::Malformed);
+            }
+        }
     }
     if document
         .revoked
@@ -182,10 +222,86 @@ fn valid_pointer(pointer: &str) -> bool {
         && !pointer.chars().any(char::is_control)
 }
 
+/// The reference tokens of a valid pointer, still escaped: `~0` and `~1` are
+/// compared as written, which is exact because `valid_pointer` admits no other
+/// use of `~`.
+fn tokens(pointer: &str) -> Vec<&str> {
+    pointer.split('/').skip(1).collect()
+}
+
+/// A member name as a reference token (RFC 6901: `~` as `~0`, `/` as `~1`).
+fn token(name: &str) -> String {
+    name.replace('~', "~0").replace('/', "~1")
+}
+
+impl Grant {
+    /// The reference tokens of every `target` and `input_keys` pointer.
+    fn pointers(&self) -> Vec<Vec<&str>> {
+        self.target
+            .iter()
+            .map(|member| member.pointer.as_str())
+            .chain(self.input_keys.iter().flatten().map(String::as_str))
+            .map(tokens)
+            .collect()
+    }
+
+    /// Whether `input` holds nothing outside this grant's pointers. The walk
+    /// starts at the root: a non-empty object is descended; every other value
+    /// (a scalar, `null`, an array, an empty object) is a leaf. A leaf is
+    /// inside when a pointer equals its own or lies above it by reference
+    /// tokens, so a listed pointer admits the whole value under it. Nesting
+    /// is counted as `runtime::channel::depth` counts it (objects and arrays,
+    /// the root is level 1); an input nested deeper than [`DEPTH`] is outside.
+    fn closes(&self, input: &Value) -> bool {
+        let allowed = self.pointers();
+        let mut path = Vec::new();
+        inside(input, &mut path, &allowed, 0)
+    }
+}
+
+/// The walk of [`Grant::closes`] at `value`, whose pointer is `path` and which
+/// lies inside `depth` containers.
+fn inside(value: &Value, path: &mut Vec<String>, allowed: &[Vec<&str>], depth: usize) -> bool {
+    let covered = allowed.iter().any(|pointer| {
+        pointer.len() <= path.len() && pointer.iter().zip(path.iter()).all(|(a, b)| a == b)
+    });
+    if covered {
+        return within(value, depth);
+    }
+    match value {
+        Value::Object(members) if !members.is_empty() => {
+            depth < DEPTH
+                && members.iter().all(|(name, member)| {
+                    path.push(token(name));
+                    let admitted = inside(member, path, allowed, depth + 1);
+                    path.pop();
+                    admitted
+                })
+        }
+        _ => false,
+    }
+}
+
+/// Whether a covered value, lying inside `depth` containers, nests no deeper
+/// than [`DEPTH`].
+fn within(value: &Value, depth: usize) -> bool {
+    match value {
+        Value::Object(members) => {
+            depth < DEPTH && members.values().all(|member| within(member, depth + 1))
+        }
+        Value::Array(elements) => {
+            depth < DEPTH && elements.iter().all(|element| within(element, depth + 1))
+        }
+        _ => true,
+    }
+}
+
 impl Grants {
     /// The grants that cover a write of `operation` on `instance` with `input`
     /// at `now_ms`, in file order: same instance and operation, every target
-    /// member present with its exact value, `now_ms < not_after_unix_ms`, and
+    /// member present with its exact value, nothing in `input` outside the
+    /// grant's `target` and `input_keys` when it lists them
+    /// ([`Uncovered::OutsideInput`]), `now_ms < not_after_unix_ms`, and
     /// not revoked. Empty means no grant covers it; the reason is the most
     /// specific one met.
     pub fn covering(
@@ -221,6 +337,10 @@ impl Grants {
             if !matched {
                 continue;
             }
+            if grant.input_keys.is_some() && !grant.closes(input) {
+                reason = reason.max_specific(Uncovered::OutsideInput);
+                continue;
+            }
             if self.revoked.contains(&grant.id) {
                 reason = reason.max_specific(Uncovered::Revoked);
                 continue;
@@ -246,8 +366,9 @@ impl Uncovered {
             Self::OtherOperation => 1,
             Self::MissingMember => 2,
             Self::OtherTarget => 3,
-            Self::Revoked => 4,
-            Self::Expired => 5,
+            Self::OutsideInput => 4,
+            Self::Revoked => 5,
+            Self::Expired => 6,
         }
     }
     fn max_specific(self, other: Self) -> Self {
@@ -877,6 +998,312 @@ mod tests {
         assert_eq!(
             read(&volume.join("grants2.json")).err(),
             Some(Unreadable::Custody)
+        );
+    }
+
+    /// A grant for `chat.postMessage` on `leaf`, with `input_keys` when given.
+    fn closed(id: &str, target: Value, input_keys: Option<Value>) -> Value {
+        let mut grant = json!({
+            "id": id, "instance": "leaf", "operation": "chat.postMessage",
+            "target": target,
+            "not_after_unix_ms": 2_000_000_000_000_i64, "max_per_hour": 1
+        });
+        if let Some(input_keys) = input_keys {
+            grant["input_keys"] = input_keys;
+        }
+        grant
+    }
+
+    /// The target of every closed-input case: one channel.
+    fn channel() -> Value {
+        json!([{"pointer": "/body/channel", "value": "C1"}])
+    }
+
+    fn file(grants: Value) -> Result<Grants, Unreadable> {
+        parse(&document(grants, json!([])))
+    }
+
+    /// The ids of the grants covering `input`, in file order.
+    fn covers(grants: &Grants, input: &Value) -> Result<Vec<String>, Uncovered> {
+        grants
+            .covering("leaf", "chat.postMessage", input, 1_000)
+            .map(|covering| covering.iter().map(|grant| grant.id.clone()).collect())
+    }
+
+    /// `levels` containers nested in each other: objects under the member
+    /// `a`, or arrays of one element. The innermost holds one scalar.
+    fn nested(levels: usize, array: bool) -> Value {
+        let mut value = if array { json!([1]) } else { json!({"a": 1}) };
+        for _ in 1..levels {
+            value = if array {
+                json!([value])
+            } else {
+                json!({"a": value})
+            };
+        }
+        value
+    }
+
+    /// Acceptance 1 of story:standing-grant-closes-the-input-to-listed-members.
+    #[test]
+    fn closed_input_refuses_every_leaf_outside_the_grant() {
+        let grants = file(json!([closed(
+            "g1",
+            channel(),
+            Some(json!(["/body/text", "/body/thread_ts"]))
+        )]))
+        .unwrap();
+        let admitted = Ok(vec!["g1".to_owned()]);
+        assert_eq!(
+            covers(&grants, &json!({"body": {"channel": "C1", "text": "t"}})),
+            admitted
+        );
+        assert_eq!(
+            covers(
+                &grants,
+                &json!({"body": {"channel": "C1", "text": "t", "thread_ts": "1.2"}})
+            ),
+            admitted
+        );
+        for (what, input) in [
+            (
+                "/body/mrkdwn added",
+                json!({"body": {"channel": "C1", "text": "t", "mrkdwn": true}}),
+            ),
+            (
+                "/body/text2 added",
+                json!({"body": {"channel": "C1", "text": "t", "text2": "u"}}),
+            ),
+            (
+                "a second top-level member",
+                json!({"body": {"channel": "C1", "text": "t"}, "query": "q"}),
+            ),
+            (
+                "/body/extra holding {}",
+                json!({"body": {"channel": "C1", "text": "t", "extra": {}}}),
+            ),
+            (
+                "/body/extra holding []",
+                json!({"body": {"channel": "C1", "text": "t", "extra": []}}),
+            ),
+            (
+                "/body/extra holding null",
+                json!({"body": {"channel": "C1", "text": "t", "extra": null}}),
+            ),
+            (
+                "a member named te/xt",
+                json!({"body": {"channel": "C1", "te/xt": "t"}}),
+            ),
+        ] {
+            assert_eq!(
+                covers(&grants, &input),
+                Err(Uncovered::OutsideInput),
+                "{what}"
+            );
+        }
+        assert_eq!(
+            covers(&grants, &json!("C1")),
+            Err(Uncovered::MissingMember),
+            "a scalar root"
+        );
+    }
+
+    /// Acceptance 2: a listed pointer admits the subtree under it, an array
+    /// is a leaf, and the walk stops at the depth the local channel admits.
+    #[test]
+    fn a_listed_pointer_admits_its_subtree() {
+        let blocks = file(json!([closed(
+            "g1",
+            channel(),
+            Some(json!(["/body/blocks"]))
+        )]))
+        .unwrap();
+        let admitted = Ok(vec!["g1".to_owned()]);
+        for value in [
+            json!([{"type": "section"}, {"type": "divider"}]),
+            json!({"first": {"type": "section", "fields": [1, 2]}}),
+        ] {
+            assert_eq!(
+                covers(
+                    &blocks,
+                    &json!({"body": {"channel": "C1", "blocks": value}})
+                ),
+                admitted
+            );
+        }
+        // A pointer into an array covers nothing: the array is the leaf.
+        let element = file(json!([closed(
+            "g1",
+            channel(),
+            Some(json!(["/body/blocks/0"]))
+        )]))
+        .unwrap();
+        assert_eq!(
+            covers(
+                &element,
+                &json!({"body": {"channel": "C1", "blocks": [{"type": "section"}]}})
+            ),
+            Err(Uncovered::OutsideInput)
+        );
+        // Depth, counted as `runtime::channel::depth` counts it: the root is
+        // 1, `body` 2, and `/body/blocks` holds the rest.
+        for array in [false, true] {
+            let at = |levels| json!({"body": {"channel": "C1", "blocks": nested(levels, array)}});
+            let (deepest_64, deepest_65) = (at(62), at(63));
+            let channel_depth = |input: &Value| {
+                super::super::runtime::channel::depth(&serde_json::to_vec(input).unwrap())
+            };
+            assert!(channel_depth(&deepest_64).is_ok(), "array: {array}");
+            assert!(channel_depth(&deepest_65).is_err(), "array: {array}");
+            assert_eq!(covers(&blocks, &deepest_64), admitted, "array: {array}");
+            assert_eq!(
+                covers(&blocks, &deepest_65),
+                Err(Uncovered::OutsideInput),
+                "array: {array}"
+            );
+        }
+        // A target pointer into an array matches its member, and the walk
+        // then meets the array as a leaf no pointer covers.
+        let into_array = file(json!([closed(
+            "g1",
+            json!([{"pointer": "/body/blocks/0/type", "value": "section"}]),
+            Some(json!([]))
+        )]))
+        .unwrap();
+        assert_eq!(
+            covers(
+                &into_array,
+                &json!({"body": {"blocks": [{"type": "section"}]}})
+            ),
+            Err(Uncovered::OutsideInput)
+        );
+    }
+
+    /// Acceptance 3, first part: a grant without `input_keys` admits what it
+    /// admitted before the member existed.
+    #[test]
+    fn an_absent_input_keys_leaves_the_input_open() {
+        let grants = file(json!([closed("g1", channel(), None)])).unwrap();
+        assert_eq!(
+            covers(
+                &grants,
+                &json!({"body": {"channel": "C1", "text": "t", "mrkdwn": true}, "query": "q"})
+            ),
+            Ok(vec!["g1".to_owned()])
+        );
+        // No depth bound either: the caller's own bound is the only one.
+        assert_eq!(
+            covers(
+                &grants,
+                &json!({"body": {"channel": "C1", "blocks": nested(80, false)}})
+            ),
+            Ok(vec!["g1".to_owned()])
+        );
+    }
+
+    /// Acceptance 3, second part.
+    #[test]
+    fn an_empty_input_keys_admits_only_the_target() {
+        let grants = file(json!([closed("g1", channel(), Some(json!([])))])).unwrap();
+        assert_eq!(
+            covers(&grants, &json!({"body": {"channel": "C1"}})),
+            Ok(vec!["g1".to_owned()])
+        );
+        assert_eq!(
+            covers(&grants, &json!({"body": {"channel": "C1", "text": "t"}})),
+            Err(Uncovered::OutsideInput)
+        );
+    }
+
+    /// Acceptance 3, third part: a closed list limits its own grant only.
+    #[test]
+    fn the_second_grant_covers_when_the_first_is_closed() {
+        let grants = file(json!([
+            closed("g1", channel(), Some(json!([]))),
+            closed("g2", channel(), Some(json!(["/body/text"])))
+        ]))
+        .unwrap();
+        assert_eq!(
+            covers(&grants, &json!({"body": {"channel": "C1", "text": "t"}})),
+            Ok(vec!["g2".to_owned()])
+        );
+        // Outside both lists the reason is the closed input.
+        assert_eq!(
+            covers(
+                &grants,
+                &json!({"body": {"channel": "C1", "text": "t", "mrkdwn": true}})
+            ),
+            Err(Uncovered::OutsideInput)
+        );
+    }
+
+    /// Acceptance 4.
+    #[test]
+    fn input_keys_are_validated_at_parse() {
+        let pointers =
+            |count: usize| -> Value { (0..count).map(|n| json!(format!("/body/k{n}"))).collect() };
+        assert!(
+            file(json!([closed("g1", channel(), Some(pointers(16)))])).is_ok(),
+            "16 pointers"
+        );
+        assert!(
+            file(json!([closed(
+                "g1",
+                channel(),
+                Some(json!(["/body/text", "/body/text2"]))
+            )]))
+            .is_ok(),
+            "/body/text beside /body/text2"
+        );
+        let long = format!("/{}", "k".repeat(256));
+        assert_eq!(long.len(), 257);
+        assert!(
+            file(json!([closed(
+                "g1",
+                channel(),
+                Some(json!([&long[..256]]))
+            )]))
+            .is_ok(),
+            "a pointer of 256 bytes"
+        );
+        for (what, input_keys) in [
+            ("17 pointers", pointers(17)),
+            ("a pointer of 257 bytes", json!([long])),
+            ("no leading /", json!(["body/text"])),
+            ("the root pointer", json!([""])),
+            ("~2", json!(["/body/te~2xt"])),
+            (
+                "the same pointer twice",
+                json!(["/body/text", "/body/text"]),
+            ),
+            ("equal to a target pointer", json!(["/body/channel"])),
+            ("/body beside target /body/channel", json!(["/body"])),
+            ("below the target pointer", json!(["/body/channel/id"])),
+            (
+                "/body/text beside /body/text/x",
+                json!(["/body/text", "/body/text/x"]),
+            ),
+            ("not a list", json!("/body/text")),
+            ("null", Value::Null),
+            ("a pointer that is not a string", json!([1])),
+        ] {
+            assert_eq!(
+                file(json!([closed("g1", channel(), Some(input_keys))])).err(),
+                Some(Unreadable::Malformed),
+                "{what}"
+            );
+        }
+        // Without `input_keys` a target reads as before the member existed:
+        // one target pointer below another is no refusal there.
+        let below = json!([
+            {"pointer": "/body", "value": {"channel": "C1"}},
+            {"pointer": "/body/channel", "value": "C1"}
+        ]);
+        assert!(file(json!([closed("g1", below.clone(), None)])).is_ok());
+        assert_eq!(
+            file(json!([closed("g1", below, Some(json!([])))])).err(),
+            Some(Unreadable::Malformed),
+            "one target pointer below another, with input_keys"
         );
     }
 }

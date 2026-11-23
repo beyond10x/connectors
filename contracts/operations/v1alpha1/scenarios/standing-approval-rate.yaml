@@ -1,0 +1,120 @@
+type: ess-scenario/1
+domain: connectors.standing_approvals
+scenario: standing-approval-rate
+summary: "Two uses of one grant in one hour: the first is bound to its attempt and counts against max_per_hour; the second is released before an attempt and does not count."
+
+# Compiled expectations of the use store and the ledger only. The cap itself
+# (the count of a grant's uses admitted in the last 3,600 seconds that are not
+# Released, compared with max_per_hour, and `rate_limited` with
+# `retry_after_seconds` when it is reached) is a host obligation: ESS has no
+# count over the records of an entity (ess/domains/standing_approvals.yaml,
+# ESS-LIMIT). A write refused at the cap sends no command: no use, no attempt.
+# The facts the count reads are the ones held here: each use's grant,
+# `admitted_at_unix_ms` and state.
+arrange:
+  - instance: first-use
+    entity: connectors.standing_approvals.GrantUse
+  - instance: second-use
+    entity: connectors.standing_approvals.GrantUse
+  - instance: attempt
+    entity: connectors.mutations.AttemptRecord
+
+timeline:
+  - at: 2026-09-08T09:00:00Z
+    command: connectors.standing_approvals.CountUse
+    input:
+      use_id: 5d0f2a56-7c58-4a0e-9d6e-0c1b6a1f3e04
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445504
+      instance_id: test-instance
+      admitted_at_unix_ms: 1788858000000
+    outcome: counted
+    events:
+      - event: connectors.standing_approvals.UseCounted
+    capture: {instance: first-use, event: connectors.standing_approvals.UseCounted, field: use_id}
+
+  - at: 2026-09-08T09:00:01Z
+    command: connectors.mutations.PrepareAttempt
+    input:
+      instance_id: test-instance
+      request_id: standing-approval-rate
+      operation_id: chat.postMessage
+      connection_ref: test-connection
+      input_digest: test-digest
+      approval_mode: not_required
+      approval_ref: null
+      idempotency_key: post-4
+      request_fingerprint:
+        operation_ref: '["connectors.operation/v1","test-instance","test-adapter","chat.postMessage"]'
+        connection_ref: test-connection
+        connection_revision: connection-r1
+        contract_ref: operations/v1alpha1
+        profile: mutation
+        descriptor_revision: descriptor-r1
+        configuration_revision: config-r1
+        canonicalization_version: adapter-v1-canonical-json
+        input_digest: test-digest
+        route: null
+      owner_nonce: 3f6f0c1e-52a7-5a39-8a43-7d0b1b0b7a04
+      publication_fence: 6e1d9a55-0d0c-5b7e-9c11-2f4a7a3c5b04
+    outcome: prepared
+    events:
+      - event: connectors.mutations.AttemptPrepared
+        payload: {approval_mode: not_required}
+    capture: {instance: attempt, event: connectors.mutations.AttemptPrepared, field: attempt_id}
+
+  - at: 2026-09-08T09:00:02Z
+    command: connectors.standing_approvals.BindUse
+    input:
+      use_id: {$instance: first-use}
+      attempt_id: {$instance: attempt}
+    outcome: bound
+    events:
+      - event: connectors.standing_approvals.UseBound
+
+  # A second write under the same grant, ten minutes later, takes a use and
+  # gives it back before any attempt (its preflight failed).
+  - at: 2026-09-08T09:10:00Z
+    command: connectors.standing_approvals.CountUse
+    input:
+      use_id: 5d0f2a56-7c58-4a0e-9d6e-0c1b6a1f3e05
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445504
+      instance_id: test-instance
+      admitted_at_unix_ms: 1788858600000
+    outcome: counted
+    events:
+      - event: connectors.standing_approvals.UseCounted
+    capture: {instance: second-use, event: connectors.standing_approvals.UseCounted, field: use_id}
+
+  - at: 2026-09-08T09:10:01Z
+    command: connectors.standing_approvals.ReleaseUse
+    input:
+      use_id: {$instance: second-use}
+    outcome: released
+    events:
+      - event: connectors.standing_approvals.UseReleased
+
+  # Releasing does not touch the first use: it stays bound and counted.
+  - at: 2026-09-08T09:10:02Z
+    command: connectors.standing_approvals.ReleaseUse
+    input:
+      use_id: {$instance: first-use}
+    outcome: conflict
+    error:
+      name: connectors.standing_approvals.UseStateConflict
+    no_events: [connectors.standing_approvals.UseReleased]
+
+assert:
+  - view: connectors.standing_approvals.GrantUses
+    contains:
+      use_id: {$instance: first-use}
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445504
+      admitted_at_unix_ms: 1788858000000
+      attempt_id: {$instance: attempt}
+      state: Bound
+  - view: connectors.standing_approvals.GrantUses
+    contains:
+      use_id: {$instance: second-use}
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445504
+      admitted_at_unix_ms: 1788858600000
+      attempt_id: null
+      state: Released

@@ -527,6 +527,29 @@ views:
 # connection on exactly these attempts and the clock provenance are host
 # obligations: ESS 0.56 has no cross-record count, byte-length, recording-host
 # or trusted-time construct (the earlier ESS-LIMIT entries on this domain).
+#
+# The local owner's keyed write under a standing grant
+# (story:local-invoke-admits-a-keyed-write-under-a-standing-grant;
+# contracts/service/local-mutations.md, "Keyed writes under a standing grant";
+# connectors.standing_approvals, LocalOwner). A write of `connectors invoke`
+# that carries an idempotency key and no proof, on an instance whose
+# configuration names a signed grant file, is recorded by LocalHost with the
+# same commands as a write that needs no approval: after the keyed lookup and
+# connectors.standing_approvals.CountUse, PrepareAttempt carries
+# `approval_mode: not_required`, `approval_ref: null` and the key, BindUse
+# names the attempt, and OpenDispatch is the gate. No approval is spent and no
+# `required` attempt exists for it. A recheck of the grant that refuses before
+# OpenDispatch sends AbortPrepared: the attempt is Aborted, `not_attempted`,
+# and its use stays Bound. The ledger schema and ApprovalMode are unchanged (a
+# third mode `standing` was not taken). Three consequences are part of the
+# contract: this ledger alone cannot tell a write under a grant from a write
+# that needs no approval (the grant id is in the use store, by attempt); a
+# local ledger now holds `not_required` for a write whose policy requires
+# approval; and OpenDispatch, which admits a `not_required` attempt, does not
+# enforce the grant. The owner's order of checks does.
+# ESS-LIMIT: that order, and the tie between a `not_required` attempt and a
+# Bound use, are host obligations: ESS has no cross-store transaction and no
+# guard over a record of another domain's store.
 
 actors:
   - name: connectors.mutations.LocalHost

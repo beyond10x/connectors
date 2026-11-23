@@ -2,6 +2,11 @@ domain: connectors.local_approval_policy
 summary: Proposed serialized local owner policy for approval issuance and write admission.
 # Owner: contracts/service/local-mutations.md. Metadata alone grants no use;
 # the authenticated owner, current policy/key leases and target checks are required.
+# A standing grant (connectors.standing_approvals) is not part of this policy:
+# the grants are in the instance's signed grant file, named by the entry's
+# `standing_grants`, which is outside Selection, so a changed path needs no
+# new policy. A published policy that lists the operation stays a prerequisite
+# of a keyed write under a grant, as of every keyed write and replay.
 types:
   - name: connectors.local_approval_policy.Selection
     kind: struct

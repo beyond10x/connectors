@@ -58,6 +58,78 @@ types:
       - {name: connector, type: String}
       - {name: instance, type: String}
       - {name: policy, type: "Optional<connectors.cli.ApprovalPolicyView>"}
+  # Standing grants (contracts/cli/v1alpha1/semantics.md, "Standing grants";
+  # story:local-invoke-admits-a-keyed-write-under-a-standing-grant). The three
+  # commands run in the CLI process, start no owner, and read and write the
+  # instance's signed grant file (connectors.standing_approvals.SignedGrantHeader,
+  # SignedGrantClaims), named by `standing_grants` in the instance's entry.
+  # `approvals grant-standing --input-file <file>`: `input_file` is the path of
+  # a connectors.standing_approvals.GrantRequest document, read by the handler's
+  # bounded document reader as policy-set reads its file. The command sets the
+  # grant's id (a new UUID) and instance, drops the file's expired grants, signs
+  # and replaces the file. Refusals: `invalid_input` naming `input_file` (a
+  # member GrantRequest does not name, `id` and `instance` included; a missing
+  # or zero `not_after_unix_ms` or `max_per_hour`; `max_per_hour` over 10,000;
+  # `not_after_unix_ms` at or before the upper bound of the clock reading; a
+  # grant the grant document's rules refuse; 256 grants left in the file; a
+  # signed file over 64 KiB), `invalid_configuration` (no `standing_grants`; an
+  # existing file that does not verify) and `unavailable` (the file's custody
+  # checks); nothing is written on any of them.
+  - name: connectors.cli.StandingGrantInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
+      - {name: input_file, type: String}
+  # `grant_id` is the new grant's id, canonical UUID text (pinned ess-cli
+  # cannot emit Uuid); `path` is the grant file's configured absolute path.
+  - name: connectors.cli.StandingGrantResult
+    kind: struct
+    fields:
+      - {name: grant_id, type: String}
+      - {name: path, type: String}
+  # `approvals revoke-standing <grant id>`: `grant_id` is the one positional
+  # argument. The command removes that grant, signs and replaces the file.
+  # Refusals: `not_found` (the file holds no grant with that id, or the path
+  # holds no file), `invalid_configuration` and `unavailable` as above.
+  - name: connectors.cli.StandingRevokeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
+      - {name: grant_id, type: String}
+  - name: connectors.cli.StandingRevokeResult
+    kind: struct
+    fields:
+      - {name: grant_id, type: String}
+      - {name: path, type: String}
+  # `approvals list-standing`: the grants of the verified file in file order,
+  # expired ones included; no file at the path lists none. Refusals:
+  # `invalid_configuration` and `unavailable` as above. It writes nothing.
+  - name: connectors.cli.StandingListInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
+  # One listed grant: connectors.standing_approvals.StandingGrant without its
+  # instance, its id under `grant_id`. `input_keys` is absent for a grant that
+  # has none.
+  - name: connectors.cli.StandingGrantView
+    kind: struct
+    fields:
+      - {name: grant_id, type: String}
+      - {name: operation, type: String}
+      - {name: target, type: "List<connectors.standing_approvals.TargetMember>"}
+      - {name: input_keys, type: "Optional<List<String>>"}
+      - {name: not_after_unix_ms, type: Integer}
+      - {name: max_per_hour, type: Integer}
+  - name: connectors.cli.StandingListResult
+    kind: struct
+    fields:
+      - {name: grants, type: "List<connectors.cli.StandingGrantView>"}
   - name: connectors.cli.ApprovalPrepareInput
     kind: struct
     fields:
@@ -710,9 +782,13 @@ types:
   - name: connectors.cli.FailureKind
     kind: enum
     variants: [usage, operational, interrupted]
+  # `rate_limited` is the code of one failure: a keyed write of `invoke` whose
+  # covering standing grants are each at their hourly cap, refused at stage
+  # admission with `retry_after_seconds` (1 to 3,600), `not_attempted`. A provider's
+  # rate limit stays `service_code = rate_limited` beside another code.
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, authentication_changed, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid, metadata_missing]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, authentication_changed, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid, metadata_missing, rate_limited]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop, installed_provider]
@@ -812,6 +888,9 @@ types:
       # (0 to 4294967295), present only beside service_code = rate_limited
       # (contracts/cli/v1alpha1/semantics.md). ESS declares no invariant on a CLI type, so the
       # range and the presence rule are enforced by the host and pinned by tests.
+      # Beside code = rate_limited (a keyed write at a standing grant's cap) it is
+      # instead the whole seconds until the grant's earliest use leaves the hour,
+      # 1 to 3600, and always present.
       - {name: retry_after_seconds, type: "Optional<Integer>"}
       - {name: connection, type: "Optional<String>"}
       - {name: acquisition, type: "Optional<String>"}
@@ -1843,6 +1922,13 @@ types:
     fields:
       - {name: instance, type: String}
       - {name: id, type: String}
+  # The standing grant a write's attempt was admitted under
+  # (connectors.standing_approvals.GrantUse, Bound to the attempt): `grant_id`
+  # is the grant's id as the grant file holds it.
+  - name: connectors.cli.StandingReference
+    kind: struct
+    fields:
+      - {name: grant_id, type: String}
   - name: connectors.cli.MutationObservation
     kind: struct
     fields:
@@ -1851,6 +1937,13 @@ types:
       - {name: original_request_id, type: "Optional<String>"}
       - {name: replayed, type: Boolean}
       - {name: cause, type: "Optional<connectors.service_wire.DiagnosticCause>"}
+      # ESS-LIMIT: standing is present exactly when the attempt has a Bound grant
+      # use: on a fresh write under a grant, on its replay and on a failure that
+      # has an attempt; absent on a per-input write, on a write that needs no
+      # approval and on every refusal made before the attempt is recorded. ESS
+      # declares no invariant on a CLI type, so the presence rule is enforced by
+      # the host and pinned by tests.
+      - {name: standing, type: "Optional<connectors.cli.StandingReference>"}
 
 # ESS-LIMIT executable obligations (ESS 0.40 has no file-system, process, terminal
 # or OS-permission construct, no TOML/JSON reader-closure or codec construct, no
@@ -1949,7 +2042,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1508, docs/local-connection-registry.md:235-236;
+    # contracts/cli/v1alpha1/semantics.md:1750, docs/local-connection-registry.md:235-236;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -2109,7 +2202,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1512) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1754) and the host
     # removal path (er.rs:4751-4753) only expires Active cursors. The error name is
     # the decision; no source names one.
 

@@ -1,0 +1,62 @@
+type: ess-scenario/1
+domain: connectors.standing_approvals
+scenario: standing-approval-revocation
+summary: "A grant removed from the file after its use was counted and before the attempt is prepared: the use is released, no attempt names it, and a released use cannot be bound or released again."
+
+# Compiled expectations of the use store only. The recheck before the attempt
+# is prepared (the grant is no longer in the verified file) is a host
+# obligation: ../semantics.md §4.3. A grant that is already revoked at the
+# first check sends no command at all. A key that was admitted before the
+# revocation still replays: a replay reads no grant and counts no use.
+arrange:
+  - instance: use
+    entity: connectors.standing_approvals.GrantUse
+
+timeline:
+  - at: 2026-09-08T09:00:00Z
+    command: connectors.standing_approvals.CountUse
+    input:
+      use_id: 5d0f2a56-7c58-4a0e-9d6e-0c1b6a1f3e03
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445503
+      instance_id: test-instance
+      admitted_at_unix_ms: 1788858000000
+    outcome: counted
+    events:
+      - event: connectors.standing_approvals.UseCounted
+    capture: {instance: use, event: connectors.standing_approvals.UseCounted, field: use_id}
+
+  # The recheck refuses: no attempt is prepared and the use is given back.
+  - at: 2026-09-08T09:00:01Z
+    command: connectors.standing_approvals.ReleaseUse
+    input:
+      use_id: {$instance: use}
+    outcome: released
+    events:
+      - event: connectors.standing_approvals.UseReleased
+
+  - at: 2026-09-08T09:00:02Z
+    command: connectors.standing_approvals.BindUse
+    input:
+      use_id: {$instance: use}
+      attempt_id: 0f4b7c1d-9a3e-4b2f-8c6d-5e7f8a9b0c03
+    outcome: conflict
+    error:
+      name: connectors.standing_approvals.UseStateConflict
+    no_events: [connectors.standing_approvals.UseBound]
+
+  - at: 2026-09-08T09:00:03Z
+    command: connectors.standing_approvals.ReleaseUse
+    input:
+      use_id: {$instance: use}
+    outcome: conflict
+    error:
+      name: connectors.standing_approvals.UseStateConflict
+    no_events: [connectors.standing_approvals.UseReleased]
+
+assert:
+  - view: connectors.standing_approvals.GrantUses
+    contains:
+      use_id: {$instance: use}
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445503
+      attempt_id: null
+      state: Released

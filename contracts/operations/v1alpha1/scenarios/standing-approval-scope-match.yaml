@@ -1,0 +1,122 @@
+type: ess-scenario/1
+domain: connectors.standing_approvals
+scenario: standing-approval-scope-match
+summary: "A keyed write a standing grant covers counts one use, binds it to a not_required attempt and completes; the bound use cannot be bound or released again."
+
+# Compiled expectations of the use store and the ledger only. Reading and
+# verifying the grant file, the covering rule (instance, operation, target,
+# closed input) and the order across the two stores are host obligations:
+# ../semantics.md §4.2 and §4.3, ess/domains/standing_approvals.yaml.
+arrange:
+  - instance: use
+    entity: connectors.standing_approvals.GrantUse
+  - instance: attempt
+    entity: connectors.mutations.AttemptRecord
+
+timeline:
+  # The grant check passed: one use of the covering grant is counted before
+  # the audit anchor.
+  - at: 2026-09-08T09:00:00Z
+    command: connectors.standing_approvals.CountUse
+    input:
+      use_id: 5d0f2a56-7c58-4a0e-9d6e-0c1b6a1f3e01
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445501
+      instance_id: test-instance
+      admitted_at_unix_ms: 1788858000000
+    outcome: counted
+    events:
+      - event: connectors.standing_approvals.UseCounted
+    capture: {instance: use, event: connectors.standing_approvals.UseCounted, field: use_id}
+
+  # The attempt of a write under a grant records not_required and its key.
+  - at: 2026-09-08T09:00:01Z
+    command: connectors.mutations.PrepareAttempt
+    input:
+      instance_id: test-instance
+      request_id: standing-approval-scope-match
+      operation_id: chat.postMessage
+      connection_ref: test-connection
+      input_digest: test-digest
+      approval_mode: not_required
+      approval_ref: null
+      idempotency_key: post-1
+      request_fingerprint:
+        operation_ref: '["connectors.operation/v1","test-instance","test-adapter","chat.postMessage"]'
+        connection_ref: test-connection
+        connection_revision: connection-r1
+        contract_ref: operations/v1alpha1
+        profile: mutation
+        descriptor_revision: descriptor-r1
+        configuration_revision: config-r1
+        canonicalization_version: adapter-v1-canonical-json
+        input_digest: test-digest
+        route: null
+      owner_nonce: 3f6f0c1e-52a7-5a39-8a43-7d0b1b0b7a01
+      publication_fence: 6e1d9a55-0d0c-5b7e-9c11-2f4a7a3c5b01
+    outcome: prepared
+    events:
+      - event: connectors.mutations.AttemptPrepared
+        payload: {approval_mode: not_required}
+    capture: {instance: attempt, event: connectors.mutations.AttemptPrepared, field: attempt_id}
+
+  - at: 2026-09-08T09:00:02Z
+    command: connectors.standing_approvals.BindUse
+    input:
+      use_id: {$instance: use}
+      attempt_id: {$instance: attempt}
+    outcome: bound
+    events:
+      - event: connectors.standing_approvals.UseBound
+
+  - at: 2026-09-08T09:00:03Z
+    command: connectors.mutations.OpenDispatch
+    input:
+      attempt_id: {$instance: attempt}
+    outcome: opened
+    events:
+      - event: connectors.mutations.DispatchOpened
+
+  - at: 2026-09-08T09:00:04Z
+    command: connectors.mutations.RecordCompletion
+    input:
+      attempt_id: {$instance: attempt}
+      settled_at: '2026-09-08T09:00:04Z'
+      terminal_result_json: '{"kind":"success","value":{"ok":true}}'
+    outcome: completed
+    events:
+      - event: connectors.mutations.AttemptCompleted
+
+  # A bound use names one attempt for good and stays counted.
+  - at: 2026-09-08T09:00:05Z
+    command: connectors.standing_approvals.BindUse
+    input:
+      use_id: {$instance: use}
+      attempt_id: {$instance: attempt}
+    outcome: conflict
+    error:
+      name: connectors.standing_approvals.UseStateConflict
+    no_events: [connectors.standing_approvals.UseBound]
+
+  - at: 2026-09-08T09:00:06Z
+    command: connectors.standing_approvals.ReleaseUse
+    input:
+      use_id: {$instance: use}
+    outcome: conflict
+    error:
+      name: connectors.standing_approvals.UseStateConflict
+    no_events: [connectors.standing_approvals.UseReleased]
+
+assert:
+  - view: connectors.standing_approvals.GrantUses
+    contains:
+      use_id: {$instance: use}
+      grant_id: 8a1c7f2e-3b4d-4c5e-8f60-112233445501
+      instance_id: test-instance
+      attempt_id: {$instance: attempt}
+      state: Bound
+  - view: connectors.mutations.AttemptStates
+    contains:
+      attempt_id: {$instance: attempt}
+      approval_mode: not_required
+      idempotency_key: post-1
+      state: Completed

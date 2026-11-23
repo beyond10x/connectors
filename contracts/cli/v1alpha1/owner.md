@@ -146,7 +146,12 @@ connection that is not visible, revoked, not ready or without the operation's
 scopes is refused by its own code, and unavailable custody is
 `custody_unavailable`. The effects rule is not among them. A write never reaches
 the `invoke` frame: `connectors invoke` sends it over the write frames, where its
-approval and idempotency key govern it. A configured, granted, connected read
+approval and idempotency key govern it: a write frame with a proof is a
+per-input write, and one with a key and no proof, on an instance whose
+configuration names a grant file, is admitted or refused under the instance's
+standing grants ([semantics, standing grants](semantics.md#standing-grants));
+any other write frame without a proof is `approval_required`. A proof that is
+refused never falls back to a grant. A configured, granted, connected read
 that declares effects is therefore served on `invoke`.
 
 The actual socket peer must be the configured UID. No credential, source path,

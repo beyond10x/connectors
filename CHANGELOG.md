@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A standing grant can close a write's input: the optional member `input_keys` of a grant in a
+  `connectors.standing-grants/1` file lists, as JSON pointers (at most 16, the list may be
+  empty), the input members a caller may set beside the grant's target. A write whose input
+  holds any other member, or nests deeper than 64 levels, is outside that grant and is answered
+  `approval_required` with no provider request and no attempt. A listed pointer admits
+  everything below it; an array is admitted or refused whole, so a pointer into an array covers
+  nothing. A closed list limits its own grant only: a second grant for the same instance,
+  operation and target without `input_keys` admits what the first refuses. A grant without
+  `input_keys` admits what it admitted before. A host older than this release refuses a grant
+  file that has the member as malformed and answers every write `unavailable`: upgrade the
+  served host before mounting such a file
+  ([running services](docs/running-services.md#standing-write-grants)).
+
 ## 0.76.0 — 2026-11-23
 
 ### Breaking
