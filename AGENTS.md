@@ -185,6 +185,14 @@ PostgreSQL, MCP, then the remaining providers. The operator's instruction author
 the source commit, tag, push and release-page sequence below; it supersedes the
 earlier local-only Connectors publication boundary for these releases.
 
+Timo, 2026-11-23: "We always merge what we can merge, and if you're done, cut a new release."
+A pull request whose required checks are green is merged without asking. When a session's work
+is on `main` and nothing of it is still open, the session cuts a release by the steps below and
+sends the session `host-operator` one message with the release's URL, its publication time, what
+a user sees and what breaks. Where the session is in doubt, `host-operator` decides in Timo's
+place (same message: "They act on my behalf"); secrets, money and a change of architecture wait
+for Timo.
+
 "Cutting a release" means completing all of these steps:
 
 1. Establish the exact released scope from runtime evidence. List unfinished
