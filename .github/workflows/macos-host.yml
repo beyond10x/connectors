@@ -13,8 +13,25 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  scope:
+    name: change scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Decide whether this change needs the code build
+        id: scope
+        run: sh .github/ci/changed-scope.sh github code
+
   host:
     name: host and CLI on macos-latest
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.run != 'false' }}
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -66,6 +83,8 @@ jobs:
 
   programs:
     name: provider programs on macos-latest
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.run != 'false' }}
     runs-on: macos-latest
     timeout-minutes: 60
     env:
@@ -181,6 +200,8 @@ jobs:
 
   release-start:
     name: release-built providers start through the host on macos-latest
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.run != 'false' }}
     runs-on: macos-latest
     timeout-minutes: 60
     env:
