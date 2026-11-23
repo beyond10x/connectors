@@ -102,6 +102,7 @@ fn security_reuse_a_source_secret_is_never_sent_to_an_origin_its_connection_does
     let entry = definitions::Entry {
         digest: digest.clone(),
         adapter: Adapter {
+            standing_grants: None,
             credential_revision: Some("credential-1".into()),
             instance_id: definitions::alias("zendesk"),
             adapter_id: "catalog".into(),

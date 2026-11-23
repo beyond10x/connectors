@@ -554,6 +554,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            standing_grants: None,
             private_protocol: None,
             permissions: Default::default(),
             instance_id: instance.into(),

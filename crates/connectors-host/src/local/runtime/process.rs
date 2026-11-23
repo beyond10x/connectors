@@ -1722,6 +1722,7 @@ executable: None,
         let (path, hash) = crate::local::test_executable::path_and_sha256();
         for mode in ["json", "schema", "identity"] {
             let config = Adapter {
+                standing_grants: None,
                 credential_revision: None,
                 private_protocol: None,
                 permissions: Default::default(),
@@ -1767,6 +1768,7 @@ executable: None,
     fn a_reason_on_a_failed_validation_is_a_protocol_violation() {
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let config = Adapter {
+            standing_grants: None,
             credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),
@@ -1916,6 +1918,7 @@ executable: None,
     fn fixture_config(mode: &str) -> Adapter {
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),

@@ -14,6 +14,14 @@ Callable: `approval-clock-check`. Input: `connectors.cli.ApprovalClockCheckInput
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `approvals grant-standing`
+
+Add one standing grant to the instance's signed grant file
+
+Callable: `approval-grant-standing`. Input: `connectors.cli.StandingGrantInput`. Result: `connectors.cli.StandingGrantResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `approvals issue`
 
 Approve the exact reconstructed subject and publish a new protected proof file
@@ -70,6 +78,14 @@ Callable: `approval-keys-status`. Input: `connectors.cli.ApprovalKeyStatusInput`
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `approvals list-standing`
+
+List the standing grants of the instance's signed grant file
+
+Callable: `approval-list-standing`. Input: `connectors.cli.StandingListInput`. Result: `connectors.cli.StandingListResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `approvals policy-set`
 
 Publish the exact permitted write-operation set under revision control
@@ -91,6 +107,14 @@ Error `failure`: `connectors.cli.Failure`.
 Resolve the exact approval subject without provider or credential access
 
 Callable: `approval-prepare`. Input: `connectors.cli.ApprovalPrepareInput`. Result: `connectors.cli.ApprovalPrepareResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals revoke-standing`
+
+Remove one standing grant from the instance's signed grant file
+
+Callable: `approval-revoke-standing`. Input: `connectors.cli.StandingRevokeInput`. Result: `connectors.cli.StandingRevokeResult`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -303,6 +327,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:adapters-status: implement the owner-qualified callable and its declared result/error contract
 - handler:adapters-stop: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-clock-check: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-grant-standing: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-issue: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-init: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-recover: implement the owner-qualified callable and its declared result/error contract
@@ -310,9 +335,11 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:approval-keys-revoke: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-rotate: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-status: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-list-standing: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-policy-set: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-policy-status: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-prepare: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-revoke-standing: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-connect: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-launch: implement the owner-qualified callable and its declared result/error contract

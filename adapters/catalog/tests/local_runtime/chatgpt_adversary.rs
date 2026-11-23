@@ -171,6 +171,7 @@ impl DeviceIssuer {
             .unwrap();
         let bootstrap = bootstrap_of(&self.config).expect("bootstrap inspection failed");
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),

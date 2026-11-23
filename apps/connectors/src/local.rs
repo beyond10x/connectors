@@ -294,6 +294,9 @@ impl LocalHandler {
                 | "approval-policy-set"
                 | "approval-prepare"
                 | "approval-issue"
+                | "approval-grant-standing"
+                | "approval-revoke-standing"
+                | "approval-list-standing"
         ) {
             let mut session = self.0.borrow_mut();
             session

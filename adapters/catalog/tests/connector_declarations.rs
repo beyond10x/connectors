@@ -1202,6 +1202,7 @@ fn described(args: &[&str]) -> (Vec<String>, Vec<(String, String)>) {
     let printed: Bootstrap = serde_json::from_value(bootstrap(derived(args))).unwrap();
     let binary = PathBuf::from(BINARY).canonicalize().unwrap();
     let child = Child::spawn(&Adapter {
+        standing_grants: None,
         credential_revision: None,
         private_protocol: Some(PrivateProtocol::V2),
         permissions: Default::default(),

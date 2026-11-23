@@ -14,7 +14,7 @@ use std::{
 const NOW: i64 = 1_789_056_000_000;
 // Public RFC 8032 §7.1 test material, never a deployment signing key.
 const SEED: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
-const PUBLIC: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+pub(crate) const PUBLIC: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
 #[derive(Clone)]
 struct TestClock(Arc<Mutex<m::Result<m::ClockInterval>>>);
 impl m::Clock for TestClock {
@@ -106,7 +106,7 @@ fn policy(subject: &Subject) -> Policy {
         },
     )))
 }
-fn signer() -> Signer {
+pub(crate) fn signer() -> Signer {
     Signer::from_seed(Secret(hex::decode(SEED).unwrap()), "key-1".into()).unwrap()
 }
 fn candidate(s: &Subject, e: &Evidence) -> m::Candidate {

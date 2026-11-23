@@ -1137,6 +1137,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             private_protocol: self.protocol,
             permissions: Default::default(),

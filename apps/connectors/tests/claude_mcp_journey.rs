@@ -388,6 +388,7 @@ fn clock_key(seed: u8) -> String {
 /// over `connectors-private/3`, granted every described read.
 fn entry(container: &Container) -> config::Adapter {
     config::Adapter {
+        standing_grants: None,
         instance_id: INSTANCE.into(),
         adapter_id: ADAPTER.into(),
         configuration_revision: "cfg-1".into(),

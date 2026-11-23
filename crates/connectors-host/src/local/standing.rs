@@ -33,10 +33,13 @@
 //!
 //! Nothing here grants caller authority: the host checks admission, the key and
 //! the grant, in that order, before any attempt or provider request.
+use super::approval_keys::Lease;
+use super::approvals::{self, ConfiguredApprovalKey, Signer};
 use super::filesystem as fs;
+use super::mutations::{Clock, ClockInterval, MAX_CLOCK_WIDTH_MS};
 use super::runtime::channel::DEPTH;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeSet, path::Path};
 use uuid::Uuid;
@@ -103,7 +106,7 @@ struct Document {
 }
 
 /// One `connectors.standing_approvals.StandingGrant`.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Grant {
     pub id: String,
@@ -113,7 +116,11 @@ pub struct Grant {
     /// Closed input. Absent: any other member of the input is admitted.
     /// Present (it may be empty, and is never `null`): the input holds nothing
     /// outside the `target` and `input_keys` pointers.
-    #[serde(default, deserialize_with = "listed")]
+    #[serde(
+        default,
+        deserialize_with = "listed",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub input_keys: Option<Vec<String>>,
     pub not_after_unix_ms: i64,
     pub max_per_hour: u32,
@@ -128,7 +135,7 @@ fn listed<'de, D: serde::Deserializer<'de>>(
 }
 
 /// One target member: an RFC 6901 pointer into the input and its exact value.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TargetMember {
     pub pointer: String,
@@ -711,6 +718,356 @@ fn create_private(directory: &Path) -> Result<(), UsesUnavailable> {
         Err(_) => return Err(UsesUnavailable),
     }
     fs::private_file_metadata_at(&parent, name).map_err(|_| UsesUnavailable)
+}
+
+// The local signed grant file
+// (story:local-invoke-admits-a-keyed-write-under-a-standing-grant;
+// contracts/cli/v1alpha1/semantics.md, "Standing grants").
+//
+// The local CLI binding keeps one instance's grants in one compact JWS the
+// instance's approval key signed: header `{alg, kid, typ}` with the `typ`
+// [`SIGNED_TYPE`], payload `{iss, aud, document}`, `document` a
+// `connectors.standing-grants/1` document under every rule of [`parse`]. One
+// decoder ([`verify`]) reads it, for the three commands and for `invoke`; a
+// bare document at the path does not verify. The commands that write
+// ([`grant`], [`revoke`]) hold [`lock`] from reading the file to replacing it.
+
+/// The `typ` of the signed grant file's header. A grant file is not an
+/// approval proof and a proof is not a grant file.
+pub const SIGNED_TYPE: &str = "b10x.connectors-standing-grants.v1+jws";
+/// The lock file of [`lock`], in the state directory.
+pub const LOCK: &str = "standing-grants.lock";
+
+/// Why the signed grant file gave no grants.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileRefusal {
+    /// The file or a directory to it fails the custody rule of [`read_file`],
+    /// or the read failed: answered `unavailable`.
+    Unavailable,
+    /// The path holds a file that does not verify (module comment above; a
+    /// file over [`FILE_LIMIT`] included). It admits nothing.
+    Unverified,
+}
+
+/// Why [`sign`], [`grant`], [`revoke`] or [`list`] refused. Nothing was
+/// written, except on [`Refused::OutcomeUnknown`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refused {
+    /// The grant request, or the file it would make: `invalid_input`.
+    InvalidInput,
+    /// The path holds a file that does not verify, or names no file a
+    /// replacement can be published at: `invalid_configuration`.
+    InvalidConfiguration,
+    /// The file holds no grant with the id, or the path holds no file.
+    NotFound,
+    /// The custody rule: `unavailable`.
+    Unavailable,
+    /// The approval key does not sign at this clock reading (revoked, outside
+    /// its window, or not the signer's pair), as a proof's issuance refuses.
+    Forbidden,
+    /// The replacement was renamed into place and its durability is unknown.
+    OutcomeUnknown,
+}
+
+/// The exclusive lock of the commands that write the grant file.
+pub struct Lock {
+    _lease: Lease,
+}
+
+/// The exclusive `flock` on [`LOCK`] in the state directory `state`, held
+/// until the value is dropped. A command takes it before the key lease; the
+/// executor holds the shared key lease and never takes this lock.
+pub fn lock(state: &Path) -> super::approval_keys::Result<Lock> {
+    Lease::acquire(state, LOCK, true).map(|lease| Lock { _lease: lease })
+}
+
+/// One reading of `clock` a grant file is signed and verified at: inside
+/// the JSON-safe range and no wider than the clock rule admits. `None` is
+/// answered `unavailable`.
+pub fn reading(clock: &impl Clock) -> Option<ClockInterval> {
+    let t = clock.now().ok()?;
+    let width = t.upper_unix_ms.checked_sub(t.lower_unix_ms)?;
+    (t.lower_unix_ms >= 0
+        && t.upper_unix_ms <= TIME_LIMIT
+        && (0..=MAX_CLOCK_WIDTH_MS).contains(&width))
+    .then_some(t)
+}
+
+#[derive(Serialize)]
+struct SignedDocument<'a> {
+    format: &'a str,
+    grants: &'a [Grant],
+    revoked: [&'a str; 0],
+}
+
+#[derive(Serialize)]
+struct SignedClaims<'a> {
+    iss: &'a str,
+    aud: &'a str,
+    document: SignedDocument<'a>,
+}
+
+/// The signed grant file holding exactly `grants`, `revoked` empty, signed
+/// by `signer` as `key` at the reading `now`. Refused when the document is
+/// not one [`parse`] admits or the file would be over [`FILE_LIMIT`]
+/// (`InvalidInput`), or when the key does not sign at `now` (`Forbidden`).
+pub fn sign(
+    signer: &Signer,
+    key: &ConfiguredApprovalKey,
+    now: ClockInterval,
+    grants: &[Grant],
+) -> Result<Vec<u8>, Refused> {
+    let document = SignedDocument {
+        format: FORMAT,
+        grants,
+        revoked: [],
+    };
+    let admitted = serde_json::to_vec(&document)
+        .ok()
+        .is_some_and(|bytes| parse(&bytes).is_ok());
+    if !admitted {
+        return Err(Refused::InvalidInput);
+    }
+    let claims = serde_json::to_value(SignedClaims {
+        iss: &key.issuer,
+        aud: &key.audience,
+        document,
+    })
+    .map_err(|_| Refused::InvalidInput)?;
+    let claims = connectors_core::canonical(&claims);
+    if claims.len() > FILE_LIMIT {
+        return Err(Refused::InvalidInput);
+    }
+    let signed = signer
+        .seal(SIGNED_TYPE, key, now, &claims)
+        .map_err(|failure| match failure {
+            approvals::Failure::Unavailable => Refused::Unavailable,
+            _ => Refused::Forbidden,
+        })?;
+    if signed.len() > FILE_LIMIT {
+        return Err(Refused::InvalidInput);
+    }
+    Ok(signed)
+}
+
+/// The grants of the signed file `bytes`, when it verifies for `key` at the
+/// reading `now`: one compact JWS of [`SIGNED_TYPE`] the key signed, the key
+/// not revoked and `now` inside its window, header and payload canonical, the
+/// payload exactly `{iss, aud, document}` with the key's issuer and audience,
+/// and `document` one [`parse`] admits.
+fn open(bytes: &[u8], key: &ConfiguredApprovalKey, now: ClockInterval) -> Option<Grants> {
+    let claims = key.open(SIGNED_TYPE, bytes, now, FILE_LIMIT).ok()?;
+    let value: Value = connectors_core::read_json(&claims).ok()?;
+    if connectors_core::canonical(&value) != claims {
+        return None;
+    }
+    let members = value.as_object()?;
+    if members.len() != 3
+        || members.get("iss")?.as_str()? != key.issuer
+        || members.get("aud")?.as_str()? != key.audience
+    {
+        return None;
+    }
+    parse(&serde_json::to_vec(members.get("document")?).ok()?).ok()
+}
+
+/// The verified grants of the signed grant file at `path`, read on every
+/// call under the custody rule of [`read_file`]. `Ok(None)`: the path holds
+/// no file, which holds no grant.
+pub fn verify(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    now: ClockInterval,
+) -> Result<Option<Grants>, FileRefusal> {
+    let bytes = match read_file(path) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Ok(None),
+        Err(Unreadable::Oversized | Unreadable::Malformed) => return Err(FileRefusal::Unverified),
+        Err(Unreadable::Custody | Unreadable::Io) => return Err(FileRefusal::Unavailable),
+    };
+    open(&bytes, key, now)
+        .map(Some)
+        .ok_or(FileRefusal::Unverified)
+}
+
+impl Grants {
+    /// Every grant of the file, in file order, expired ones included.
+    pub fn grants(&self) -> &[Grant] {
+        &self.grants
+    }
+
+    /// The grants a command writes back: those the file does not list in
+    /// `revoked`. The commands write `revoked` empty, so a listed grant is
+    /// removed, never admitted again by the list being dropped.
+    fn kept(self) -> Vec<Grant> {
+        let Self { grants, revoked } = self;
+        grants
+            .into_iter()
+            .filter(|grant| !revoked.contains(&grant.id))
+            .collect()
+    }
+}
+
+/// The file's grants for a command: a file that does not verify is
+/// `InvalidConfiguration` and is left as it is.
+fn current(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    now: ClockInterval,
+) -> Result<Option<Grants>, Refused> {
+    verify(path, key, now).map_err(|refusal| match refusal {
+        FileRefusal::Unavailable => Refused::Unavailable,
+        FileRefusal::Unverified => Refused::InvalidConfiguration,
+    })
+}
+
+/// Signs `grants` and replaces the file at `path` (mode 0600), or creates it.
+fn publish(
+    path: &Path,
+    signer: &Signer,
+    key: &ConfiguredApprovalKey,
+    now: ClockInterval,
+    grants: &[Grant],
+) -> Result<(), Refused> {
+    let signed = sign(signer, key, now, grants)?;
+    fs::validate_path(path).map_err(|_| Refused::InvalidConfiguration)?;
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(Refused::InvalidConfiguration);
+    };
+    let directory = fs::directory(parent, false, false).map_err(|_| Refused::Unavailable)?;
+    fs::publish_replace(&directory, name, &signed).map_err(|failure| match failure {
+        super::Failure::OutcomeUnknown => Refused::OutcomeUnknown,
+        _ => Refused::Unavailable,
+    })
+}
+
+/// The document `approvals grant-standing --input-file` reads
+/// (`connectors.standing_approvals.GrantRequest`): a grant without `id` and
+/// `instance`. Any other member is refused.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GrantRequest {
+    operation: String,
+    target: Vec<TargetMember>,
+    #[serde(default, deserialize_with = "listed")]
+    input_keys: Option<Vec<String>>,
+    not_after_unix_ms: i64,
+    max_per_hour: u32,
+}
+
+/// The grant `request` describes, with `id` and `instance` set. Refused
+/// (`InvalidInput`) unless `request` is one JSON object that is a strict
+/// `GrantRequest` with a `not_after_unix_ms` and a `max_per_hour` of at least
+/// 1, and the grant is one [`parse`] admits. The clock is not read here.
+fn requested(request: &[u8], id: String, instance: &str) -> Result<Grant, Refused> {
+    if request.len() > FILE_LIMIT || super::runtime::channel::depth(request).is_err() {
+        return Err(Refused::InvalidInput);
+    }
+    // One JSON object: a struct also reads from an array of its members.
+    let request: Value = connectors_core::read_json(request).map_err(|_| Refused::InvalidInput)?;
+    if !request.is_object() {
+        return Err(Refused::InvalidInput);
+    }
+    let request: GrantRequest =
+        serde_json::from_value(request).map_err(|_| Refused::InvalidInput)?;
+    if request.not_after_unix_ms < 1 || !(1..=MAX_PER_HOUR).contains(&request.max_per_hour) {
+        return Err(Refused::InvalidInput);
+    }
+    let grant = Grant {
+        id,
+        instance: instance.to_owned(),
+        operation: request.operation,
+        target: request.target,
+        input_keys: request.input_keys,
+        not_after_unix_ms: request.not_after_unix_ms,
+        max_per_hour: request.max_per_hour,
+    };
+    let alone = SignedDocument {
+        format: FORMAT,
+        grants: std::slice::from_ref(&grant),
+        revoked: [],
+    };
+    let admitted = serde_json::to_vec(&alone)
+        .ok()
+        .is_some_and(|bytes| parse(&bytes).is_ok());
+    if !admitted {
+        return Err(Refused::InvalidInput);
+    }
+    Ok(grant)
+}
+
+/// Whether `request` is a grant request [`grant`] can take for `instance`,
+/// decided without the clock, the key or the file: what a command refuses
+/// before it reads any of them.
+pub fn check_request(request: &[u8], instance: &str) -> Result<(), Refused> {
+    requested(request, Uuid::new_v4().to_string(), instance).map(drop)
+}
+
+/// Adds the grant `request` describes to the signed file at `path` for the
+/// instance `instance` and returns its id, a new UUID. Grants whose
+/// `not_after_unix_ms` is at or before the reading's lower bound are dropped
+/// first. `InvalidInput`: a request [`check_request`] refuses, a
+/// `not_after_unix_ms` at or before the reading's upper bound, 256 grants
+/// left in the file, a signed file over [`FILE_LIMIT`]. The caller holds
+/// `lock` until this returns.
+pub fn grant(
+    _lock: &Lock,
+    path: &Path,
+    signer: &Signer,
+    key: &ConfiguredApprovalKey,
+    instance: &str,
+    now: ClockInterval,
+    request: &[u8],
+) -> Result<String, Refused> {
+    let new = requested(request, Uuid::new_v4().to_string(), instance)?;
+    if new.not_after_unix_ms <= now.upper_unix_ms {
+        return Err(Refused::InvalidInput);
+    }
+    let mut grants = current(path, key, now)?
+        .map(Grants::kept)
+        .unwrap_or_default();
+    grants.retain(|grant| grant.not_after_unix_ms > now.lower_unix_ms);
+    if grants.len() >= GRANTS_LIMIT {
+        return Err(Refused::InvalidInput);
+    }
+    let id = new.id.clone();
+    grants.push(new);
+    publish(path, signer, key, now, &grants)?;
+    Ok(id)
+}
+
+/// Removes the grant `grant_id` from the signed file at `path` and replaces
+/// the file. `NotFound`: the file holds no grant with that id, or the path
+/// holds no file. The caller holds `lock` until this returns.
+pub fn revoke(
+    _lock: &Lock,
+    path: &Path,
+    signer: &Signer,
+    key: &ConfiguredApprovalKey,
+    now: ClockInterval,
+    grant_id: &str,
+) -> Result<(), Refused> {
+    let Some(file) = current(path, key, now)? else {
+        return Err(Refused::NotFound);
+    };
+    if !file.grants().iter().any(|grant| grant.id == grant_id) {
+        return Err(Refused::NotFound);
+    }
+    let mut grants = file.kept();
+    grants.retain(|grant| grant.id != grant_id);
+    publish(path, signer, key, now, &grants)
+}
+
+/// The grants of the verified file at `path` in file order, expired ones
+/// included; none when the path holds no file. Nothing is written or signed.
+pub fn list(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    now: ClockInterval,
+) -> Result<Vec<Grant>, Refused> {
+    Ok(current(path, key, now)?
+        .map(|file| file.grants)
+        .unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -1305,5 +1662,799 @@ mod tests {
             Some(Unreadable::Malformed),
             "one target pointer below another, with input_keys"
         );
+    }
+}
+
+/// The local signed grant file
+/// (story:local-invoke-admits-a-keyed-write-under-a-standing-grant).
+#[cfg(all(test, unix))]
+mod signed_tests {
+    use super::*;
+    use crate::local::approvals::{
+        Evidence,
+        tests::{PUBLIC, signer},
+    };
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use connectors_sdk::Secret;
+    use ring::{
+        rand::{SecureRandom, SystemRandom},
+        signature::{Ed25519KeyPair, KeyPair},
+    };
+    use serde_json::json;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+
+    const NOW: i64 = 1_789_056_000_000;
+    /// The seed of `approvals::tests::signer`: public RFC 8032 §7.1 test
+    /// material, never a deployment signing key.
+    const SEED: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+    const PROOF_TYPE: &str = "b10x.connectors-approval.v1+jws";
+
+    fn now() -> ClockInterval {
+        ClockInterval {
+            lower_unix_ms: NOW,
+            upper_unix_ms: NOW + 2_000,
+        }
+    }
+
+    /// The approval key of the instance `leaf`, the pair of `signer()`.
+    fn key() -> ConfiguredApprovalKey {
+        ConfiguredApprovalKey {
+            issuer: "connectors.local-issuer/leaf".into(),
+            audience: "connectors.approval/leaf".into(),
+            kid: "key-1".into(),
+            public_key: URL_SAFE_NO_PAD.encode(hex::decode(PUBLIC).unwrap()),
+            not_before_unix_ms: 0,
+            not_after_unix_ms: NOW + 1_000_000,
+            revoked: false,
+        }
+    }
+
+    /// A pair generated here, its signer under `kid` and its configured key.
+    fn other(kid: &str) -> (Signer, ConfiguredApprovalKey) {
+        let mut seed = [0u8; 32];
+        SystemRandom::new().fill(&mut seed).unwrap();
+        let pair = Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        let configured = ConfiguredApprovalKey {
+            kid: kid.into(),
+            public_key: URL_SAFE_NO_PAD.encode(pair.public_key().as_ref()),
+            ..key()
+        };
+        (
+            Signer::from_seed(Secret(seed.to_vec()), kid.into()).unwrap(),
+            configured,
+        )
+    }
+
+    /// A state directory and, beside it, the path of the instance's grant file.
+    struct Site {
+        _root: tempfile::TempDir,
+        state: PathBuf,
+        path: PathBuf,
+    }
+
+    fn site() -> Site {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        std::fs::create_dir(&state).unwrap();
+        std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let path = root.path().join("leaf.grants");
+        Site {
+            _root: root,
+            state,
+            path,
+        }
+    }
+
+    fn put(path: &Path, bytes: &[u8], mode: u32) {
+        std::fs::write(path, bytes).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    fn mode(path: &Path) -> u32 {
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o7777
+    }
+
+    /// A grant of `leaf` for `chat.postMessage` to the channel `C1`.
+    fn channel_grant(id: &str, not_after_unix_ms: i64) -> Grant {
+        Grant {
+            id: id.into(),
+            instance: "leaf".into(),
+            operation: "chat.postMessage".into(),
+            target: vec![TargetMember {
+                pointer: "/body/channel".into(),
+                value: json!("C1"),
+            }],
+            input_keys: Some(vec!["/body/text".into()]),
+            not_after_unix_ms,
+            max_per_hour: 2,
+        }
+    }
+
+    /// The request document of `approvals grant-standing --input-file`.
+    fn request() -> Value {
+        json!({
+            "operation": "chat.postMessage",
+            "target": [{"pointer": "/body/channel", "value": "C1"}],
+            "input_keys": ["/body/text"],
+            "not_after_unix_ms": NOW + 600_000,
+            "max_per_hour": 2
+        })
+    }
+
+    fn bytes(value: &Value) -> Vec<u8> {
+        serde_json::to_vec(value).unwrap()
+    }
+
+    fn write() -> Value {
+        json!({"body": {"channel": "C1", "text": "hello"}})
+    }
+
+    /// One compact JWS of the RFC 8032 test pair over `header` and `claims`.
+    fn compact(header: &Value, claims: &[u8]) -> Vec<u8> {
+        let pair = Ed25519KeyPair::from_seed_unchecked(&hex::decode(SEED).unwrap()).unwrap();
+        let input = format!(
+            "{}.{}",
+            URL_SAFE_NO_PAD.encode(connectors_core::canonical(header)),
+            URL_SAFE_NO_PAD.encode(claims)
+        );
+        let signature = URL_SAFE_NO_PAD.encode(pair.sign(input.as_bytes()).as_ref());
+        format!("{input}.{signature}").into_bytes()
+    }
+
+    /// The claims bytes of a signed grant file.
+    fn claims_of(signed: &[u8]) -> Vec<u8> {
+        let text = std::str::from_utf8(signed).unwrap();
+        URL_SAFE_NO_PAD
+            .decode(text.split('.').nth(1).unwrap())
+            .unwrap()
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum Outcome {
+        /// Admitted under the grant of this id; one use is counted.
+        Admitted(String),
+        ApprovalRequired,
+        RateLimited,
+        Unavailable,
+    }
+
+    /// The composition run 3 gives `standing::admit`, here only as far as
+    /// this run's seam reaches: the verified file, the covering grants at the
+    /// reading's upper bound, one use.
+    fn admit(site: &Site, key: &ConfiguredApprovalKey, input: &Value) -> Outcome {
+        let grants = match verify(&site.path, key, now()) {
+            Ok(Some(grants)) => grants,
+            Ok(None) | Err(FileRefusal::Unverified) => return Outcome::ApprovalRequired,
+            Err(FileRefusal::Unavailable) => return Outcome::Unavailable,
+        };
+        let at = now().upper_unix_ms;
+        let Ok(covering) = grants.covering("leaf", "chat.postMessage", input, at) else {
+            return Outcome::ApprovalRequired;
+        };
+        match Uses::open(&site.state).unwrap().take("leaf", &covering, at) {
+            Ok(Taken::Slot(taken)) => Outcome::Admitted(taken.grant_id),
+            Ok(Taken::AtCap { .. }) => Outcome::RateLimited,
+            Err(_) => Outcome::Unavailable,
+        }
+    }
+
+    fn uses(site: &Site) -> u32 {
+        Uses::open(&site.state).unwrap().rows().unwrap()
+    }
+
+    /// Acceptance 1.
+    #[test]
+    fn a_signed_grant_file_admits_the_granted_write_and_counts_one_use() {
+        let site = site();
+        let signed = sign(
+            &signer(),
+            &key(),
+            now(),
+            &[channel_grant("g1", NOW + 600_000)],
+        )
+        .unwrap();
+        // Header and payload are the contract's: exactly these members.
+        let text = std::str::from_utf8(&signed).unwrap();
+        let header: Value = serde_json::from_slice(
+            &URL_SAFE_NO_PAD
+                .decode(text.split('.').next().unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            header,
+            json!({"alg": "Ed25519", "kid": "key-1", "typ": "b10x.connectors-standing-grants.v1+jws"})
+        );
+        let claims: Value = serde_json::from_slice(&claims_of(&signed)).unwrap();
+        assert_eq!(claims["iss"], "connectors.local-issuer/leaf");
+        assert_eq!(claims["aud"], "connectors.approval/leaf");
+        assert_eq!(claims["document"]["format"], FORMAT);
+        assert_eq!(claims["document"]["revoked"], json!([]));
+        assert_eq!(claims.as_object().unwrap().len(), 3);
+        put(&site.path, &signed, 0o600);
+        assert_eq!(uses(&site), 0);
+        assert_eq!(
+            admit(&site, &key(), &write()),
+            Outcome::Admitted("g1".into())
+        );
+        assert_eq!(uses(&site), 1);
+        // A write outside the grant counts none; no file admits nothing.
+        let outside = json!({"body": {"channel": "C2", "text": "hello"}});
+        assert_eq!(admit(&site, &key(), &outside), Outcome::ApprovalRequired);
+        std::fs::remove_file(&site.path).unwrap();
+        assert_eq!(
+            verify(&site.path, &key(), now()).map(|file| file.is_none()),
+            Ok(true)
+        );
+        assert_eq!(admit(&site, &key(), &write()), Outcome::ApprovalRequired);
+        assert_eq!(uses(&site), 1);
+    }
+
+    /// Acceptance 2.
+    #[test]
+    fn a_grant_file_that_does_not_verify_admits_nothing() {
+        let grants = [channel_grant("g1", NOW + 600_000)];
+        let signed = sign(&signer(), &key(), now(), &grants).unwrap();
+        // The control: the file as signed is admitted.
+        let control = site();
+        put(&control.path, &signed, 0o600);
+        assert_eq!(
+            admit(&control, &key(), &write()),
+            Outcome::Admitted("g1".into())
+        );
+
+        // One changed byte, in the payload and in the signature.
+        let dot = signed.iter().position(|b| *b == b'.').unwrap();
+        let changed = |at: usize| {
+            let mut bytes = signed.clone();
+            bytes[at] = if bytes[at] == b'A' { b'B' } else { b'A' };
+            bytes
+        };
+        // Signed by another key under the same kid.
+        let (other_signer, other_key) = other("key-1");
+        let by_other = sign(&other_signer, &other_key, now(), &grants).unwrap();
+        // A per-input proof's `typ` over the same payload, and a file whose
+        // header carries one member more.
+        let proof_header = json!({"alg": "Ed25519", "kid": "key-1", "typ": PROOF_TYPE});
+        let as_proof = compact(&proof_header, &claims_of(&signed));
+        let wide_header = json!({"alg": "Ed25519", "kid": "key-1", "typ": SIGNED_TYPE, "crit": []});
+        let wide = compact(&wide_header, &claims_of(&signed));
+        // A bare unsigned grant document, the served host's form.
+        let bare = bytes(&json!({"format": FORMAT, "grants": [grants[0]], "revoked": []}));
+        assert!(parse(&bare).is_ok());
+        // Another issuer, another audience, one payload member more.
+        let iss = ConfiguredApprovalKey {
+            issuer: "connectors.local-issuer/other".into(),
+            ..key()
+        };
+        let aud = ConfiguredApprovalKey {
+            audience: "connectors.approval/other".into(),
+            ..key()
+        };
+        let by_iss = sign(&signer(), &iss, now(), &grants).unwrap();
+        let by_aud = sign(&signer(), &aud, now(), &grants).unwrap();
+        let mut wide_claims: Value = serde_json::from_slice(&claims_of(&signed)).unwrap();
+        wide_claims["exp"] = json!(NOW);
+        let good_header = json!({"alg": "Ed25519", "kid": "key-1", "typ": SIGNED_TYPE});
+        let by_member = compact(&good_header, &connectors_core::canonical(&wide_claims));
+        // The same members in another order: not canonical.
+        let reordered = format!(
+            r#"{{"iss":"connectors.local-issuer/leaf","aud":"connectors.approval/leaf","document":{}}}"#,
+            String::from_utf8(connectors_core::canonical(
+                &serde_json::from_slice::<Value>(&claims_of(&signed)).unwrap()["document"]
+            ))
+            .unwrap()
+        );
+        let by_order = compact(&good_header, reordered.as_bytes());
+        for (case, file) in [
+            ("a changed payload byte", changed(dot + 8)),
+            ("a changed signature byte", changed(signed.len() - 8)),
+            ("another key", by_other),
+            ("a proof's typ", as_proof),
+            ("a header member more", wide),
+            ("a bare document", bare),
+            ("another iss", by_iss),
+            ("another aud", by_aud),
+            ("a payload member more", by_member),
+            ("a payload that is not canonical", by_order),
+        ] {
+            let site = site();
+            put(&site.path, &file, 0o600);
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unverified),
+                "{case}"
+            );
+            assert_eq!(
+                admit(&site, &key(), &write()),
+                Outcome::ApprovalRequired,
+                "{case}"
+            );
+            assert_eq!(uses(&site), 0, "{case}");
+        }
+
+        // The good file under a key that no longer admits it: the key was
+        // rotated (the configured key is the next one), retired at this
+        // reading, not yet valid, or revoked.
+        let (_, rotated) = other("key-2");
+        let retired = ConfiguredApprovalKey {
+            not_after_unix_ms: NOW + 2_000,
+            ..key()
+        };
+        let early = ConfiguredApprovalKey {
+            not_before_unix_ms: NOW + 1,
+            ..key()
+        };
+        let revoked = ConfiguredApprovalKey {
+            revoked: true,
+            ..key()
+        };
+        for (case, configured) in [
+            ("a rotated key", rotated),
+            ("a retired key", retired),
+            ("a key not yet valid", early),
+            ("a revoked key", revoked),
+        ] {
+            let site = site();
+            put(&site.path, &signed, 0o600);
+            assert_eq!(
+                verify(&site.path, &configured, now()).err(),
+                Some(FileRefusal::Unverified),
+                "{case}"
+            );
+            assert_eq!(
+                admit(&site, &configured, &write()),
+                Outcome::ApprovalRequired,
+                "{case}"
+            );
+            assert_eq!(uses(&site), 0, "{case}");
+        }
+        // Such a key signs no file either.
+        assert_eq!(
+            sign(&signer(), &revoked_key(), now(), &grants).err(),
+            Some(Refused::Forbidden)
+        );
+    }
+
+    fn revoked_key() -> ConfiguredApprovalKey {
+        ConfiguredApprovalKey {
+            revoked: true,
+            ..key()
+        }
+    }
+
+    /// Acceptance 3.
+    #[test]
+    fn a_grant_file_is_not_a_proof() {
+        let signed = sign(
+            &signer(),
+            &key(),
+            now(),
+            &[channel_grant("g1", NOW + 600_000)],
+        )
+        .unwrap();
+        // The grant file's bytes, given to the proof decoder, are refused.
+        let evidence = Evidence::from_protected("0".repeat(64), Secret(signed.clone())).unwrap();
+        assert!(!evidence.decodes());
+        // And the grant file's signer makes nothing of a proof's `typ`.
+        assert!(
+            signer()
+                .seal(PROOF_TYPE, &key(), now(), &claims_of(&signed))
+                .is_err()
+        );
+        assert!(key().open(PROOF_TYPE, &signed, now(), FILE_LIMIT).is_err());
+    }
+
+    /// Acceptance 4. A foreign owner is covered by `admitted`'s own test.
+    #[test]
+    fn an_unsafe_grant_file_is_unavailable() {
+        let signed = sign(
+            &signer(),
+            &key(),
+            now(),
+            &[channel_grant("g1", NOW + 600_000)],
+        )
+        .unwrap();
+        // The control: the same file at mode 0600 is admitted.
+        let control = site();
+        put(&control.path, &signed, 0o600);
+        assert_eq!(
+            admit(&control, &key(), &write()),
+            Outcome::Admitted("g1".into())
+        );
+        fn group_writable(site: &Site, signed: &[u8]) {
+            put(&site.path, signed, 0o620);
+        }
+        fn world_writable(site: &Site, signed: &[u8]) {
+            put(&site.path, signed, 0o602);
+        }
+        fn linked(site: &Site, signed: &[u8]) {
+            let real = site.path.with_extension("real");
+            put(&real, signed, 0o600);
+            std::os::unix::fs::symlink(&real, &site.path).unwrap();
+        }
+        fn directory(site: &Site, _: &[u8]) {
+            std::fs::create_dir(&site.path).unwrap();
+        }
+        type Place = fn(&Site, &[u8]);
+        let cases: [(&str, Place); 4] = [
+            ("mode 0620", group_writable),
+            ("mode 0602", world_writable),
+            ("a symlink to it", linked),
+            ("a directory at the path", directory),
+        ];
+        for (case, place) in cases {
+            let site = site();
+            place(&site, &signed);
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unavailable),
+                "{case}"
+            );
+            assert_eq!(
+                admit(&site, &key(), &write()),
+                Outcome::Unavailable,
+                "{case}"
+            );
+            assert_eq!(uses(&site), 0, "{case}");
+            // The commands answer the same and write nothing.
+            let lock = lock(&site.state).unwrap();
+            assert_eq!(
+                grant(
+                    &lock,
+                    &site.path,
+                    &signer(),
+                    &key(),
+                    "leaf",
+                    now(),
+                    &bytes(&request())
+                )
+                .err(),
+                Some(Refused::Unavailable),
+                "{case}"
+            );
+            assert_eq!(
+                revoke(&lock, &site.path, &signer(), &key(), now(), "g1").err(),
+                Some(Refused::Unavailable),
+                "{case}"
+            );
+            assert_eq!(
+                list(&site.path, &key(), now()).err(),
+                Some(Refused::Unavailable),
+                "{case}"
+            );
+        }
+    }
+
+    /// Acceptance 11.
+    #[test]
+    fn grant_revoke_and_list_keep_the_file() {
+        let site = site();
+        let (signer, key) = (signer(), key());
+        let lock = lock(&site.state).unwrap();
+        assert!(site.state.join("standing-grants.lock").is_file());
+        // An absent file: nothing listed, nothing to revoke, and a grant creates it.
+        assert_eq!(list(&site.path, &key, now()), Ok(vec![]));
+        assert_eq!(
+            revoke(&lock, &site.path, &signer, &key, now(), "g1").err(),
+            Some(Refused::NotFound)
+        );
+        assert!(!site.path.exists());
+        let add = |request: &Value| {
+            grant(
+                &lock,
+                &site.path,
+                &signer,
+                &key,
+                "leaf",
+                now(),
+                &bytes(request),
+            )
+        };
+        let first = add(&request()).unwrap();
+        assert_eq!(first.parse::<Uuid>().unwrap().get_version_num(), 4);
+        assert_eq!(first, first.parse::<Uuid>().unwrap().to_string());
+        assert_eq!(mode(&site.path), 0o600);
+        // A second grant keeps the first; `list` shows both in file order.
+        let mut open = request();
+        open.as_object_mut().unwrap().remove("input_keys");
+        let second = add(&open).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(mode(&site.path), 0o600);
+        let listed = list(&site.path, &key, now()).unwrap();
+        assert_eq!(
+            listed
+                .iter()
+                .map(|grant| grant.id.as_str())
+                .collect::<Vec<_>>(),
+            [first.as_str(), second.as_str()]
+        );
+        assert!(listed.iter().all(|grant| grant.instance == "leaf"));
+        assert_eq!(listed[0].input_keys, Some(vec!["/body/text".to_owned()]));
+        assert_eq!(listed[1].input_keys, None);
+        assert_eq!(
+            admit(&site, &key, &write()),
+            Outcome::Admitted(first.clone())
+        );
+        // `revoke` removes one; an id the file does not hold is `not_found`.
+        revoke(&lock, &site.path, &signer, &key, now(), &first).unwrap();
+        assert_eq!(mode(&site.path), 0o600);
+        assert_eq!(
+            list(&site.path, &key, now())
+                .unwrap()
+                .iter()
+                .map(|grant| grant.id.clone())
+                .collect::<Vec<_>>(),
+            std::slice::from_ref(&second)
+        );
+        let before = std::fs::read(&site.path).unwrap();
+        for absent in [first.as_str(), "no-such-grant"] {
+            assert_eq!(
+                revoke(&lock, &site.path, &signer, &key, now(), absent).err(),
+                Some(Refused::NotFound)
+            );
+        }
+        assert_eq!(std::fs::read(&site.path).unwrap(), before);
+
+        // A file signed by a rotated key: all three are `invalid_configuration`
+        // and the file's bytes are unchanged.
+        let (next_signer, next_key) = other("key-2");
+        assert_eq!(
+            list(&site.path, &next_key, now()).err(),
+            Some(Refused::InvalidConfiguration)
+        );
+        assert_eq!(
+            grant(
+                &lock,
+                &site.path,
+                &next_signer,
+                &next_key,
+                "leaf",
+                now(),
+                &bytes(&request())
+            )
+            .err(),
+            Some(Refused::InvalidConfiguration)
+        );
+        assert_eq!(
+            revoke(&lock, &site.path, &next_signer, &next_key, now(), &second).err(),
+            Some(Refused::InvalidConfiguration)
+        );
+        assert_eq!(std::fs::read(&site.path).unwrap(), before);
+
+        // A file that lists a grant in `revoked` (no command writes one): the
+        // next grant removes the listed grant with the list.
+        let pair = [
+            channel_grant("g1", NOW + 600_000),
+            channel_grant("g2", NOW + 600_000),
+        ];
+        let claims = json!({
+            "iss": key.issuer, "aud": key.audience,
+            "document": {"format": FORMAT, "grants": pair, "revoked": ["g1"]}
+        });
+        let header = json!({"alg": "Ed25519", "kid": "key-1", "typ": SIGNED_TYPE});
+        put(
+            &site.path,
+            &compact(&header, &connectors_core::canonical(&claims)),
+            0o600,
+        );
+        assert_eq!(list(&site.path, &key, now()).unwrap().len(), 2);
+        let added = add(&request()).unwrap();
+        assert_eq!(
+            list(&site.path, &key, now())
+                .unwrap()
+                .iter()
+                .map(|grant| grant.id.clone())
+                .collect::<Vec<_>>(),
+            ["g2".to_owned(), added]
+        );
+
+        // 256 grants of which one is expired: `grant` succeeds and the
+        // expired one is gone.
+        let small = |id: String, not_after_unix_ms: i64| Grant {
+            target: vec![TargetMember {
+                pointer: "/c".into(),
+                value: json!(1),
+            }],
+            input_keys: None,
+            ..channel_grant(&id, not_after_unix_ms)
+        };
+        let mut full: Vec<Grant> = (0..255)
+            .map(|n| small(format!("g{n}"), NOW + 600_000))
+            .collect();
+        full.push(small("expired".into(), NOW));
+        put(
+            &site.path,
+            &sign(&signer, &key, now(), &full).unwrap(),
+            0o600,
+        );
+        assert_eq!(list(&site.path, &key, now()).unwrap().len(), 256);
+        let added = add(&request()).unwrap();
+        let listed = list(&site.path, &key, now()).unwrap();
+        assert_eq!(listed.len(), 256);
+        assert!(listed.iter().all(|grant| grant.id != "expired"));
+        assert_eq!(listed.last().unwrap().id, added);
+        // 256 unexpired grants: `grant` is `invalid_input`, nothing written.
+        let before = std::fs::read(&site.path).unwrap();
+        assert_eq!(add(&request()).err(), Some(Refused::InvalidInput));
+        assert_eq!(std::fs::read(&site.path).unwrap(), before);
+
+        // A grant that would make the signed file larger than 64 KiB is
+        // `invalid_input` and the file's bytes are unchanged.
+        let wide = |id: String| Grant {
+            target: vec![TargetMember {
+                pointer: "/c".into(),
+                value: json!("v".repeat(3_000)),
+            }],
+            input_keys: None,
+            ..channel_grant(&id, NOW + 600_000)
+        };
+        let near: Vec<Grant> = (0..15).map(|n| wide(format!("w{n}"))).collect();
+        let near_file = sign(&signer, &key, now(), &near).unwrap();
+        assert!(near_file.len() <= FILE_LIMIT);
+        put(&site.path, &near_file, 0o600);
+        let mut large = request();
+        large["target"] = json!([{"pointer": "/c", "value": "v".repeat(6_000)}]);
+        assert_eq!(add(&large).err(), Some(Refused::InvalidInput));
+        assert_eq!(std::fs::read(&site.path).unwrap(), near_file);
+        // A file over the limit at the path does not verify.
+        put(&site.path, &vec![b'A'; FILE_LIMIT + 1], 0o600);
+        assert_eq!(
+            verify(&site.path, &key, now()).err(),
+            Some(FileRefusal::Unverified)
+        );
+        assert_eq!(add(&request()).err(), Some(Refused::InvalidConfiguration));
+        assert_eq!(
+            std::fs::metadata(&site.path).unwrap().len(),
+            FILE_LIMIT as u64 + 1
+        );
+    }
+
+    /// Acceptance 12.
+    #[test]
+    fn eight_concurrent_grants_keep_all_eight() {
+        let site = site();
+        let ids: Vec<String> = std::thread::scope(|scope| {
+            let threads: Vec<_> = (0..8)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let lock = lock(&site.state).unwrap();
+                        grant(
+                            &lock,
+                            &site.path,
+                            &signer(),
+                            &key(),
+                            "leaf",
+                            now(),
+                            &bytes(&request()),
+                        )
+                        .unwrap()
+                    })
+                })
+                .collect();
+            threads
+                .into_iter()
+                .map(|thread| thread.join().unwrap())
+                .collect()
+        });
+        let listed: BTreeSet<String> = list(&site.path, &key(), now())
+            .unwrap()
+            .into_iter()
+            .map(|grant| grant.id)
+            .collect();
+        assert_eq!(listed.len(), 8);
+        assert_eq!(listed, ids.into_iter().collect::<BTreeSet<_>>());
+        assert_eq!(mode(&site.path), 0o600);
+    }
+
+    /// Acceptance 13.
+    #[test]
+    fn a_grant_input_is_validated() {
+        let site = site();
+        let lock = lock(&site.state).unwrap();
+        let add =
+            |request: &[u8]| grant(&lock, &site.path, &signer(), &key(), "leaf", now(), request);
+        let without = |member: &str| {
+            let mut value = request();
+            value.as_object_mut().unwrap().remove(member);
+            value
+        };
+        let with = |member: &str, value: Value| {
+            let mut request = request();
+            request[member] = value;
+            request
+        };
+        for (case, refused) in [
+            ("no not_after_unix_ms", without("not_after_unix_ms")),
+            (
+                "a zero not_after_unix_ms",
+                with("not_after_unix_ms", json!(0)),
+            ),
+            (
+                "one before the clock",
+                with("not_after_unix_ms", json!(NOW - 1)),
+            ),
+            (
+                "one at the reading's upper bound",
+                with("not_after_unix_ms", json!(NOW + 2_000)),
+            ),
+            (
+                "one over the JSON-safe range",
+                with("not_after_unix_ms", json!(9_007_199_254_740_992_i64)),
+            ),
+            ("no max_per_hour", without("max_per_hour")),
+            ("a zero max_per_hour", with("max_per_hour", json!(0))),
+            ("10,001 an hour", with("max_per_hour", json!(10_001))),
+            (
+                "an id member",
+                with("id", json!("7b0c4a52-55a4-4a5c-9a39-0d6b1c0e7a11")),
+            ),
+            ("an instance member", with("instance", json!("leaf"))),
+            ("input_keys null", with("input_keys", Value::Null)),
+            ("no target", with("target", json!([]))),
+            (
+                "a pointer that is not RFC 6901",
+                with("target", json!([{"pointer": "body", "value": 1}])),
+            ),
+            (
+                "an input key below the target",
+                with("input_keys", json!(["/body/channel/id"])),
+            ),
+            ("no operation", without("operation")),
+            ("an array", json!([request()])),
+            (
+                "the members as an array",
+                json!(["chat.postMessage", [{"pointer": "/body/channel", "value": "C1"}], ["/body/text"], NOW + 600_000, 2]),
+            ),
+        ] {
+            assert_eq!(
+                add(&bytes(&refused)).err(),
+                Some(Refused::InvalidInput),
+                "{case}"
+            );
+            assert!(!site.path.exists(), "{case}");
+        }
+        // A member named twice, and bytes that are not one JSON document.
+        let twice =
+            String::from_utf8(bytes(&request()))
+                .unwrap()
+                .replacen('{', r#"{"max_per_hour":1,"#, 1);
+        for refused in [twice.as_bytes(), b"".as_slice(), b"{} {}".as_slice()] {
+            assert_eq!(add(refused).err(), Some(Refused::InvalidInput));
+            assert!(!site.path.exists());
+        }
+        // The control: the request itself is granted, one millisecond past
+        // the reading's upper bound included.
+        add(&bytes(&with("not_after_unix_ms", json!(NOW + 2_001)))).unwrap();
+        add(&bytes(&request())).unwrap();
+        assert_eq!(list(&site.path, &key(), now()).unwrap().len(), 2);
+        // The clock reading the commands sign at is a bounded one.
+        struct At(ClockInterval);
+        impl Clock for At {
+            fn now(&self) -> crate::local::mutations::Result<ClockInterval> {
+                Ok(self.0)
+            }
+        }
+        assert_eq!(
+            reading(&At(now())).map(|t| (t.lower_unix_ms, t.upper_unix_ms)),
+            Some((NOW, NOW + 2_000))
+        );
+        for refused in [
+            ClockInterval {
+                lower_unix_ms: -1,
+                upper_unix_ms: 1,
+            },
+            ClockInterval {
+                lower_unix_ms: NOW,
+                upper_unix_ms: NOW - 1,
+            },
+            ClockInterval {
+                lower_unix_ms: NOW,
+                upper_unix_ms: NOW + MAX_CLOCK_WIDTH_MS + 1,
+            },
+        ] {
+            assert!(reading(&At(refused)).is_none());
+        }
     }
 }

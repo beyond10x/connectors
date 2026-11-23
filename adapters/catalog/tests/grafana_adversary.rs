@@ -221,6 +221,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Child::spawn(&Adapter {
+            standing_grants: None,
             credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),

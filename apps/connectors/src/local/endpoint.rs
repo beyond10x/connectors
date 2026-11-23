@@ -664,4 +664,35 @@ mod tests {
         assert_eq!(published.len(), 1, "{published:?}");
         assert_eq!(std::fs::read_to_string(&config).unwrap(), published[0]);
     }
+
+    /// Acceptance 19 of
+    /// story:local-invoke-admits-a-keyed-write-under-a-standing-grant: the
+    /// command that rewrites an instance's table keeps `standing_grants`, and
+    /// the member is no pin, so the endpoint is still written beside it.
+    #[test]
+    fn endpoint_keeps_standing_grants() {
+        let member = "standing_grants = '/etc/connectors/grafana.grants'";
+        let text = format!(
+            "format = 'connectors-local/5'\nowner_uid = 1000\n\n[connectors.grafana]\nenabled = true\n\n[connectors.grafana.instances.main]\n{member}\n"
+        );
+        let Ok(Some(first)) = edited(&text, "grafana", "main", "https://grafana.example.com")
+        else {
+            panic!("the endpoint is written beside the member");
+        };
+        assert_eq!(first.matches(member).count(), 1, "{first}");
+        assert!(
+            first.contains("endpoint = \"https://grafana.example.com\""),
+            "{first}"
+        );
+        // An instance the command adds leaves the other's member as it is.
+        let Ok(Some(second)) = edited(&first, "grafana", "other", "https://other.example.com")
+        else {
+            panic!("another instance is added");
+        };
+        assert_eq!(second.matches(member).count(), 1, "{second}");
+        assert!(
+            second.contains("[connectors.grafana.instances.other]"),
+            "{second}"
+        );
+    }
 }
