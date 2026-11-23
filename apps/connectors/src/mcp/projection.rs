@@ -102,6 +102,14 @@ fn check(until: Instant) -> Result<(), Value> {
         Ok(())
     }
 }
+/// The refusal of a read whose budget did not start: `unsupported` on a
+/// platform without a budget clock, and `timeout` for every other failure.
+fn budget_start_refusal(failure: runtime::Failure) -> Value {
+    refusal(match failure {
+        runtime::Failure::Unsupported => "unsupported",
+        _ => "timeout",
+    })
+}
 /// What stops a request: its own cancellation before each owner call, and the
 /// end of local admission at the session's first terminal before its first one
 /// (sessions § 4.1). A request already at the owner keeps its reply unless its
@@ -742,7 +750,7 @@ impl Reader<'_> {
         let input = input.to_string();
         let budget = runtime::ReadBudget::start(execution, provider, input_limit, result_limit)
             .and_then(|b| b.constrain(until))
-            .map_err(|_| refusal("timeout"))?;
+            .map_err(budget_start_refusal)?;
         halt.cancelled()?;
         let owner = read_client(self.paths, Some(&selection.host), until)?;
         // Dispatch: the configuration still selects the admitted connection,
@@ -1045,5 +1053,26 @@ mod tests {
         ] {
             assert!(!inline_schema(&schema));
         }
+    }
+}
+
+/// Runs on every platform: the module above is Unix only.
+#[cfg(test)]
+mod budget_start_tests {
+    use super::*;
+
+    /// A platform without a budget clock answers `unsupported`, as the owner
+    /// does; every other failure of a budget's start stays the request's
+    /// `timeout`.
+    #[test]
+    fn a_failed_budget_start_answers_unsupported_only_without_a_clock() {
+        assert_eq!(
+            budget_start_refusal(runtime::Failure::Unsupported),
+            refusal("unsupported")
+        );
+        assert_eq!(
+            budget_start_refusal(runtime::Failure::Unavailable),
+            refusal("timeout")
+        );
     }
 }

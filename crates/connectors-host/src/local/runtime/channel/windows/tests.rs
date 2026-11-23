@@ -290,6 +290,128 @@ fn a_write_to_a_closed_or_stalled_peer_ends() {
     assert!(started.elapsed() < Duration::from_secs(2));
 }
 
+/// A clone of a pipe end reads while the original writes, as the owner's
+/// cancel watcher and its reply do. The clone's read is cancelled and started
+/// again every 250 ms while a write of four pipe buffers pends on the
+/// original; that write then completes whole, and the clone's read still
+/// returns the frame the peer sends afterwards. Each wait ends within 10 s.
+#[test]
+fn a_clone_reads_while_its_original_writes() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    };
+    const WAIT: Duration = Duration::from_secs(10);
+    let (mut original, mut other) = ends();
+    let mut clone = original.try_clone().unwrap();
+    let checks = Arc::new(AtomicUsize::new(0));
+    let (reading, read_started) = mpsc::channel();
+    let (answer, answered) = mpsc::channel();
+    let reader = std::thread::spawn({
+        let checks = checks.clone();
+        move || {
+            let check = || -> Result<()> {
+                checks.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            };
+            reading.send(()).unwrap();
+            let frame = read_with_cancel::<serde_json::Value>(
+                &mut clone,
+                Instant::now() + WAIT,
+                false,
+                0,
+                Some(&check),
+            );
+            answer.send(frame.map(|frame| frame.control)).unwrap();
+        }
+    });
+    read_started
+        .recv_timeout(WAIT)
+        .expect("the clone's reader started");
+    let bytes: Vec<u8> = (0..4 * BUFFER as usize)
+        .map(|at| (at % 251) as u8)
+        .collect();
+    assert_eq!(bytes.len(), 256 * 1024);
+    let (writing, write_started) = mpsc::channel();
+    let (wrote, written) = mpsc::channel();
+    let writer = std::thread::spawn({
+        let bytes = bytes.clone();
+        move || {
+            let until = Instant::now() + WAIT;
+            let mut sent = 0;
+            writing.send(()).unwrap();
+            let result: std::io::Result<()> = loop {
+                if sent == bytes.len() {
+                    break Ok(());
+                }
+                let Some(wait) = until.checked_duration_since(Instant::now()) else {
+                    break Err(std::io::ErrorKind::TimedOut.into());
+                };
+                match original.write_within(&bytes[sent..], wait) {
+                    Ok(0) => break Err(std::io::ErrorKind::WriteZero.into()),
+                    Ok(count) => sent += count,
+                    Err(error) => break Err(error),
+                }
+            };
+            wrote
+                .send((result.map_err(|error| error.kind()), sent))
+                .unwrap();
+            // Kept open until the test ends, so the clone never reads a close.
+            original
+        }
+    });
+    write_started
+        .recv_timeout(WAIT)
+        .expect("the original's writer started");
+    // Two more checks: one whole read of the clone was started and cancelled
+    // after the write began.
+    let seen = checks.load(Ordering::SeqCst);
+    let started = Instant::now();
+    while checks.load(Ordering::SeqCst) < seen + 2 {
+        assert!(
+            started.elapsed() < WAIT,
+            "the clone's read was not cancelled and started again within 10 s"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(checks.load(Ordering::SeqCst) >= 2);
+    assert!(
+        written.try_recv().is_err(),
+        "a write of four pipe buffers ended before its peer read"
+    );
+    let mut received = vec![0u8; bytes.len()];
+    let mut filled = 0;
+    let until = Instant::now() + WAIT;
+    while filled < received.len() {
+        let wait = until
+            .checked_duration_since(Instant::now())
+            .expect("the peer read the write within 10 s");
+        let count = other.read_within(&mut received[filled..], wait).unwrap();
+        assert_ne!(count, 0, "the pipe closed under the write");
+        filled += count;
+    }
+    let (result, sent) = written
+        .recv_timeout(WAIT)
+        .expect("the write ended once its peer had read");
+    assert_eq!(
+        (result, sent),
+        (Ok(()), bytes.len()),
+        "the write completed whole"
+    );
+    assert!(received == bytes, "the peer read other bytes than written");
+    other.write_within(&frame(CONTROL), WAIT).unwrap();
+    let control = answered
+        .recv_timeout(WAIT)
+        .expect("the clone's read returned");
+    assert_eq!(
+        control,
+        Ok(serde_json::from_slice::<serde_json::Value>(CONTROL).unwrap())
+    );
+    reader.join().unwrap();
+    let _original = writer.join().unwrap();
+}
+
 /// An inherited pipe handle is taken over as one that is not inheritable,
 /// and the inherited value is closed; anything but a pipe refuses.
 #[test]

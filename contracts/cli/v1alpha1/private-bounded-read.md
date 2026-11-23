@@ -13,8 +13,9 @@ write control. This selection supplies no extended mutation support.
 
 The closed `invoke_bounded` control contains `request_id`, `operation`, `revision`,
 `partition` and `budget`. The request id is a canonical nonnil UUID. `budget` is
-the `connectors.transport.PrivateReadBudget` value: `deadline_ticks` (original
-CLOCK_MONOTONIC nanoseconds; Unix only, a budget elsewhere refuses as
+the `connectors.transport.PrivateReadBudget` value: `deadline_ticks` (the
+original deadline in nanoseconds of CLOCK_MONOTONIC on Unix and of the unbiased
+interrupt time on Windows; a budget on any other platform refuses as
 unsupported), `execution_ms`, `provider_ms`, `input_bytes`,
 `result_bytes`. All are positive integers. Maximums are 40,000 ms execution,
 30,000 ms provider, 262,144 input bytes and 4,194,304 result bytes; provider time

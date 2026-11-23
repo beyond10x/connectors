@@ -2475,8 +2475,9 @@ fn exchange_cancellable(
 /// Reads the stream of a `connectors-owner/3` read for its cancellation until
 /// `finished` or `until`: a `cancel` naming `request_id`, any other frame, or
 /// the stream failing or closing cancels `cancel`. A `cancel` naming another
-/// request is ignored.
-#[cfg(unix)]
+/// request is ignored. The watcher reads a clone of the stream (on Windows a
+/// duplicate of the pipe handle) while the exchange writes its reply on the
+/// stream itself.
 fn watch_cancel(
     stream: &channel::Stream,
     request_id: String,
@@ -2522,17 +2523,6 @@ fn watch_cancel(
             }
         })
         .map_err(|_| Code::Unavailable.into())
-}
-/// Only a Unix owner serves a bounded read.
-#[cfg(not(unix))]
-fn watch_cancel(
-    _: &channel::Stream,
-    _: String,
-    _: Instant,
-    _: &supervisor::Cancel,
-    _: &Arc<AtomicBool>,
-) -> Result<std::thread::JoinHandle<()>> {
-    Err(Code::Unsupported.into())
 }
 fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let frame = channel::read::<WriteRequest>(
@@ -4013,6 +4003,125 @@ mod governed_client_tests {
         let mut bytes = Vec::new();
         peer.read_to_end(&mut bytes).unwrap();
         assert!(bytes.is_empty());
+    }
+}
+
+/// The cancellation watcher on a named pipe
+/// (story:windows-mcp-tool-call-answers-timeout): it reads on a clone of the
+/// request's pipe end, and the cases `governed_client_tests` holds on a Unix
+/// socket hold there, one test per case.
+#[cfg(all(test, windows))]
+mod windows_cancel_watcher_tests {
+    use super::*;
+    use runtime::channel::windows::{Pipe, pair};
+
+    /// A watcher of the request `own` on the server end of a fresh pair, with
+    /// both ends: the server end stays open for the whole test, as the
+    /// exchange keeps it to write its reply.
+    struct Watched {
+        client: Pipe,
+        _server: Pipe,
+        cancel: supervisor::Cancel,
+        finished: Arc<AtomicBool>,
+        watcher: std::thread::JoinHandle<()>,
+    }
+    fn watched() -> Watched {
+        let (server, client) = pair().unwrap();
+        let client = Pipe::from_owned(client).unwrap();
+        let cancel = supervisor::Cancel::default();
+        let finished = Arc::new(AtomicBool::new(false));
+        let watcher = watch_cancel(
+            &server,
+            "own".into(),
+            Instant::now() + Duration::from_secs(20),
+            &cancel,
+            &finished,
+        )
+        .unwrap();
+        Watched {
+            client,
+            _server: server,
+            cancel,
+            finished,
+            watcher,
+        }
+    }
+    fn cancelled(cancel: &supervisor::Cancel, within: Duration) -> bool {
+        let until = Instant::now() + within;
+        while Instant::now() < until {
+            if cancel.cancelled() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        cancel.cancelled()
+    }
+    fn say_cancel(client: &mut Pipe, request_id: &str) {
+        channel::write(
+            client,
+            &CancellableRequest::Cancel {
+                request_id: request_id.into(),
+            },
+            None,
+            &[],
+            Instant::now() + Duration::from_secs(2),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_cancel_naming_the_request_cancels_it() {
+        let mut watched = watched();
+        say_cancel(&mut watched.client, "own");
+        assert!(cancelled(&watched.cancel, Duration::from_secs(10)));
+        watched.finished.store(true, Ordering::SeqCst);
+        watched.watcher.join().unwrap();
+    }
+
+    #[test]
+    fn a_cancel_naming_another_request_cancels_nothing_and_the_watcher_reads_on() {
+        let mut watched = watched();
+        say_cancel(&mut watched.client, "another");
+        assert!(!cancelled(&watched.cancel, Duration::from_millis(600)));
+        assert!(
+            !watched.watcher.is_finished(),
+            "the watcher ended on a cancel naming another request"
+        );
+        watched.finished.store(true, Ordering::SeqCst);
+        watched.watcher.join().unwrap();
+        assert!(!watched.cancel.cancelled());
+    }
+
+    #[test]
+    fn a_peer_that_closed_its_end_cancels_the_request() {
+        let Watched {
+            client,
+            _server,
+            cancel,
+            finished: _finished,
+            watcher,
+        } = watched();
+        drop(client);
+        assert!(cancelled(&cancel, Duration::from_secs(10)));
+        watcher.join().unwrap();
+    }
+
+    #[test]
+    fn a_finished_request_ends_its_watcher_within_a_second_uncancelled() {
+        let watched = watched();
+        // Long enough for the watcher's read to be pending on the clone.
+        std::thread::sleep(Duration::from_millis(100));
+        watched.finished.store(true, Ordering::SeqCst);
+        let set = Instant::now();
+        while !watched.watcher.is_finished() {
+            assert!(
+                set.elapsed() < Duration::from_secs(1),
+                "the watcher read on for 1 s after its request finished"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        watched.watcher.join().unwrap();
+        assert!(!watched.cancel.cancelled());
     }
 }
 
