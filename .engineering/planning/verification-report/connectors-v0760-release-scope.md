@@ -5,7 +5,7 @@ kind: verification-report
 status: draft
 title: connectors 0.76.0 release scope
 summary: Scope, exclusions and evidence of the 0.76.0 cut
-revision: 1
+revision: 3
 ---
 ## Scope of connectors 0.76.0
 
@@ -32,6 +32,13 @@ Released 2026-11-23 on Timo's pick for question D4, relayed by host-operator at 
   Runtime 0.32.0 too. story:store-tests-end-within-60s-under-load carries them. The forge's
   repository gate decides the merge.
 - Records already in a store keep their size.
+- On `windows-latest` a tool call through the MCP stdio server answers `timeout` (step 10 of
+  the job "host and CLI on windows-latest", run 45148199646). The step never ran on Windows
+  before pull request 284. Read from code, not yet shown by a run: the bounded read behind a
+  tool call is built for Unix only (`runtime/bounded.rs:97-102`), so earlier releases have the
+  defect too. story:windows-mcp-tool-call-answers-timeout carries it and comes next.
+  host-operator, D6, 2026-11-23 about 11:40 CET: "merge #284 as it is, ship 0.76.0 right
+  after, fix Windows step 10 as its own story, named in the release's 'known' list".
 
 ## Not in this release
 
