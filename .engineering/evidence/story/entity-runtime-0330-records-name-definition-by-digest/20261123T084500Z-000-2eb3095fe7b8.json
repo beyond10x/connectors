@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-23T08:45:00Z",
+  "actor": "human:timo",
+  "artifact": "story:entity-runtime-0330-records-name-definition-by-digest",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-host --lib a_store_the_previous_pin_wrote_a_read_into_takes_a_read_invoke: 1 passed, 2.49 s at load 78"
+  }
+}

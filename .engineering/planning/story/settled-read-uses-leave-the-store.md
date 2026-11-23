@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:entity-runtime-0330-records-name-definition-by-digest
 - depends_on: story:read-cost-test-reports-bytes-per-read
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -32,13 +32,59 @@ estimated third (about 3×; story:entity-runtime-0330-records-name-definition-by
 
 ## Open before design
 
-Not decided here; the scoper and the design critic settle it from the code, and a choice that
-changes how the store is laid out goes to Timo as a question with options:
+Question D5 (2026-11-23, with host-operator for Timo; a change of architecture, so no default):
+which of the ways below. The acceptance lines under it are written for "removed from the store"
+and are rewritten once D5 is answered.
 
-- whether settled read uses are removed from the recorded store (compaction, or snapshot and
-  truncate, which needs a statement from Entity Runtime about removing records of a chain), or
-  read-use fencing stops being recorded durably in the first place;
-- what an audit of past reads still needs after removal, and for how long.
+Read from the code by the scoper on 2026-11-23 (connectors 0.75.0, Entity Runtime 0.32.0 and
+tag 0.33.0, Eventlog 0.9.4; paths under `crates/connectors-host/src/local/`):
+
+- One settled read is one `connectors.credential_evidence.ReadUse` subject with 4 events
+  (Captured, Dispatched, Released, Expired) and about 15 blobs (`registry/use_and_retirement.rs:246-313`,
+  `metadata/er.rs:4540-4542`, `:4641-4650`, `:4749-4762`). A write takes a read use too
+  (`owner/mutation/execution.rs:203`, `:446`).
+- No production code reads a settled read use: an Expired one is not projected to SQL
+  (`metadata/er.rs:3198-3219`); the SQL readers ask for open or unexpired rows
+  (`registry/use_and_retirement.rs:25`, `:285`, `:361`, `:447`; `registry/revalidation.rs:160`);
+  `read_history` has two production callers, both verification (`metadata/er.rs:2531`, `:2593`).
+- Every open replays every subject, and the in-memory baseline keeps each terminal row including
+  Expired read uses (`metadata/er.rs:2396-2440`, `:3011-3043`); every persist loops the whole
+  baseline (`:3998-4035`, `:4384-4405`, `:5076-5092`). That this is the cause of the time and RSS
+  growth is inferred, not measured.
+- Why the record is durable: "Expiry deletes these transient SQL rows while their ER terminal
+  history remains available for audit and stale-token refusal" (`metadata/er.rs:3214-3215`); the
+  root decision in story:ess-evolution-er-metadata-adoption (`:240-250`): "model concrete ReadUse
+  retention"; `docs/local-er-metadata.md:129-132`. No decision, comment or test says a read use
+  must survive an owner restart; `docs/local-connection-registry.md:214-220`: "Restart does not
+  resume a captured provider operation."
+- Entity Runtime 0.32.0 and 0.33.0 have no delete, truncate, compact or prune
+  (`entity-eventlog/src/facade.rs:157-474`), and refuse a store with a missing blob or a redacted
+  event (`adapter.rs:4026`, `:4409-4412`, `:2926-2928`, `:4616-4617`). One connectors batch mixes
+  the expiry of one use, the capture of the next, a clock advance and the writer marker
+  (`metadata/er.rs:4096-4109`), so cutting one chain breaks batches of surviving subjects
+  (inferred). A durable checkpoint removes nothing from the blob or event tables.
+- An import path exists (`import_legacy`, `facade.rs:393`; `provision_with_lock`,
+  `metadata/er.rs:2302-2365`).
+
+The ways:
+
+- A. Read uses are no longer recorded: open uses live in the owner process. connectors only. An
+  existing store is not rewritten and stays readable by older builds if the `ReadUse` definition
+  stays (`metadata/er.rs:985-1014`, `:1043-1053`); it does not shrink. Changes: the root decision
+  above; a CLI revoke no longer releases the owner's undispatched use through the recorded row
+  (`registry/lifecycle.rs:469`), dispatch still re-checks state, fence, generation and material
+  (`registry/use_and_retirement.rs:295-297`). Surface: `registry/use_and_retirement.rs`,
+  `reuse.rs`, `revalidation.rs`, `lifecycle.rs`, `refresh.rs`, `registry.rs`, the command mapping
+  in `metadata/er.rs`, the capture and dispatch call sites in `owner/`.
+- B. A removal operation in Entity Runtime first (none exists), then compaction here. One-way for
+  an existing store, so by decision-blocker:store-checkpoints-one-way it needs an explicit command.
+- C. The owner writes a new store from the terminal rows and swaps the file. connectors only.
+  Must carry subjects without an SQL row (`StoreWriter`, `RefreshAttempt`, `AccessTokenIssue`) and
+  pass the legacy digest check (`metadata.rs:1039-1042`, inferred). One-way unless the old file
+  is kept.
+
+Not determined: what an audit of past reads needs and for how long (no requirement found in
+code, docs or planning); whether a capture path runs in a CLI process without an owner.
 
 ## Acceptance
 
