@@ -129,7 +129,7 @@ reader exists whose definition version could be silently reinterpreted.
 
 `local_authority`, `schema_migrations`, `connectors_er_authority`, Eventlog's own
 tables, SQLite indexes and triggers are provider bookkeeping. The two clock rows
-are owner anti-regression observations. The retained ReadUse is a concrete owner
+are owner anti-regression observations. A recorded ReadUse, which releases up to 0.76.0 wrote and the legacy import creates (from 0.77.0 on a captured use is held by the owner process and not recorded), is a concrete owner
 fact because conflating it with a transient admission both fabricated absent
 evidence during legacy migration and made revoke unable to preserve a
 historical use. No generic row type is introduced.

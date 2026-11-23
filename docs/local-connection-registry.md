@@ -231,7 +231,7 @@ The initial bounds are 1,000 connections per instance, 10,000 total connections,
 100,000 acquisition histories, 64 retained material versions per connection (one bound
 for connect, reconnect and refresh),
 1,000 open read uses of the owner process (those not yet released; a released use holds no
-capacity) and 10,000 live cursors. Exhaustion refuses;
+capacity; an unreleased use that an ended owner of a release up to 0.76.0 recorded counts against the bound until its deadline passes) and 10,000 live cursors. Exhaustion refuses;
 it does not evict authority or pretend an incomplete list is complete. Pages accept
 1–500 members, bind instance/configuration/limit/epoch, and expire at the
 original five-minute deadline. Publication, revoke and known invalidity invalidate

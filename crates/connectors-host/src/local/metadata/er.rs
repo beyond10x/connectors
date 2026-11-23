@@ -478,9 +478,10 @@ pub(super) struct ErAuthority {
     /// [`IDLE`]: an open of the same store by another thread of this process
     /// waits for it to return there ([`take_or_wait`]).
     checkout: Option<Checkout>,
-    /// The ids of the read uses this process holds ([`HELD_USES`]) that are
-    /// rows of the projection last built from this handle.
-    held_uses: std::collections::BTreeSet<String>,
+    /// The read uses this process holds ([`HELD_USES`]) that are rows of the
+    /// projection last built from this handle, by id, as that projection
+    /// holds them since its build or its last persist that was not refused.
+    held_uses: BTreeMap<String, RowImage>,
     /// The caller held the store's lifecycle lock when that projection was
     /// built, and holds it until its persist: only such a handle's persist
     /// replaces what the process holds.
@@ -2452,7 +2453,7 @@ impl ErAuthority {
             opened: facade.open_verification(),
             facade,
             checkout: None,
-            held_uses: std::collections::BTreeSet::new(),
+            held_uses: BTreeMap::new(),
             built_locked: false,
         }
     }
@@ -2997,8 +2998,35 @@ pub(super) fn simulate_process(id: u64) {
     PROCESS.with(|process| process.set(id));
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The stores this thread built a projection of, each with the process the
+    /// thread acted as then.
+    static USED_STORES: std::cell::RefCell<Vec<(u64, std::path::PathBuf, Authority)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Notes that this thread used `er`'s store as the process it acts as.
+#[cfg(test)]
+fn note_used_store(er: &ErAuthority) {
+    let store = (
+        er.process,
+        er.durable_path.clone(),
+        er.facade.authority().clone(),
+    );
+    USED_STORES.with(|used| {
+        let mut used = used.borrow_mut();
+        if !used.contains(&store) {
+            used.push(store);
+        }
+    });
+}
+
 /// Ends the process this thread acts as: the handles it holds are closed,
-/// as they are when a real process exits.
+/// as they are when a real process exits. Its read uses end in the stores
+/// this thread used as that process: test threads share process ids, and a
+/// thread of another test that acts as the same process on its own store is
+/// another process, whose uses stay.
 #[cfg(test)]
 pub(super) fn exit_process() {
     let process = process();
@@ -3016,8 +3044,20 @@ pub(super) fn exit_process() {
     if let Ok(mut checkouts) = CHECKOUTS.lock() {
         checkouts.opened.retain(|(_, owner, _)| *owner != process);
     }
-    // The read uses a process holds end with it.
-    held_uses_lock().retain(|held| held.process != process);
+    // The read uses a process holds end with it, store by store.
+    let ended = USED_STORES.with(|used| {
+        let (ended, kept) = std::mem::take(&mut *used.borrow_mut())
+            .into_iter()
+            .partition::<Vec<_>, _>(|(owner, _, _)| *owner == process);
+        *used.borrow_mut() = kept;
+        ended
+    });
+    held_uses_lock().retain(|held| {
+        held.process != process
+            || !ended
+                .iter()
+                .any(|(_, path, authority)| held.path == *path && held.authority == *authority)
+    });
 }
 
 #[cfg(test)]
@@ -3148,6 +3188,8 @@ pub(super) fn projection(
     let (connection, held) = timed("host.projection", || build_projection(authority_id, er))?;
     er.held_uses = held;
     er.built_locked = locked;
+    #[cfg(test)]
+    note_used_store(er);
     Ok(connection)
 }
 
@@ -3174,11 +3216,11 @@ fn held_use_projects(connection: &Connection, held: &RowImage) -> Result<bool> {
         .map_err(unavailable)
 }
 
-/// The projection, and the ids of the held read uses that are rows of it.
+/// The projection, and the held read uses that are rows of it, by id.
 fn build_projection(
     authority_id: uuid::Uuid,
     er: &ErAuthority,
-) -> Result<(Connection, std::collections::BTreeSet<String>)> {
+) -> Result<(Connection, BTreeMap<String, RowImage>)> {
     let level = er.projection_level;
     let mut connection = Connection::open_in_memory().map_err(unavailable)?;
     connection
@@ -3238,7 +3280,7 @@ fn build_projection(
     }
     // The read uses this process holds, each only while the rows it names
     // are projected: the foreign-key check below then holds for them too.
-    let mut held = std::collections::BTreeSet::new();
+    let mut held = BTreeMap::new();
     if let Some(table) = TABLES
         .iter()
         .find(|table| table.entity == READ_USE && table.level <= level)
@@ -3252,7 +3294,7 @@ fn build_projection(
                 continue;
             }
             insert_row(&connection, table, &row, &er.baseline, level)?;
-            held.insert(row.id);
+            held.insert(row.id.clone(), row);
         }
     }
     connection
@@ -4056,9 +4098,11 @@ pub(super) fn persist(
     // projection built without the lock (an observation, an inspection) may
     // lack a use captured, or hold one swept or released, since its build.
     if er.built_locked {
-        er.held_uses = held.iter().map(|row| row.id.clone()).collect();
-        hold_uses(er, held);
+        hold_uses(er, held.clone());
     }
+    // Either way they are what `connection` holds unrecorded from here on,
+    // which the next persist of this handle compares its rows with.
+    er.held_uses = held.into_iter().map(|row| (row.id.clone(), row)).collect();
     Ok(())
 }
 
@@ -4123,6 +4167,22 @@ fn persist_batch(
         .filter(|key| key.0 == READ_USE && !reference.contains_key(*key))
         .cloned()
         .collect::<Vec<_>>();
+    // A persist that may write only the registry clock, or only runtime
+    // rows, has no statement on a read use: the unrecorded uses its SQL
+    // holds are the ones its projection held, each unchanged. A use added,
+    // changed or removed refuses the persist, as it does for a recorded use
+    // in the two checks below.
+    if (runtime_state_only || prepared_observation)
+        && (unrecorded.len() != er.held_uses.len()
+            || unrecorded.iter().any(|key| {
+                let (Some(held), Some(next)) = (er.held_uses.get(&key.1), desired.get(key)) else {
+                    return true;
+                };
+                held.fields != next.fields || held.lifecycle_state != next.lifecycle_state
+            }))
+    {
+        return Err(Failure::MetadataUnavailable);
+    }
     let mut held = Vec::new();
     for key in unrecorded {
         // Under the lifecycle lock since the build, a use the build did not
@@ -4131,7 +4191,7 @@ fn persist_batch(
         // Without the lock since the build, another thread of this process
         // may have swept or released the use since: that is no creation.
         let holds = !er.built_locked
-            || er.held_uses.contains(&key.1)
+            || er.held_uses.contains_key(&key.1)
             || (!records_new_read_uses()
                 && desired
                     .get(&key)

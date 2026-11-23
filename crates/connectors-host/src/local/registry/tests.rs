@@ -2398,3 +2398,766 @@ fn read_invoke_metadata_time() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Adversarial pass on story:settled-read-uses-leave-the-store (e08df9e9fd8).
+// Each test acts as its own simulated process, so that ending it closes only
+// its own handles and held uses.
+
+/// Row count and content hash of every table of the store file.
+fn adversary_d5_store_tables(root: &Path) -> std::collections::BTreeMap<String, (i64, u64)> {
+    use rusqlite::types::ValueRef;
+    use std::hash::{Hash, Hasher};
+    let connection = rusqlite::Connection::open_with_flags(
+        root.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    let names = connection
+        .prepare(
+            "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        )
+        .unwrap()
+        .query_map([], |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .unwrap();
+    let mut tables = std::collections::BTreeMap::new();
+    for name in names {
+        let mut statement = connection
+            .prepare(&format!("SELECT * FROM \"{name}\""))
+            .unwrap();
+        let columns = statement.column_count();
+        let mut rows = statement.query([]).unwrap();
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        let mut count = 0_i64;
+        while let Some(row) = rows.next().unwrap() {
+            count += 1;
+            for index in 0..columns {
+                match row.get_ref(index).unwrap() {
+                    ValueRef::Null => 0_u8.hash(&mut hasher),
+                    ValueRef::Integer(value) => {
+                        1_u8.hash(&mut hasher);
+                        value.hash(&mut hasher);
+                    }
+                    ValueRef::Real(value) => {
+                        2_u8.hash(&mut hasher);
+                        value.to_bits().hash(&mut hasher);
+                    }
+                    ValueRef::Text(value) => {
+                        3_u8.hash(&mut hasher);
+                        value.hash(&mut hasher);
+                    }
+                    ValueRef::Blob(value) => {
+                        4_u8.hash(&mut hasher);
+                        value.hash(&mut hasher);
+                    }
+                }
+            }
+        }
+        tables.insert(name, (count, hasher.finish()));
+    }
+    tables
+}
+
+/// The read uses of the calling process's projection, as (dispatched, released) by id.
+fn adversary_d5_uses(root: &Path) -> std::collections::BTreeMap<String, (bool, bool)> {
+    let metadata = Metadata::inspect(root).unwrap();
+    let mut statement = metadata
+        .connection
+        .prepare("SELECT use_id,dispatched,released FROM registry_uses")
+        .unwrap();
+    statement
+        .query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))
+        .unwrap()
+        .collect::<std::result::Result<_, _>>()
+        .unwrap()
+}
+
+/// Read uses the store records in a state other than `Expired`.
+fn adversary_d5_unexpired_recorded_uses(root: &Path) -> usize {
+    Metadata::inspect(root)
+        .unwrap()
+        .recorded_rows()
+        .iter()
+        .filter(|row| {
+            row.contains("entity: \"connectors.credential_evidence.ReadUse\"")
+                && !row.contains("lifecycle_state: \"Expired\"")
+        })
+        .count()
+}
+
+/// Point 5, the Outcome: "A read invoke records nothing per read in the local
+/// metadata store." Acceptance 1 counts two tables (events and blobs). Here
+/// every table of the store file is compared, and the file's commit counter,
+/// after one warm-up read: a read, a cancelled read, a reuse and a cancelled
+/// revalidation, all inside one interval of the recorded clock floor.
+#[test]
+fn adversary_d5_read_paths_leave_every_table_of_the_store_file_unchanged() {
+    use super::super::metadata::{exit_process, simulate_process};
+    simulate_process(0xad5_0001);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let read = |now: u64| {
+        registry
+            .admit_read(&binding(), &reference, &BTreeSet::new(), now)
+            .unwrap();
+        let captured = registry
+            .capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 1000)
+            .unwrap();
+        let dispatched = registry.dispatch_read(captured, now).unwrap();
+        registry.release_read(dispatched, now).unwrap();
+    };
+    // Whatever a first read writes once (an open checkpoint) is written here.
+    read(NOW + 1);
+    let observer = rusqlite::Connection::open_with_flags(
+        root.path().join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    let commits = |observer: &rusqlite::Connection| -> i64 {
+        observer
+            .query_row("PRAGMA data_version", [], |row| row.get(0))
+            .unwrap()
+    };
+    let before_commits = commits(&observer);
+    let mut before = adversary_d5_store_tables(root.path());
+    assert!(
+        before
+            .get("connectors_er_events")
+            .is_some_and(|table| table.0 > 0),
+        "the comparison reads the store's tables: {before:?}"
+    );
+    let mut changes = Vec::new();
+    let mut compare = |path: &str| {
+        let after = adversary_d5_store_tables(root.path());
+        for (table, now) in &after {
+            if before.get(table) != Some(now) {
+                changes.push(format!(
+                    "{path}: table {table} was {:?} (rows, hash), is {now:?}",
+                    before.get(table)
+                ));
+            }
+        }
+        before = after;
+    };
+    for invoke in 2..=4 {
+        read(NOW + invoke);
+    }
+    compare("three reads");
+    let captured = registry
+        .capture_read(
+            &binding(),
+            &reference,
+            &BTreeSet::new(),
+            NOW + 5,
+            NOW + 1005,
+        )
+        .unwrap();
+    registry.cancel_read(captured, NOW + 5).unwrap();
+    compare("a cancelled read");
+    let target = Binding {
+        instance_id: "target-instance".into(),
+        configuration_revision: "config-target".into(),
+        ..binding()
+    };
+    let source = registry
+        .capture_reuse(
+            "fixture-instance",
+            "fixture-adapter",
+            "config-1",
+            &target,
+            &reference,
+            &revision,
+            NOW + 6,
+            NOW + 1006,
+        )
+        .unwrap();
+    let dispatched = registry.dispatch_reuse(source, NOW + 6).unwrap();
+    registry.release_read(dispatched, NOW + 6).unwrap();
+    compare("a reuse");
+    let captured = registry
+        .capture_revalidation(&binding(), &reference, &revision, NOW + 7, NOW + 1007)
+        .unwrap();
+    registry.cancel_revalidation(captured, NOW + 7).unwrap();
+    compare("a cancelled revalidation");
+    let after_commits = commits(&observer);
+    drop(observer);
+    exit_process();
+    simulate_process(0);
+    assert!(
+        changes.is_empty(),
+        "read paths changed the store file: {changes:#?}"
+    );
+    assert_eq!(
+        after_commits, before_commits,
+        "no table changed, yet a commit wrote the store file during the read paths"
+    );
+}
+
+/// Point 3. A store an owner of 0.76.0 left: ten recorded, released uses and
+/// two recorded uses still open (one Captured, one Dispatched), the owner
+/// gone. The next owner (this change) reads the open ones as open until their
+/// deadline and no longer; its first capture after the deadline records each
+/// of the twelve Expired once, in bounded batches, while its own use is held
+/// and not recorded; nothing is recorded after that.
+#[test]
+fn adversary_d5_the_next_owner_expires_the_recorded_uses_of_an_ended_0760_owner_once() {
+    use super::super::metadata::{
+        exit_process, record_read_uses, simulate_process, with_expiry_batches,
+    };
+    use super::use_and_retirement::TEST_READ_USE_BOUND;
+    simulate_process(0xad5_0002);
+    record_read_uses(true);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let capture =
+        |now: u64| registry.capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 1000);
+    for invoke in 1..=10 {
+        let dispatched = registry
+            .dispatch_read(capture(NOW + invoke).unwrap(), NOW + invoke)
+            .unwrap();
+        registry.release_read(dispatched, NOW + invoke).unwrap();
+    }
+    let left_captured = capture(NOW + 11).unwrap();
+    registry
+        .dispatch_read(capture(NOW + 11).unwrap(), NOW + 11)
+        .unwrap();
+    record_read_uses(false);
+    assert_eq!(adversary_d5_unexpired_recorded_uses(root.path()), 12);
+    // The 0.76.0 owner ends; the next owner is another process.
+    exit_process();
+    simulate_process(0xad5_0003);
+    TEST_READ_USE_BOUND.with(|bound| bound.set(Some(2)));
+    let before_deadline = capture(NOW + 12).err();
+    let read_uses = recorded_read_uses(root.path());
+    let later = NOW + 10_000;
+    let (first, expiry_batches) = with_expiry_batches(4, None, || capture(later));
+    let unexpired = adversary_d5_unexpired_recorded_uses(root.path());
+    let expired = recorded_read_uses(root.path()) - read_uses;
+    let events = recorded_events(root.path());
+    let second = capture(later);
+    let third = capture(later).err();
+    let dispatched = first.and_then(|first| registry.dispatch_read(first, later));
+    let released = dispatched.and_then(|dispatched| registry.release_read(dispatched, later));
+    let fourth = capture(later).map(|_| ());
+    let left = registry.dispatch_read(left_captured, later).err();
+    let events_after = recorded_events(root.path()) - events;
+    let unexpired_after = adversary_d5_unexpired_recorded_uses(root.path());
+    TEST_READ_USE_BOUND.with(|bound| bound.set(None));
+    exit_process();
+    simulate_process(0);
+    assert_eq!(
+        before_deadline,
+        Some(Failure::Capacity),
+        "the two open uses the ended owner recorded count as open before their deadline"
+    );
+    assert_eq!(
+        (released, second.map(|_| ()), third, fourth, left),
+        (
+            Ok(()),
+            Ok(()),
+            Some(Failure::Capacity),
+            Ok(()),
+            Some(Failure::Conflict)
+        ),
+        "after the deadline: the first capture and its read, a second capture, a third past the \
+         bound of 2, a fourth once one is released, and the dispatch of the ended owner's use"
+    );
+    assert_eq!(
+        (unexpired, expired, expiry_batches),
+        (0, 12, 2),
+        "recorded uses not Expired after the first capture, Expired events it recorded, expiry \
+         batches ahead of the final one"
+    );
+    assert_eq!(
+        (events_after, unexpired_after),
+        (0, 0),
+        "events recorded and recorded uses not Expired after the first capture"
+    );
+}
+
+/// Point 4. An observation builds its projection without the lifecycle lock
+/// and takes the lock back before it persists. In that window this process
+/// cancels a use the projection holds as open and captures another, which
+/// records nothing, so the observation's feed check does not refuse it. Its
+/// persist must neither revive the cancelled use nor drop the new one, with
+/// and without a batch (the clock floor) to record.
+#[test]
+fn adversary_d5_an_observation_built_before_a_capture_neither_revives_nor_drops_a_use() {
+    use super::super::metadata::{exit_process, set_relock_hook, simulate_process};
+    use std::{cell::RefCell, rc::Rc};
+    simulate_process(0xad5_0004);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let capture = |now: u64| {
+        Registry::new(root.path())
+            .capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 50_000)
+            .unwrap()
+    };
+    // In the window: cancel `old` and capture another use, both at `at`.
+    let race = |old: ReadUse, at: u64| -> Rc<RefCell<Option<ReadUse>>> {
+        let pending = RefCell::new(Some(old));
+        let captured = Rc::new(RefCell::new(None));
+        let slot = captured.clone();
+        let writer = Registry::new(root.path());
+        let reference = reference.clone();
+        set_relock_hook(Some(Box::new(move || {
+            if let Some(old) = pending.borrow_mut().take() {
+                writer.cancel_read(old, at).unwrap();
+                *slot.borrow_mut() = Some(
+                    writer
+                        .capture_read(&binding(), &reference, &BTreeSet::new(), at, at + 50_000)
+                        .unwrap(),
+                );
+            }
+        })));
+        captured
+    };
+
+    // Without a batch: the observation is inside the clock interval.
+    let first = capture(NOW + 1);
+    let first_id = first.id.clone();
+    let events = recorded_events(root.path());
+    let slot = race(first, NOW + 2);
+    let observed = registry
+        .describe(
+            "fixture-instance",
+            "fixture-adapter",
+            "config-1",
+            &reference,
+            NOW + 3,
+            true,
+        )
+        .map(|_| ());
+    set_relock_hook(None);
+    let second = slot.borrow_mut().take();
+    let unrecorded = recorded_events(root.path()) - events;
+    let uses = adversary_d5_uses(root.path());
+    let second_id = second.as_ref().map(|second| second.id.clone());
+    let dispatched = second.map(|second| registry.dispatch_read(second, NOW + 4).map(|_| ()));
+
+    // With a batch: the observation records a clock floor.
+    let third = capture(NOW + 5);
+    let third_id = third.id.clone();
+    let slot = race(third, NOW + 6);
+    let observed_with_batch = registry
+        .describe(
+            "fixture-instance",
+            "fixture-adapter",
+            "config-1",
+            &reference,
+            NOW + 60_001,
+            true,
+        )
+        .map(|_| ());
+    set_relock_hook(None);
+    let fourth_id = slot.borrow_mut().take().map(|fourth| fourth.id);
+    let recorded = recorded_events(root.path()) - events;
+    let uses_with_batch = adversary_d5_uses(root.path());
+    exit_process();
+    simulate_process(0);
+
+    assert_eq!(observed, Ok(()));
+    let second_id = second_id.expect("the window's capture ran");
+    assert_eq!(
+        unrecorded, 0,
+        "the window's cancel and capture recorded events: the observation was refused and \
+         replayed under the lock, which is not the case under test"
+    );
+    assert_eq!(
+        uses,
+        [
+            (first_id.clone(), (false, true)),
+            (second_id.clone(), (false, false))
+        ]
+        .into_iter()
+        .collect(),
+        "after the observation: the cancelled use released, the window's use open"
+    );
+    assert_eq!(dispatched, Some(Ok(())), "the window's use dispatches");
+    assert_eq!(observed_with_batch, Ok(()));
+    let fourth_id = fourth_id.expect("the second window's capture ran");
+    assert!(
+        recorded > 0,
+        "the second observation recorded its clock floor"
+    );
+    assert_eq!(
+        uses_with_batch,
+        [
+            (first_id, (false, true)),
+            (second_id, (true, false)),
+            (third_id, (false, true)),
+            (fourth_id, (false, false))
+        ]
+        .into_iter()
+        .collect(),
+        "after the observation with a batch: no use revived, none dropped"
+    );
+}
+
+/// Point 2. Three threads of one process read at once while a fourth observes
+/// (its projections are built without the lifecycle lock). Every read
+/// succeeds, every use ends released exactly once, none is lost, doubled or
+/// recorded.
+#[test]
+fn adversary_d5_reads_and_observations_of_one_process_at_once_leave_every_use_released() {
+    use super::super::metadata::{exit_process, simulate_process};
+    const PROCESS: u64 = 0xad5_0005;
+    const READERS: usize = 3;
+    const READS: usize = 3;
+    simulate_process(PROCESS);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let barrier = Arc::new(Barrier::new(READERS + 1));
+    let mut workers = Vec::new();
+    for reader in 0..=READERS {
+        let path = root.path().to_owned();
+        let reference = reference.clone();
+        let barrier = Arc::clone(&barrier);
+        workers.push(std::thread::spawn(move || -> Result<()> {
+            simulate_process(PROCESS);
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
+            let registry = Registry::new(&path);
+            barrier.wait();
+            // Every step at one instant: the registry clock never runs back.
+            let now = NOW + 1;
+            if reader == READERS {
+                for _ in 0..READS * 2 {
+                    registry.admit_read(&binding(), &reference, &BTreeSet::new(), now)?;
+                }
+                return Ok(());
+            }
+            for _ in 0..READS {
+                let captured = registry.capture_read(
+                    &binding(),
+                    &reference,
+                    &BTreeSet::new(),
+                    now,
+                    now + 1000,
+                )?;
+                let dispatched = registry.dispatch_read(captured, now)?;
+                registry.release_read(dispatched, now)?;
+            }
+            Ok(())
+        }));
+    }
+    let outcomes = workers
+        .into_iter()
+        .map(|worker| worker.join().unwrap())
+        .collect::<Vec<_>>();
+    let uses = adversary_d5_uses(root.path());
+    let recorded = recorded_read_uses(root.path());
+    drop(registry);
+    exit_process();
+    simulate_process(0);
+    assert_eq!(outcomes, vec![Ok(()); READERS + 1]);
+    assert_eq!(
+        (
+            uses.len(),
+            uses.values()
+                .filter(|state| **state == (true, true))
+                .count(),
+            recorded
+        ),
+        (READERS * READS, READERS * READS, 0),
+        "uses the process holds, of them dispatched and released, ReadUse events recorded: {uses:?}"
+    );
+}
+
+/// Point 1, and `contracts/cli/v1alpha1/owner.md` (the reuse paragraph this
+/// change extends): "A `connections revoke` run by another process does not
+/// release that use; its dispatch then answers `revoked`", and "A refused
+/// dispatch cancels the read use". The owner holds a reuse capture and a read
+/// in flight when another process revokes the connection. The reuse's dispatch
+/// answers `Revoked` and leaves no open use; the provider's refusal of the
+/// read in flight is taken, changes nothing of the revoked connection and
+/// records no use.
+#[test]
+fn adversary_d5_a_revoke_by_another_process_refuses_the_reuse_and_ends_the_read_in_flight() {
+    use super::super::metadata::{exit_process, simulate_process};
+    simulate_process(0xad5_0006);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let captured = registry
+        .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, NOW + 1000)
+        .unwrap();
+    let flying = registry.dispatch_read(captured, NOW).unwrap();
+    let target = Binding {
+        instance_id: "target-instance".into(),
+        configuration_revision: "config-target".into(),
+        ..binding()
+    };
+    let source = registry
+        .capture_reuse(
+            "fixture-instance",
+            "fixture-adapter",
+            "config-1",
+            &target,
+            &reference,
+            &revision,
+            NOW,
+            NOW + 1000,
+        )
+        .unwrap();
+    // The CLI process: `connections revoke`.
+    simulate_process(0xad5_0007);
+    let revoked = registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &revision,
+            NOW + 1,
+        )
+        .unwrap();
+    exit_process();
+    simulate_process(0xad5_0006);
+    let open_before = adversary_d5_uses(root.path())
+        .values()
+        .filter(|state| !state.1)
+        .count();
+    let reuse = registry.dispatch_reuse(source, NOW + 2).err();
+    let refused = registry.refuse_read(flying, NOW + 2);
+    let open_after = adversary_d5_uses(root.path())
+        .values()
+        .filter(|state| !state.1)
+        .count();
+    let observed = describe(&registry, &reference, NOW + 3);
+    let recorded = recorded_read_uses(root.path());
+    exit_process();
+    simulate_process(0);
+    assert_eq!(
+        open_before, 2,
+        "the other process's revoke released a use the owner holds"
+    );
+    assert_eq!(reuse, Some(Failure::Revoked));
+    assert_eq!(refused, Ok(()));
+    assert_eq!(open_after, 0, "the owner still holds an open use");
+    assert_eq!(
+        (observed.state, observed.revision, recorded),
+        (State::Revoked, revoked, 0),
+        "the revoked connection's state and revision, and ReadUse events recorded"
+    );
+}
+
+/// Point 4. Two persists may write only their own rows: an observation its
+/// registry clock ("This check also covers additions and removals",
+/// `persist_batch`), the runtime-state writer its runtime rows. Up to 0.76.0
+/// both refused a persist whose SQL had added, changed or removed a read use.
+/// Each attempt below is made once against a use that is recorded, as 0.76.0
+/// recorded it (the control: the comparison still refuses it), and once
+/// against a use the process holds.
+#[test]
+fn adversary_d5_a_persist_that_may_write_only_the_clock_or_runtime_rows_refuses_a_changed_use() {
+    use super::super::Failure::MetadataUnavailable;
+    use super::super::metadata::{exit_process, record_read_uses, simulate_process};
+    let attempt = |recorded: bool, process: u64| {
+        // A refused persist retires its handle, which keeps the lifecycle lock until
+        // its worker ended: the next open waits for it.
+        crate::local::metadata::set_lifecycle_lock_wait(
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        );
+        simulate_process(process);
+        let (root, registry) = fixture();
+        let (_, candidate) = prepared(&registry, "one", NOW);
+        let reference = publish_fixture(&registry, candidate, NOW);
+        record_read_uses(recorded);
+        let captured = registry
+            .capture_read(
+                &binding(),
+                &reference,
+                &BTreeSet::new(),
+                NOW + 1,
+                NOW + 1001,
+            )
+            .unwrap();
+        record_read_uses(false);
+        // An observation, replayed outside the lock and relocked, whose SQL
+        // gained a use.
+        let mut observation = Metadata::update_observation(root.path()).unwrap();
+        observation.relock_observation().unwrap();
+        let added = observation
+            .connection
+            .execute(
+                "INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) \
+                 SELECT ?1,connection_ref,generation_id,version_id,publication_fence,expires_at_ms \
+                 FROM registry_uses WHERE use_id=?2",
+                [&uuid::Uuid::new_v4().to_string(), &captured.id],
+            )
+            .unwrap();
+        assert_eq!(
+            added, 1,
+            "the observation's projection holds the captured use"
+        );
+        let inserted = observation.persist_prepared_observation();
+        drop(observation);
+        // An observation replayed under the lock whose SQL released the use.
+        let mut observation = Metadata::update(root.path(), false).unwrap();
+        let changed = observation
+            .connection
+            .execute(
+                "UPDATE registry_uses SET released=1 WHERE use_id=?1",
+                [&captured.id],
+            )
+            .unwrap();
+        assert_eq!(changed, 1);
+        let released = observation.persist_prepared_observation();
+        drop(observation);
+        // The runtime-state writer (`runtime/state.rs`) whose SQL lost the use.
+        let mut runtime = Metadata::update(root.path(), true).unwrap();
+        let removed = runtime
+            .connection
+            .execute("DELETE FROM registry_uses WHERE use_id=?1", [&captured.id])
+            .unwrap();
+        assert_eq!(removed, 1);
+        let deleted = runtime.persist_runtime_state();
+        drop(runtime);
+        // Refused persists change nothing: the use still dispatches.
+        let dispatched = registry.dispatch_read(captured, NOW + 2).map(|_| ());
+        exit_process();
+        simulate_process(0);
+        (inserted, released, deleted, dispatched)
+    };
+    let (_, released, deleted, dispatched) = attempt(true, 0xad5_0008);
+    assert_eq!(
+        (released, deleted, dispatched),
+        (Err(MetadataUnavailable), Err(MetadataUnavailable), Ok(())),
+        "control, a recorded use: the observation that released it, the runtime-state persist \
+         that removed it, its dispatch afterwards"
+    );
+    assert_eq!(
+        attempt(false, 0xad5_0009),
+        (
+            Err(MetadataUnavailable),
+            Err(MetadataUnavailable),
+            Err(MetadataUnavailable),
+            Ok(())
+        ),
+        "a use the process holds: the observation that added one, the observation that released \
+         it, the runtime-state persist that removed it, its dispatch afterwards"
+    );
+}
+
+/// Design, `persist`: "a key that is not in the build snapshot is a new use:
+/// it is admitted only where a recorded creation is admitted today
+/// (`admitted_registry_use`, a row that is Captured, not dispatched and not
+/// released)". A persist that is no admission, and an admission whose new use
+/// is already dispatched, are refused and leave what the process held; an
+/// admission of a captured use holds it.
+#[test]
+fn adversary_d5_only_an_admission_holds_a_new_use_and_only_a_captured_one() {
+    use super::super::Failure::MetadataUnavailable;
+    use super::super::metadata::{exit_process, simulate_process};
+    crate::local::metadata::set_lifecycle_lock_wait(crate::local::metadata::CONTENDED_LOCK_WAIT);
+    simulate_process(0xad5_000a);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let captured = registry
+        .capture_read(
+            &binding(),
+            &reference,
+            &BTreeSet::new(),
+            NOW + 1,
+            NOW + 1001,
+        )
+        .unwrap();
+    // A handle built under the lifecycle lock whose SQL gained a use.
+    let with_new_use = |dispatched: bool| {
+        let metadata = Metadata::update(root.path(), false).unwrap();
+        let added = metadata
+            .connection
+            .execute(
+                "INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms,dispatched) \
+                 SELECT ?1,connection_ref,generation_id,version_id,publication_fence,expires_at_ms,?3 \
+                 FROM registry_uses WHERE use_id=?2",
+                rusqlite::params![uuid::Uuid::new_v4().to_string(), captured.id, dispatched],
+            )
+            .unwrap();
+        assert_eq!(added, 1);
+        metadata
+    };
+    let mut metadata = with_new_use(false);
+    let no_admission = metadata.persist();
+    drop(metadata);
+    let mut metadata = with_new_use(true);
+    let dispatched_admission = metadata.persist_admission();
+    drop(metadata);
+    let held_after_refusals = adversary_d5_uses(root.path()).len();
+    let mut metadata = with_new_use(false);
+    let admission = metadata.persist_admission();
+    drop(metadata);
+    let held_after_admission = adversary_d5_uses(root.path()).len();
+    exit_process();
+    simulate_process(0);
+    assert_eq!(
+        (no_admission, dispatched_admission, held_after_refusals),
+        (Err(MetadataUnavailable), Err(MetadataUnavailable), 1),
+        "a persist that is no admission, an admission of a dispatched use, uses held afterwards"
+    );
+    assert_eq!(
+        (admission, held_after_admission),
+        (Ok(()), 2),
+        "an admission of a captured use, uses held afterwards"
+    );
+}
+
+/// `cargo test -p connectors-host` (`.github/workflows/macos-host.yml`,
+/// `windows-host.yml`) runs the tests of this binary as threads of one process.
+/// The helpers `read_invoke`, `read_invoke_with_distinct_step_clocks` and
+/// `measured_invoke` act as the owner, process 1, from capture to release, and
+/// the tests this change added end process 1 and process 2 (`exit_process`).
+/// Up to 0.76.0 that closed the other thread's idle handles, which it opened
+/// again. This test holds a use as those helpers do while another thread does
+/// what `a_revoke_by_another_process_refuses_the_owners_dispatch_as_revoked`,
+/// `the_read_uses_of_an_ended_process_are_gone_with_it` and
+/// `read_invokes_inside_one_clock_interval_record_nothing` do in their last
+/// lines: the use must still dispatch. The control records the use, as 0.76.0
+/// did.
+#[test]
+fn adversary_d5_a_test_that_ends_process_1_does_not_end_the_uses_of_another_test_thread() {
+    use super::super::metadata::{exit_process, record_read_uses, simulate_process};
+    let dispatch_beside_another_test = |recorded: bool| {
+        let (_root, registry) = fixture();
+        let (_, candidate) = prepared(&registry, "one", NOW);
+        let reference = publish_fixture(&registry, candidate, NOW);
+        // As `read_invoke` (the owner's part of an invoke).
+        simulate_process(1);
+        record_read_uses(recorded);
+        let captured = registry
+            .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, NOW + 1000)
+            .unwrap();
+        record_read_uses(false);
+        // The end of another test, on that test's thread.
+        std::thread::spawn(|| {
+            simulate_process(1);
+            exit_process();
+            simulate_process(0);
+        })
+        .join()
+        .unwrap();
+        let dispatched = registry.dispatch_read(captured, NOW).map(|_| ());
+        simulate_process(0);
+        dispatched
+    };
+    assert_eq!(
+        dispatch_beside_another_test(true),
+        Ok(()),
+        "control: a recorded use dispatches after another test thread ended process 1"
+    );
+    assert_eq!(
+        dispatch_beside_another_test(false),
+        Ok(()),
+        "a held use dispatches after another test thread ended process 1"
+    );
+}
