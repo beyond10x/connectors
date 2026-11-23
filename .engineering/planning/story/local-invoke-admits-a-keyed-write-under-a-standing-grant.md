@@ -100,7 +100,7 @@ scope:
   path: website/docs/guides/guarded-write.md
 - confidence: inferred
   path: website/docs/reference
-revision: 62
+revision: 63
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:03:26Z", actor: "human:timo", revision: 61, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:03:27Z", actor: "human:timo", revision: 62, decided_on: {"recorded":{"review_outcome":8}}}
@@ -606,16 +606,23 @@ Unchanged, generated and the rest:
 
 ## Order and shared files
 
-- One implementor, one checkout, one pull request, in this order: line 21; then
-  story:standing-grant-closes-the-input-to-listed-members; then the signed file, the three
-  commands and the configuration member (acceptance 1-4, 11-14, 16, 19); then the owner path,
-  the answer, the traces and the journey (the rest). `host/standing.rs`,
-  `host/approvals/proof.rs`, `host/config.rs` and `apps/connectors/spec/cli.yaml` are shared by
-  the parts, and the journey reads the file the commands write.
+- Order (the operator, 2026-11-23 about 13:10 CET): this story and
+  story:standing-grant-closes-the-input-to-listed-members are built before
+  story:windows-mcp-tool-call-answers-timeout. Two consumers wait: the `inbox` bridge and the
+  Jira step of release-review.
+- One checkout, one pull request, three implementor runs in this order, each reviewed before
+  the next starts: (1) story:standing-grant-closes-the-input-to-listed-members and design
+  steps 1, 2 and 4 of this story; (2) the signed file, the three commands and the
+  configuration member (acceptance 1-4, 11-14, 16, 19); (3) line 21, then the owner path, the
+  answer, the traces, the documents of design step 3 and the journey (the rest).
+  `host/standing.rs`, `host/approvals/proof.rs`, `host/config.rs` and
+  `apps/connectors/spec/cli.yaml` are shared by the parts, and the journey reads the file the
+  commands write.
 - Generated files: `crates/connectors-build/generated/metadata-emissions/inputs.json` digests
-  `ess/domains` and the Entity Runtime pin. Regenerate once, after the rebase on a `main` that
-  holds release 0.76.1 and story:windows-mcp-tool-call-answers-timeout, never before. Until
-  then the generated checks of both stories are red inside the pull request.
+  `ess/domains` and the Entity Runtime pin. Regenerate once, at the end of run 3, after the
+  rebase on a `main` that holds release 0.76.1 if that release is out by then, never before.
+  Until then the generated checks of both stories are red inside the pull request. If 0.76.1
+  merges later, its pull request regenerates again.
 - In work now: `CHANGELOG.md` is shared with story:windows-mcp-tool-call-answers-timeout,
   story:settled-read-uses-leave-the-store, story:connections-list-answers-through-the-owner
   and releases 0.76.0 and 0.76.1 (these also `inputs.json`); `contracts/cli/v1alpha1/owner.md`,

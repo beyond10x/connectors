@@ -31,7 +31,7 @@ scope:
   path: docs/running-services.md
 - confidence: cited
   path: ess/domains/standing_approvals.yaml
-revision: 17
+revision: 18
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:03:23Z", actor: "human:timo", revision: 16, decided_on: {"recorded":{"review_outcome":4}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:03:24Z", actor: "human:timo", revision: 17, decided_on: {"recorded":{"review_outcome":4}}}
@@ -192,8 +192,8 @@ story:local-invoke-admits-a-keyed-write-under-a-standing-grant, in the same pull
   `ess/domains/standing_approvals.yaml`, `contracts/operations/v1alpha1/semantics.md`,
   `contracts/service/compatibility.md`, `docs/running-services.md` and `CHANGELOG.md`.
 - `crates/connectors-build/generated/metadata-emissions/inputs.json` digests `ess/domains` and
-  the Entity Runtime pin. The generated files are regenerated once, after the rebase on a `main`
-  that holds release 0.76.1 and story:windows-mcp-tool-call-answers-timeout, never before.
+  the Entity Runtime pin. The generated files are regenerated once, at the end of the other
+  story, after the rebase on a `main` that holds release 0.76.1 if it is out by then.
 - `CHANGELOG.md` is also changed by story:settled-read-uses-leave-the-store,
   story:connections-list-answers-through-the-owner, story:windows-mcp-tool-call-answers-timeout
   and releases 0.76.0 and 0.76.1; this story's line goes in after the rebase.
