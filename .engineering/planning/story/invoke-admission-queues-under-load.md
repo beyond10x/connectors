@@ -11,6 +11,8 @@ scope:
 - confidence: inferred
   path: CHANGELOG.md
 - confidence: cited
+  path: adapters/catalog/tests/local_runtime/invoke_definition.rs
+- confidence: cited
   path: apps/connectors-cli-contract
 - confidence: cited
   path: apps/connectors/spec/cli.yaml
@@ -37,7 +39,13 @@ scope:
 - confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
 - confidence: cited
+  path: crates/connectors-build/generated/metadata-emissions
+- confidence: cited
   path: crates/connectors-build/generated/metadata-emissions/inputs.json
+- confidence: cited
+  path: crates/connectors-core/generated/operation-types
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata/entity-runtime-definitions.json
 - confidence: cited
   path: crates/connectors-host/src/local/owner.rs
 - confidence: cited
@@ -51,8 +59,10 @@ scope:
 - confidence: cited
   path: website/docs/reference/contracts/cli.md
 - confidence: cited
+  path: website/docs/reference/contracts/model
+- confidence: cited
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 32
+revision: 38
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T04:15:21Z", actor: "human:timo", revision: 31, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T04:15:23Z", actor: "human:timo", revision: 32, decided_on: {"recorded":{"review_outcome":8}}}
@@ -148,9 +158,14 @@ Tests assert on events, not on elapsed time against a bound a loaded runner cros
 1. `apps/connectors/tests/owner_slow_start.rs`, provider delay 1.5 s (`invoke_ms`), 3 parallel
    reads on one instance, `--deadline-seconds 2`: at least one exits with `timeout` at
    `admission`.
-2. Same run: the line count of `/work/invocations` equals the number of reads that answered.
-3. Same setup with `--deadline-seconds 20`: all 3 answer; and one read with `--definition` and
-   `--deadline-seconds 20` answers.
+2. Same run: a read refused at `admission` was never sent. The fixture provider records a read
+   before its delay, so a read refused at `dispatch` has a line: the lines of
+   `/work/invocations` number at least the reads that answered and at most those plus the
+   reads refused at `dispatch`.
+3. Same setup with `--deadline-seconds 20`: all 3 answer. One read with `--definition` and
+   `--deadline-seconds 20` answers, in the ignored journey of
+   `adapters/catalog/tests/local_runtime/invoke_definition.rs`, which CI runs in its job
+   "ignored CLI journeys".
 4. One cutoff: with `--deadline-seconds 2`, an owner start delayed 1.5 s
    (`CONNECTORS_TEST_OWNER_START_DELAY_MS`) and a read of 1.5 s, the call is refused `timeout`
    (the test names the stage it observes). With two separate windows it would answer.
@@ -163,22 +178,25 @@ Tests assert on events, not on elapsed time against a bound a loaded runner cros
 7. A unit test in `apps/connectors/src/local/invoke.rs` asserts that the cutoff built from
    arguments without the flag is 30,000 ms after its instant. (Line 4 checks that the owner
    start and the read share it.)
-8. A `--walk` with `--deadline-seconds 2` over 3 pages of 1.5 s each answers every page
+8. A `--walk` with `--deadline-seconds 8` over 3 pages of 3 s each answers every page
    (`apps/connectors/tests/invoke_walks.rs`; its fixture gets a per-page delay). Page 1 follows
-   the owner start of `prepare`, as today.
-9. Executable-changed path: the lease length is a parameter of `follow_executable` (30 s in
-   production). A test in the `connectors-host` lib tests uses a 1 s lease, a 5 s read deadline
-   and a validation that pauses 2 s (the injectable pause of `revalidate_with_retries`): the
-   read is refused once, with the code this path answers for a lapsed lease, which the test
-   names, and the registry holds no validation record dated after the lease expiry.
+   the owner start of `prepare`, as today. (With pages of 1.5 s and a deadline of 2 the first
+   page timed out at `dispatch` in 4 of 4 runs at host load 65 to 120.)
+9. Executable-changed path: the lease length is a parameter of `follow_executable_within` (30 s
+   in production; `follow_executable` keeps its signature for the write path). A test in the
+   `connectors-host` lib tests uses a 3 s lease, a 10 s read deadline and a validation that
+   pauses 3.5 s: the read is refused once with `timeout` (the registry's `Expired`), and no
+   validation is sent after the lease expiry. (A 1 s lease made the test depend on two sqlite
+   commits finishing within 300 ms.)
 10. `connectors invoke --help` and the bash completion contain `--deadline-seconds`, and the help
     names `1` and `120`. `semantics.md` contains `--deadline-seconds`. `owner.md` no longer
     contains "the read's own 30 seconds". The checks `AGENTS.md` lists after an edit to
     `ess/domains` pass: `connectors-build metadata-entities --check`, `ess-boundary`, `cli
     --check`, `mcp-bindings --check`, `service-metadata --check`, `connectors-docs generate
     --check` and `cargo test -p connectors-build --tests`.
-11. Measurement, outside the test step, on the instance of the 2026-11-23 comment: 16 parallel
-    reads with `--deadline-seconds 120`. Recorded on issue #267 and as evidence on this story:
+11. Measurement, outside the test step, on the instance of the 2026-11-23 comment, with the
+    released binary that carries the flag (the instance's own credential setup, no second one):
+    16 parallel reads with `--deadline-seconds 120`. Recorded on issue #267 and as evidence on this story:
     version, store size, host load, and per read the outcome and time. Pass: no read is refused
     `timeout` before 120 s of its own wall time; each read answers, is refused `capacity`, or is
     refused `timeout` at `admission` at 120 s; and more than 5 of the 16 answer (baseline: 5 of
@@ -214,6 +232,9 @@ with `--deadline-seconds 120` too.
   alternative: not delivered. The caller names its own deadline instead.
 - `metadata_unavailable` at `observation` under load: cause not shown; assumed to be the 650 MB
   store (issue #267). Re-checked when the consumer reads through a small store.
+- The write path (`crates/connectors-host/src/local/owner/mutation/execution.rs`) calls
+  `follow_executable` and validates up to its own deadline; the implementor reported that this
+  can pass the 30 s lease. Not checked and not changed here.
 - More than one worker per instance, and a longer queue than 16: no artifact carries it. It is
   raised only if bursts are still refused after entity-runtime#94.
 - A deadline flag for writes, `connections` commands and the MCP projection: not requested.
