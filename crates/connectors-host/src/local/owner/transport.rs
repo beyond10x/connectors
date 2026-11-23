@@ -1657,12 +1657,16 @@ fn spawn(
     let launch = runtime::artifact::launch_path(&executable)?;
     #[cfg(target_os = "macos")]
     let mut command = Command::new(launch.path());
+    // The owner runs in `/`, whatever directory the CLI was called from: it
+    // outlives the call and keeps no directory of the caller in use. Its
+    // configuration and state paths are absolute (`Paths::resolve`).
     command
         .args([
             std::ffi::OsStr::new("__connectors-owner"),
             paths.config.as_os_str(),
             paths.state.as_os_str(),
         ])
+        .current_dir("/")
         .env_clear()
         .stdin(Stdio::null())
         .stdout(Stdio::null())

@@ -5,11 +5,25 @@
 ### Changed
 
 - Entity Runtime 0.33.1 (from 0.33.0). No change of the store's form: a store that 0.76.0 wrote
-  opens as before. Measured 2026-11-23 on a store of 50 recorded events, 100 read invokes per
-  run, release profile, three runs per pin at host load 52 to 67: the median time of
-  `er.execute_batch` per read invoke is 110.3 ms with 0.33.1, 129.5 ms with 0.33.0 and 122.9 ms
-  with 0.32.0. A read invoke appends 24,500 blob bytes with 0.33.1 and 0.33.0, and 78,488 with
-  0.32.0.
+  opens as before. Measured 2026-11-23 on the code of 0.76.0, where a read invoke still recorded
+  its uses, on a store of 50 recorded events, 100 read invokes per run, release profile, three
+  runs per pin at host load 52 to 67: the median time of `er.execute_batch` per read invoke is
+  110.3 ms with 0.33.1, 129.5 ms with 0.33.0 and 122.9 ms with 0.32.0, and a read invoke
+  appended 24,500 blob bytes with 0.33.1 and 0.33.0, and 78,488 with 0.32.0. From 0.76.1 a read
+  invoke appends nothing; the pin was not measured again on that code.
+
+### Fixed
+
+- On Linux and macOS the owner and every provider process it starts run in `/`. They kept the
+  working directory of the CLI call that started the owner, and they outlive that call (the
+  owner ends after 10 idle minutes, and it keeps an idle provider after a read), so the
+  caller's directory stayed in use by processes the caller does not know. Reported on 0.65.2:
+  an owner and two providers, up to 27 minutes old, had as working directory a checkout whose
+  run had ended, and that checkout could not be removed. A relative path in a provider's
+  `executable.args` therefore resolves against `/` in the provider the owner starts. In the
+  CLI's own `--print-*` and `--version` calls of that provider it resolves against the
+  directory the CLI was called from, as before. `executable.path` is absolute, as before.
+  Windows is not changed.
 
 ## 0.76.1 — 2026-11-23
 
