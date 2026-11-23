@@ -19011,6 +19011,12 @@
                 "kind": "string"
               }
             },
+            "deadline_seconds": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            },
             "definition": {
               "kind": "optional",
               "of": {
@@ -26388,6 +26394,13 @@
           "source": {
             "kind": "option",
             "long": "out"
+          }
+        },
+        {
+          "field": "deadline_seconds",
+          "source": {
+            "kind": "option",
+            "long": "deadline-seconds"
           }
         }
       ]

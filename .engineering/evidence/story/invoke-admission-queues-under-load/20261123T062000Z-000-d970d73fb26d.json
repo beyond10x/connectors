@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-23T06:20:00Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-admission-queues-under-load",
+  "kind": "story",
+  "revision": 38,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "one-off probe on commit 050f1efe7e1, not committed (two ignored tests appended to apps/connectors/tests/owner_slow_start.rs, run with cargo test, removed again), host load 99: 3 reads of 18 s each on one instance with --deadline-seconds 120: 3 answered, 62.4 s wall, 3 sent; the same 3 without the flag: 1 answered, 1 refused timeout at admission, 1 refused timeout at dispatch, 30.4 s wall, 2 sent"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-23T05:50:00Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-admission-queues-under-load",
+  "kind": "story",
+  "revision": 38,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "implementor, commit 320cb223c56 before rebase: cargo nextest run -p connectors --test owner_slow_start --test invoke_short --test invoke_walks: 44 passed, 0 failed; -p connectors --bin connectors local::invoke: 9 passed; -p connectors-host --lib executable_lease, revalidation_retry, dispatch_wait tests: 9 passed; cargo test -p connectors-build --tests: 163 and 172 passed; the 6 generated-file checks exit 0; ignored journey invoke_definition (with --deadline-seconds 20): 1 passed in 78.57 s"
+  }
+}

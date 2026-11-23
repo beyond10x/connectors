@@ -45,6 +45,10 @@ pub(super) struct Session {
     /// The environment variable a refused `--credential-env` named.
     variable: Option<protected::VariableRefused>,
     pub deadline: u64,
+    /// The one cutoff the preparation of an `invoke` read took, in
+    /// milliseconds since the epoch (story:invoke-admission-queues-under-load):
+    /// the owner start waited until it, and the read's deadline is it.
+    pub read_cutoff: Option<u64>,
     pub approval_deadline: Instant,
     pub mutation_deadline: Option<owner::mutation::Deadline>,
     pub cancelled: bool,
@@ -128,6 +132,7 @@ impl Session {
             ambiguous: None,
             variable: None,
             deadline: 0,
+            read_cutoff: None,
             approval_deadline,
             mutation_deadline,
             cancelled: false,
@@ -597,7 +602,12 @@ impl DynamicValidator for NativeValidator {
                 .map_err(|_| Code::NotFound)?;
             match phase {
                 DynamicPhase::Input => {
-                    session.deadline = connectors_sdk::now_ms() + 30_000;
+                    // A prepared read ends by the cutoff its preparation
+                    // took; a write, and a command line the preparation did
+                    // not read, has 30 seconds from here.
+                    session.deadline = session
+                        .read_cutoff
+                        .unwrap_or_else(|| connectors_sdk::now_ms() + 30_000);
                     owner::validate_document(
                         &operation.input_schema,
                         call.input["input"]

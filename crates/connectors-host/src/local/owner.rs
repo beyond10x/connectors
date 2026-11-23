@@ -1129,28 +1129,66 @@ pub(crate) fn follow_executable<G>(
         &connectors_sdk::Secret,
     ) -> (runtime::Result<runtime::Baseline>, u32, Option<Cause>),
 ) -> Result<()> {
+    follow_executable_within(
+        registry,
+        binding,
+        connection,
+        deadline,
+        EXECUTABLE_LEASE_MS,
+        stored_material(paths, selection),
+        admit,
+        |material, _| validate(material),
+    )
+}
+/// How long the capture of an executable follow-up is leased for: the registry
+/// admits no longer revalidation capture.
+pub(crate) const EXECUTABLE_LEASE_MS: u64 = 30_000;
+/// The custody read of [`follow_executable`]: the captured version's bytes
+/// from the configured store, a failure as the owner answers it.
+pub(crate) fn stored_material<'a>(
+    paths: &'a Paths,
+    selection: &'a super::config::Selection,
+) -> impl FnOnce(custody::Version) -> Result<connectors_sdk::Secret> + 'a {
+    move |version| {
+        custody::Store::open_for(version.scope(), selection, &paths.state)
+            .and_then(|store| store.read(version))
+            .map_err(|error| read_error(selection, error))
+    }
+}
+/// [`follow_executable`] with its capture leased for `lease_ms` (at most the
+/// registry's 30 seconds) and its custody read as `read`. The capture expires
+/// at the earlier of `deadline` and the lease's end, and `validate` is given
+/// that instant: a validation the registry would no longer record is not sent
+/// after it (story:invoke-admission-queues-under-load). A capture that expired
+/// before its result was recorded is the registry's `Expired`, `timeout`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn follow_executable_within<G>(
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    connection: &str,
+    deadline: u64,
+    lease_ms: u64,
+    read: impl FnOnce(custody::Version) -> Result<connectors_sdk::Secret>,
+    admit: impl FnOnce() -> Result<G>,
+    validate: impl FnOnce(
+        &connectors_sdk::Secret,
+        u64,
+    ) -> (runtime::Result<runtime::Baseline>, u32, Option<Cause>),
+) -> Result<()> {
     let revision =
         registry.recorded_revision(&binding.instance_id, &binding.adapter_id, connection)?;
     let now = connectors_sdk::now_ms();
-    let captured = registry.capture_revalidation(
-        binding,
-        connection,
-        &revision,
-        now,
-        deadline.min(now + 30_000),
-    )?;
+    let expires = deadline.min(now + lease_ms);
+    let captured = registry.capture_revalidation(binding, connection, &revision, now, expires)?;
     if !captured.follows_executable() {
         registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
         return Err(registry::Failure::UpgradeRequired.into());
     }
-    let version = captured.version();
-    let material = custody::Store::open_for(version.scope(), selection, &paths.state)
-        .and_then(|s| s.read(version));
-    let material = match material {
+    let material = match read(captured.version()) {
         Ok(value) => value,
         Err(error) => {
             registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-            return Err(read_error(selection, error));
+            return Err(error);
         }
     };
     // Whatever `admit` holds (the owner's control lock) is held until the
@@ -1164,7 +1202,7 @@ pub(crate) fn follow_executable<G>(
     };
     let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
     drop(held);
-    let (result, attempts, cause) = validate(&material);
+    let (result, attempts, cause) = validate(&material, expires);
     match result {
         Ok(baseline) => Ok(registry.finish_revalidation(
             dispatched,

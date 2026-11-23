@@ -584,6 +584,7 @@ connectors invoke [OPTIONS] [CONNECTOR[/INSTANCE]] <OPERATION>
 | `--walk <field:walk>` | no | none | any | true: read every page of the walk the read declares, one invoke per page, writing each record as one JSON line to --out, then print a summary |
 | `--max-pages <field:max_pages>` | no | none | any | With --walk: the most pages read, 1 to 10000 [default: 20]; a walk stopped there names its next input in `resume` |
 | `--out <field:out>` | no | none | any | With --walk: a new file the records are written to, owner-only, or `-` for standard output |
+| `--deadline-seconds <field:deadline_seconds>` | no | none | any | A read's deadline in seconds, 1 to 120 [default: 30]: the owner start, the wait for the read's turn and the provider's answer end by it; with --walk each page's; refused on a write and with --describe |
 
 ## `connectors list`
 

@@ -39,13 +39,13 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     // its target (or `--definition`), connection and pins are resolved and
     // stated, `--describe` is answered and a write without approval is
     // refused.
-    let (args, shaping) = match invoke::prepare(args) {
+    let (args, shaping, read_cutoff) = match invoke::prepare(args) {
         Ok(prepared) => prepared,
         Err(answered) => return answered,
     };
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
-    let mut output = run_selected(args, shaping);
+    let mut output = run_selected(args, shaping, read_cutoff);
     if !deprecations.is_empty() {
         select::deprecate(&mut output, json, &deprecations);
     }
@@ -65,12 +65,17 @@ fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::Proce
     }
 }
 
+/// `args` run by the generated runner. `read_cutoff` is the one cutoff the
+/// preparation of an `invoke` read took, in milliseconds since the epoch: it
+/// is carried to the session here, in the process, and is no argument.
 fn run_selected(
     args: Vec<OsString>,
     shaping: Option<invoke::Shaping>,
+    read_cutoff: Option<u64>,
 ) -> connectors_cli_contract::ProcessOutput {
     let session = session::Session::new(&args);
     session.borrow_mut().shaping = shaping;
+    session.borrow_mut().read_cutoff = read_cutoff;
     if let Some(output) = configuration_preflight(&session.borrow()) {
         return output;
     }

@@ -45,7 +45,7 @@ pub const CREDENTIAL_ENV_HELP: &str = "The name of an environment variable holdi
 
 /// The help of the `invoke` arguments (story:connectors-do-short-invocation;
 /// `contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
-pub const INVOKE_HELP: [(&str, &str); 19] = [
+pub const INVOKE_HELP: [(&str, &str); 20] = [
     (
         "field:target",
         "The connector, and after one `/` its instance; the instance may be left out when the connector has only one; with --definition the target may be left out, the file naming the connector",
@@ -109,6 +109,10 @@ pub const INVOKE_HELP: [(&str, &str); 19] = [
     (
         "field:out",
         "With --walk: a new file the records are written to, owner-only, or `-` for standard output",
+    ),
+    (
+        "field:deadline_seconds",
+        "A read's deadline in seconds, 1 to 120 [default: 30]: the owner start, the wait for the read's turn and the provider's answer end by it; with --walk each page's; refused on a write and with --describe",
     ),
 ];
 

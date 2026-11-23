@@ -594,6 +594,37 @@ fn every_invalid_input_of_invoke_names_its_field() {
             ],
             "target",
         ),
+        // story:invoke-admission-queues-under-load: `--deadline-seconds` is
+        // refused from the arguments, with `--definition` too; a value in
+        // range beside `--definition` is admitted, and the refusal is the
+        // absent file's.
+        (
+            vec!["invoke", CONNECTOR, READ, "--deadline-seconds", "0"],
+            "deadline_seconds",
+        ),
+        (
+            vec![
+                "invoke",
+                "project.get",
+                "--definition",
+                definition,
+                "--deadline-seconds",
+                "121",
+            ],
+            "deadline_seconds",
+        ),
+        (
+            vec![
+                "invoke",
+                "forge",
+                "project.get",
+                "--definition",
+                absent,
+                "--deadline-seconds",
+                "20",
+            ],
+            "definition",
+        ),
     ];
     let mut seen = Vec::new();
     let mut expected = Vec::new();
@@ -1000,6 +1031,62 @@ fn no_invoke_answer_names_adapter() {
     }
 }
 
+/// story:invoke-admission-queues-under-load: `invoke --help` and the bash
+/// completion offer `--deadline-seconds`, the help names its bounds, and the
+/// contract states the rule: `semantics.md` names the flag, and `owner.md` no
+/// longer says the read has 30 seconds of its own.
+#[test]
+fn the_help_the_completion_and_the_contract_name_the_deadline() {
+    let home = tempfile::tempdir().unwrap();
+    let cli = |args: &[&str]| {
+        let output = Command::new(env!("CARGO_BIN_EXE_connectors"))
+            .args(args)
+            .env("HOME", home.path())
+            .env_remove("XDG_CONFIG_HOME")
+            .env_remove("XDG_STATE_HOME")
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let help = cli(&["invoke", "--help"]);
+    let option = help
+        .lines()
+        .position(|line| line.contains("--deadline-seconds"))
+        .expect(
+            "story:invoke-admission-queues-under-load: `invoke --help` names --deadline-seconds",
+        );
+    // The option's own help: its line and the wrapped lines after it, up to
+    // the next option.
+    let own: String = help
+        .lines()
+        .skip(option)
+        .take_while(|line| {
+            line.contains("--deadline-seconds") || !line.trim_start().starts_with("--")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        own.contains("1 to 120"),
+        "story:invoke-admission-queues-under-load: the help names 1 and 120: {own:?}"
+    );
+    assert!(
+        cli(&["completions", "bash"]).contains("--deadline-seconds"),
+        "story:invoke-admission-queues-under-load: the bash completion offers --deadline-seconds"
+    );
+    let semantics = include_str!("../../../contracts/cli/v1alpha1/semantics.md");
+    assert!(
+        semantics.contains("`--deadline-seconds <n>`") && semantics.contains("`deadline_seconds`"),
+        "story:invoke-admission-queues-under-load: semantics.md states the rule"
+    );
+    let owner = include_str!("../../../contracts/cli/v1alpha1/owner.md");
+    assert!(
+        !owner.contains("the read's own 30 seconds"),
+        "story:invoke-admission-queues-under-load: owner.md still gives the read 30 seconds of its own"
+    );
+}
+
 #[cfg(target_os = "linux")]
 mod jailed {
     use super::{Value, json, names_adapter};
@@ -1160,5 +1247,62 @@ mod jailed {
             "story:connectors-do-short-invocation"
         );
         assert!(container.seen("invocations").is_empty());
+    }
+
+    /// story:invoke-admission-queues-under-load: `--deadline-seconds` is a
+    /// whole number from 1 to 120 and belongs to a read. Outside that range,
+    /// not a number, or beside `--idempotency-key`, `--approval-file` or
+    /// `--describe`, it is `invalid_input` naming `deadline_seconds` at
+    /// `arguments`, decided from the arguments alone: no owner is started and
+    /// nothing reaches the provider. `1` and `120` are admitted.
+    #[test]
+    fn a_deadline_outside_its_range_or_beside_a_write_or_describe_is_refused_unsent() {
+        let (container, _) = connected();
+        success(&container.run(&["setup", "owner-stop"]));
+        assert!(container.owners().is_empty());
+        let read = ["invoke", "fixture/main", READ];
+        let document = ["--input-json", "{}"];
+        let refused: [&[&str]; 6] = [
+            &["--deadline-seconds", "0"],
+            &["--deadline-seconds", "121"],
+            &["--deadline-seconds", "x"],
+            &["--deadline-seconds", "20", "--idempotency-key", "key-1"],
+            &["--deadline-seconds", "20", "--approval-file", "/work/proof"],
+            &["--deadline-seconds", "20", "--describe"],
+        ];
+        for extra in refused {
+            let describes = extra.contains(&"--describe");
+            let mut args = read.to_vec();
+            if !describes {
+                args.extend(document);
+            }
+            args.extend(extra);
+            let (code, data) = refusal(&container.run(&args));
+            assert_eq!(
+                (code, &data["code"], &data["field"], &data["stage"]),
+                (
+                    Some(2),
+                    &json!("invalid_input"),
+                    &json!("deadline_seconds"),
+                    &json!("arguments")
+                ),
+                "story:invoke-admission-queues-under-load: {extra:?}: {data}"
+            );
+            assert!(container.owners().is_empty(), "{extra:?} started an owner");
+            assert!(container.seen("invocations").is_empty(), "{extra:?}");
+        }
+        // The largest value is admitted and the read answers.
+        let mut args = [&read[..], &document[..], &["--deadline-seconds", "120"][..]].concat();
+        let answered = success(&container.run(&args));
+        assert_eq!(answered["result"]["credential"], digest(SECRET));
+        assert_eq!(container.seen("invocations").len(), 1);
+        // The smallest is admitted too: the read answers, or its second ends
+        // first on a loaded host, which is `timeout` and never `invalid_input`.
+        *args.last_mut().unwrap() = "1";
+        let output = container.run(&args);
+        if !output.status.success() {
+            let (_, data) = refusal(&output);
+            assert_eq!(data["code"], "timeout", "{data}");
+        }
     }
 }
