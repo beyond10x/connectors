@@ -207,6 +207,15 @@ impl Served {
     fn config(&self) -> PathBuf {
         self.root.path().join("config/config.toml")
     }
+    /// Where the files go that the CLI and the owner admit by who may write
+    /// them: on Windows the configuration directory, elsewhere the root.
+    fn private_directory(&self) -> PathBuf {
+        if cfg!(windows) {
+            self.root.path().join("config")
+        } else {
+            self.root.path().to_owned()
+        }
+    }
     fn run(&self, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_connectors"))
             .args(["--output", "json", "--config"])
@@ -228,7 +237,21 @@ impl Served {
             _keyring: keyring,
         };
         success(&served.run(&["setup", "init"]));
-        let executable = std::env::current_exe().unwrap();
+        // On Windows the owner admits an adapter executable only below
+        // directories nobody else may write, and a hosted runner's
+        // `D:\a\…\target` inherits such a grant from its volume root
+        // (`test_executable.rs` in connectors-host). The configuration
+        // directory `setup init` made is the user's alone, so the adapter and
+        // the credential file go there.
+        let built = std::env::current_exe().unwrap();
+        #[cfg(windows)]
+        let executable = {
+            let copy = served.private_directory().join(built.file_name().unwrap());
+            fs::copy(&built, &copy).unwrap();
+            copy
+        };
+        #[cfg(not(windows))]
+        let executable = built;
         let adapter = config::Adapter {
             instance_id: INSTANCE.into(),
             adapter_id: ADAPTER.into(),
@@ -267,9 +290,9 @@ impl Served {
             serde_json::to_string(&adapter.executable.args).unwrap(),
         );
         private(&served.config(), &text);
-        let credential = served.root.path().join("credential");
+        let credential = served.private_directory().join("credential");
         private(&credential, std::str::from_utf8(SECRET).unwrap());
-        let connected = success(&served.run(&[
+        let connect = served.run(&[
             "connections",
             "connect",
             "--adapter",
@@ -278,7 +301,21 @@ impl Served {
             PROFILE,
             "--credential-file",
             credential.to_str().unwrap(),
-        ]));
+        ]);
+        // A refused connect does not say which step of the adapter's start
+        // failed; the owner it left running does, in `start_failure`.
+        assert!(
+            connect.status.success(),
+            "{}\n{}\ninstances status: {}",
+            String::from_utf8_lossy(&connect.stdout),
+            String::from_utf8_lossy(&connect.stderr),
+            String::from_utf8_lossy(
+                &served
+                    .run(&["instances", "status", "--adapter", ALIAS])
+                    .stdout
+            )
+        );
+        let connected = success(&connect);
         let connection = connected["connection"]["summary"]["connection"]
             .as_str()
             .unwrap_or_else(|| panic!("{connected}"))
