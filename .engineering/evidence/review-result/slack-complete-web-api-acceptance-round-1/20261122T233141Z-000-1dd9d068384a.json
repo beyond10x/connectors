@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-22T23:31:41Z",
+  "actor": "human:timo",
+  "artifact": "review-result:slack-complete-web-api-acceptance-round-1",
+  "kind": "review-result",
+  "revision": 2,
+  "change": {
+    "change": "redaction",
+    "literal_sha256": "fe02e6dffd58a25a635417ccac0ef2626e46d235beead08689a30f73f65c62b6",
+    "literal_chars": 70,
+    "replacement": "",
+    "count": 3,
+    "reason": "a local worktree path the privacy check refuses"
+  }
+}
