@@ -254,10 +254,27 @@ fn ms(duration: Duration) -> f64 {
     duration.as_secs_f64() * 1000.0
 }
 
+/// The bytes of every blob the store in `root` holds: `sum(length(bytes))`
+/// over `connectors_er_blobs`.
+fn blob_bytes(root: &Path) -> i64 {
+    rusqlite::Connection::open_with_flags(
+        root.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
+    .query_row(
+        "SELECT coalesce(sum(length(bytes)),0) FROM connectors_er_blobs",
+        [],
+        |row| row.get(0),
+    )
+    .unwrap()
+}
+
 /// Per-invoke metadata time at 50, 600 and 1,200 recorded events, or at the
 /// comma-separated sizes in `CONNECTORS_STORE_COST_EVENTS`, with where the
 /// time went: per step, and per kind of metadata work, and the peak resident
-/// set of measuring that size. A measurement, not a check; run it in a
+/// set of measuring that size, and with `blob_bytes_per_invoke`, the blob
+/// bytes a measured invoke appended. A measurement, not a check; run it in a
 /// release build:
 /// `CONNECTORS_STORE_COST_STORES=<dir> cargo test --release -p connectors-host --lib read_invoke_cost_by_store_size -- --ignored --nocapture`.
 /// The first run grows and saves the stores in `<dir>`; later runs reuse them.
@@ -319,15 +336,22 @@ fn read_invoke_cost_by_store_size() {
         let mut failed = 0;
         let mut by_step: BTreeMap<String, (Duration, Duration)> = BTreeMap::new();
         let mut by_kind: BTreeMap<&'static str, (u64, Duration)> = BTreeMap::new();
+        // Blob bytes are read between invokes, outside every timed step, and
+        // only a measured invoke's growth is counted.
+        let mut blobs = blob_bytes(root.path());
+        let mut blob_growth = 0;
         for invoke in 1..=invokes {
             // An invoke past the bridge deadline answers `OutcomeUnknown`, as
             // it does for an operator: counted, not measured.
-            let Ok(steps) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 measured_invoke(root.path(), registry, reference, NOW + 10_000 + invoke)
-            })) else {
+            }));
+            let blobs_before = std::mem::replace(&mut blobs, blob_bytes(root.path()));
+            let Ok(steps) = outcome else {
                 failed += 1;
                 continue;
             };
+            blob_growth += blobs - blobs_before;
             totals.push(steps.iter().map(|step| step.elapsed).sum::<Duration>());
             cpu.push(steps.iter().map(|step| step.cpu).sum::<Duration>());
             for (index, step) in steps.iter().enumerate() {
@@ -358,9 +382,10 @@ fn read_invoke_cost_by_store_size() {
         cpu.sort_unstable();
         let per = |total: Duration| ms(total) / measured as f64;
         println!(
-            "events={recorded} invokes={measured} failed={failed} appended_per_invoke={} clock_floor_events_per_invoke={:.1} median_ms={:.0} min_ms={:.0} max_ms={:.0} median_cpu_ms={:.0} peak_rss_mb={}",
+            "events={recorded} invokes={measured} failed={failed} appended_per_invoke={} clock_floor_events_per_invoke={:.1} blob_bytes_per_invoke={:.0} median_ms={:.0} min_ms={:.0} max_ms={:.0} median_cpu_ms={:.0} peak_rss_mb={}",
             appended / invokes as i64,
             floors as f64 / invokes as f64,
+            blob_growth as f64 / measured as f64,
             ms(totals[measured / 2]),
             ms(totals[0]),
             ms(totals[measured - 1]),
