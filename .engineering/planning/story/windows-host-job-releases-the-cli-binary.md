@@ -13,7 +13,9 @@ scope:
   path: .github/workflows/macos-host.yml
 - confidence: cited
   path: .github/workflows/windows-host.yml
-revision: 6
+- confidence: cited
+  path: apps/connectors/tests/mcp_stdio_serves.rs
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T08:18:23Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-23T08:18:24Z", actor: "human:timo", revision: 6}
@@ -69,3 +71,30 @@ connectors --no-run`, each of the five commands with `-p connectors-host -p conn
 
 Stopping the processes a test leaves running: not known to exist until the new step printed
 them.
+
+## What the first run of the pull request showed (2026-11-23, run 45137905852)
+
+- "The MCP stdio server's launch contract and lease timers" passed in 4 s: nothing was rebuilt.
+- The new step printed 20 processes still running from `target\`, all
+  `connectors.exe __connectors-owner` started by tests of the step before. story:test-children-die-with-their-parent
+  (active) carries them.
+- "The MCP stdio server serves a session on the platform's own custody" then ran on Windows for
+  the first time and failed: `connections connect` answered `invalid_configuration`, stage
+  `configuration` (`apps/connectors/tests/mcp_stdio_serves.rs:180`). That step was `skipped` on
+  every Windows run on `main` since it was added (first red run 43370169181,
+  2026-11-13T05:09Z, commit 1122ee1c945).
+- Cause, read from the code, the runner's access list inferred: the test configured the test
+  binary where cargo built it. On Windows the owner admits an adapter executable only below
+  directories nobody else may write (`crates/connectors-host/src/local/config.rs:2337-2343`,
+  `filesystem/windows.rs:702-726`), and a hosted runner's `D:\a\…\target` inherits a wider grant
+  from its volume root (`crates/connectors-host/src/local/test_executable.rs:4-11`). The unit
+  tests of connectors-host copy the binary into an owner-only directory; this test did not. No
+  test in `apps/connectors/tests` had started an adapter child on Windows before.
+- Fix in the test: on Windows the adapter binary is copied into the configuration directory
+  `setup init` made, and the credential file is written there. A refused connect now prints
+  `instances status`, whose `start_failure` names the step of the adapter's start that failed.
+- On Linux the changed test passes with the step's own command: `1 passed … finished in 21.41s`
+  at host load 71 to 104.
+
+Still not known until the next Windows run: whether the copy is admitted, and whether the
+`connectors-private/3` handshake through `serve` works on Windows (no Windows test covered it).
