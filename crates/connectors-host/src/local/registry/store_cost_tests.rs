@@ -452,6 +452,76 @@ fn measure_each_size_alone(sizes: &[i64], saved: Option<std::path::PathBuf>) {
     }
 }
 
+/// The `CONNECTORS_STORE_COST_EVENTS` that `read_invoke_cost_by_store_size`
+/// grew `tests/fixtures/metadata-store-er-0.32.0` to; its README says how.
+#[cfg(unix)]
+const PREVIOUS_PIN_EVENTS: i64 = 18;
+
+/// A store Entity Runtime 0.32.0, the pin before this one, wrote a read
+/// invoke into takes a read invoke under the current pin: the fixture is
+/// loaded as a saved store is, and each of the four registry calls of
+/// `measured_invoke` answers `Ok` for the binding the cost test published.
+///
+/// The fixture records the uid of the machine that wrote it, and `Metadata`
+/// refuses a store another uid owns, so the copy is always handed to the uid
+/// running this test, as `tests/metadata_store_previous_pin.rs` does.
+#[cfg(unix)]
+#[test]
+fn a_store_the_previous_pin_wrote_a_read_into_takes_a_read_invoke() {
+    use std::os::unix::fs::MetadataExt;
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/metadata-store-er-0.32.0");
+    let copy = tempfile::tempdir().unwrap();
+    for name in ["metadata.sqlite3", "reference", FLOOR_FILE] {
+        std::fs::copy(fixture.join(name), copy.path().join(name)).unwrap();
+    }
+    let owner = std::fs::metadata(copy.path()).unwrap().uid();
+    let copied = rusqlite::Connection::open(copy.path().join("metadata.sqlite3")).unwrap();
+    assert_eq!(
+        copied
+            .execute(
+                "UPDATE local_authority SET owner_uid = ?1 WHERE singleton = 1",
+                [owner],
+            )
+            .unwrap(),
+        1,
+        "the fixture has no ownership record"
+    );
+    // `load` copies the database file alone, so the row must be in it.
+    let (busy, log): (i64, i64) = copied
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .unwrap();
+    assert_eq!((busy, log), (0, 0), "the ownership row stayed in the WAL");
+    drop(copied);
+
+    let (root, registry, reference) = load(copy.path());
+    let loaded = recorded_events(root.path());
+    assert!(
+        loaded >= PREVIOUS_PIN_EVENTS,
+        "{loaded} recorded events loaded, the fixture was grown to {PREVIOUS_PIN_EVENTS}"
+    );
+    let now = NOW + 10_000;
+    registry
+        .admit_read(&binding(), &reference, &BTreeSet::new(), now)
+        .expect("admit_read");
+    let captured = registry
+        .capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 1000)
+        .expect("capture_read");
+    let dispatched = registry
+        .dispatch_read(captured, now)
+        .expect("dispatch_read");
+    registry
+        .release_read(dispatched, now)
+        .expect("release_read");
+    let recorded = recorded_events(root.path());
+    assert!(
+        recorded > loaded,
+        "the read invoke recorded nothing: {loaded} events before it, {recorded} after"
+    );
+}
+
 /// The read-back of a handle's own write is not a licence to skip the next
 /// verification: blob bytes altered after it are refused on the next reopen
 /// whenever a full replay of the same bytes refuses them.

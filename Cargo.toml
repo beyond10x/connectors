@@ -20,10 +20,10 @@ connectors-host = { path = "crates/connectors-host" }
 connectors-custody = { path = "crates/connectors-custody" }
 connectors-definitions-install = { path = "crates/connectors-definitions-install" }
 connectors-oauth2 = { path = "crates/connectors-oauth2" }
-entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.32.0" }
-entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.32.0", features = ["sqlite", "sync-bridge"] }
-entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.32.0" }
-entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.32.0" }
+entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.33.0" }
+entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.33.0", features = ["sqlite", "sync-bridge"] }
+entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.33.0" }
+entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.33.0" }
 eventlog-core = { git = "https://github.com/beyond10x/eventlog", tag = "0.9.4" }
 ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.97.4" }
 ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.97.4" }

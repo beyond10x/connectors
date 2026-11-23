@@ -1,12 +1,12 @@
 {
-  "digest": "d84a6a97aee05277376e530f4a31d79ef5ed631eb6d1a0b25fc792326b1914a6",
+  "digest": "08d0e45f8e66d38cedb63e9a6e6aa79c0da95b703e3297ae23c48ccc02e1b3ec",
   "ess_crates": [
     "entity-core 0.28.0",
-    "entity-core 0.32.0",
-    "entity-eventlog 0.32.0",
-    "entity-executor 0.32.0",
-    "entity-query 0.32.0",
-    "entity-store 0.32.0",
+    "entity-core 0.33.0",
+    "entity-eventlog 0.33.0",
+    "entity-executor 0.33.0",
+    "entity-query 0.33.0",
+    "entity-store 0.33.0",
     "ess-compiler 0.97.4",
     "ess-conformance 0.97.4",
     "ess-domain 0.97.4",
