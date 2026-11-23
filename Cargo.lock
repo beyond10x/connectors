@@ -620,7 +620,7 @@ dependencies = [
  "connectors-oauth2",
  "connectors-sdk",
  "connectors-spec",
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "ess-compiler",
  "ess-conformance",
  "ess-domain",
@@ -673,7 +673,7 @@ dependencies = [
  "connectors-host",
  "connectors-oauth2",
  "connectors-sdk",
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "entity-eventlog",
  "entity-store",
  "eventlog-core",
@@ -857,7 +857,7 @@ dependencies = [
  "connectors-custody",
  "connectors-oauth2",
  "connectors-sdk",
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "entity-eventlog",
  "entity-executor",
  "entity-store",
@@ -1349,8 +1349,8 @@ dependencies = [
 
 [[package]]
 name = "entity-core"
-version = "0.33.0"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.0#cd91442aa8d9744b765635cc6fff013347703b18"
+version = "0.33.1"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.1#45d2b64cde22d77fe2ee0816cce4ceaea0a9c580"
 dependencies = [
  "serde",
  "serde_json",
@@ -1358,10 +1358,10 @@ dependencies = [
 
 [[package]]
 name = "entity-eventlog"
-version = "0.33.0"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.0#cd91442aa8d9744b765635cc6fff013347703b18"
+version = "0.33.1"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.1#45d2b64cde22d77fe2ee0816cce4ceaea0a9c580"
 dependencies = [
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "entity-executor",
  "entity-query",
  "entity-store",
@@ -1376,20 +1376,20 @@ dependencies = [
 
 [[package]]
 name = "entity-executor"
-version = "0.33.0"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.0#cd91442aa8d9744b765635cc6fff013347703b18"
+version = "0.33.1"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.1#45d2b64cde22d77fe2ee0816cce4ceaea0a9c580"
 dependencies = [
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "entity-store",
  "serde_json",
 ]
 
 [[package]]
 name = "entity-query"
-version = "0.33.0"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.0#cd91442aa8d9744b765635cc6fff013347703b18"
+version = "0.33.1"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.1#45d2b64cde22d77fe2ee0816cce4ceaea0a9c580"
 dependencies = [
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "entity-store",
  "serde",
  "serde_json",
@@ -1397,10 +1397,10 @@ dependencies = [
 
 [[package]]
 name = "entity-store"
-version = "0.33.0"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.0#cd91442aa8d9744b765635cc6fff013347703b18"
+version = "0.33.1"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.33.1#45d2b64cde22d77fe2ee0816cce4ceaea0a9c580"
 dependencies = [
- "entity-core 0.33.0",
+ "entity-core 0.33.1",
  "fs2",
  "serde",
  "serde_json",
