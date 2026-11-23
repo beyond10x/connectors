@@ -8,7 +8,8 @@ relations:
 - decomposes: epic:review-20261123-findings
 - serves: vision:independent-contract-adapters
 - depends_on: story:entity-runtime-0330-records-name-definition-by-digest
-revision: 1
+- depends_on: story:read-cost-test-reports-bytes-per-read
+revision: 2
 ---
 ## Outcome
 
@@ -27,7 +28,7 @@ Measured on connectors 0.74.0
 events and 11.0 MB of blobs; one read took 2.5 s at a 3 MB store and 9.9 s at 14 MB; owner RSS
 98 MB at 5 MB and 216 MB at 14.7 MB. On 0.73.0 (issue body): 2,710 of 3,159 recorded entries
 were `connectors.credential_evidence.ReadUse`. With `er.record/5` the bytes per read fall to an
-estimated fifth, and still grow without a bound.
+estimated third (about 3×; story:entity-runtime-0330-records-name-definition-by-digest), and still grow without a bound.
 
 ## Open before design
 

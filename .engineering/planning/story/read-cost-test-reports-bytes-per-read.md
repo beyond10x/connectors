@@ -7,7 +7,8 @@ title: The read-cost test reports bytes appended per read invoke
 relations:
 - decomposes: epic:review-20261123-findings
 - serves: vision:independent-contract-adapters
-revision: 1
+- depends_on: story:entity-runtime-0330-records-name-definition-by-digest
+revision: 2
 ---
 ## Outcome
 
@@ -24,9 +25,10 @@ this number today, so a change that doubles it passes the gate.
 ## Acceptance
 
 - `crates/connectors-host/src/local/registry/store_cost_tests.rs`
-  `read_invoke_cost_by_store_size` prints bytes appended per read invoke for each store size it
-  measures.
-- The bound is the number measured on the commit that adds it; the test fails above it.
+  `read_invoke_cost_by_store_size` keeps the `blob_bytes_per_invoke` print that
+  story:entity-runtime-0330-records-name-definition-by-digest added (this story depends on it).
+- The bound is the number measured on the commit that adds it, which is after the Entity Runtime
+  0.33.0 pin; the test fails above it.
 - The test keeps its place in the lane it runs in today, and its time is reported before and
   after (budget: 60 s per test, 120 s for the test step).
 
