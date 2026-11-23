@@ -7,6 +7,12 @@
 //! granted channel and is refused outside the grant before any provider
 //! request (contracts/cli/v1alpha1/semantics.md, "Standing grants"). The
 //! fixture token is fictional and only ever compared, never printed.
+//!
+//! The story's one journey (steps a to l and the empty approval file) is
+//! five tests here, each on a fixture of its own, so that none nears 60 s
+//! on a loaded host: the connection's validation evidence lasts 60 s from
+//! `connections connect`, and a send after that is `not_granted`, whatever
+//! the grant says.
 use super::cli_journey::{Cli, Custody, success};
 use super::*;
 use std::io::Write;
@@ -170,13 +176,7 @@ impl Slack {
                     "header": "Authorization",
                     "bearer": true,
                     "label": "Slack bot token",
-                    "identity": {"path": "auth.test", "kind": "slack.user", "subject_pointer": "/user_id"},
-                    // The one member the guide's configuration does not
-                    // hold: the connection's validation evidence lasts 60 s
-                    // without it, and a send after that is `not_granted`,
-                    // whatever the grant says. The journey connects once and
-                    // must not depend on how fast the machine runs it.
-                    "evidence_lifetime_ms": 300_000
+                    "identity": {"path": "auth.test", "kind": "slack.user", "subject_pointer": "/user_id"}
                 },
                 "operations_file": repository.join("providers/slack/operations.json").canonicalize().unwrap(),
             }))
@@ -326,23 +326,135 @@ fn names(value: &Value, name: &str) -> bool {
     }
 }
 
-#[test]
-#[ignore = "requires built production CLI and qualified disposable Secret Service"]
-fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() {
-    let slack = Slack::new();
-    let root = slack.root.path();
-    let custody = Custody::new(root);
-    let time = clock();
-    let cli = Cli::new(root);
-    let run = |args: &[&str]| {
-        // The two command words, then the instance selectors.
-        let output = cli.run(&[&args[..2], SELECTION, &args[2..]].concat());
+/// An in-grant post: the granted channel and a text.
+fn post(text: &str) -> Value {
+    json!({"body": {"channel": CHANNEL, "text": text}})
+}
+
+/// One bot instance ready for a keyed write: the Slack fixture, the
+/// disposable Secret Service, the clock, the CLI on the guide's instance with
+/// a grant file configured, a connected bot token, an approval key and a
+/// published policy that lists the operation. No grant is signed yet. Each
+/// journey below builds its own, so none runs longer than its own steps take.
+struct Bot {
+    // Dropped in this order: the reader, the CLI, the Secret Service, the
+    // clock, then the Slack fixture with the root directory.
+    /// The attempts' reader, opened at the first count.
+    recorded: std::cell::OnceCell<recorded_state::Reader>,
+    cli: Cli,
+    _custody: Custody,
+    time: Time,
+    slack: Slack,
+    private_dir: PathBuf,
+    /// The instance's grant file (`standing_grants`).
+    grants: PathBuf,
+    connection: String,
+    begun: Instant,
+}
+
+impl Bot {
+    fn new() -> Self {
+        let begun = Instant::now();
+        let slack = Slack::new();
+        let root = slack.root.path();
+        let custody = Custody::new(root);
+        let time = clock();
+        let cli = Cli::new(root);
+        let q = |value: &str| serde_json::to_string(value).unwrap();
+        let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
+            .canonicalize()
+            .unwrap();
+        let private_dir = root.join("private");
+        let grants = private_dir.join("slack-bot.grants");
+        success(cli.run(&["setup", "init"]));
+        // The guide's bot instance (docs/catalog-slack.md), on private protocol
+        // two, with the approval clock and the instance's grant file.
+        private(
+            &cli.paths.config,
+            format!(
+                "format='connectors-local/5'\nowner_uid={}\nsecret_service_socket={}\n{}\n[connectors.slack]\nenabled=true\n\n[connectors.slack.instances.bot]\nalias='slack'\ninstance_id='fixture-slack'\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='on-demand'\nrestart='never'\nstanding_grants={}\n\n[connectors.slack.instances.bot.permissions]\nprofiles=['slack.bot']\noperations=['auth.test','chat.postMessage']\n\n[connectors.slack.instances.bot.executable]\npath={}\nsha256={}\nargs={}\n",
+                filesystem::uid(),
+                q(custody.socket.to_str().unwrap()),
+                clock_fixture::quorum_toml(
+                    2,
+                    100,
+                    &[(&time.sources[0].address, 7), (&time.sources[1].address, 8)]
+                ),
+                q(&slack.configuration_revision()),
+                q(grants.to_str().unwrap()),
+                q(binary.to_str().unwrap()),
+                q(&hex::encode(Sha256::digest(fs::read(&binary).unwrap()))),
+                serde_json::to_string(&["--local-config", slack.config.to_str().unwrap()]).unwrap(),
+            )
+            .as_bytes(),
+        );
+        let mut bot = Self {
+            recorded: std::cell::OnceCell::new(),
+            cli,
+            _custody: custody,
+            time,
+            slack,
+            private_dir,
+            grants,
+            connection: String::new(),
+            begun,
+        };
+
+        let credential = bot.private_dir.join("credential.json");
+        private(
+            &credential,
+            &serde_json::to_vec(&json!({"token": TOKEN})).unwrap(),
+        );
+        let connected = success(bot.run(&[
+            "connections",
+            "connect",
+            "--profile",
+            "slack.bot",
+            "--credential-file",
+            credential.to_str().unwrap(),
+        ]));
+        fs::remove_file(&credential).unwrap();
+        assert_eq!(connected["connection"]["summary"]["state"], "ready");
+        bot.connection = connected["connection"]["summary"]["connection"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        // The prerequisites of every keyed write: an approval key and a
+        // published policy that lists the operation. The grant is not in that
+        // document.
+        success(bot.run(&["approvals", "key-init"]));
+        let policy = bot.private_dir.join("policy.json");
+        private(&policy, br#"{"operations":["chat.postMessage"]}"#);
+        success(bot.run(&[
+            "approvals",
+            "policy-set",
+            "--input-file",
+            policy.to_str().unwrap(),
+        ]));
+        bot.stamp("fixture");
+        bot
+    }
+
+    /// One line per step on standard error, with the seconds since the
+    /// journey began: a run that nears its 60 s shows where the time went.
+    fn stamp(&self, step: &str) {
+        eprintln!(
+            "slack_standing: {step} done at {:.1} s",
+            self.begun.elapsed().as_secs_f64()
+        );
+    }
+
+    /// The two command words, then the instance selectors, then the rest.
+    fn run(&self, args: &[&str]) -> Output {
+        let output = self.cli.run(&[&args[..2], SELECTION, &args[2..]].concat());
         assert!(!carries_token(&output));
         output
-    };
-    // The outcome's command: no `--approval-file`, no pins, the input on
-    // standard input.
-    let send_with = |key: &str, input: &Value, extra: &[&str]| {
+    }
+
+    /// The outcome's command: no pins, the input on standard input, and no
+    /// `--approval-file` unless `extra` names one.
+    fn send_with(&self, key: &str, input: &Value, extra: &[&str]) -> Output {
         let mut process = Command::new(std::env::var_os("CONNECTORS_TEST_CLI").unwrap())
             .env_clear()
             .env(
@@ -350,9 +462,9 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
                 std::process::id().to_string(),
             )
             .args(["--output", "json", "--config"])
-            .arg(&cli.paths.config)
+            .arg(&self.cli.paths.config)
             .arg("--state-dir")
-            .arg(&cli.paths.state)
+            .arg(&self.cli.paths.state)
             .args([
                 "invoke",
                 "slack/bot",
@@ -376,84 +488,31 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
         let output = process.wait_with_output().unwrap();
         assert!(!carries_token(&output));
         output
-    };
-    let send = |key: &str, input: &Value| send_with(key, input, &[]);
-    let post = |text: &str| json!({"body": {"channel": CHANNEL, "text": text}});
-    let q = |value: &str| serde_json::to_string(value).unwrap();
-    let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
-        .canonicalize()
-        .unwrap();
-    let private_dir = root.join("private");
-    let grants = private_dir.join("slack-bot.grants");
-    success(cli.run(&["setup", "init"]));
-    // The guide's bot instance (docs/catalog-slack.md), on private protocol
-    // two, with the approval clock and the instance's grant file.
-    private(
-        &cli.paths.config,
-        format!(
-            "format='connectors-local/5'\nowner_uid={}\nsecret_service_socket={}\n{}\n[connectors.slack]\nenabled=true\n\n[connectors.slack.instances.bot]\nalias='slack'\ninstance_id='fixture-slack'\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='on-demand'\nrestart='never'\nstanding_grants={}\n\n[connectors.slack.instances.bot.permissions]\nprofiles=['slack.bot']\noperations=['auth.test','chat.postMessage']\n\n[connectors.slack.instances.bot.executable]\npath={}\nsha256={}\nargs={}\n",
-            filesystem::uid(),
-            q(custody.socket.to_str().unwrap()),
-            clock_fixture::quorum_toml(
-                2,
-                100,
-                &[(&time.sources[0].address, 7), (&time.sources[1].address, 8)]
-            ),
-            q(&slack.configuration_revision()),
-            q(grants.to_str().unwrap()),
-            q(binary.to_str().unwrap()),
-            q(&hex::encode(Sha256::digest(fs::read(&binary).unwrap()))),
-            serde_json::to_string(&["--local-config", slack.config.to_str().unwrap()]).unwrap(),
-        )
-        .as_bytes(),
-    );
+    }
 
-    let credential = private_dir.join("credential.json");
-    private(
-        &credential,
-        &serde_json::to_vec(&json!({"token": TOKEN})).unwrap(),
-    );
-    let connected = success(run(&[
-        "connections",
-        "connect",
-        "--profile",
-        "slack.bot",
-        "--credential-file",
-        credential.to_str().unwrap(),
-    ]));
-    fs::remove_file(&credential).unwrap();
-    assert_eq!(connected["connection"]["summary"]["state"], "ready");
-    let connection = connected["connection"]["summary"]["connection"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    fn send(&self, key: &str, input: &Value) -> Output {
+        self.send_with(key, input, &[])
+    }
 
-    // The prerequisites of every keyed write: an approval key and a published
-    // policy that lists the operation. The grant is not in that document.
-    success(run(&["approvals", "key-init"]));
-    let policy = private_dir.join("policy.json");
-    private(&policy, br#"{"operations":["chat.postMessage"]}"#);
-    success(run(&[
-        "approvals",
-        "policy-set",
-        "--input-file",
-        policy.to_str().unwrap(),
-    ]));
-
-    // The attempts recorded so far, by one reader opened at the first count.
-    let recorded = std::cell::OnceCell::new();
-    let attempts = || {
-        recorded
-            .get_or_init(|| recorded_state::Reader::open(&cli.paths.state))
+    /// The attempts recorded so far.
+    fn attempts(&self) -> usize {
+        self.recorded
+            .get_or_init(|| recorded_state::Reader::open(&self.cli.paths.state))
             .snapshot()
             .subjects(ATTEMPT)
             .len()
-    };
-    // What a refusal before the attempt leaves: no request, no attempt.
-    let quiet = |step: &str, refusal: &dyn Fn() -> Value| {
-        let before = (slack.requests(), attempts());
+    }
+
+    /// What a refusal before the attempt leaves: no request, no attempt.
+    #[track_caller]
+    fn quiet(&self, step: &str, refusal: &dyn Fn() -> Value) -> Value {
+        let before = (self.slack.requests(), self.attempts());
         let data = refusal();
-        assert_eq!((slack.requests(), attempts()), before, "{step}: {data}");
+        assert_eq!(
+            (self.slack.requests(), self.attempts()),
+            before,
+            "{step}: {data}"
+        );
         assert_eq!(
             data["mutation"]["classification"], "not_attempted",
             "{step}: {data}"
@@ -461,9 +520,13 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
         assert!(!names(&data, "standing"), "{step}: {data}");
         assert!(!names(&data, "axis"), "{step}: {data}");
         data
-    };
-    let grant = |not_after_unix_ms: i64, name: &str| {
-        let request = private_dir.join(name);
+    }
+
+    /// `approvals grant-standing` for the granted channel, `max_per_hour`
+    /// writes an hour, the text and the thread open: the new grant's id.
+    #[track_caller]
+    fn grant(&self, not_after_unix_ms: i64, max_per_hour: u64, name: &str) -> String {
+        let request = self.private_dir.join(name);
         private(
             &request,
             &serde_json::to_vec(&json!({
@@ -471,24 +534,55 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
                 "target": [{"pointer": "/body/channel", "value": CHANNEL}],
                 "input_keys": ["/body/text", "/body/thread_ts"],
                 "not_after_unix_ms": not_after_unix_ms,
-                "max_per_hour": 3
+                "max_per_hour": max_per_hour
             }))
             .unwrap(),
         );
-        let granted = success(run(&[
+        let granted = success(self.run(&[
             "approvals",
             "grant-standing",
             "--input-file",
             request.to_str().unwrap(),
         ]));
-        assert_eq!(granted["path"], grants.to_str().unwrap(), "{granted}");
+        assert_eq!(granted["path"], self.grants.to_str().unwrap(), "{granted}");
         granted["grant_id"].as_str().unwrap().to_owned()
-    };
-    let listed = || success(run(&["approvals", "list-standing"]))["grants"].clone();
-    // A replay of `key` with `input`: the original answer and its grant.
-    let replays = |step: &str, key: &str, input: &Value, grant_id: &str| {
-        let before = slack.requests();
-        let replayed = success(send(key, input));
+    }
+
+    /// The first grant of a journey: it ends 3600 s after the fixture clock's
+    /// midpoint.
+    #[track_caller]
+    fn grant_for_an_hour(&self, max_per_hour: u64) -> String {
+        let not_after =
+            i64::try_from(clock_fixture::Fixture::default().midpoint * 1000).unwrap() + 3_600_000;
+        self.grant(not_after, max_per_hour, "grant-1.json")
+    }
+
+    #[track_caller]
+    fn listed(&self) -> Value {
+        success(self.run(&["approvals", "list-standing"]))["grants"].clone()
+    }
+
+    /// A keyed send that is admitted under `grant_id` and applied.
+    #[track_caller]
+    fn admitted(&self, step: &str, key: &str, input: &Value, grant_id: &str) -> Value {
+        let invoked = success(self.send(key, input));
+        assert_eq!(
+            invoked["mutation"]["classification"], "applied",
+            "{step}: {invoked}"
+        );
+        assert_eq!(invoked["mutation"]["replayed"], false, "{step}: {invoked}");
+        assert_eq!(
+            invoked["mutation"]["standing"]["grant_id"], grant_id,
+            "{step}: {invoked}"
+        );
+        invoked
+    }
+
+    /// A replay of `key` with `input`: the original answer and its grant.
+    #[track_caller]
+    fn replays(&self, step: &str, key: &str, input: &Value, grant_id: &str) -> Value {
+        let before = self.slack.requests();
+        let replayed = success(self.send(key, input));
         assert_eq!(
             replayed["mutation"]["classification"], "applied",
             "{step}: {replayed}"
@@ -498,95 +592,125 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
             replayed["mutation"]["standing"]["grant_id"], grant_id,
             "{step}: {replayed}"
         );
-        assert_eq!(slack.requests(), before, "{step}: a replay made a request");
+        assert_eq!(
+            self.slack.requests(),
+            before,
+            "{step}: a replay made a request"
+        );
         replayed
-    };
+    }
+}
+
+/// Steps a to e of the story's journey, then the empty approval file.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_replayed_by_its_key() {
+    let bot = Bot::new();
+    let slack = &bot.slack;
 
     // a. A keyed send before any grant file exists.
-    assert!(!grants.exists());
-    let data = quiet("a", &|| {
-        refused(send("standing-a", &post("before a grant")))
+    assert!(!bot.grants.exists());
+    let data = bot.quiet("a", &|| {
+        refused(bot.send("standing-a", &post("before a grant")))
     });
     assert_eq!(data["code"], "approval_required", "{data}");
+    bot.stamp("a");
 
     // b. The operator grants once, and sees the grant.
-    let not_after =
-        i64::try_from(clock_fixture::Fixture::default().midpoint * 1000).unwrap() + 3_600_000;
-    let first = grant(not_after, "grant-1.json");
+    let first = bot.grant_for_an_hour(3);
     assert_eq!(
-        fs::metadata(&grants).unwrap().permissions().mode() & 0o777,
+        fs::metadata(&bot.grants).unwrap().permissions().mode() & 0o777,
         0o600
     );
-    let held = listed();
+    let held = bot.listed();
     assert_eq!(held.as_array().unwrap().len(), 1, "{held}");
     assert_eq!(held[0]["grant_id"], first.as_str(), "{held}");
+    bot.stamp("b");
 
     // c. A keyed send to the granted channel is admitted and names the grant.
     let original = post("fixture standing post");
-    let before = attempts();
-    let invoked = success(send("standing-c", &original));
-    assert_eq!(
-        invoked["mutation"]["classification"], "applied",
-        "{invoked}"
-    );
-    assert_eq!(invoked["mutation"]["replayed"], false, "{invoked}");
-    assert_eq!(
-        invoked["mutation"]["standing"]["grant_id"],
-        first.as_str(),
-        "{invoked}"
-    );
+    let before = bot.attempts();
+    let invoked = bot.admitted("c", "standing-c", &original, &first);
     assert_eq!(invoked["result"]["body"]["ts"], POSTED_TS, "{invoked}");
     assert_eq!(
         slack.posts(),
         [json!({"channel": CHANNEL, "text": "fixture standing post"})]
     );
     // One attempt for the one write; the refusal of step a left none.
-    assert_eq!((before, attempts()), (0, 1));
+    assert_eq!((before, bot.attempts()), (0, 1));
+    bot.stamp("c");
 
     // d. The same key and input: the same answer, no second post.
-    let replayed = replays("d", "standing-c", &original, &first);
+    let replayed = bot.replays("d", "standing-c", &original, &first);
     assert_eq!(replayed["result"], invoked["result"]);
     assert_eq!(
         replayed["mutation"]["attempt"],
         invoked["mutation"]["attempt"]
     );
     assert_eq!(slack.posts().len(), 1);
+    bot.stamp("d");
 
     // e. The same key with another text.
     let before = slack.requests();
-    let data = refused(send("standing-c", &post("another text")));
+    let data = refused(bot.send("standing-c", &post("another text")));
     assert_eq!(data["code"], "idempotency_conflict", "{data}");
     assert_eq!(
         data["mutation"]["classification"], "not_attempted",
         "{data}"
     );
     assert_eq!(slack.requests(), before);
+    bot.stamp("e");
 
-    // f. Outside the grant: another channel, then a member the grant's
-    // `input_keys` does not list. Neither names what was outside.
-    let elsewhere = json!({"body": {"channel": OTHER_CHANNEL, "text": "outside"}});
-    let wider = json!({"body": {"channel": CHANNEL, "text": "outside", "mrkdwn": false}});
-    for (step, key, input) in [
-        ("f channel", "standing-f1", &elsewhere),
-        ("f mrkdwn", "standing-f2", &wider),
-    ] {
-        let data = quiet(step, &|| refused(send(key, input)));
-        assert_eq!(data["code"], "approval_required", "{step}: {data}");
-    }
+    // An approval file that holds no byte is answered as no approval file is,
+    // by the CLI: the gate's reply, and it takes no grant either, although
+    // the grant of step b covers this input and has two uses left. No owner
+    // is started for it: the one the sends above reached is stopped first
+    // (the control: `owner-stop` sees an owner that runs), and none runs
+    // afterwards. This needs the registered connection, the published policy
+    // and the key this journey has: without them the keyed lookup refuses
+    // the call before the approval file is read.
+    let stopped = success(bot.cli.run(&["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+    let empty = bot.private_dir.join("proof-empty.json");
+    private(&empty, b"");
+    let before = (slack.requests(), bot.attempts());
+    let data = refused(bot.send_with(
+        "standing-empty-proof",
+        &post("under an empty proof"),
+        &["--approval-file", empty.to_str().unwrap()],
+    ));
+    assert_eq!(
+        data,
+        json!({"kind":"operational","code":"approval_required","stage":"admission","next_action":"none",
+            "approval_steps":["approvals prepare","approvals clock-check","approvals issue"]})
+    );
+    assert_eq!((slack.requests(), bot.attempts()), before);
+    let none = success(bot.cli.run(&["setup", "owner-stop"]));
+    assert_eq!(none["disposition"], "no_owner", "{none}");
+    bot.stamp("empty proof");
+}
+
+/// Steps g and h of the story's journey, then the two parts of step j that
+/// show them: the grant admits one write an hour here, so the write after g
+/// and h is admitted only if neither kept a use, and its key replays while
+/// the grant is at its cap.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_refused_proof_and_a_failed_preflight_take_no_use_of_a_standing_grant() {
+    let bot = Bot::new();
+    let slack = &bot.slack;
+    let first = bot.grant_for_an_hour(1);
+    bot.stamp("grant");
 
     // g. A proof with one changed byte is refused as a proof: it does not
     // fall back to the grant that covers the same input.
-    let description = success(run(&[
-        "operations",
-        "describe",
-        "--operation",
-        "chat.postMessage",
-    ]));
+    let description =
+        success(bot.run(&["operations", "describe", "--operation", "chat.postMessage"]));
     let tampered_input = post("under a tampered proof");
     let input_text = tampered_input.to_string();
     let target = [
         "--connection",
-        &connection,
+        &bot.connection,
         "--operation",
         "chat.postMessage",
         "--schema",
@@ -596,40 +720,44 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
         "--input-json",
         &input_text,
     ];
-    let prepared = success(run(&[&["approvals", "prepare"][..], &target].concat()));
-    let proof = private_dir.join("proof.json");
-    success(run(&[
-        &["approvals", "issue"][..],
-        &target,
-        &[
-            "--approve-subject",
-            prepared["preparation"]["subject_sha256"].as_str().unwrap(),
-            "--proof-output",
-            proof.to_str().unwrap(),
-        ],
-    ]
-    .concat()));
+    let prepared = success(bot.run(&[&["approvals", "prepare"][..], &target].concat()));
+    let proof = bot.private_dir.join("proof.json");
+    success(
+        bot.run(
+            &[
+                &["approvals", "issue"][..],
+                &target,
+                &[
+                    "--approve-subject",
+                    prepared["preparation"]["subject_sha256"].as_str().unwrap(),
+                    "--proof-output",
+                    proof.to_str().unwrap(),
+                ],
+            ]
+            .concat(),
+        ),
+    );
     let mut bytes = fs::read(&proof).unwrap();
     // The signature is the last part of the compact evidence, which ends the
     // document: change one of its characters to another of the alphabet.
     let at = bytes.len() - 20;
     assert!(bytes[at].is_ascii_alphanumeric() || bytes[at] == b'-' || bytes[at] == b'_');
     bytes[at] = if bytes[at] == b'A' { b'B' } else { b'A' };
-    let tampered = private_dir.join("proof-tampered.json");
+    let tampered = bot.private_dir.join("proof-tampered.json");
     private(&tampered, &bytes);
-    let posts = slack.posts().len();
-    let data = refused(send_with(
+    let data = refused(bot.send_with(
         "standing-g",
         &tampered_input,
         &["--approval-file", tampered.to_str().unwrap()],
     ));
     assert_eq!(data["code"], "approval_refused", "{data}");
     assert!(!names(&data, "standing"), "{data}");
-    assert_eq!(slack.posts().len(), posts);
+    assert_eq!(slack.posts().len(), 0);
+    bot.stamp("g");
 
     // h. A preflight that fails gives the use back.
     slack.refuse_auth.store(true, Ordering::SeqCst);
-    let data = refused(send("standing-h", &post("while auth.test refuses")));
+    let data = refused(bot.send("standing-h", &post("while auth.test refuses")));
     assert!(
         !slack.refuse_auth.load(Ordering::SeqCst),
         "auth.test was not read"
@@ -639,11 +767,36 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
         "{data}"
     );
     assert!(!names(&data, "standing"), "{data}");
-    assert_eq!(slack.posts().len(), posts);
+    assert_eq!(slack.posts().len(), 0);
+    bot.stamp("h");
+
+    // j, its first send: the one use of the hour is still there. Had g or h
+    // kept a use, this send would be at the cap.
+    let original = post("the one write of the hour");
+    bot.admitted("j", "standing-j", &original, &first);
+    assert_eq!(slack.posts().len(), 1);
+    bot.stamp("j admitted");
+
+    // j, its replay: the grant is at its cap now, and the settled key still
+    // replays with the grant id.
+    bot.replays("j", "standing-j", &original, &first);
+    bot.stamp("j replay");
+}
+
+/// Step i of the story's journey, then the refusal of step j that shows it:
+/// the grant admits one write an hour here, so the next fresh key is at the
+/// cap only if the write Slack failed kept its use.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_write_sent_under_a_standing_grant_keeps_its_use_and_the_next_is_rate_limited() {
+    let bot = Bot::new();
+    let slack = &bot.slack;
+    let first = bot.grant_for_an_hour(1);
+    bot.stamp("grant");
 
     // i. A write that was sent keeps its use, whatever the provider answered.
     slack.fail_post.store(true, Ordering::SeqCst);
-    let data = refused(send("standing-i", &post("while Slack fails")));
+    let data = refused(bot.send("standing-i", &post("while Slack fails")));
     assert!(
         !slack.fail_post.load(Ordering::SeqCst),
         "the post was not sent"
@@ -657,84 +810,85 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it() 
         first.as_str(),
         "{data}"
     );
-    assert_eq!(slack.posts().len(), posts + 1);
+    assert_eq!(slack.posts().len(), 1);
+    bot.stamp("i");
 
-    // j. The third use of the hour (c, i and this one), then the cap. Had g
-    // or h kept a use, this send would be at the cap.
-    let third = success(send("standing-j", &post("the third of the hour")));
-    assert_eq!(third["mutation"]["classification"], "applied", "{third}");
-    assert_eq!(
-        third["mutation"]["standing"]["grant_id"],
-        first.as_str(),
-        "{third}"
-    );
-    let data = quiet("j", &|| {
-        refused(send("standing-j-capped", &post("over the cap")))
+    // j, its refusal: the cap.
+    let data = bot.quiet("j", &|| {
+        refused(bot.send("standing-j-capped", &post("over the cap")))
     });
     assert_eq!(data["code"], "rate_limited", "{data}");
     let retry = data["retry_after_seconds"].as_u64().unwrap();
     assert!((1..=3600).contains(&retry), "{data}");
-    replays("j", "standing-c", &original, &first);
+    bot.stamp("j capped");
+}
+
+/// Steps f and k of the story's journey, on a grant and a first admitted
+/// write of this journey's own (what steps b and c are to the story's f and
+/// k).
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_slack_bot_post_outside_the_standing_grant_or_after_its_revocation_is_refused() {
+    let bot = Bot::new();
+    let first = bot.grant_for_an_hour(3);
+    let original = post("fixture standing post");
+    bot.admitted("first", "standing-c", &original, &first);
+    bot.stamp("grant and first write");
+
+    // f. Outside the grant: another channel, then a member the grant's
+    // `input_keys` does not list. Neither names what was outside.
+    let elsewhere = json!({"body": {"channel": OTHER_CHANNEL, "text": "outside"}});
+    let wider = json!({"body": {"channel": CHANNEL, "text": "outside", "mrkdwn": false}});
+    for (step, key, input) in [
+        ("f channel", "standing-f1", &elsewhere),
+        ("f mrkdwn", "standing-f2", &wider),
+    ] {
+        let data = bot.quiet(step, &|| refused(bot.send(key, input)));
+        assert_eq!(data["code"], "approval_required", "{step}: {data}");
+    }
+    bot.stamp("f");
 
     // k. Revoked: nothing new is admitted, and the settled key still replays.
-    let revoked = success(run(&["approvals", "revoke-standing", &first]));
+    let revoked = success(bot.run(&["approvals", "revoke-standing", &first]));
     assert_eq!(revoked["grant_id"], first.as_str(), "{revoked}");
-    assert_eq!(listed(), json!([]));
-    let data = quiet("k", &|| {
-        refused(send("standing-k", &post("after the revocation")))
+    assert_eq!(bot.listed(), json!([]));
+    let data = bot.quiet("k", &|| {
+        refused(bot.send("standing-k", &post("after the revocation")))
     });
     assert_eq!(data["code"], "approval_required", "{data}");
-    replays("k", "standing-c", &original, &first);
+    bot.replays("k", "standing-c", &original, &first);
+    bot.stamp("k");
+}
+
+/// Step l of the story's journey, on a grant and a first admitted write of
+/// this journey's own (what steps b and c are to the story's l).
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn an_expired_standing_grant_admits_nothing_new_and_its_writes_still_replay() {
+    let bot = Bot::new();
+    let first = bot.grant_for_an_hour(3);
+    let original = post("fixture standing post");
+    bot.admitted("first", "standing-c", &original, &first);
+    bot.stamp("grant and first write");
+
+    // The first grant is revoked, as step k leaves it in the story: the
+    // second is then the only grant that covers the next write.
+    let revoked = success(bot.run(&["approvals", "revoke-standing", &first]));
+    assert_eq!(revoked["grant_id"], first.as_str(), "{revoked}");
 
     // l. A second grant, 600 s long, admits under its own id; an hour later
     // it is expired, and both settled keys still replay with their grants.
-    let second = grant(time.now_ms() + 600_000, "grant-2.json");
+    let second = bot.grant(bot.time.now_ms() + 600_000, 3, "grant-2.json");
     assert_ne!(second, first);
     let later = post("under the second grant");
-    let invoked = success(send("standing-l", &later));
-    assert_eq!(
-        invoked["mutation"]["classification"], "applied",
-        "{invoked}"
-    );
-    assert_eq!(
-        invoked["mutation"]["standing"]["grant_id"],
-        second.as_str(),
-        "{invoked}"
-    );
-    time.offset.store(3600, Ordering::SeqCst);
-    let data = quiet("l", &|| {
-        refused(send("standing-l-expired", &post("after the expiry")))
+    bot.admitted("l", "standing-l", &later, &second);
+    bot.stamp("l admitted");
+    bot.time.offset.store(3600, Ordering::SeqCst);
+    let data = bot.quiet("l", &|| {
+        refused(bot.send("standing-l-expired", &post("after the expiry")))
     });
     assert_eq!(data["code"], "approval_required", "{data}");
-    replays("l", "standing-l", &later, &second);
-    replays("l", "standing-c", &original, &first);
-
-    // An approval file that holds no byte is answered as no approval file is,
-    // by the CLI: the gate's reply, and it takes no grant either. No owner is
-    // started for it: the one the sends above reached is stopped first (the
-    // control: `owner-stop` sees an owner that runs), and none runs
-    // afterwards. This needs the registered connection, the published policy
-    // and the key this journey has: without them the keyed lookup refuses
-    // the call before the approval file is read.
-    let stopped = success(cli.run(&["setup", "owner-stop"]));
-    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
-    let empty = private_dir.join("proof-empty.json");
-    private(&empty, b"");
-    let before = (slack.requests(), attempts());
-    let data = refused(send_with(
-        "standing-empty-proof",
-        &post("under an empty proof"),
-        &["--approval-file", empty.to_str().unwrap()],
-    ));
-    assert_eq!(
-        data,
-        json!({"kind":"operational","code":"approval_required","stage":"admission","next_action":"none",
-            "approval_steps":["approvals prepare","approvals clock-check","approvals issue"]})
-    );
-    assert_eq!((slack.requests(), attempts()), before);
-    let none = success(cli.run(&["setup", "owner-stop"]));
-    assert_eq!(none["disposition"], "no_owner", "{none}");
-    drop(recorded);
-    drop(cli);
-    drop(custody);
+    bot.replays("l", "standing-l", &later, &second);
+    bot.replays("l", "standing-c", &original, &first);
+    bot.stamp("l");
 }
