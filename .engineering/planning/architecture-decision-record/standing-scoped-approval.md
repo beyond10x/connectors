@@ -10,6 +10,7 @@ relations:
 - decides: story:served-keyed-writes-under-a-standing-approval
 - informed_by: decision-blocker:standing-write-approval-mode
 - serves: vision:independent-contract-adapters
+- decides: story:local-invoke-admits-a-keyed-write-under-a-standing-grant
 revision: 2
 transitions:
 - {from: "proposed", to: "accepted", at: "2026-10-30T03:19:13Z", actor: "human:operator", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
