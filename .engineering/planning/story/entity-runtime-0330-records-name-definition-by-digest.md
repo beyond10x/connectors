@@ -37,7 +37,7 @@ scope:
   path: crates/connectors-host/tests/metadata_reopen_adversary.rs
 - confidence: cited
   path: docs/development.md
-revision: 25
+revision: 26
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T07:21:33Z", actor: "human:timo", revision: 24, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T07:21:34Z", actor: "human:timo", revision: 25, decided_on: {"recorded":{"review_outcome":8}}}
@@ -217,3 +217,16 @@ story:owner-cancel-timing-test-under-load, story:test-binary-per-package.
   drafted; it needs a store migration.
 - Entity Runtime's File, SQLite and PostgreSQL stores (beyond10x/entity-runtime#96): connectors
   does not use them.
+
+## Decision D4, 2026-11-23
+
+Timo, relayed by host-operator at about 10:55 CET: "A: ship now". The pin ships with the
+CHANGELOG Breaking entry and the way back, in connectors 0.76.0, once the Windows host fix
+(pull request 284) is merged.
+
+## Result
+
+Acceptance lines 1 to 7 and 9 are met (pull request 286). Line 8 is not met on the
+workstation at host load 68 to 85: five tests of its filterset are killed at 60 s, four of
+them run 82 to 123 s on Entity Runtime 0.32.0 too. story:store-tests-end-within-60s-under-load
+carries them and the filterset.

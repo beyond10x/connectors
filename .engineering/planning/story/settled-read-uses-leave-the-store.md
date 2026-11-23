@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:entity-runtime-0330-records-name-definition-by-digest
 - depends_on: story:read-cost-test-reports-bytes-per-read
-revision: 3
+revision: 4
 ---
 ## Outcome
 
@@ -107,3 +107,9 @@ code, docs or planning); whether a capture path runs in a CLI process without an
 ## Blocked on
 
 The Entity Runtime 0.33.0 pin on `main`.
+
+## Decision D5, 2026-11-23
+
+Timo, relayed by host-operator at about 10:55 CET: "A: stop recording reads". Read uses are
+no longer recorded; open ones live in the owner process; connectors only. The acceptance
+above is rewritten to this way before the story is built.
