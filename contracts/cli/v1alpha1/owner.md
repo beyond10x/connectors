@@ -207,7 +207,8 @@ the source to be published, Live, not Stale and under the fence and version it
 read (`revoked`, `lifecycle_conflict`). A refused dispatch cancels the read use. Every refusal after the allocation fails
 that acquisition; a lost acknowledgement is `outcome_unknown` with the acquisition
 to follow. The CLI never receives, prints or logs the material, and the source
-connection's record is not written by any step but its read use.
+connection's record is not written by any step: its read use is held in the owner process and is not recorded.
+A `connections revoke` run by another process does not release that use; its dispatch then answers `revoked`.
 
 A `begin` request of a definition's connect
 (story:definition-connect-begin-carries-selection) carries

@@ -131,6 +131,11 @@ pub(super) fn exit_process() {
 }
 
 #[cfg(test)]
+pub(super) fn record_read_uses(on: bool) {
+    er::record_read_uses(on);
+}
+
+#[cfg(test)]
 pub(super) fn with_expiry_batches<T>(
     size: usize,
     fail: Option<usize>,
@@ -828,9 +833,11 @@ impl Metadata {
                 .pragma_query_value(None, "user_version", |row| row.get(0))
                 .map_err(unavailable)?;
             let authority_id = self.authority()?;
+            // The persist above required the lifecycle lock; it is still held.
+            let locked = self.require_lifecycle_lock().is_ok();
             let authority = self.er.as_mut().ok_or(Failure::MetadataUnavailable)?;
             er::advance_projection_level(authority, level)?;
-            self.connection = er::projection(authority_id, authority)?;
+            self.connection = er::projection(authority_id, authority, locked)?;
         }
         fs::sync_directory(&self._directory)?;
         self.validate()
@@ -954,14 +961,15 @@ impl Metadata {
             .ok_or(Failure::MetadataUnavailable)?
             .try_clone()
             .map_err(|_| Failure::MetadataUnavailable)?;
-        let (authority, coordinates, source_digest) = er::provision_with_lock(
+        let (mut authority, coordinates, source_digest) = er::provision_with_lock(
             &self.durable_path,
             authority_id,
             level,
             rows,
             Some(import_lock),
         )?;
-        let projection = er::projection(authority_id, &authority)?;
+        // Legacy adoption holds the lifecycle lock throughout.
+        let projection = er::projection(authority_id, &mut authority, true)?;
         if er::capture_digest(&projection, level)? != source_digest {
             return Err(Failure::MetadataUnavailable);
         }
@@ -1067,7 +1075,7 @@ impl Metadata {
                 return Err(Failure::MetadataUnavailable);
             }
         }
-        let (authority, imported_digest) = er::open(
+        let (mut authority, imported_digest) = er::open(
             &self.durable_path,
             entity_eventlog::Authority {
                 logical_scope,
@@ -1093,7 +1101,8 @@ impl Metadata {
         // Before any record is projected or read: a store a newer binary with
         // another record model wrote is refused by name (semantics.md §3).
         er::admit_writer(&authority)?;
-        let projection = er::projection(authority_id, &authority)?;
+        // The lifecycle lock is held unless it was released above.
+        let projection = er::projection(authority_id, &mut authority, !release_physical)?;
         self.connection = projection;
         self.er = Some(authority);
         self.validate()

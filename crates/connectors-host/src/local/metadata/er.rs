@@ -478,6 +478,74 @@ pub(super) struct ErAuthority {
     /// [`IDLE`]: an open of the same store by another thread of this process
     /// waits for it to return there ([`take_or_wait`]).
     checkout: Option<Checkout>,
+    /// The read uses this process holds ([`HELD_USES`]) that are rows of the
+    /// projection last built from this handle, by id, as that projection
+    /// holds them since its build or its last persist that was not refused.
+    held_uses: BTreeMap<String, RowImage>,
+    /// The caller held the store's lifecycle lock when that projection was
+    /// built, and holds it until its persist: only such a handle's persist
+    /// replaces what the process holds.
+    built_locked: bool,
+}
+
+/// The entity of a read use, a row of `registry_uses`.
+const READ_USE: &str = "connectors.credential_evidence.ReadUse";
+
+/// The read uses one process captured in one store and did not record.
+struct HeldUses {
+    authority: Authority,
+    path: std::path::PathBuf,
+    process: u64,
+    rows: Vec<RowImage>,
+}
+
+impl HeldUses {
+    fn of(&self, er: &ErAuthority) -> bool {
+        self.process == er.process
+            && self.path == er.durable_path
+            && self.authority == *er.facade.authority()
+    }
+}
+
+/// A read use (the reservation a read, a reuse or a revalidation takes between
+/// capture and release) is not recorded: the process that captured it holds its
+/// row here, by the store's authority, its path and the process, and every
+/// projection that process builds of that store holds the row beside the
+/// recorded ones ([`build_projection`]). A store recreated at the same path has
+/// another authority and starts empty. The rows end with the process.
+///
+/// Only a persist whose projection was built under the store's lifecycle lock
+/// replaces them ([`persist`]), so replacements are in the order of that lock.
+static HELD_USES: std::sync::Mutex<Vec<HeldUses>> = std::sync::Mutex::new(Vec::new());
+
+fn held_uses_lock() -> std::sync::MutexGuard<'static, Vec<HeldUses>> {
+    // No holder of this lock can panic: a poisoned lock still holds a whole list.
+    HELD_USES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// The read uses this process holds in `er`'s store.
+fn held_uses(er: &ErAuthority) -> Vec<RowImage> {
+    held_uses_lock()
+        .iter()
+        .find(|held| held.of(er))
+        .map(|held| held.rows.clone())
+        .unwrap_or_default()
+}
+
+/// Makes `rows` the read uses this process holds in `er`'s store.
+fn hold_uses(er: &ErAuthority, rows: Vec<RowImage>) {
+    let mut held = held_uses_lock();
+    held.retain(|held| !held.of(er));
+    if !rows.is_empty() {
+        held.push(HeldUses {
+            authority: er.facade.authority().clone(),
+            path: er.durable_path.clone(),
+            process: er.process,
+            rows,
+        });
+    }
 }
 
 /// One verified handle in use, by the thread of the process that took it.
@@ -2385,6 +2453,8 @@ impl ErAuthority {
             opened: facade.open_verification(),
             facade,
             checkout: None,
+            held_uses: BTreeMap::new(),
+            built_locked: false,
         }
     }
 }
@@ -2928,8 +2998,35 @@ pub(super) fn simulate_process(id: u64) {
     PROCESS.with(|process| process.set(id));
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The stores this thread built a projection of, each with the process the
+    /// thread acted as then.
+    static USED_STORES: std::cell::RefCell<Vec<(u64, std::path::PathBuf, Authority)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Notes that this thread used `er`'s store as the process it acts as.
+#[cfg(test)]
+fn note_used_store(er: &ErAuthority) {
+    let store = (
+        er.process,
+        er.durable_path.clone(),
+        er.facade.authority().clone(),
+    );
+    USED_STORES.with(|used| {
+        let mut used = used.borrow_mut();
+        if !used.contains(&store) {
+            used.push(store);
+        }
+    });
+}
+
 /// Ends the process this thread acts as: the handles it holds are closed,
-/// as they are when a real process exits.
+/// as they are when a real process exits. Its read uses end in the stores
+/// this thread used as that process: test threads share process ids, and a
+/// thread of another test that acts as the same process on its own store is
+/// another process, whose uses stay.
 #[cfg(test)]
 pub(super) fn exit_process() {
     let process = process();
@@ -2947,6 +3044,44 @@ pub(super) fn exit_process() {
     if let Ok(mut checkouts) = CHECKOUTS.lock() {
         checkouts.opened.retain(|(_, owner, _)| *owner != process);
     }
+    // The read uses a process holds end with it, store by store.
+    let ended = USED_STORES.with(|used| {
+        let (ended, kept) = std::mem::take(&mut *used.borrow_mut())
+            .into_iter()
+            .partition::<Vec<_>, _>(|(owner, _, _)| *owner == process);
+        *used.borrow_mut() = kept;
+        ended
+    });
+    held_uses_lock().retain(|held| {
+        held.process != process
+            || !ended
+                .iter()
+                .any(|(_, path, authority)| held.path == *path && held.authority == *authority)
+    });
+}
+
+#[cfg(test)]
+thread_local! {
+    static RECORD_READ_USES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// With `on`, a persist on this thread records a new read use, as releases up
+/// to 0.76.0 did: for the tests that need a store with recorded uses.
+#[cfg(test)]
+pub(super) fn record_read_uses(on: bool) {
+    RECORD_READ_USES.with(|record| record.set(on));
+}
+
+/// Whether a persist on this thread records a new read use. Never outside
+/// tests.
+#[cfg(not(test))]
+fn records_new_read_uses() -> bool {
+    false
+}
+
+#[cfg(test)]
+fn records_new_read_uses() -> bool {
+    RECORD_READ_USES.with(std::cell::Cell::get)
 }
 
 /// Makes this process's last fresh open of the store at `path` as long as
@@ -3042,11 +3177,50 @@ fn split_snapshot(snapshot: CompleteStoreSnapshot) -> Result<(Baseline, Observed
     Ok((baseline, observed))
 }
 
-pub(super) fn projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connection> {
-    timed("host.projection", || build_projection(authority_id, er))
+/// The SQL projection of `er`'s recorded baseline, with the read uses this
+/// process holds in that store beside the recorded ones. `locked` says the
+/// caller holds the store's lifecycle lock now and until it persists.
+pub(super) fn projection(
+    authority_id: uuid::Uuid,
+    er: &mut ErAuthority,
+    locked: bool,
+) -> Result<Connection> {
+    let (connection, held) = timed("host.projection", || build_projection(authority_id, er))?;
+    er.held_uses = held;
+    er.built_locked = locked;
+    #[cfg(test)]
+    note_used_store(er);
+    Ok(connection)
 }
 
-fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connection> {
+/// Whether the connection, generation and custody version `held`, a read use
+/// this process holds, names are rows of `connection`.
+fn held_use_projects(connection: &Connection, held: &RowImage) -> Result<bool> {
+    let text = |name: &str| {
+        domain(held, name)?
+            .as_str()
+            .ok_or(Failure::MetadataUnavailable)
+    };
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM registry_connections WHERE connection_ref=?1) \
+             AND EXISTS(SELECT 1 FROM registry_generations WHERE generation_id=?2) \
+             AND EXISTS(SELECT 1 FROM registry_materials WHERE version_id=?3)",
+            rusqlite::params![
+                text("connection_ref")?,
+                text("generation_id")?,
+                text("custody_version_ref")?
+            ],
+            |row| row.get(0),
+        )
+        .map_err(unavailable)
+}
+
+/// The projection, and the held read uses that are rows of it, by id.
+fn build_projection(
+    authority_id: uuid::Uuid,
+    er: &ErAuthority,
+) -> Result<(Connection, BTreeMap<String, RowImage>)> {
     let level = er.projection_level;
     let mut connection = Connection::open_in_memory().map_err(unavailable)?;
     connection
@@ -3104,6 +3278,25 @@ fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connec
     if level >= 2 {
         ledger::project_acquisitions(&connection, &er.baseline)?;
     }
+    // The read uses this process holds, each only while the rows it names
+    // are projected: the foreign-key check below then holds for them too.
+    let mut held = BTreeMap::new();
+    if let Some(table) = TABLES
+        .iter()
+        .find(|table| table.entity == READ_USE && table.level <= level)
+    {
+        for row in held_uses(er) {
+            if er
+                .baseline
+                .contains_key(&(row.entity.clone(), row.id.clone()))
+                || !held_use_projects(&connection, &row)?
+            {
+                continue;
+            }
+            insert_row(&connection, table, &row, &er.baseline, level)?;
+            held.insert(row.id.clone(), row);
+        }
+    }
     connection
         .pragma_update(None, "foreign_keys", true)
         .map_err(unavailable)?;
@@ -3131,7 +3324,7 @@ fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connec
     connection
         .pragma_update(None, "temp_store", "MEMORY")
         .map_err(unavailable)?;
-    Ok(connection)
+    Ok((connection, held))
 }
 
 fn insert_row(
@@ -3896,17 +4089,41 @@ pub(super) fn persist(
     // A refused or uncertain batch leaves the baseline unproven; such a
     // handle is never reopened.
     er.reusable = false;
-    persist_batch(er, connection, mode, staged)?;
+    let held = persist_batch(er, connection, mode, staged)?;
     er.reusable = true;
+    // The read uses `connection` holds unrecorded are what this process holds
+    // from here on, when the lifecycle lock was held from the projection's
+    // build to this point: no other persist of this process came between. A
+    // refused persist returned above and leaves what the process held. A
+    // projection built without the lock (an observation, an inspection) may
+    // lack a use captured, or hold one swept or released, since its build.
+    if er.built_locked {
+        hold_uses(er, held.clone());
+    }
+    // Either way they are what `connection` holds unrecorded from here on,
+    // which the next persist of this handle compares its rows with.
+    er.held_uses = held.into_iter().map(|row| (row.id.clone(), row)).collect();
     Ok(())
 }
 
+/// Whether a persist may create this read use, recorded or held: only the
+/// registry's admission transaction creates one, captured and neither
+/// dispatched nor released.
+fn read_use_creation_admitted(desired: &RowImage, admitted_registry_use: bool) -> bool {
+    admitted_registry_use
+        && desired.lifecycle_state == "Captured"
+        && desired.fields.get("dispatch_opened") == Some(&json!(false))
+        && desired.fields.get("released") == Some(&json!(false))
+}
+
+/// Records the change and returns the read uses `connection` holds that are
+/// not recorded, which the process holds instead ([`HELD_USES`]).
 fn persist_batch(
     er: &mut ErAuthority,
     connection: &Connection,
     mode: PersistMode,
     staged: &[LedgerStep],
-) -> Result<()> {
+) -> Result<Vec<RowImage>> {
     let (admitted_registry_use, concurrent_observation, runtime_state_only, prepared_observation) =
         match mode {
             PersistMode::Standard {
@@ -3923,7 +4140,7 @@ fn persist_batch(
     let level: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(unavailable)?;
-    let desired = capture(connection, level)?
+    let mut desired = capture(connection, level)?
         .into_iter()
         .map(|row| ((row.entity.clone(), row.id.clone()), row))
         .collect::<BTreeMap<_, _>>();
@@ -3940,6 +4157,49 @@ fn persist_batch(
         refuse_changed_since_baseline(er, prepared_observation)?
     };
     let reference = caught_up.as_ref().unwrap_or(&er.baseline);
+    // A read use the SQL holds and the recorded baseline does not is held by
+    // this process and not recorded: it is no difference to record or to
+    // refuse, here or in the post-commit check. A use the baseline holds (a
+    // release up to 0.76.0 or the legacy import recorded it) is compared and
+    // recorded like every other subject.
+    let unrecorded = desired
+        .keys()
+        .filter(|key| key.0 == READ_USE && !reference.contains_key(*key))
+        .cloned()
+        .collect::<Vec<_>>();
+    // A persist that may write only the registry clock, or only runtime
+    // rows, has no statement on a read use: the unrecorded uses its SQL
+    // holds are the ones its projection held, each unchanged. A use added,
+    // changed or removed refuses the persist, as it does for a recorded use
+    // in the two checks below.
+    if (runtime_state_only || prepared_observation)
+        && (unrecorded.len() != er.held_uses.len()
+            || unrecorded.iter().any(|key| {
+                let (Some(held), Some(next)) = (er.held_uses.get(&key.1), desired.get(key)) else {
+                    return true;
+                };
+                held.fields != next.fields || held.lifecycle_state != next.lifecycle_state
+            }))
+    {
+        return Err(Failure::MetadataUnavailable);
+    }
+    let mut held = Vec::new();
+    for key in unrecorded {
+        // Under the lifecycle lock since the build, a use the build did not
+        // insert is new: it is held only where its creation is admitted, and
+        // stays in `desired` otherwise, which refuses it below as before.
+        // Without the lock since the build, another thread of this process
+        // may have swept or released the use since: that is no creation.
+        let holds = !er.built_locked
+            || er.held_uses.contains_key(&key.1)
+            || (!records_new_read_uses()
+                && desired
+                    .get(&key)
+                    .is_some_and(|row| read_use_creation_admitted(row, admitted_registry_use)));
+        if holds {
+            held.extend(desired.remove(&key));
+        }
+    }
     if runtime_state_only {
         // Suppression and cached bootstrap writes read only the runtime
         // table. Reject any attempt to use this path for a registry clock
@@ -4100,7 +4360,7 @@ fn persist_batch(
     // since this baseline was refused above, before this batch; each action
     // still names its exact predecessor revision for the subject it writes.
     if actions.is_empty() {
-        return Ok(());
+        return Ok(held);
     }
     // A write records or raises the store's writer marker in its own batch,
     // against the newest marker this handle has read.
@@ -4196,7 +4456,11 @@ fn persist_batch(
                 .map(|record| (key.clone(), record.position.store))
         })
         .collect::<BTreeMap<_, _>>();
-    let rebuilt = projection_from_connection(connection)?;
+    let mut rebuilt = projection_from_connection(connection)?;
+    // The held read uses are rows of the SQL and of no record.
+    for row in &held {
+        rebuilt.remove(&(row.entity.clone(), row.id.clone()));
+    }
     let current = visible_rows(&er.baseline);
     if !postcommit_projection_matches(
         &rebuilt,
@@ -4209,7 +4473,7 @@ fn persist_batch(
     ) {
         return Err(Failure::MetadataUnavailable);
     }
-    Ok(())
+    Ok(held)
 }
 
 /// The most expiries one batch records when more are due than fit in it.
@@ -4762,12 +5026,7 @@ fn removal_command(current: &RowImage) -> Result<Option<(&'static str, RowImage)
 }
 
 fn creation_stages(desired: &RowImage, admitted_registry_use: bool) -> Result<Vec<RowImage>> {
-    if desired.entity == "connectors.credential_evidence.ReadUse"
-        && (!admitted_registry_use
-            || desired.lifecycle_state != "Captured"
-            || desired.fields.get("dispatch_opened") != Some(&json!(false))
-            || desired.fields.get("released") != Some(&json!(false)))
-    {
+    if desired.entity == READ_USE && !read_use_creation_admitted(desired, admitted_registry_use) {
         return Err(Failure::MetadataUnavailable);
     }
     let initial_state = match desired.entity.as_str() {

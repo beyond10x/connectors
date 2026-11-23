@@ -456,12 +456,15 @@ fn approval_subject(world: &World) -> approvals::Subject {
 fn populated() -> World {
     let mut world = World::new();
     world.connect_together(&["one", "two"], NOW);
-    // ReadUse (credential_evidence), cursor (cli), clock floors (clock).
+    // ReadUse (credential_evidence), cursor (cli), clock floors (clock). The
+    // use is recorded, as a release up to 0.76.0 recorded it.
     let (first, _) = world.connections[0].clone();
+    super::record_read_uses(true);
     world
         .registry
         .capture_read(&binding(), &first, &BTreeSet::new(), NOW, NOW + 1000)
         .unwrap();
+    super::record_read_uses(false);
     let page = world
         .registry
         .list(

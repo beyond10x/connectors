@@ -32,8 +32,11 @@ fn unexpired_read_uses(root: &Path) -> usize {
         .count()
 }
 
-/// A store with `n` released read uses, all due by `NOW + 10_000`.
+/// A store with `n` recorded, released read uses, all due by `NOW + 10_000`.
+/// Read uses are recorded on this thread from here on, as releases up to
+/// 0.76.0 recorded them: only a recorded use has an expiry to record.
 fn store_with_due_read_uses(n: u64) -> (tempfile::TempDir, Registry, String) {
+    crate::local::metadata::record_read_uses(true);
     let (root, registry) = fixture();
     let (_, candidate) = prepared(&registry, "one", NOW);
     let reference = publish_fixture(&registry, candidate, NOW);

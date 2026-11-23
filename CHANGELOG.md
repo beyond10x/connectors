@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.76.1 — 2026-11-23
+
+### Changed
+
+- A read invoke records nothing per read in the local metadata store (issue #267, item 1). A
+  read use, the reservation a read, a credential reuse or a revalidation takes between capture
+  and release, is held in the memory of the owner process and is no longer recorded. Before,
+  one read invoke appended 3 events and 24,500 blob bytes (0.76.0, a store of 50 recorded
+  events). What differs:
+  1. The store holds no record that a read was captured, dispatched or released. The
+     clock-floor event stays: a registry transaction more than 60,000 ms past the recorded
+     floor records one, so an instance that reads all day adds at most one event per 60 s of
+     use.
+  2. A read use that is open when the owner process ends is gone with the owner. The read was
+     not resumed before either. A dispatch of its id by the next owner answers
+     `Failure::Conflict`, the answer for an unknown id.
+  3. A read use is visible only to the process that captured it. One owner serves a state
+     directory, so the bound of 1,000 open read uses counts as before.
+  4. A `connections revoke` run by the CLI process no longer releases the owner's
+     undispatched read uses of that connection. Such a use stays in the owner's bound until
+     its deadline, at most 120 s. The owner's dispatch of it answers `revoked` where it
+     answered `Failure::Conflict`, and an undispatched revalidation of it likewise; after the
+     deadline both answer `Expired` as before.
+  5. A store written by an earlier release gets one Expired event for each read use left in
+     it, recorded by the first capture after that use's deadline, and keeps the records it
+     has: such stores do not shrink.
+  6. The uses a process holds are not written in one step with a recorded batch. When a batch
+     commits and its persist then answers an error, the process keeps the uses it held, so a
+     release by connection or by version that the same transaction made does not reach them.
+     Their dispatch is still refused (`Failure::Conflict`, the publication fence), and they
+     count in the bound until their deadline.
+
 ## 0.76.0 — 2026-11-23
 
 ### Breaking

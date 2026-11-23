@@ -78,7 +78,10 @@ of the instance, does the connection record its own as `configuration_revision`.
 
 `registry_uses` retains a bounded captured read, its selected connection,
 generation and custody version, the publication fence, the original expiry,
-and whether dispatch opened or the use was released. The host's
+and whether dispatch opened or the use was released. From connectors 0.76.1 on a
+captured use is a row only in the projection of the process that captured it and
+is not recorded; `connectors.credential_evidence.ReadUse` subjects come from
+releases up to 0.76.0 and from the legacy import. The host's
 `capture_read` checks current readiness and scope before creating that row;
 `dispatch_read` rechecks generation, fence, material and readiness and opens
 transport at most once. This retained use is not the authored transient
@@ -126,7 +129,7 @@ reader exists whose definition version could be silently reinterpreted.
 
 `local_authority`, `schema_migrations`, `connectors_er_authority`, Eventlog's own
 tables, SQLite indexes and triggers are provider bookkeeping. The two clock rows
-are owner anti-regression observations. The retained ReadUse is a concrete owner
+are owner anti-regression observations. A recorded ReadUse, which releases up to 0.76.0 wrote and the legacy import creates (from 0.76.1 on a captured use is held by the owner process and not recorded), is a concrete owner
 fact because conflating it with a transient admission both fabricated absent
 evidence during legacy migration and made revoke unable to preserve a
 historical use. No generic row type is introduced.
@@ -294,6 +297,8 @@ and the bound was 32). Each expiry
 batch's receipt is read back; the projection check runs once, after the
 caller's batch. A refused or uncertain expiry batch leaves earlier ones
 committed and the caller's change unapplied; the next write records the rest.
+A due `ExpireReadUse` comes only from a use that a release up to 0.76.0 or the
+legacy import recorded.
 
 The local owner, the processes serving instances and the keyring remain separate processes with their
 current socket, supervision, startup coalescing, bounded shutdown and explicit
