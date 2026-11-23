@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- connectors 0.75.0 and earlier do not open a metadata store once this release wrote to it.
+  Every record this release writes names its entity definition by digest (`er.record/5`,
+  Entity Runtime 0.33.0), and Entity Runtime 0.32.0 and earlier do not read that form. Entity
+  Runtime 0.33.0 has no switch that keeps a writer on the older form, so the change comes with
+  the first write and without a command of the store's owner. Two runs on 2026-11-23, each on
+  a store this release grew by read invokes to 50 recorded events: in a checkout of `v0.74.2`
+  (Entity Runtime 0.32.0, the pin 0.75.0 also has) a test that is not in the repository loaded
+  the store as the cost test does, and `Metadata::inspect` and `Registry::admit_read` each
+  returned `Err(MetadataUnavailable)`; and the 0.74.2 release binary
+  (`x86_64-unknown-linux-gnu`) answered `metadata_unavailable` with exit status 1 to
+  `setup checkpoints-enable --confirm one-way`, and `setup check` reported the `metadata`
+  prerequisite `failed`. The same two runs on a store 0.75.0 grew returned `Ok` and
+  `already_enabled`. The store's schema level stays 9, so an older build has no named refusal
+  for this case. The way back to an older release: move the state directory aside and connect
+  again; nothing converts the store back. Upgrade every installed `connectors` binary and any
+  other tool that opens the store together.
+- Records already in a store keep their bytes: this release rewrites none of them, so a store
+  does not shrink by upgrading. It grows more slowly from the first write on. Reclaiming the
+  bytes of settled reads waits for compaction, which has not shipped.
+
+### Changed
+
+- Entity Runtime 0.33.0 on Eventlog 0.9.4 (from 0.32.0). A decision record names its entity
+  definition by digest instead of carrying it, and the store keeps each definition once as an
+  `er.definition/1` blob. A store Entity Runtime 0.32.0 wrote opens, verifies and takes writes
+  without a rewrite (`a_store_the_previous_pin_wrote_a_read_into_takes_a_read_invoke`, on a
+  store 0.74.2 wrote a read invoke into). One read invoke appended 78,488 blob bytes before and
+  24,500 after, 3.2 times less (`read_invoke_cost_by_store_size`, a store of 50 recorded
+  events, 100 invokes, the test's new `blob_bytes_per_invoke`). No call site changed.
+
 ## 0.75.0 — 2026-11-23
 
 ### Added
