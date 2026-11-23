@@ -1,5 +1,5 @@
 use super::*;
-use crate::local::{approvals, clock, keyring::custody, registry, runtime};
+use crate::local::{approvals, clock, keyring::custody, registry, runtime, standing};
 use connectors_sdk::Secret;
 use std::sync::{
     Mutex,
@@ -117,17 +117,133 @@ fn verify(
     };
     approvals::verify(evidence, subject, &admitted, clock).map_err(proof_error)
 }
+/// What admitted the write: the proof that came with it, or a standing grant
+/// (contracts/cli/v1alpha1/semantics.md, "`invoke` under a grant").
+enum Approval<'a> {
+    Proof(approvals::Evidence),
+    Grant {
+        /// The use taken under the grant; given back unless it is bound.
+        taken: standing::Admitted<'a>,
+        /// The input as `resolve` reads it, which the grant is checked against.
+        input: Value,
+    },
+}
+/// The owner's answer to a write a grant does not admit, and its line in the
+/// owner's log. The answer never says which part of the grant was missed.
+fn standing_error(paths: &Paths, refusal: standing::NotAdmitted) -> Failure {
+    use standing::NotAdmitted::*;
+    let (failure, logged): (Failure, Code) = match refusal {
+        Uncovered(_) | Unverified => (ApprovalCode::ApprovalRequired.into(), Code::NotGranted),
+        AtCap {
+            retry_after_seconds,
+        } => (Failure::rate_limited(retry_after_seconds), Code::Capacity),
+        FileUnavailable | UsesUnavailable | ClockUnavailable => {
+            (Code::Unavailable.into(), Code::Unavailable)
+        }
+    };
+    crate::local::owner::diagnostics::record(&paths.state, refusal.event(), logged);
+    failure
+}
+/// The grant path's recheck where the per-input path verifies its proof
+/// again: the clock and the grant file are read afresh, under the held key
+/// lease. `latest` is the instance as its configuration names it now; an
+/// entry that no longer names a grant file holds no grant.
+fn still_admitted(
+    paths: &Paths,
+    latest: &issuance::Resolved,
+    operation: &str,
+    input: &Value,
+    keys: &crate::local::approval_keys::KeyUse,
+    clock: &clock::BoundedClock,
+    taken: &standing::Admitted<'_>,
+) -> Result<(), Failure> {
+    let Some(path) = latest.adapter.standing_grants.as_deref() else {
+        return Err(standing_error(
+            paths,
+            standing::NotAdmitted::Uncovered(standing::Uncovered::NoGrant),
+        ));
+    };
+    standing::still_admitted(
+        path,
+        keys.key().map_err(issuance::key_error)?,
+        standing::Call {
+            instance: &latest.adapter.instance_id,
+            operation,
+            input,
+        },
+        standing::reading(clock),
+        taken,
+    )
+    .map_err(|refusal| standing_error(paths, refusal))
+}
+/// The grant path's admission, in place of the proof check and before the
+/// audit anchor and the preflight: the published policy and the instance's
+/// current key as the proof check holds them, then one call to
+/// `standing::admit`, which takes one use. The leases end with this call.
+fn admit<'a>(
+    paths: &Paths,
+    current: &issuance::Resolved,
+    request: &issuance::Request<'_>,
+    clock: &clock::BoundedClock,
+    uses: &'a std::cell::OnceCell<standing::Uses>,
+) -> Result<Approval<'a>, Failure> {
+    let Some(path) = current.adapter.standing_grants.as_deref() else {
+        return Err(standing_error(
+            paths,
+            standing::NotAdmitted::Uncovered(standing::Uncovered::NoGrant),
+        ));
+    };
+    let policy = issuance::policy_store(paths, &current.adapter)?
+        .acquire(&current.policy.selection, request.operation)
+        .map_err(issuance::policy_error)?;
+    if policy.policy().map_err(issuance::policy_error)? != &current.policy {
+        return Err(Code::Forbidden.into());
+    }
+    let keys = issuance::key_store(paths, &current.config, &current.adapter)?
+        .acquire_key()
+        .map_err(issuance::key_error)?;
+    // The value `resolve` checked, from the bytes the adapter is sent.
+    let input: Value =
+        connectors_core::read_json(request.input.as_bytes()).map_err(|_| Code::InvalidInput)?;
+    let uses = match uses.get() {
+        Some(uses) => uses,
+        None => {
+            let opened = standing::Uses::open(&paths.state)
+                .map_err(|_| standing_error(paths, standing::NotAdmitted::UsesUnavailable))?;
+            uses.get_or_init(|| opened)
+        }
+    };
+    let taken = standing::admit(
+        path,
+        keys.key().map_err(issuance::key_error)?,
+        standing::Call {
+            instance: &current.adapter.instance_id,
+            operation: request.operation,
+            input: &input,
+        },
+        standing::reading(clock),
+        uses,
+    )
+    .map_err(|refusal| standing_error(paths, refusal))?;
+    Ok(Approval::Grant { taken, input })
+}
+/// Names the attempt in the answer and, for a write under a grant, the grant
+/// bound to it.
 fn correlation(
     value: &mut Delivery,
     current: &issuance::Resolved,
     candidate: &ledger::Candidate,
     reference: ledger::AttemptRef,
+    approval: (&Paths, &Approval<'_>),
 ) {
     value.mutation.attempt = Some(Attempt {
         instance: current.adapter.instance_id.clone(),
         id: reference.attempt_id,
     });
     value.mutation.original_request_id = Some(candidate.request_id.clone());
+    if let (paths, Approval::Grant { .. }) = approval {
+        standing::named(&mut value.mutation, reference.attempt_id, &paths.state);
+    }
 }
 fn safe_failure(error: Failure) -> StoredOutcome {
     StoredOutcome::Failure { error }
@@ -161,15 +277,33 @@ pub(in crate::local::owner) fn execute(
     let mut candidate = candidate(&first, key, &request_id)?;
     let mut audit_reference = None;
     let audits = audit_store(paths)?;
+    // The use store of the grant path, opened on that path only. The use a
+    // grant admits borrows it until the write ends.
+    let uses = std::cell::OnceCell::new();
     // A failure before prepare is subject to the authoritative winner recheck.
     let initial: Result<_, Failure> = (|| {
         control.check()?;
-        let proof = proof.ok_or(ApprovalCode::ApprovalRequired)?;
-        let evidence = approvals::Evidence::from_document(proof).map_err(proof_error)?;
+        // What the owner received decides the path. A proof is the per-input
+        // path, in every step as before, and its refusal is final.
+        let evidence = match standing::route(proof, key, first.adapter.standing_grants.as_deref()) {
+            standing::Route::PerInput(proof) => {
+                Some(approvals::Evidence::from_document(proof).map_err(proof_error)?)
+            }
+            standing::Route::Grant(_) => None,
+            standing::Route::ApprovalRequired => {
+                return Err(ApprovalCode::ApprovalRequired.into());
+            }
+        };
         let clock = time(&first, until)?;
         let current = issuance::resolve(paths, alias, request, until)?;
         unchanged(&first, &current)?;
-        verify(paths, &current, &evidence, &clock)?;
+        let approval = match evidence {
+            Some(evidence) => {
+                verify(paths, &current, &evidence, &clock)?;
+                Approval::Proof(evidence)
+            }
+            None => admit(paths, &current, request, &clock, &uses)?,
+        };
         let bootstrap = child.bootstrap().clone();
         if serde_json::to_value(&bootstrap).map_err(|_| Code::Unavailable)?
             != serde_json::to_value(super::super::cached(paths, alias)?)
@@ -295,7 +429,7 @@ pub(in crate::local::owner) fn execute(
         let custody_target =
             super::custody::expected(&final_current.adapter.permissions, requirement)?.cloned();
         Ok((
-            evidence,
+            approval,
             final_current,
             clock,
             connection_use,
@@ -305,7 +439,7 @@ pub(in crate::local::owner) fn execute(
             custody_target,
         ))
     })();
-    let (evidence, current, clock, mut connection_use, native, audit, facts, custody_target) =
+    let (approval, current, clock, mut connection_use, native, audit, facts, custody_target) =
         match initial {
             Ok(value) => value,
             Err(error) => {
@@ -370,21 +504,45 @@ pub(in crate::local::owner) fn execute(
         subject: &current.preparation.subject,
     };
     let final_admission: Result<_, Failure> = (|| {
-        unchanged(&current, &issuance::resolve(paths, alias, request, until)?)?;
-        let verified =
-            approvals::verify(&evidence, &current.preparation.subject, &admitted, &clock)
-                .map_err(proof_error)?;
+        let latest = issuance::resolve(paths, alias, request, until)?;
+        unchanged(&current, &latest)?;
+        let verified = match &approval {
+            Approval::Proof(evidence) => Some(
+                approvals::verify(evidence, &current.preparation.subject, &admitted, &clock)
+                    .map_err(proof_error)?,
+            ),
+            // The first recheck: no attempt is recorded yet, and a refusal
+            // here gives the use back.
+            Approval::Grant { taken, input } => {
+                still_admitted(
+                    paths,
+                    &latest,
+                    request.operation,
+                    input,
+                    &keys,
+                    &clock,
+                    taken,
+                )?;
+                None
+            }
+        };
         audits
             .confirm(audit, &facts)
             .map_err(|_| Code::MetadataUnavailable)?;
-        candidate.approval = ledger::Approval::Required {
-            reference: evidence.reference().into(),
-        };
+        if let Approval::Proof(evidence) = &approval {
+            candidate.approval = ledger::Approval::Required {
+                reference: evidence.reference().into(),
+            };
+        }
         issuance::check(until)?;
         control.check()?;
-        ledger
-            .prepare_approved(&candidate, &verified)
-            .map_err(ledger_error)
+        match &verified {
+            Some(verified) => ledger.prepare_approved(&candidate, verified),
+            // Under a grant the attempt records `not_required`, as the served
+            // host's do; the grant's id is bound to it in the use store.
+            None => ledger.prepare(&candidate),
+        }
+        .map_err(ledger_error)
     })();
     let prepared = match final_admission {
         Ok(ledger::Preparation::Prepared(prepared)) => prepared,
@@ -420,25 +578,50 @@ pub(in crate::local::owner) fn execute(
     let pre_gate: Result<_, Failure> = (|| {
         issuance::check(until)?;
         unchanged(&current, &issuance::resolve(paths, alias, request, until)?)?;
-        let spends =
-            approvals::Store::new(&paths.state, ClockRef(&clock), 100_000).map_err(proof_error)?;
-        let spent = spends
-            .spend(
-                &prepared,
-                &evidence,
-                &current.preparation.subject,
-                &admitted,
-            )
-            .map_err(proof_error)?;
+        let spent = match &approval {
+            Approval::Proof(evidence) => {
+                let spends = approvals::Store::new(&paths.state, ClockRef(&clock), 100_000)
+                    .map_err(proof_error)?;
+                Some(
+                    spends
+                        .spend(&prepared, evidence, &current.preparation.subject, &admitted)
+                        .map_err(proof_error)?,
+                )
+            }
+            // A grant has no spend. Its use is bound to the attempt here and
+            // stays counted from now on, whatever becomes of the write.
+            Approval::Grant { taken, .. } => {
+                taken
+                    .bind(attempt.attempt_id)
+                    .map_err(|_| standing_error(paths, standing::NotAdmitted::UsesUnavailable))?;
+                None
+            }
+        };
         let guard = control.lifecycle.lock().map_err(|_| Code::Unavailable)?;
         guard.check(control.epoch)?;
         if control.stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
         }
         issuance::check(until)?;
-        unchanged(&current, &issuance::resolve(paths, alias, request, until)?)?;
-        approvals::verify(&evidence, &current.preparation.subject, &admitted, &clock)
-            .map_err(proof_error)?;
+        let latest = issuance::resolve(paths, alias, request, until)?;
+        unchanged(&current, &latest)?;
+        match &approval {
+            Approval::Proof(evidence) => {
+                approvals::verify(evidence, &current.preparation.subject, &admitted, &clock)
+                    .map_err(proof_error)?;
+            }
+            // The second recheck, and the grant's last: a refusal leaves an
+            // aborted attempt that names the grant.
+            Approval::Grant { taken, input } => still_admitted(
+                paths,
+                &latest,
+                request.operation,
+                input,
+                &keys,
+                &clock,
+                taken,
+            )?,
+        }
         let captured = connection_use.captured.take().ok_or(Code::Unavailable)?;
         connection_use.dispatched = Some(
             connection_use
@@ -455,7 +638,13 @@ pub(in crate::local::owner) fn execute(
             let outcome = safe_failure(error.clone());
             let aborted = ledger.abort(attempt, stored_value(&outcome)?);
             let mut value = delivery(&current, &request_id, Classification::NotAttempted, outcome);
-            correlation(&mut value, &current, &candidate, attempt);
+            correlation(
+                &mut value,
+                &current,
+                &candidate,
+                attempt,
+                (paths, &approval),
+            );
             if aborted.is_err() {
                 value.mutation.cause = Some(Cause {
                     code: connectors_core::ErrorCode::Unavailable,
@@ -466,7 +655,11 @@ pub(in crate::local::owner) fn execute(
             return Ok(value);
         }
     };
-    let gate = ledger.open_approved_dispatch(prepared, spent);
+    let gate = match spent {
+        Some(spent) => ledger.open_approved_dispatch(prepared, spent),
+        // The ledger's gate does not enforce the grant; the order above does.
+        None => ledger.open_dispatch(prepared),
+    };
     let winner = match gate {
         Ok(winner) => winner,
         Err(error) => {
@@ -490,7 +683,13 @@ pub(in crate::local::owner) fn execute(
                 },
                 outcome,
             );
-            correlation(&mut value, &current, &candidate, attempt);
+            correlation(
+                &mut value,
+                &current,
+                &candidate,
+                attempt,
+                (paths, &approval),
+            );
             finish_audit(&audits, reference, &mut value, until);
             return Ok(value);
         }
@@ -498,10 +697,15 @@ pub(in crate::local::owner) fn execute(
     // No network, custody lookup, mutation retry or replacement frame can be
     // introduced between this live gate winner and its matching native commit.
     let final_check = issuance::check(until)
-        .and_then(|_| {
-            approvals::verify(&evidence, &current.preparation.subject, &admitted, &clock)
-                .map(|_| ())
-                .map_err(|_| Code::OutcomeUnknown.into())
+        .and_then(|_| match &approval {
+            Approval::Proof(evidence) => {
+                approvals::verify(evidence, &current.preparation.subject, &admitted, &clock)
+                    .map(|_| ())
+                    .map_err(|_| Code::OutcomeUnknown.into())
+            }
+            // The recheck before the gate was the grant's last: no file is
+            // read between the gate and the commit.
+            Approval::Grant { .. } => Ok(()),
         })
         .and_then(|_| {
             winner
@@ -544,7 +748,13 @@ pub(in crate::local::owner) fn execute(
         },
     );
     let mut value = delivery(&current, &request_id, classification, outcome);
-    correlation(&mut value, &current, &candidate, attempt);
+    correlation(
+        &mut value,
+        &current,
+        &candidate,
+        attempt,
+        (paths, &approval),
+    );
     if settled.is_err() {
         value.mutation.cause = Some(Cause {
             code: connectors_core::ErrorCode::Unavailable,

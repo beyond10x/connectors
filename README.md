@@ -48,7 +48,10 @@ Two instances of one connector exist when you connect twice, for example with tw
 accounts or two hosts; the instance name addresses the right one. Every operation of
 an enabled connector is available on its instances. Configuration does not group
 operations or hide a subset; a library that wants a narrower surface projects one over
-it. A write that requires approval still needs a proof issued for its exact input.
+it. A write that requires approval still needs a proof issued for its exact input, or, on
+an instance whose entry names a `standing_grants` file, a standing grant its operator signed
+once with `approvals grant-standing`
+([standing grants](docs/local-approvals.md#standing-grants)).
 
 "Adapter" is not one of these words. It is the internal name of an implementation (the
 catalog engine, a credential binary) and of the process that serves an instance.

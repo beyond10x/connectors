@@ -42,6 +42,15 @@ const APPROVAL_STEPS: [&str; 3] = [
     "approvals clock-check",
     "approvals issue",
 ];
+/// The reply to a write that came without an approval: `approval_required`
+/// at admission, naming the approval commands.
+pub(super) fn approval_required() -> HandlerReply {
+    let mut reply = failure("approval_required", "admission", "none", false);
+    if let HandlerReply::Error { data, .. } = &mut reply {
+        data["approval_steps"] = json!(APPROVAL_STEPS);
+    }
+    reply
+}
 /// The connections one page of an instance's listing reads.
 const LISTED: u16 = 500;
 /// A read's deadline when `--deadline-seconds` is left out, in milliseconds.
@@ -1152,12 +1161,15 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
             return Err(refused("idempotency_key"));
         }
         Effect::Read if request.approval_file.is_some() => return Err(refused("approval_file")),
-        Effect::Write if request.approval_file.is_none() => {
-            let mut reply = failure("approval_required", "admission", "none", false);
-            if let HandlerReply::Error { data, .. } = &mut reply {
-                data["approval_steps"] = json!(APPROVAL_STEPS);
-            }
-            return Err(reply);
+        // A write without an approval file goes on only with an idempotency
+        // key, on an instance whose entry names its grant file: the owner
+        // then admits it under a standing grant or refuses it
+        // (contracts/cli/v1alpha1/semantics.md, "Standing grants").
+        Effect::Write
+            if request.approval_file.is_none()
+                && !(request.idempotency_key.is_some() && adapter.standing_grants.is_some()) =>
+        {
+            return Err(approval_required());
         }
         _ => {}
     }

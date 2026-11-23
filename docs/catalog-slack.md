@@ -309,7 +309,10 @@ is a binary request body, which the catalog does not send.
 Two writes post a message, one edits it and one deletes it. Each is a
 mutation: the host requires an approval that binds the operation and the whole
 input by digest, records the attempt, and sends the request once
-([the catalog provider guide](local-catalog-provider.md)).
+([the catalog provider guide](local-catalog-provider.md)). Through the local
+CLI a keyed write also runs with no approval of its own under a standing
+grant the operator signed with `approvals grant-standing`
+([a standing grant for posts](#a-standing-grant-for-posts)).
 
 | id | pinned `operationId` | request | scope | body | answer |
 |---|---|---|---|---|---|
@@ -844,6 +847,46 @@ $ connectors invoke slack/bot chat.postMessage --input-file ~/private/post.json 
 ```
 
 The invocation sends a real message, which [Messages](#messages) describes.
+
+#### A standing grant for posts
+
+A caller that posts often into one channel does not need a proof per post. Name a grant file
+in the instance's entry, by an absolute path, and sign one grant
+([standing grants](local-approvals.md#standing-grants)). The key, the clock and the policy
+above stay as they are:
+
+```toml
+[connectors.slack.instances.bot]
+standing_grants = "/absolute/private/slack-bot.grants"
+```
+
+`~/private/slack-grant.json` holds the grant: posts to one channel, with a text and
+optionally a thread, until the expiry, at most 20 an hour:
+
+```json
+{
+  "operation": "chat.postMessage",
+  "target": [{"pointer": "/body/channel", "value": "C0000000001"}],
+  "input_keys": ["/body/text", "/body/thread_ts"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 20
+}
+```
+
+```sh
+connectors approvals grant-standing --connector slack --instance bot --input-file ~/private/slack-grant.json
+connectors approvals list-standing --connector slack --instance bot
+connectors --output json invoke slack/bot chat.postMessage --input-stdin --idempotency-key post-2 < ~/private/post.json
+```
+
+The answer's `mutation.standing.grant_id` is the id `grant-standing` printed. A post to
+another channel, or one that sets `mrkdwn`, `unfurl_links` or any member outside
+`input_keys`, is `approval_required` and no request reaches Slack; the 21st post of an
+hour is `rate_limited` with `retry_after_seconds`. `thread_ts` is admitted with any value:
+the channel stays the granted one. `approvals revoke-standing <grant id>` ends the grant.
+
+Verified against a local fixture in
+`adapters/catalog/tests/local_runtime/slack_standing.rs`, not against a live workspace.
 
 ### Retire the credential-only `legacy` instance
 

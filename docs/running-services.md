@@ -260,6 +260,13 @@ targets a caller may write to and how often. There is no per-call approval. The 
 the [service contract](../contracts/service/compatibility.md#21-first-binding-post-v1alpha2invoke),
 "Keyed writes under a standing grant".
 
+This section is the served host's. The local CLI takes grants too, per instance and beside
+its per-write proofs, and holds them in another form: a file signed by the instance's
+approval key, which `connectors approvals grant-standing` writes
+([standing grants](local-approvals.md#standing-grants)). The two forms do not mix. The bare
+JSON file below does not verify at a local instance's `standing_grants` path, and the served
+host does not read a signed one.
+
 Point the host at the file with `standing_grants` in its service configuration, here the
 `service` member of the catalog example above. It requires `state`; without it the host does
 not start.

@@ -261,6 +261,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local_runtime::cli_journey::guarded_merge::custody_journey::a_created_token_custody_refuses_is_reported_by_its_hash_and_held_nowhere"
             | "local_runtime::cli_journey::guarded_merge::custody_journey::a_created_token_is_held_as_a_new_connection_and_only_its_hash_is_returned"
             | "local_runtime::cli_journey::guarded_merge::custody_journey::a_write_after_an_executable_only_change_is_validated_once_and_sent"
+            | "local_runtime::slack_standing::a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it"
             | "local_runtime::cli_journey::guarded_merge::custody_journey::security2_a_proof_issued_before_an_executable_only_change_authorizes_no_write"
             | "local_runtime::cli_journey::guarded_merge::custody_journey::security2_a_write_whose_new_executable_answers_another_identity_sends_nothing"
             | "local_runtime::cli_journey::revision_recovery::revalidate_replaces_the_adapter_process_of_an_earlier_entry"

@@ -5,8 +5,13 @@
 //! decided in the CLI process before any approval key is read.
 // The fixture configures a Unix absolute executable path.
 #![cfg(unix)]
+use connectors_host::local::{
+    config::{Config, Paths},
+    registry, runtime,
+};
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeSet,
     fs,
     path::Path,
     process::{Command, Output},
@@ -207,4 +212,154 @@ fn standing_commands_refusing_their_selection_name_adapter() {
             assert_eq!(data["field"], "adapter", "{name} {selection:?}: {data}");
         }
     }
+}
+
+/// The cached description of the fixture instance: one write operation.
+fn bootstrap() -> runtime::Bootstrap {
+    let descriptor = connectors_core::Descriptor {
+        version: "v1alpha1".into(),
+        instance: "forge-local".into(),
+        adapter: "catalog".into(),
+        revision: "desc-1".into(),
+        operations: vec![connectors_core::Operation {
+            id: "item.write".into(),
+            description: "fixture operation".into(),
+            contract: "operations/v1alpha1".into(),
+            profile: "resource".into(),
+            input_schema: json!({"type":"object"}),
+            output_schema: json!({"type":"object"}),
+        }],
+        configuration_schema: json!({"type":"object"}),
+    };
+    runtime::Bootstrap {
+        bindings: None,
+        credential_revision: None,
+        executable: None,
+        instance: "forge-local".into(),
+        adapter: "catalog".into(),
+        protocol: "v1alpha1".into(),
+        configuration_revision: "cfg-1".into(),
+        provider_authority: "https://fixture.invalid".into(),
+        descriptor: serde_json::to_string(&descriptor).unwrap(),
+        profiles: vec![runtime::Profile {
+            id: "token".into(),
+            revision: "profile-1".into(),
+            purpose: registry::Purpose::DelegatedUser,
+            subject: registry::Subject::User,
+            scheme: "http_bearer".into(),
+            capability: "http-bearer".into(),
+            minimum_scopes: BTreeSet::new(),
+            evidence_lifetime_ms: 60_000,
+            fields: vec![runtime::EntryField {
+                name: "token".into(),
+                label: "Token".into(),
+                max_bytes: 1024,
+            }],
+            acquisition: None,
+            token_recipient: None,
+        }],
+        requirements: vec![runtime::Requirement {
+            operation: "item.write".into(),
+            custody: false,
+            profile: "token".into(),
+            scopes: BTreeSet::new(),
+            effect: runtime::Effect::Write,
+        }],
+    }
+}
+
+/// [`configured`] with the instance's description cached, as a launch for a
+/// description leaves it: `invoke` reaches its handler's decisions.
+fn described(member: &str) -> tempfile::TempDir {
+    let root = configured(member);
+    let paths = Paths {
+        config: root.path().join("config/config.toml"),
+        state: root.path().join("state"),
+    };
+    let adapter = Config::load(&paths.config).unwrap().adapters[ALIAS].clone();
+    runtime::state::State::new(&paths.state)
+        .remember(&adapter.selection(), &bootstrap())
+        .unwrap();
+    root
+}
+
+/// What a write without an approval answers, as
+/// `invoke_short.rs::a_write_without_an_approval_file_is_approval_required_naming_the_steps`
+/// pins it.
+fn no_approval() -> Value {
+    json!({"kind":"operational","code":"approval_required","stage":"admission","next_action":"none",
+        "approval_steps":["approvals prepare","approvals clock-check","approvals issue"]})
+}
+
+/// A write of the fixture instance with `extra` arguments, standard input
+/// closed.
+fn write(root: &Path, extra: &[&str]) -> Output {
+    let target = format!("{CONNECTOR}/{INSTANCE}");
+    command(
+        root,
+        &[
+            &[
+                "invoke",
+                &target,
+                "item.write",
+                "--connection",
+                "c1",
+                "--input-json",
+                "{}",
+            ][..],
+            extra,
+        ]
+        .concat(),
+    )
+}
+
+/// Acceptance 17. Without `--approval-file`, a write goes on to the owner's
+/// write path only with an idempotency key on an instance that names its
+/// grant file. With the member and no key, and with a key and no member, the
+/// answer is the one a write without an approval had before grants existed,
+/// byte for byte, and no use store is made. The control, with both: the write
+/// is not refused at the gate (here the keyed lookup refuses it, the fixture
+/// holding no connection). The three cases run side by side: the one without
+/// a key starts an owner, as every `invoke` that names neither does.
+///
+/// An `--approval-file` that holds no byte (acceptance 18) is not shown here:
+/// this fixture has no registered connection, and the keyed lookup refuses
+/// the call before the approval file is read. The journey
+/// `adapters/catalog/tests/local_runtime/slack_standing.rs` shows it.
+#[test]
+fn a_write_without_a_key_or_without_the_member_changes_no_byte() {
+    let grants = tempfile::tempdir().unwrap();
+    let member = format!(
+        "standing_grants='{}'\n",
+        grants.path().join("forge.grants").display()
+    );
+    let keyed = &["--idempotency-key", "k"][..];
+    let case = |member: &str, extra: &[&str]| {
+        let root = described(member);
+        let output = write(root.path(), extra);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert!(output.stdout.is_empty(), "{output:?}");
+        let held = state(root.path());
+        assert!(
+            !held.iter().any(|held| held == "standing-grants.sqlite3"),
+            "{held:?}"
+        );
+        (failure(&output), held)
+    };
+    std::thread::scope(|scope| {
+        let unkeyed = scope.spawn(|| case(&member, &[]));
+        let without_member = scope.spawn(|| case("", keyed));
+        let both = scope.spawn(|| case(&member, keyed));
+        let (data, _) = unkeyed.join().unwrap();
+        assert_eq!(data, no_approval(), "the member and no key");
+        let (data, held) = without_member.join().unwrap();
+        assert_eq!(data, no_approval(), "a key and no member");
+        // The gate refused it: no owner was started for it.
+        for name in ["owner.lock", "owner.sock"] {
+            assert!(!held.iter().any(|held| held == name), "{held:?}");
+        }
+        let (data, _) = both.join().unwrap();
+        assert_ne!(data["code"], "approval_required", "{data}");
+        assert!(data.get("approval_steps").is_none(), "{data}");
+    });
 }

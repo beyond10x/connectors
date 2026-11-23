@@ -65,6 +65,8 @@ mod recorded_state;
 mod retry_after_adversary;
 #[path = "local_runtime/slack_approval.rs"]
 mod slack_approval;
+#[path = "local_runtime/slack_standing.rs"]
+mod slack_standing;
 
 /// Fictional HTTP basic material the fixture accepts, and the exact header it
 /// expects: `Basic base64("fixture-account@example.test:fixture-api-token-one")`,

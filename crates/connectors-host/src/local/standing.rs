@@ -572,6 +572,31 @@ impl Uses {
         })
     }
 
+    /// The store of the state directory `directory` for reading, when it
+    /// holds one: opened read-only, under the custody check of [`Uses::open`].
+    /// `None` when the directory holds no store file; none is ever created
+    /// here, so reading for a grant leaves no store behind.
+    pub fn existing(directory: &Path) -> Result<Option<Self>, UsesUnavailable> {
+        let name = std::ffi::OsStr::new(USES_FILE);
+        let parent = fs::directory(directory, false, false).map_err(|_| UsesUnavailable)?;
+        if !fs::private_file_metadata_if_present_at(&parent, name).map_err(|_| UsesUnavailable)? {
+            return Ok(None);
+        }
+        let connection = Connection::open_with_flags(
+            directory.join(USES_FILE),
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .map_err(|_| UsesUnavailable)?;
+        connection
+            .busy_timeout(BUSY_TIMEOUT)
+            .map_err(|_| UsesUnavailable)?;
+        Ok(Some(Self {
+            connection: std::sync::Mutex::new(connection),
+        }))
+    }
+
     fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
         // A panic while the lock was held left no open transaction: rusqlite
         // rolls back a dropped one.
@@ -1068,6 +1093,219 @@ pub fn list(
     Ok(current(path, key, now)?
         .map(|file| file.grants)
         .unwrap_or_default())
+}
+
+// A keyed write of `invoke` under the signed grant file
+// (contracts/cli/v1alpha1/semantics.md, "`invoke` under a grant"). The
+// owner's executor calls [`route`], [`admit`], [`still_admitted`] and
+// [`named`] and adds nothing of its own to a decision.
+
+/// The path a write takes in the owner, from what the owner received.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Route<P, M> {
+    /// A proof came with the write: the per-input path, in every byte as
+    /// without grants. Its refusal is final; nothing falls back to a grant.
+    PerInput(P),
+    /// No proof, an idempotency key and an instance that names its grant
+    /// file: the grant path, under that file.
+    Grant(M),
+    /// No proof and no key, or no grant file: `approval_required`.
+    ApprovalRequired,
+}
+
+/// [`Route`] for a write with `proof`, the idempotency key `key` and the
+/// instance's `standing_grants` member `member`.
+pub fn route<P, M>(proof: Option<P>, key: Option<&str>, member: Option<M>) -> Route<P, M> {
+    match (proof, key, member) {
+        (Some(proof), ..) => Route::PerInput(proof),
+        (None, Some(_), Some(member)) => Route::Grant(member),
+        (None, ..) => Route::ApprovalRequired,
+    }
+}
+
+/// The write a grant is checked against: the instance's `instance_id`, the
+/// operation and the input as `connectors_core::read_json` reads it.
+#[derive(Clone, Copy, Debug)]
+pub struct Call<'a> {
+    pub instance: &'a str,
+    pub operation: &'a str,
+    pub input: &'a Value,
+}
+
+/// Why a write is not admitted under a grant, or no longer is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NotAdmitted {
+    /// No grant of the verified file covers the write, or the path holds no
+    /// file: `approval_required`. The reason is logged, never answered.
+    Uncovered(Uncovered),
+    /// The path holds a file that does not verify: `approval_required`.
+    Unverified,
+    /// Every covering grant admitted `max_per_hour` writes in the last hour:
+    /// `rate_limited` with this number.
+    AtCap { retry_after_seconds: u64 },
+    /// The grant file or a directory to it fails the custody rule, or the
+    /// read failed: `unavailable`.
+    FileUnavailable,
+    /// The use store failed: `unavailable`.
+    UsesUnavailable,
+    /// The clock gave no reading: `unavailable`, never `approval_required`.
+    ClockUnavailable,
+}
+
+impl NotAdmitted {
+    /// The fixed event the owner's log names this refusal by. It holds
+    /// nothing of the request, the grant or the file.
+    pub fn event(self) -> &'static str {
+        match self {
+            Self::Uncovered(Uncovered::NoGrant) => "standing grant: none for this instance",
+            Self::Uncovered(Uncovered::OtherOperation) => "standing grant: another operation",
+            Self::Uncovered(Uncovered::MissingMember) => "standing grant: target member missing",
+            Self::Uncovered(Uncovered::OtherTarget) => "standing grant: another target value",
+            Self::Uncovered(Uncovered::OutsideInput) => "standing grant: input outside input_keys",
+            Self::Uncovered(Uncovered::Expired) => "standing grant: expired",
+            Self::Uncovered(Uncovered::Revoked) => "standing grant: revoked",
+            Self::Unverified => "standing grant: file does not verify",
+            Self::AtCap { .. } => "standing grant: at its hourly cap",
+            Self::FileUnavailable => "standing grant: file fails the custody rule",
+            Self::UsesUnavailable => "standing grant: use store unavailable",
+            Self::ClockUnavailable => "standing grant: no clock reading",
+        }
+    }
+}
+
+/// One use taken under a grant by [`admit`]. Dropped before [`Admitted::bind`]
+/// it gives the use back, on every exit; once bound, the use stays counted
+/// whatever becomes of the write.
+#[must_use]
+pub struct Admitted<'a> {
+    uses: &'a Uses,
+    taken: Use,
+    bound: std::cell::Cell<bool>,
+}
+
+impl Admitted<'_> {
+    /// The id of the grant the use was taken under.
+    pub fn grant_id(&self) -> &str {
+        &self.taken.grant_id
+    }
+
+    /// Records the grant with the write's attempt ([`Uses::bind`]). After a
+    /// failure the use is still given back when the guard is dropped.
+    pub fn bind(&self, attempt_id: Uuid) -> Result<(), UsesUnavailable> {
+        self.uses.bind(&self.taken, attempt_id)?;
+        self.bound.set(true);
+        Ok(())
+    }
+}
+
+impl Drop for Admitted<'_> {
+    fn drop(&mut self) {
+        if !self.bound.get() {
+            // A failed release leaves the use counting until its hour ends.
+            let _ = self.uses.release(&self.taken);
+        }
+    }
+}
+
+impl std::fmt::Debug for Admitted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Admitted")
+            .field("grant_id", &self.taken.grant_id)
+            .field("bound", &self.bound.get())
+            .finish()
+    }
+}
+
+/// The grants of the verified file at `path` that cover `call` when the
+/// reading `now` ends, in file order.
+fn covering_now(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    call: Call<'_>,
+    now: ClockInterval,
+) -> Result<Vec<Grant>, NotAdmitted> {
+    let grants = match verify(path, key, now) {
+        Ok(Some(grants)) => grants,
+        Ok(None) => return Err(NotAdmitted::Uncovered(Uncovered::NoGrant)),
+        Err(FileRefusal::Unverified) => return Err(NotAdmitted::Unverified),
+        Err(FileRefusal::Unavailable) => return Err(NotAdmitted::FileUnavailable),
+    };
+    grants
+        .covering(call.instance, call.operation, call.input, now.upper_unix_ms)
+        .map(|covering| covering.into_iter().cloned().collect())
+        .map_err(NotAdmitted::Uncovered)
+}
+
+/// Admits `call` under the signed grant file at `path`: reads and verifies
+/// the file for `key` at the reading `now` ([`verify`]), finds the grants that
+/// cover the write ([`Grants::covering`]) and takes one use in `uses` under
+/// the first with room ([`Uses::take`]). Expiry and the hour are read at the
+/// upper bound of `now`, a fresh reading of the trusted clock
+/// ([`reading`]); `None`, a clock that gave none, is `ClockUnavailable`.
+pub fn admit<'a>(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    call: Call<'_>,
+    now: Option<ClockInterval>,
+    uses: &'a Uses,
+) -> Result<Admitted<'a>, NotAdmitted> {
+    let now = now.ok_or(NotAdmitted::ClockUnavailable)?;
+    let covering = covering_now(path, key, call, now)?;
+    let covering: Vec<&Grant> = covering.iter().collect();
+    match uses.take(call.instance, &covering, now.upper_unix_ms) {
+        Ok(Taken::Slot(taken)) => Ok(Admitted {
+            uses,
+            taken,
+            bound: std::cell::Cell::new(false),
+        }),
+        Ok(Taken::AtCap {
+            retry_after_seconds,
+        }) => Err(NotAdmitted::AtCap {
+            retry_after_seconds,
+        }),
+        Err(UsesUnavailable) => Err(NotAdmitted::UsesUnavailable),
+    }
+}
+
+/// The recheck of a write [`admit`] admitted: the file at `path` is read and
+/// verified again at the fresh reading `now`, and the grant the use was taken
+/// under must still be in it, still cover `call` and not be expired when the
+/// reading ends. Another grant that covers the write does not stand in for
+/// it. No use is taken or given back.
+pub fn still_admitted(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    call: Call<'_>,
+    now: Option<ClockInterval>,
+    admitted: &Admitted<'_>,
+) -> Result<(), NotAdmitted> {
+    let now = now.ok_or(NotAdmitted::ClockUnavailable)?;
+    if covering_now(path, key, call, now)?
+        .iter()
+        .any(|grant| grant.id == admitted.taken.grant_id)
+    {
+        Ok(())
+    } else {
+        Err(NotAdmitted::Uncovered(Uncovered::NoGrant))
+    }
+}
+
+/// Names the grant in `observation` when a grant admitted the attempt
+/// `attempt_id`: the id [`Uses::bind`] recorded with it in the use store of
+/// the state directory `state`. The member stays absent for an attempt no
+/// grant admitted, when the directory holds no use store (none is created),
+/// and when the store cannot be read: naming the grant never fails a write
+/// or its replay.
+pub fn named(
+    observation: &mut crate::local::owner::mutation::MutationObservation,
+    attempt_id: Uuid,
+    state: &Path,
+) {
+    if let Ok(Some(uses)) = Uses::existing(state)
+        && let Ok(Some(grant_id)) = uses.grant_of(attempt_id)
+    {
+        observation.standing = Some(crate::local::owner::mutation::Standing { grant_id });
+    }
 }
 
 #[cfg(test)]
@@ -1812,33 +2050,43 @@ mod signed_tests {
 
     #[derive(Debug, PartialEq)]
     enum Outcome {
-        /// Admitted under the grant of this id; one use is counted.
+        /// Admitted under the grant of this id; its use is bound and counts.
         Admitted(String),
         ApprovalRequired,
         RateLimited,
         Unavailable,
     }
 
-    /// The composition run 3 gives `standing::admit`, here only as far as
-    /// this run's seam reaches: the verified file, the covering grants at the
-    /// reading's upper bound, one use.
-    fn admit(site: &Site, key: &ConfiguredApprovalKey, input: &Value) -> Outcome {
-        let grants = match verify(&site.path, key, now()) {
-            Ok(Some(grants)) => grants,
-            Ok(None) | Err(FileRefusal::Unverified) => return Outcome::ApprovalRequired,
-            Err(FileRefusal::Unavailable) => return Outcome::Unavailable,
-        };
-        let at = now().upper_unix_ms;
-        let Ok(covering) = grants.covering("leaf", "chat.postMessage", input, at) else {
-            return Outcome::ApprovalRequired;
-        };
-        match Uses::open(&site.state).unwrap().take("leaf", &covering, at) {
-            Ok(Taken::Slot(taken)) => Outcome::Admitted(taken.grant_id),
-            Ok(Taken::AtCap { .. }) => Outcome::RateLimited,
-            Err(_) => Outcome::Unavailable,
+    /// A write of `leaf`'s `chat.postMessage` with `input`.
+    fn call(input: &Value) -> Call<'_> {
+        Call {
+            instance: "leaf",
+            operation: "chat.postMessage",
+            input,
         }
     }
 
+    /// `standing::admit` for that write at `now()`, by the code the owner
+    /// answers. An admitted use is bound to a new attempt, so it stays
+    /// counted after the guard is dropped.
+    fn admit(site: &Site, key: &ConfiguredApprovalKey, input: &Value) -> Outcome {
+        let uses = Uses::open(&site.state).unwrap();
+        match super::admit(&site.path, key, call(input), Some(now()), &uses) {
+            Ok(admitted) => {
+                admitted.bind(Uuid::new_v4()).unwrap();
+                Outcome::Admitted(admitted.grant_id().to_owned())
+            }
+            Err(NotAdmitted::Uncovered(_) | NotAdmitted::Unverified) => Outcome::ApprovalRequired,
+            Err(NotAdmitted::AtCap { .. }) => Outcome::RateLimited,
+            Err(
+                NotAdmitted::FileUnavailable
+                | NotAdmitted::UsesUnavailable
+                | NotAdmitted::ClockUnavailable,
+            ) => Outcome::Unavailable,
+        }
+    }
+
+    /// The uses the store holds, given back or not: a refusal adds none.
     fn uses(site: &Site) -> u32 {
         Uses::open(&site.state).unwrap().rows().unwrap()
     }
@@ -2456,5 +2704,379 @@ mod signed_tests {
         ] {
             assert!(reading(&At(refused)).is_none());
         }
+    }
+
+    /// A reading two seconds wide that ends at `upper`.
+    fn ending(upper: i64) -> ClockInterval {
+        ClockInterval {
+            lower_unix_ms: upper - 2_000,
+            upper_unix_ms: upper,
+        }
+    }
+
+    /// The site's grant file holding `grants`, signed by the test key.
+    fn granted(site: &Site, grants: &[Grant]) {
+        put(
+            &site.path,
+            &sign(&signer(), &key(), now(), grants).unwrap(),
+            0o600,
+        );
+    }
+
+    /// Acceptance 5.
+    #[test]
+    fn a_write_outside_the_grant_is_refused_and_counts_no_use() {
+        let site = site();
+        granted(&site, &[channel_grant("g1", NOW + 600_000)]);
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        // The control: the granted write is admitted under this file, key
+        // and clock, and its use is given back when the guard is dropped.
+        let admitted = super::admit(&site.path, &key(), call(&input), Some(now()), &uses).unwrap();
+        assert_eq!(admitted.grant_id(), "g1");
+        drop(admitted);
+        assert_eq!(uses.rows().unwrap(), 1);
+
+        let other_channel = json!({"body": {"channel": "C2", "text": "hello"}});
+        let no_channel = json!({"body": {"text": "hello"}});
+        let wider = json!({"body": {"channel": "C1", "text": "hello", "mrkdwn": false}});
+        let cases = [
+            (
+                "another instance",
+                Call {
+                    instance: "other",
+                    ..call(&input)
+                },
+                Uncovered::NoGrant,
+            ),
+            (
+                "another operation",
+                Call {
+                    operation: "chat.update",
+                    ..call(&input)
+                },
+                Uncovered::OtherOperation,
+            ),
+            (
+                "another channel",
+                call(&other_channel),
+                Uncovered::OtherTarget,
+            ),
+            (
+                "the channel missing",
+                call(&no_channel),
+                Uncovered::MissingMember,
+            ),
+            ("/body/mrkdwn added", call(&wider), Uncovered::OutsideInput),
+        ];
+        for (case, call, reason) in cases {
+            assert_eq!(
+                super::admit(&site.path, &key(), call, Some(now()), &uses).err(),
+                Some(NotAdmitted::Uncovered(reason)),
+                "{case}"
+            );
+            assert_eq!(uses.rows().unwrap(), 1, "{case}");
+        }
+        std::fs::remove_file(&site.path).unwrap();
+        assert_eq!(
+            super::admit(&site.path, &key(), call(&input), Some(now()), &uses).err(),
+            Some(NotAdmitted::Uncovered(Uncovered::NoGrant)),
+            "no file"
+        );
+        assert_eq!(uses.rows().unwrap(), 1, "no file");
+        // A clock that gave no reading is `unavailable`, with or without a
+        // file, and counts none either.
+        granted(&site, &[channel_grant("g1", NOW + 600_000)]);
+        assert_eq!(
+            super::admit(&site.path, &key(), call(&input), None, &uses).err(),
+            Some(NotAdmitted::ClockUnavailable)
+        );
+        assert_eq!(uses.rows().unwrap(), 1);
+        // No refusal's log event holds anything of the write.
+        assert_eq!(
+            NotAdmitted::Uncovered(Uncovered::OtherTarget).event(),
+            "standing grant: another target value"
+        );
+    }
+
+    /// Acceptance 6.
+    #[test]
+    fn expiry_reads_the_upper_bound_of_the_clock() {
+        let site = site();
+        let not_after = NOW + 600_000;
+        granted(&site, &[channel_grant("g1", not_after)]);
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let at = |upper: i64| {
+            super::admit(&site.path, &key(), call(&input), Some(ending(upper)), &uses)
+                .map(|admitted| admitted.grant_id().to_owned())
+        };
+        // A reading that ends before `not_after` is admitted.
+        assert_eq!(at(not_after - 1), Ok("g1".to_owned()));
+        // One that straddles it is refused: its lower bound is before
+        // `not_after`, its upper bound is not.
+        assert_eq!(
+            at(not_after + 1_000),
+            Err(NotAdmitted::Uncovered(Uncovered::Expired))
+        );
+        // One whose upper bound reaches it is refused too.
+        assert_eq!(
+            at(not_after),
+            Err(NotAdmitted::Uncovered(Uncovered::Expired))
+        );
+        assert_eq!(uses.rows().unwrap(), 1);
+    }
+
+    /// Acceptance 7.
+    #[test]
+    fn a_fresh_key_at_the_cap_is_rate_limited() {
+        let site = site();
+        // A key and a grant that outlive the hour the test moves through.
+        let key = ConfiguredApprovalKey {
+            not_after_unix_ms: NOW + 3 * WINDOW_MS,
+            ..key()
+        };
+        let grant = Grant {
+            max_per_hour: 1,
+            ..channel_grant("g1", NOW + 2 * WINDOW_MS)
+        };
+        put(
+            &site.path,
+            &sign(&signer(), &key, now(), &[grant]).unwrap(),
+            0o600,
+        );
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let at = |reading: ClockInterval| {
+            super::admit(&site.path, &key, call(&input), Some(reading), &uses).map(|admitted| {
+                admitted.bind(Uuid::new_v4()).unwrap();
+                admitted.grant_id().to_owned()
+            })
+        };
+        let first = now().upper_unix_ms;
+        assert_eq!(at(now()), Ok("g1".to_owned()));
+        // The second write of the hour is at the cap.
+        let Err(NotAdmitted::AtCap {
+            retry_after_seconds,
+        }) = at(now())
+        else {
+            panic!("the second write was not at the cap");
+        };
+        assert!(
+            (1..=3600).contains(&retry_after_seconds),
+            "{retry_after_seconds}"
+        );
+        assert_eq!(retry_after_seconds, 3600);
+        // 3,600 s later the first use is still inside the hour.
+        assert_eq!(
+            at(ending(first + WINDOW_MS)),
+            Err(NotAdmitted::AtCap {
+                retry_after_seconds: 1
+            })
+        );
+        // 3,600 s and 1 ms later it has left it.
+        assert_eq!(at(ending(first + WINDOW_MS + 1)), Ok("g1".to_owned()));
+        assert_eq!(uses.rows().unwrap(), 2);
+    }
+
+    /// Acceptance 8.
+    #[test]
+    fn a_use_not_bound_is_released_and_a_bound_use_stays_counted() {
+        let site = site();
+        let grant = Grant {
+            max_per_hour: 1,
+            ..channel_grant("g1", NOW + 600_000)
+        };
+        granted(&site, &[grant]);
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let admit = || super::admit(&site.path, &key(), call(&input), Some(now()), &uses);
+        // A guard dropped before `bind` gives its use back: the grant's one
+        // use of the hour is free again.
+        let unbound = admit().unwrap();
+        assert!(matches!(admit(), Err(NotAdmitted::AtCap { .. })));
+        drop(unbound);
+        // A guard that was bound keeps its use counted after the drop, and
+        // the store names the grant for the attempt.
+        let bound = admit().unwrap();
+        let attempt = Uuid::new_v4();
+        bound.bind(attempt).unwrap();
+        drop(bound);
+        assert!(matches!(admit(), Err(NotAdmitted::AtCap { .. })));
+        assert_eq!(uses.grant_of(attempt).unwrap().as_deref(), Some("g1"));
+        // A bind that fails leaves the use to be given back: the attempt id
+        // is taken, so the second bind is refused by the store.
+        let site = self::site();
+        granted(&site, &[channel_grant("g1", NOW + 600_000)]);
+        let uses = Uses::open(&site.state).unwrap();
+        let admit = || super::admit(&site.path, &key(), call(&input), Some(now()), &uses);
+        let first = admit().unwrap();
+        first.bind(attempt).unwrap();
+        let second = admit().unwrap();
+        assert_eq!(second.bind(attempt), Err(UsesUnavailable));
+        drop(second);
+        // `max_per_hour` is 2: one bound use, and the failed one given back.
+        drop(admit().unwrap());
+        let third = admit().unwrap();
+        assert!(matches!(admit(), Err(NotAdmitted::AtCap { .. })));
+        drop(third);
+    }
+
+    /// Acceptance 9.
+    #[test]
+    fn a_recheck_refuses_a_grant_that_left_the_file_and_takes_no_use() {
+        let input = write();
+        let signed_g1 = sign(
+            &signer(),
+            &key(),
+            now(),
+            &[channel_grant("g1", NOW + 600_000)],
+        )
+        .unwrap();
+        // The control: the recheck passes on the unchanged file, at a later
+        // reading, and takes no second use.
+        let control = site();
+        put(&control.path, &signed_g1, 0o600);
+        let uses = Uses::open(&control.state).unwrap();
+        let admitted =
+            super::admit(&control.path, &key(), call(&input), Some(now()), &uses).unwrap();
+        assert_eq!(
+            still_admitted(
+                &control.path,
+                &key(),
+                call(&input),
+                Some(ending(NOW + 30_000)),
+                &admitted
+            ),
+            Ok(())
+        );
+        assert_eq!(uses.rows().unwrap(), 1);
+        drop(admitted);
+
+        fn unchanged(_: &Site) {}
+        // The same grant under another id covers the same write: it does not
+        // stand in for the grant the use was taken under.
+        fn replaced(site: &Site) {
+            granted(site, &[channel_grant("g2", NOW + 600_000)]);
+        }
+        fn removed(site: &Site) {
+            std::fs::remove_file(&site.path).unwrap();
+        }
+        type Change = fn(&Site);
+        let (_, rotated) = other("key-2");
+        let wider = json!({"body": {"channel": "C1", "text": "hello", "mrkdwn": false}});
+        let cases: [(
+            &str,
+            Change,
+            ConfiguredApprovalKey,
+            &Value,
+            i64,
+            NotAdmitted,
+        ); 5] = [
+            (
+                "the file replaced without the grant",
+                replaced,
+                key(),
+                &input,
+                NOW + 30_000,
+                NotAdmitted::Uncovered(Uncovered::NoGrant),
+            ),
+            (
+                "the file removed",
+                removed,
+                key(),
+                &input,
+                NOW + 30_000,
+                NotAdmitted::Uncovered(Uncovered::NoGrant),
+            ),
+            (
+                "the clock past not_after",
+                unchanged,
+                key(),
+                &input,
+                NOW + 600_000,
+                NotAdmitted::Uncovered(Uncovered::Expired),
+            ),
+            (
+                "the key rotated",
+                unchanged,
+                rotated,
+                &input,
+                NOW + 30_000,
+                NotAdmitted::Unverified,
+            ),
+            (
+                "the input given one more member",
+                unchanged,
+                key(),
+                &wider,
+                NOW + 30_000,
+                NotAdmitted::Uncovered(Uncovered::OutsideInput),
+            ),
+        ];
+        for (case, change, configured, rechecked, upper, refusal) in cases {
+            let site = site();
+            put(&site.path, &signed_g1, 0o600);
+            let uses = Uses::open(&site.state).unwrap();
+            let admitted =
+                super::admit(&site.path, &key(), call(&input), Some(now()), &uses).unwrap();
+            change(&site);
+            assert_eq!(
+                still_admitted(
+                    &site.path,
+                    &configured,
+                    call(rechecked),
+                    Some(ending(upper)),
+                    &admitted
+                ),
+                Err(refusal),
+                "{case}"
+            );
+            assert_eq!(uses.rows().unwrap(), 1, "{case}");
+            drop(admitted);
+        }
+        // A clock that gives no reading at the recheck is `unavailable`,
+        // never `approval_required`.
+        let site = site();
+        put(&site.path, &signed_g1, 0o600);
+        let uses = Uses::open(&site.state).unwrap();
+        let admitted = super::admit(&site.path, &key(), call(&input), Some(now()), &uses).unwrap();
+        assert_eq!(
+            still_admitted(&site.path, &key(), call(&input), None, &admitted),
+            Err(NotAdmitted::ClockUnavailable)
+        );
+    }
+
+    /// Acceptance 10.
+    #[test]
+    fn a_present_proof_never_falls_back_to_a_grant() {
+        let member = Path::new("/etc/connectors/grants/leaf.grants");
+        // The control: no proof, a key and the member give the grant path.
+        assert_eq!(
+            route(None::<&str>, Some("k"), Some(member)),
+            Route::Grant(member)
+        );
+        // A proof gives the per-input path, whatever else is there.
+        for (key, grants) in [
+            (Some("k"), Some(member)),
+            (Some("k"), None),
+            (None, Some(member)),
+            (None, None),
+        ] {
+            assert_eq!(route(Some("proof"), key, grants), Route::PerInput("proof"));
+        }
+        // No proof and no key, or no member: `approval_required`.
+        assert_eq!(
+            route(None::<&str>, None, Some(member)),
+            Route::ApprovalRequired
+        );
+        assert_eq!(
+            route(None::<&str>, Some("k"), None::<&Path>),
+            Route::ApprovalRequired
+        );
+        assert_eq!(
+            route(None::<&str>, None, None::<&Path>),
+            Route::ApprovalRequired
+        );
     }
 }

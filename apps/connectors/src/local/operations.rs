@@ -248,6 +248,20 @@ pub(super) fn dispatch_tagged(
                 return Err(about("approval_file")(error));
             }
         };
+        // The owner reads an empty proof as no proof. On an instance that
+        // takes standing grants that would send a write that named an
+        // approval file down the grant path, so an approval file that holds
+        // no byte is answered here as no approval file is, and no owner is
+        // started. An instance without `standing_grants` keeps the owner's
+        // answer.
+        if proof.as_ref().is_some_and(|proof| proof.0.is_empty())
+            && connectors_host::local::config::Config::load_at(&paths)?
+                .adapters
+                .get(alias)
+                .is_some_and(|adapter| adapter.standing_grants.is_some())
+        {
+            return Ok(super::invoke::approval_required());
+        }
         let result = owner::WriteClient::connect(&paths, true, deadline)
             .and_then(|client| client.invoke(alias, &request, key, proof.as_ref(), deadline))
             .map_err(|mut error| {
@@ -298,6 +312,7 @@ fn project(
                 origin: owner::Origin::Host,
                 store_version: None,
                 created: None,
+                retry_after_seconds: None,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,
@@ -319,6 +334,11 @@ fn project(
         if let Some(created) = &error.created {
             data["custody"] = json!("failed");
             data["created"] = json!(created);
+        }
+        // `rate_limited`, a keyed write over its standing grant's hourly
+        // cap, says when the earliest use leaves the hour.
+        if let Some(seconds) = error.retry_after_seconds {
+            data["retry_after_seconds"] = json!(seconds);
         }
         // The owner's `metadata_schema_newer` names both versions, as the
         // direct path does (semantics.md §3).

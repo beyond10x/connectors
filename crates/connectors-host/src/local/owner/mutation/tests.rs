@@ -27,6 +27,7 @@ fn production_finish_audit_recovers_a_lost_acknowledgement_on_the_real_clock() {
                 code: connectors_core::ErrorCode::Unavailable,
                 stage: Stage::Response,
             }),
+            standing: None,
         },
         source_audit: SourceAudit {
             instance: "alpha".into(),
@@ -83,6 +84,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         origin: crate::local::owner::Origin::Host,
                         store_version: None,
                         created: None,
+                        retry_after_seconds: None,
                     }),
                     Classification::Unknown => Some(Code::OutcomeUnknown.into()),
                     _ => Some(Code::Forbidden.into()),
@@ -99,6 +101,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         code: connectors_core::ErrorCode::Unavailable,
                         stage: Stage::Response,
                     }),
+                    standing: None,
                 },
                 source_audit: SourceAudit {
                     instance: "alpha".into(),
@@ -505,5 +508,153 @@ fn a_write_failure_names_its_stage_and_never_suggests_retrying_a_possible_effect
             action,
             "{error:?} {classification:?}"
         );
+    }
+}
+
+/// story:local-invoke-admits-a-keyed-write-under-a-standing-grant, acceptance
+/// 15: `standing::named` and the bytes of the observation and of `Failure`.
+#[cfg(unix)]
+#[test]
+fn standing_is_named_for_an_attempt_and_absent_without_a_store() {
+    use crate::local::standing;
+    use serde_json::json;
+    use std::os::unix::fs::PermissionsExt;
+
+    /// A private state directory below a temporary one.
+    fn state() -> (tempfile::TempDir, std::path::PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        std::fs::create_dir(&state).unwrap();
+        std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
+        (root, state)
+    }
+    let delivery = |attempt: Option<Uuid>, error: Option<Failure>| {
+        let classification = match (&error, attempt) {
+            (None, _) => Classification::Applied,
+            (Some(_), Some(_)) => Classification::Refused,
+            (Some(_), None) => Classification::NotAttempted,
+        };
+        Delivery {
+            request_id: Uuid::new_v4().to_string(),
+            result: error.is_none().then(|| json!({"status": 200})),
+            error,
+            mutation: MutationObservation {
+                classification,
+                attempt: attempt.map(|id| Attempt {
+                    instance: "leaf".into(),
+                    id,
+                }),
+                original_request_id: attempt.map(|_| "request-1".to_owned()),
+                replayed: false,
+                cause: None,
+                standing: None,
+            },
+            source_audit: SourceAudit {
+                instance: "leaf".into(),
+                audit_ref: None,
+                audit_status: AuditStatus::Unavailable,
+            },
+        }
+    };
+    let named = |mut value: Delivery, attempt: Uuid, state: &std::path::Path| {
+        standing::named(&mut value.mutation, attempt, state);
+        value.validate().unwrap();
+        // The bytes the owner sends are the bytes the CLI reads back.
+        let bytes = serde_json::to_value(&value).unwrap();
+        let read: Delivery = serde_json::from_value(bytes.clone()).unwrap();
+        assert_eq!(read.mutation.standing, value.mutation.standing);
+        bytes
+    };
+
+    // One use bound to an attempt, one counted and bound to none.
+    let (_root, directory) = state();
+    let grant = standing::Grant {
+        id: "g1".into(),
+        instance: "leaf".into(),
+        operation: "chat.postMessage".into(),
+        target: vec![standing::TargetMember {
+            pointer: "/body/channel".into(),
+            value: json!("C1"),
+        }],
+        input_keys: None,
+        not_after_unix_ms: 1_789_056_600_000,
+        max_per_hour: 2,
+    };
+    let uses = standing::Uses::open(&directory).unwrap();
+    let take = || match uses.take("leaf", &[&grant], 1_789_056_002_000).unwrap() {
+        standing::Taken::Slot(taken) => taken,
+        standing::Taken::AtCap { .. } => panic!("at the cap"),
+    };
+    let (bound, unbound) = (Uuid::new_v4(), Uuid::new_v4());
+    uses.bind(&take(), bound).unwrap();
+    let _counted = take();
+
+    // A bound attempt names its grant, on the success shape and on the
+    // failure shape.
+    let success = named(delivery(Some(bound), None), bound, &directory);
+    assert_eq!(success["mutation"]["standing"], json!({"grant_id": "g1"}));
+    assert!(success["result"].is_object());
+    let failed = named(
+        delivery(Some(bound), Some(Code::ServiceFailure.into())),
+        bound,
+        &directory,
+    );
+    assert_eq!(failed["mutation"]["standing"], json!({"grant_id": "g1"}));
+    assert_eq!(failed["error"]["code"], "service_failure");
+
+    // An attempt with no row has no member, not a null one.
+    let other = named(delivery(Some(unbound), None), unbound, &directory);
+    assert!(other["mutation"].get("standing").is_none(), "{other}");
+
+    // With no store file the member is absent and none is created.
+    let (_empty_root, empty) = state();
+    let absent = named(delivery(Some(bound), None), bound, &empty);
+    assert!(absent["mutation"].get("standing").is_none(), "{absent}");
+    assert!(standing::Uses::existing(&empty).unwrap().is_none());
+    assert!(!empty.join("standing-grants.sqlite3").exists());
+    assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0);
+    // The store that exists is read, not written: a row count as before.
+    assert_eq!(uses.rows().unwrap(), 2);
+
+    // `rate_limited` carries `retry_after_seconds`; no other failure does.
+    let limited = delivery(None, Some(Failure::rate_limited(1800)));
+    limited.validate().unwrap();
+    let limited = serde_json::to_value(&limited).unwrap();
+    assert_eq!(
+        limited["error"],
+        json!({"code": "rate_limited", "retry_after_seconds": 1800})
+    );
+    assert_eq!(limited["mutation"]["classification"], "not_attempted");
+    let read: Failure = serde_json::from_value(limited["error"].clone()).unwrap();
+    assert_eq!(read.code, FailureCode::Approval(ApprovalCode::RateLimited));
+    assert_eq!(read.retry_after_seconds, Some(1800));
+    assert_eq!(read.stage(Classification::NotAttempted), "admission");
+    assert_eq!(
+        read.next_action(Classification::NotAttempted),
+        "retry_status"
+    );
+    assert_eq!(
+        serde_json::to_value(Failure::from(ApprovalCode::ApprovalRequired)).unwrap(),
+        json!({"code": "approval_required"})
+    );
+
+    // What the owner never sends: a grant named without an attempt, a cap
+    // without its number or with one outside 1 to 3,600, the number on
+    // another code.
+    let mut unattempted = delivery(None, Some(ApprovalCode::ApprovalRequired.into()));
+    unattempted.mutation.standing = Some(Standing {
+        grant_id: "g1".into(),
+    });
+    assert!(unattempted.validate().is_err());
+    for refused in [
+        Failure::from(ApprovalCode::RateLimited),
+        Failure::rate_limited(0),
+        Failure::rate_limited(3601),
+        Failure {
+            retry_after_seconds: Some(60),
+            ..Failure::from(ApprovalCode::ApprovalRequired)
+        },
+    ] {
+        assert!(delivery(None, Some(refused)).validate().is_err());
     }
 }

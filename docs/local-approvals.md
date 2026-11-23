@@ -84,6 +84,88 @@ links are never overwritten. Locked custody or changed admission refuses issuanc
 An uncertain acknowledgement can leave a protected file; the CLI neither deletes
 it nor issues a replacement automatically.
 
+## Standing grants
+
+A proof admits one write of one input. A standing grant admits every keyed write it
+covers, with no proof per write, until it expires. The operator signs it once. A grant
+names one instance, one operation, the exact value of each target member, the input
+members a caller may set beside them, an expiry and a cap of writes per hour. The rules
+are in the [CLI contract](../contracts/cli/v1alpha1/semantics.md#standing-grants).
+
+An instance takes grants only when its entry names its grant file by an absolute path.
+The member is optional, changes no policy and no key, and a binary built before it
+existed refuses a configuration that carries it:
+
+```toml
+[connectors.slack.instances.bot]
+standing_grants = "/absolute/private/slack-bot.grants"
+```
+
+The key, the clock and a published policy that lists the operation stay prerequisites,
+as for a proof. The grant is not part of the `policy-set` document. Write the grant to a
+file and sign it:
+
+```json
+{
+  "operation": "chat.postMessage",
+  "target": [{"pointer": "/body/channel", "value": "C0000000001"}],
+  "input_keys": ["/body/text", "/body/thread_ts"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 20
+}
+```
+
+```sh
+connectors approvals grant-standing --connector slack --instance bot --input-file grant.json --output json
+connectors approvals list-standing --connector slack --instance bot --output json
+connectors approvals revoke-standing --connector slack --instance bot "$grant_id" --output json
+```
+
+- `target` holds 1 to 16 members; a write is covered only when its input has each pointer
+  with exactly that value.
+- `input_keys`, at most 16 pointers, closes the input: a write that sets any other member
+  is outside the grant. Without `input_keys` the rest of the input is open.
+- `not_after_unix_ms` has no upper bound and `max_per_hour` is 1 to 10,000. Both are read
+  against the trusted clock, not the system clock.
+- `grant-standing` answers `{grant_id, path}`, creates the file with mode 0600 or replaces
+  it, and drops the grants that expired. `list-standing` prints the grants of the file.
+  `revoke-standing` removes one grant; nothing new is admitted under it afterwards.
+
+A keyed write with no `--approval-file` then runs under the grant:
+
+```sh
+connectors --output json invoke slack/bot chat.postMessage --input-stdin --idempotency-key "$key" < post.json
+```
+
+The answer is that of any guarded write, and `mutation.standing.grant_id` names the
+grant, also on a replay of the key and on a failure that has an attempt. A write with
+`--approval-file` stays a per-input write: a refused proof is final and never falls back
+to a grant. An `--approval-file` that holds no byte is answered as no `--approval-file`
+is. Without `--idempotency-key`, or on an instance without `standing_grants`, a write
+without a proof is `approval_required` as before.
+
+What the grant refuses, each before any provider request and with no attempt recorded:
+
+- `approval_required`: no grant covers the write. The answer does not say why; another
+  operation, another target value, an input member outside `input_keys`, an expired or
+  revoked grant, a file that does not verify and no file at all answer alike. The reason
+  is in the owner's log.
+- `rate_limited` with `retry_after_seconds` (1 to 3,600): every covering grant admitted
+  `max_per_hour` writes in the last hour.
+- `unavailable`: the grant file or its directory is not private to the operator, the use
+  count cannot be kept, or the clock gives no reading.
+
+The same key with the same input replays the original answer with no grant check, also
+after the grant expired, was revoked or reached its cap.
+
+The size of a grant. The grant file, the key that signs it and the state directory
+belong to the operator's UID, so a process of that UID can grant, as it can issue a
+proof. One proof admits one write; one grant admits up to 10,000 writes an hour until
+its expiry. A grant bounds what a caller that only invokes can write. Rotating or
+revoking the approval key ends every grant it signed. A revoked grant comes back when an
+older signed file is put back at the path (a backup, a file sync or a snapshot restore
+running as the operator can do that); rotating the key ends it for certain.
+
 The implementation is exercised through the generated production CLI with a
 disposable qualified Secret Service and independent synthetic clock responder,
 including keyring restart and locked custody. Deterministic tests also cover
