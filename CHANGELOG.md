@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Entity Runtime 0.33.1 (from 0.33.0). No change of the store's form: a store that 0.76.0 wrote
+  opens as before. Measured 2026-11-23 on a store of 50 recorded events, 100 read invokes per
+  run, release profile, three runs per pin at host load 52 to 67: the median time of
+  `er.execute_batch` per read invoke is 110.3 ms with 0.33.1, 129.5 ms with 0.33.0 and 122.9 ms
+  with 0.32.0. A read invoke appends 24,500 blob bytes with 0.33.1 and 0.33.0, and 78,488 with
+  0.32.0.
+
 ## 0.76.1 — 2026-11-23
 
 ### Changed
