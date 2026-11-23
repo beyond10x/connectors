@@ -160,6 +160,10 @@ fn grown_stores(sizes: &[i64], saved: Option<&Path>) -> Vec<(tempfile::TempDir, 
     let reference = publish_fixture(&registry, candidate, NOW);
     let mut grown = Vec::new();
     let mut now = NOW + 1;
+    // A read invoke records nothing, so a store grows by read invokes only
+    // while they are recorded as releases up to 0.76.0 recorded them: the
+    // store an operator of such a release has. The measured invokes are not.
+    super::super::metadata::record_read_uses(true);
     for &events in sizes {
         while recorded_events(root.path()) < events {
             measured_invoke(root.path(), &registry, &reference, now);
@@ -174,6 +178,7 @@ fn grown_stores(sizes: &[i64], saved: Option<&Path>) -> Vec<(tempfile::TempDir, 
         // store as it was, not as the measurement left it.
         grown.push(load(copy.path()));
     }
+    super::super::metadata::record_read_uses(false);
     grown
 }
 
@@ -502,24 +507,73 @@ fn a_store_the_previous_pin_wrote_a_read_into_takes_a_read_invoke() {
         loaded >= PREVIOUS_PIN_EVENTS,
         "{loaded} recorded events loaded, the fixture was grown to {PREVIOUS_PIN_EVENTS}"
     );
+    let invoke = |now: u64| {
+        registry
+            .admit_read(&binding(), &reference, &BTreeSet::new(), now)
+            .expect("admit_read");
+        let captured = registry
+            .capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 1000)
+            .expect("capture_read");
+        let dispatched = registry
+            .dispatch_read(captured, now)
+            .expect("dispatch_read");
+        registry
+            .release_read(dispatched, now)
+            .expect("release_read");
+    };
+    // The fixture's one read use was captured at `NOW + 1` until `NOW + 1001`,
+    // and its recorded registry floor is `NOW`: `now` is past that deadline
+    // and within 60,000 ms of that floor, so no clock floor is recorded.
     let now = NOW + 10_000;
-    registry
-        .admit_read(&binding(), &reference, &BTreeSet::new(), now)
-        .expect("admit_read");
-    let captured = registry
-        .capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 1000)
-        .expect("capture_read");
-    let dispatched = registry
-        .dispatch_read(captured, now)
-        .expect("dispatch_read");
-    registry
-        .release_read(dispatched, now)
-        .expect("release_read");
+    use super::tests::recorded_read_uses;
+    let read_uses = recorded_read_uses(root.path());
+    invoke(now);
     let recorded = recorded_events(root.path());
     assert!(
         recorded > loaded,
         "the read invoke recorded nothing: {loaded} events before it, {recorded} after"
     );
+    // The capture's sweep records the use the earlier release left Expired,
+    // once; the read's own use is not recorded.
+    assert_eq!(
+        recorded_read_uses(root.path()) - read_uses,
+        1,
+        "the first read invoke records the one Expired event of the use the fixture holds"
+    );
+    invoke(now + 1);
+    assert_eq!(
+        recorded_events(root.path()) - recorded,
+        0,
+        "a second read invoke recorded events"
+    );
+}
+
+/// story:settled-read-uses-leave-the-store. Read invokes inside one interval
+/// of the registry clock's recorded floor record nothing: no event and no blob
+/// byte. It covers the registry sequence of `measured_invoke`, not the owner's
+/// transport.
+#[test]
+fn read_invokes_inside_one_clock_interval_record_nothing() {
+    const INVOKES: u64 = 20;
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let events = recorded_events(root.path());
+    let blobs = blob_bytes(root.path());
+    // The recorded floor is `NOW`; every sample below is within 60,000 ms of it.
+    for invoke in 1..=INVOKES {
+        measured_invoke(root.path(), &registry, &reference, NOW + invoke);
+    }
+    let events = recorded_events(root.path()) - events;
+    let blobs = blob_bytes(root.path()) - blobs;
+    assert_eq!(
+        (events, blobs),
+        (0, 0),
+        "{INVOKES} read invokes recorded {events} events ({} per invoke) and {blobs} blob bytes",
+        events / INVOKES as i64
+    );
+    super::super::metadata::exit_process();
+    super::super::metadata::simulate_process(0);
 }
 
 /// The read-back of a handle's own write is not a licence to skip the next

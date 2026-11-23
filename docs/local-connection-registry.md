@@ -217,7 +217,7 @@ material and check current operation policy/permission before consuming the
 one-use final dispatch guard. These APIs neither implement transport nor authorize
 a business mutation. Positive missing/invalid/revoked/insufficient/uncertain
 credential observations cut off that exact version. Outage is never inferred to
-mean missing. Restart does not resume a captured provider operation.
+mean missing. Restart does not resume a captured provider operation. The read uses of an ended owner are gone with it.
 
 Replacement, terminal revoke, failure or an admitted expiry sweep establishes a
 durable retirement decision. Retention is at least 24 hours from that decision,
@@ -230,7 +230,7 @@ An unknown response retains the cleanup obligation for guarded reconciliation.
 The initial bounds are 1,000 connections per instance, 10,000 total connections,
 100,000 acquisition histories, 64 retained material versions per connection (one bound
 for connect, reconnect and refresh),
-1,000 concurrent read-use records (those not yet released; a released use holds no
+1,000 open read uses of the owner process (those not yet released; a released use holds no
 capacity) and 10,000 live cursors. Exhaustion refuses;
 it does not evict authority or pretend an incomplete list is complete. Pages accept
 1–500 members, bind instance/configuration/limit/epoch, and expire at the
@@ -279,7 +279,7 @@ the target instance: `begin` (refused while the instance holds a connection),
 same bytes as a new version in the new connection's own scope and publication.
 The owner refuses a validated identity other than the source's before
 `prepare`, failing the acquisition; the source's row, generation, material,
-evidence and revision are written by nothing but its read use. A definition
+evidence and revision are written by nothing: its read use is not recorded. A definition
 instance's own connection under a changed authority or profile is not a
 candidate: changing those still needs a new instance id.
 

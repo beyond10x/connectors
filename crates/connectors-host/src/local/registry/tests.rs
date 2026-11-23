@@ -1668,6 +1668,9 @@ fn acknowledged_deletion_cannot_keep_the_byte_size() {
 // invoke) must still be admitted; it failed with MetadataUnavailable.
 #[test]
 fn observation_after_a_recorded_read_use_expiry_is_admitted() {
+    // The first use is recorded, as a release up to 0.76.0 recorded it: a
+    // store such a release wrote holds uses whose expiry is still to record.
+    super::super::metadata::record_read_uses(true);
     let (_root, registry) = fixture();
     let (_claim, first) = prepared(&registry, "one", NOW);
     let connection = publish_fixture(&registry, first, NOW);
@@ -1691,6 +1694,199 @@ fn observation_after_a_recorded_read_use_expiry_is_admitted() {
         true,
     );
     assert!(observed.is_ok(), "{:?}", observed.err());
+}
+
+/// story:settled-read-uses-leave-the-store. No path of a read use records it:
+/// a read, a cancelled read, a reuse, a finished and a cancelled revalidation,
+/// a refused read and an invalidated read leave no `ReadUse` event in the
+/// store. With `record_read_uses` on, one read records its three events, as
+/// releases up to 0.76.0 did.
+#[test]
+fn no_path_of_a_read_use_records_it() {
+    use super::super::metadata::record_read_uses;
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let capture = |reference: &str, now: u64| {
+        registry
+            .capture_read(&binding(), reference, &BTreeSet::new(), now, now + 1000)
+            .unwrap()
+    };
+    // A read: captured, dispatched, released.
+    let dispatched = registry
+        .dispatch_read(capture(&reference, NOW + 1), NOW + 1)
+        .unwrap();
+    registry.release_read(dispatched, NOW + 1).unwrap();
+    // A cancelled read.
+    registry
+        .cancel_read(capture(&reference, NOW + 2), NOW + 2)
+        .unwrap();
+    // A reuse by another instance, and its release.
+    let target = Binding {
+        instance_id: "target-instance".into(),
+        configuration_revision: "config-target".into(),
+        ..binding()
+    };
+    let source = registry
+        .capture_reuse(
+            "fixture-instance",
+            "fixture-adapter",
+            "config-1",
+            &target,
+            &reference,
+            &revision,
+            NOW + 3,
+            NOW + 1003,
+        )
+        .unwrap();
+    let dispatched = registry.dispatch_reuse(source, NOW + 3).unwrap();
+    registry.release_read(dispatched, NOW + 3).unwrap();
+    // A revalidation: captured, dispatched, finished.
+    let captured = registry
+        .capture_revalidation(&binding(), &reference, &revision, NOW + 4, NOW + 1004)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(captured, NOW + 4).unwrap();
+    registry
+        .finish_revalidation(dispatched, Err(None), NOW + 4)
+        .unwrap();
+    // A cancelled revalidation.
+    let captured = registry
+        .capture_revalidation(&binding(), &reference, &revision, NOW + 5, NOW + 1005)
+        .unwrap();
+    registry.cancel_revalidation(captured, NOW + 5).unwrap();
+    // A refused read and an invalidated read. Each makes the connection
+    // Stale, so both are captured, and the first dispatched, before either ends.
+    let refused = capture(&reference, NOW + 6);
+    let invalid = capture(&reference, NOW + 6);
+    let dispatched = registry.dispatch_read(refused, NOW + 6).unwrap();
+    registry
+        .invalidate_read(&invalid, InvalidCredential::Invalid, NOW + 6)
+        .unwrap();
+    registry.refuse_read(dispatched, NOW + 6).unwrap();
+    let recorded = recorded_read_uses(root.path());
+    assert_eq!(
+        recorded, 0,
+        "seven read uses, one per path, recorded {recorded} ReadUse events"
+    );
+
+    // The connection is Stale; the read below needs a new one.
+    let stale = describe(&registry, &reference, NOW + 7).revision;
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &stale,
+            NOW + 7,
+        )
+        .unwrap();
+    let (_, candidate) = prepared(&registry, "one", NOW + 8);
+    let again = publish_fixture(&registry, candidate, NOW + 8);
+    record_read_uses(true);
+    let dispatched = registry
+        .dispatch_read(capture(&again, NOW + 9), NOW + 9)
+        .unwrap();
+    registry.release_read(dispatched, NOW + 9).unwrap();
+    record_read_uses(false);
+    assert_eq!(
+        recorded_read_uses(root.path()),
+        3,
+        "a read with `record_read_uses` on records Captured, Dispatched and Released"
+    );
+}
+
+/// story:settled-read-uses-leave-the-store, difference 4. A use is a row only
+/// in the process that captured it, so a revoke another process runs (the CLI's
+/// `connections revoke`) does not release it: the owner's dispatch of it finds
+/// the use open and the connection revoked, and answers `Revoked`. An
+/// undispatched revalidation likewise.
+#[test]
+fn a_revoke_by_another_process_refuses_the_owners_dispatch_as_revoked() {
+    use super::super::metadata::{exit_process, simulate_process};
+    let revoke = |registry: &Registry, reference: &str, revision: &str| {
+        simulate_process(2);
+        registry
+            .revoke(
+                "fixture-instance",
+                "fixture-adapter",
+                reference,
+                revision,
+                NOW + 1,
+            )
+            .unwrap();
+        exit_process();
+        simulate_process(1);
+    };
+
+    simulate_process(1);
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let captured = registry
+        .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, NOW + 1000)
+        .unwrap();
+    revoke(&registry, &reference, &revision);
+    let read = registry.dispatch_read(captured, NOW + 2).err();
+
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let captured = registry
+        .capture_revalidation(&binding(), &reference, &revision, NOW, NOW + 1000)
+        .unwrap();
+    revoke(&registry, &reference, &revision);
+    let revalidation = registry.dispatch_revalidation(captured, NOW + 2).err();
+    assert_eq!(
+        (read, revalidation),
+        (Some(Failure::Revoked), Some(Failure::Revoked)),
+        "the dispatch of a read use and of a revalidation whose connection another process revoked"
+    );
+    exit_process();
+    simulate_process(0);
+}
+
+/// story:settled-read-uses-leave-the-store, difference 2. The uses a process
+/// holds are gone when it ends: the next process of the same id and another
+/// process both see no use, and a dispatch of an ended process's use answers
+/// `Conflict`, the answer for an unknown id.
+#[test]
+fn the_read_uses_of_an_ended_process_are_gone_with_it() {
+    use super::super::metadata::{exit_process, simulate_process};
+    let uses = |root: &Path| -> i64 {
+        Metadata::inspect(root)
+            .unwrap()
+            .connection
+            .query_row("SELECT count(*) FROM registry_uses", [], |row| row.get(0))
+            .unwrap()
+    };
+    simulate_process(1);
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let capture = || {
+        registry
+            .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, NOW + 1000)
+            .unwrap()
+    };
+    let first = capture();
+    registry.dispatch_read(capture(), NOW).unwrap();
+    exit_process();
+
+    simulate_process(1);
+    assert_eq!(uses(root.path()), 0, "the next process 1 sees a use");
+    simulate_process(2);
+    assert_eq!(uses(root.path()), 0, "process 2 sees a use");
+    exit_process();
+    simulate_process(1);
+    assert_eq!(
+        registry.dispatch_read(first, NOW + 1).err(),
+        Some(Failure::Conflict)
+    );
+    exit_process();
+    simulate_process(0);
 }
 
 // Revoking a connection is terminal for that connection only: the same
@@ -1861,6 +2057,26 @@ pub(super) fn recorded_clock_floor_events(root: &Path) -> i64 {
          ON b.tenant_id=e.tenant_id AND b.digest=json_extract(e.data,'$.blob') \
          WHERE e.event_name='er.recorded_entry' \
          AND instr(CAST(b.bytes AS TEXT),'\"subject\":[\"connectors.clock.LocalClockFloor\",')>0",
+        [],
+        |row| row.get(0),
+    )
+    .unwrap()
+}
+
+/// Recorded entries whose subject is a
+/// `connectors.credential_evidence.ReadUse`, read as
+/// `recorded_clock_floor_events` reads the clock's.
+pub(super) fn recorded_read_uses(root: &Path) -> i64 {
+    rusqlite::Connection::open_with_flags(
+        root.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
+    .query_row(
+        "SELECT count(*) FROM connectors_er_events e JOIN connectors_er_blobs b \
+         ON b.tenant_id=e.tenant_id AND b.digest=json_extract(e.data,'$.blob') \
+         WHERE e.event_name='er.recorded_entry' \
+         AND instr(CAST(b.bytes AS TEXT),'\"subject\":[\"connectors.credential_evidence.ReadUse\",')>0",
         [],
         |row| row.get(0),
     )
