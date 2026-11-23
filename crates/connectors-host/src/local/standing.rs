@@ -3047,6 +3047,559 @@ mod signed_tests {
         );
     }
 
+    /// Security review: one signature verifies exactly one file. Every other
+    /// spelling of the signed file is refused, the old signature carries no
+    /// other document, and no other spelling of a payload or a header the key
+    /// did sign is read.
+    #[test]
+    fn security_sg_one_signature_admits_exactly_one_file() {
+        /// One compact JWS of the RFC 8032 test pair over exactly these
+        /// header and payload bytes.
+        fn raw(header: &[u8], claims: &[u8]) -> Vec<u8> {
+            let pair = Ed25519KeyPair::from_seed_unchecked(&hex::decode(SEED).unwrap()).unwrap();
+            let input = format!(
+                "{}.{}",
+                URL_SAFE_NO_PAD.encode(header),
+                URL_SAFE_NO_PAD.encode(claims)
+            );
+            let signature = URL_SAFE_NO_PAD.encode(pair.sign(input.as_bytes()).as_ref());
+            format!("{input}.{signature}").into_bytes()
+        }
+        const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        const HEADER: &str =
+            r#"{"alg":"Ed25519","kid":"key-1","typ":"b10x.connectors-standing-grants.v1+jws"}"#;
+
+        let grants = [channel_grant("g1", NOW + 600_000)];
+        let signed = sign(&signer(), &key(), now(), &grants).unwrap();
+        let text = String::from_utf8(signed.clone()).unwrap();
+        let parts: Vec<&str> = text.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        let claims = claims_of(&signed);
+        let payload = String::from_utf8(claims.clone()).unwrap();
+        // The controls: the helper builds the signed file itself (an Ed25519
+        // signature is deterministic), and that file is admitted.
+        assert_eq!(URL_SAFE_NO_PAD.decode(parts[0]).unwrap(), HEADER.as_bytes());
+        assert_eq!(raw(HEADER.as_bytes(), &claims), signed);
+        let control = site();
+        put(&control.path, &signed, 0o600);
+        assert_eq!(
+            admit(&control, &key(), &write()),
+            Outcome::Admitted("g1".into())
+        );
+
+        // The signed bytes with bytes around them.
+        let around = |before: &str, after: &str| format!("{before}{text}{after}").into_bytes();
+        // 64 signature bytes are 86 characters, the last one with four unused
+        // bits: the same signature with one of those bits set.
+        let last = *signed.last().unwrap();
+        let at = ALPHABET.iter().position(|c| *c == last).unwrap();
+        assert_eq!(at % 16, 0);
+        let mut respelled = signed.clone();
+        *respelled.last_mut().unwrap() = ALPHABET[at + 1];
+        // The old header and signature around a document with one number
+        // changed: what extending a grant without the key would be.
+        let under_the_old_signature = |member: &str, value: i64| {
+            let mut changed: Value = serde_json::from_slice(&claims).unwrap();
+            changed["document"]["grants"][0][member] = json!(value);
+            format!(
+                "{}.{}.{}",
+                parts[0],
+                URL_SAFE_NO_PAD.encode(connectors_core::canonical(&changed)),
+                parts[2]
+            )
+            .into_bytes()
+        };
+        assert_eq!(under_the_old_signature("max_per_hour", 2), signed);
+        // Another spelling of the payload, signed by the key.
+        let spelled = |from: &str, to: &str| {
+            assert!(payload.contains(from), "{from}");
+            raw(HEADER.as_bytes(), payload.replacen(from, to, 1).as_bytes())
+        };
+        let document = String::from_utf8(connectors_core::canonical(
+            &serde_json::from_slice::<Value>(&claims).unwrap()["document"],
+        ))
+        .unwrap();
+        let named = |members: String| {
+            format!(
+                r#"{{"aud":"connectors.approval/leaf",{members},"iss":"connectors.local-issuer/leaf"}}"#
+            )
+        };
+        assert_eq!(named(format!(r#""document":{document}"#)), payload);
+        let twice = named(format!(r#""document":{document},"document":{document}"#));
+        let end = format!(r#""not_after_unix_ms":{},"#, NOW + 600_000);
+        let end_with_fraction = format!(r#""not_after_unix_ms":{}.0,"#, NOW + 600_000);
+        let after = |tail: &str| format!("{payload}{tail}");
+        let reordered =
+            r#"{"typ":"b10x.connectors-standing-grants.v1+jws","kid":"key-1","alg":"Ed25519"}"#;
+        let kid_twice = r#"{"alg":"Ed25519","kid":"key-1","kid":"key-1","typ":"b10x.connectors-standing-grants.v1+jws"}"#;
+        for (case, file) in [
+            ("a byte order mark before it", around("\u{feff}", "")),
+            ("a space before it", around(" ", "")),
+            ("a line feed after it", around("", "\n")),
+            ("a NUL after it", around("", "\0")),
+            ("an empty fourth part", around("", ".")),
+            ("base64 padding after the signature", around("", "==")),
+            (
+                "the file twice, a line feed between",
+                format!("{text}\n{text}").into_bytes(),
+            ),
+            (
+                "the file twice, a dot between",
+                format!("{text}.{text}").into_bytes(),
+            ),
+            (
+                "an unused bit set in the signature's last character",
+                respelled,
+            ),
+            (
+                "a larger cap under the old signature",
+                under_the_old_signature("max_per_hour", 10_000),
+            ),
+            (
+                "a later end under the old signature",
+                under_the_old_signature("not_after_unix_ms", NOW + 86_400_000),
+            ),
+            (
+                "a space after the payload",
+                raw(HEADER.as_bytes(), after(" ").as_bytes()),
+            ),
+            (
+                "a space before the payload",
+                raw(HEADER.as_bytes(), format!(" {payload}").as_bytes()),
+            ),
+            (
+                "a second document after the payload",
+                raw(HEADER.as_bytes(), after(&payload).as_bytes()),
+            ),
+            (
+                "document named twice",
+                raw(HEADER.as_bytes(), twice.as_bytes()),
+            ),
+            (
+                "max_per_hour spelled 2.0",
+                spelled(r#""max_per_hour":2,"#, r#""max_per_hour":2.0,"#),
+            ),
+            (
+                "max_per_hour spelled 2e0",
+                spelled(r#""max_per_hour":2,"#, r#""max_per_hour":2e0,"#),
+            ),
+            (
+                "not_after_unix_ms with a fraction",
+                spelled(&end, &end_with_fraction),
+            ),
+            (
+                "an escaped letter in a member name",
+                spelled(r#""iss":"#, &format!(r#""is{}0073":"#, r"\u")),
+            ),
+            (
+                "the header's members in another order",
+                raw(reordered.as_bytes(), &claims),
+            ),
+            (
+                "kid named twice in the header",
+                raw(kid_twice.as_bytes(), &claims),
+            ),
+            (
+                "a space after the header",
+                raw(format!("{HEADER} ").as_bytes(), &claims),
+            ),
+        ] {
+            let site = site();
+            put(&site.path, &file, 0o600);
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unverified),
+                "{case}"
+            );
+            assert_eq!(
+                admit(&site, &key(), &write()),
+                Outcome::ApprovalRequired,
+                "{case}"
+            );
+            assert_eq!(uses(&site), 0, "{case}");
+        }
+    }
+
+    /// Security review: nothing self-issues. Only the configured pair under
+    /// the configured kid signs a grant file; any other signer is `forbidden`
+    /// and the commands write nothing.
+    #[test]
+    fn security_sg_only_the_configured_pair_signs_a_grant_file() {
+        let grants = [channel_grant("g1", NOW + 600_000)];
+        // The control: the configured pair signs.
+        assert!(sign(&signer(), &key(), now(), &grants).is_ok());
+        // Another pair under the configured kid, and the configured pair
+        // under another kid.
+        let (stranger, _) = other("key-1");
+        let renamed =
+            Signer::from_seed(Secret(hex::decode(SEED).unwrap()), "key-2".into()).unwrap();
+        for (case, holder) in [("another pair", &stranger), ("another kid", &renamed)] {
+            assert_eq!(
+                sign(holder, &key(), now(), &grants).err(),
+                Some(Refused::Forbidden),
+                "{case}"
+            );
+            let site = site();
+            let lock = lock(&site.state).unwrap();
+            assert_eq!(
+                grant(
+                    &lock,
+                    &site.path,
+                    holder,
+                    &key(),
+                    "leaf",
+                    now(),
+                    &bytes(&request())
+                )
+                .err(),
+                Some(Refused::Forbidden),
+                "{case}"
+            );
+            assert!(!site.path.exists(), "{case}");
+            // A file that is there keeps its bytes.
+            granted(&site, &grants);
+            let before = std::fs::read(&site.path).unwrap();
+            assert_eq!(
+                revoke(&lock, &site.path, holder, &key(), now(), "g1").err(),
+                Some(Refused::Forbidden),
+                "{case}"
+            );
+            assert_eq!(
+                grant(
+                    &lock,
+                    &site.path,
+                    holder,
+                    &key(),
+                    "leaf",
+                    now(),
+                    &bytes(&request())
+                )
+                .err(),
+                Some(Refused::Forbidden),
+                "{case}"
+            );
+            assert_eq!(std::fs::read(&site.path).unwrap(), before, "{case}");
+        }
+    }
+
+    /// Security review: the hourly cap holds on the handle that took the use,
+    /// on a second handle beside it (a second host on the state directory),
+    /// on a handle opened after both closed (a restart), under a clock set
+    /// back, and across every rewrite of the grant file within the hour.
+    #[test]
+    fn security_sg_the_cap_holds_across_handles_a_clock_set_back_and_a_rewrite() {
+        let site = site();
+        // A key and a grant that outlive the hour the test moves through.
+        let key = ConfiguredApprovalKey {
+            not_after_unix_ms: NOW + 3 * WINDOW_MS,
+            ..key()
+        };
+        let one_an_hour = Grant {
+            max_per_hour: 1,
+            ..channel_grant("g1", NOW + 2 * WINDOW_MS)
+        };
+        let original = sign(&signer(), &key, now(), std::slice::from_ref(&one_an_hour)).unwrap();
+        put(&site.path, &original, 0o600);
+        let input = write();
+        let at = |uses: &Uses, reading: ClockInterval| {
+            super::admit(&site.path, &key, call(&input), Some(reading), uses).map(|admitted| {
+                admitted.bind(Uuid::new_v4()).unwrap();
+                admitted.grant_id().to_owned()
+            })
+        };
+        let capped =
+            |result: Result<String, NotAdmitted>| matches!(result, Err(NotAdmitted::AtCap { .. }));
+        // The one write of the hour.
+        let first = Uses::open(&site.state).unwrap();
+        assert_eq!(at(&first, now()), Ok("g1".to_owned()));
+        assert!(capped(at(&first, now())), "the handle that took the use");
+        let second = Uses::open(&site.state).unwrap();
+        assert!(capped(at(&second, now())), "a second handle beside it");
+        drop(first);
+        drop(second);
+        let restarted = Uses::open(&site.state).unwrap();
+        assert!(capped(at(&restarted, now())), "a handle opened afterwards");
+        // A clock set back by a millisecond, by two hours and to the start
+        // of time widens no window.
+        for upper in [NOW + 1_999, NOW - 2 * WINDOW_MS, 2_000] {
+            assert!(capped(at(&restarted, ending(upper))), "{upper}");
+        }
+        // Rewrites of the file within the hour: a grant for another channel
+        // is added and revoked, then the first file's bytes are put back.
+        let lock = lock(&site.state).unwrap();
+        let mut elsewhere = request();
+        elsewhere["target"] = json!([{"pointer": "/body/channel", "value": "C2"}]);
+        let added = grant(
+            &lock,
+            &site.path,
+            &signer(),
+            &key,
+            "leaf",
+            now(),
+            &bytes(&elsewhere),
+        )
+        .unwrap();
+        assert!(capped(at(&restarted, now())), "after a grant was added");
+        revoke(&lock, &site.path, &signer(), &key, now(), &added).unwrap();
+        assert!(capped(at(&restarted, now())), "after a grant was revoked");
+        put(&site.path, &original, 0o600);
+        assert!(
+            capped(at(&restarted, now())),
+            "after the bytes were put back"
+        );
+        assert_eq!(restarted.rows().unwrap(), 1);
+        // The control: one millisecond past the hour the grant admits again.
+        assert_eq!(
+            at(&restarted, ending(NOW + 2_000 + WINDOW_MS + 1)),
+            Ok("g1".to_owned())
+        );
+        assert_eq!(restarted.rows().unwrap(), 2);
+    }
+
+    /// Security review: the hourly cap is not lost with the use store. The
+    /// store file is in the state directory of the host's own UID; removing
+    /// it needs no key and no signature and leaves the grant file untouched.
+    /// A host that then finds no store must not admit the grant's write of
+    /// the hour a second time: `rate_limited` or `unavailable`.
+    #[test]
+    fn security_sg_a_removed_use_store_does_not_free_the_hourly_cap() {
+        let site = site();
+        granted(
+            &site,
+            &[Grant {
+                max_per_hour: 1,
+                ..channel_grant("g1", NOW + 600_000)
+            }],
+        );
+        assert_eq!(
+            admit(&site, &key(), &write()),
+            Outcome::Admitted("g1".into())
+        );
+        // The control: with the store in place the next write is at the cap.
+        assert_eq!(admit(&site, &key(), &write()), Outcome::RateLimited);
+        std::fs::remove_file(site.state.join("standing-grants.sqlite3")).unwrap();
+        // The next write of the same hour, as the owner admits it: it opens
+        // the store of the state directory and asks for a use.
+        let input = write();
+        let reopened = Uses::open(&site.state);
+        let after = match &reopened {
+            Err(UsesUnavailable) => Outcome::Unavailable,
+            Ok(uses) => match super::admit(&site.path, &key(), call(&input), Some(now()), uses) {
+                Ok(admitted) => Outcome::Admitted(admitted.grant_id().to_owned()),
+                Err(NotAdmitted::AtCap { .. }) => Outcome::RateLimited,
+                Err(NotAdmitted::Uncovered(_) | NotAdmitted::Unverified) => {
+                    Outcome::ApprovalRequired
+                }
+                Err(_) => Outcome::Unavailable,
+            },
+        };
+        assert!(
+            matches!(after, Outcome::RateLimited | Outcome::Unavailable),
+            "a grant of one write an hour admitted a second write in the same hour after the \
+             use store was removed: {after:?}"
+        );
+    }
+
+    /// Security review: what bounds an older signed file put back at the path
+    /// after a revocation (the limit the contract states). It admits again
+    /// without any key; the uses taken before the revocation still count; it
+    /// ends at the grant's `not_after_unix_ms` and at a rotation of the key.
+    #[test]
+    fn security_sg_a_put_back_file_admits_only_until_not_after_or_a_key_rotation() {
+        let site = site();
+        let lock = lock(&site.state).unwrap();
+        let id = grant(
+            &lock,
+            &site.path,
+            &signer(),
+            &key(),
+            "leaf",
+            now(),
+            &bytes(&request()),
+        )
+        .unwrap();
+        let kept = std::fs::read(&site.path).unwrap();
+        assert_eq!(
+            admit(&site, &key(), &write()),
+            Outcome::Admitted(id.clone())
+        );
+        revoke(&lock, &site.path, &signer(), &key(), now(), &id).unwrap();
+        assert_eq!(list(&site.path, &key(), now()), Ok(vec![]));
+        assert_eq!(admit(&site, &key(), &write()), Outcome::ApprovalRequired);
+        // The older signed file is put back.
+        put(&site.path, &kept, 0o600);
+        // `max_per_hour` is 2 and one use was taken before the revocation:
+        // one more write is admitted, the next is at the cap.
+        assert_eq!(
+            admit(&site, &key(), &write()),
+            Outcome::Admitted(id.clone())
+        );
+        assert_eq!(admit(&site, &key(), &write()), Outcome::RateLimited);
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        // The first bound: a reading that reaches the grant's end.
+        assert_eq!(
+            super::admit(
+                &site.path,
+                &key(),
+                call(&input),
+                Some(ending(NOW + 600_000)),
+                &uses
+            )
+            .err(),
+            Some(NotAdmitted::Uncovered(Uncovered::Expired))
+        );
+        // The second: the approval key rotated, to another kid or to another
+        // pair under the same kid.
+        for kid in ["key-2", "key-1"] {
+            let (_, rotated) = other(kid);
+            assert_eq!(
+                super::admit(&site.path, &rotated, call(&input), Some(now()), &uses).err(),
+                Some(NotAdmitted::Unverified),
+                "{kid}"
+            );
+        }
+        assert_eq!(uses.rows().unwrap(), 2);
+    }
+
+    /// Security review: a target member holds "the exact JSON value". A
+    /// grant for the number 18446744073709551616 must not admit a write whose
+    /// member is 18446744073709551617; the adapter is sent the caller's bytes.
+    #[test]
+    fn security_sg_a_bound_number_is_matched_digit_for_digit() {
+        let site = site();
+        let lock = lock(&site.state).unwrap();
+        let request = format!(
+            r#"{{"operation":"chat.postMessage","target":[{{"pointer":"/body/id","value":18446744073709551616}}],"not_after_unix_ms":{},"max_per_hour":2}}"#,
+            NOW + 600_000
+        );
+        let id = grant(
+            &lock,
+            &site.path,
+            &signer(),
+            &key(),
+            "leaf",
+            now(),
+            request.as_bytes(),
+        )
+        .unwrap();
+        // A write's input as the owner reads it.
+        let input =
+            |bytes: &str| -> Value { connectors_core::read_json(bytes.as_bytes()).unwrap() };
+        // The controls: the granted number is admitted, a far one is not.
+        assert_eq!(
+            admit(
+                &site,
+                &key(),
+                &input(r#"{"body":{"id":18446744073709551616}}"#)
+            ),
+            Outcome::Admitted(id)
+        );
+        assert_eq!(
+            admit(
+                &site,
+                &key(),
+                &input(r#"{"body":{"id":18446744073709559808}}"#)
+            ),
+            Outcome::ApprovalRequired
+        );
+        assert_eq!(
+            admit(
+                &site,
+                &key(),
+                &input(r#"{"body":{"id":18446744073709551617}}"#)
+            ),
+            Outcome::ApprovalRequired,
+            "a write whose member is 18446744073709551617 was admitted under a grant for \
+             18446744073709551616"
+        );
+    }
+
+    /// Security review: fail closed. The custody of the grant file is decided
+    /// before its bytes are judged, and a use store that fails its own
+    /// custody rule, or is no database, is not opened.
+    #[test]
+    fn security_sg_custody_is_decided_before_the_bytes_and_a_broken_use_store_is_not_opened() {
+        fn store(state: &Path) -> PathBuf {
+            state.join("standing-grants.sqlite3")
+        }
+        fn group_readable(state: &Path) {
+            std::fs::set_permissions(store(state), std::fs::Permissions::from_mode(0o640)).unwrap();
+        }
+        fn second_name(state: &Path) {
+            std::fs::hard_link(store(state), state.join("second.sqlite3")).unwrap();
+        }
+        fn linked(state: &Path) {
+            let real = state.join("real.sqlite3");
+            std::fs::rename(store(state), &real).unwrap();
+            std::os::unix::fs::symlink(&real, store(state)).unwrap();
+        }
+        fn not_a_database(state: &Path) {
+            std::fs::write(store(state), b"not a database ".repeat(64)).unwrap();
+        }
+        fn directory(state: &Path) {
+            std::fs::remove_file(store(state)).unwrap();
+            std::fs::create_dir(store(state)).unwrap();
+        }
+
+        let signed = sign(
+            &signer(),
+            &key(),
+            now(),
+            &[channel_grant("g1", NOW + 600_000)],
+        )
+        .unwrap();
+        let mut over = signed.clone();
+        over.resize(FILE_LIMIT + 1, b'A');
+        for (case, content) in [
+            ("bytes that are no grant file", b"{}".to_vec()),
+            ("more than 64 KiB", over),
+        ] {
+            // The control: at mode 0600 the bytes are read and do not verify.
+            let site = site();
+            put(&site.path, &content, 0o600);
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unverified),
+                "{case}"
+            );
+            // Writable by the group, the same bytes are not judged.
+            put(&site.path, &content, 0o620);
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unavailable),
+                "{case}"
+            );
+            assert_eq!(
+                admit(&site, &key(), &write()),
+                Outcome::Unavailable,
+                "{case}"
+            );
+            assert_eq!(uses(&site), 0, "{case}");
+        }
+
+        type Break = fn(&Path);
+        let cases: [(&str, Break); 5] = [
+            ("readable by the group", group_readable),
+            ("a second name for the store", second_name),
+            ("a symlink to the store", linked),
+            ("not a database", not_a_database),
+            ("a directory at the name", directory),
+        ];
+        for (case, break_it) in cases {
+            let site = site();
+            put(&site.path, &signed, 0o600);
+            // The control: the store as the host made it takes a use.
+            assert_eq!(
+                admit(&site, &key(), &write()),
+                Outcome::Admitted("g1".into()),
+                "{case}"
+            );
+            break_it(&site.state);
+            assert!(Uses::open(&site.state).is_err(), "{case}");
+        }
+    }
+
     /// Acceptance 10.
     #[test]
     fn a_present_proof_never_falls_back_to_a_grant() {
@@ -3078,5 +3631,933 @@ mod signed_tests {
             route(None::<&str>, None, None::<&Path>),
             Route::ApprovalRequired
         );
+    }
+
+    // Adversarial cases. Each is named `adversary_sg_…`.
+
+    /// Eight writers at once against a cap of three: on one use store handle
+    /// (the threads of one owner) and each on a handle of its own that it
+    /// opens in the race (as each write of an owner opens one, and as a second
+    /// process on the same state directory does). Never more than three.
+    #[test]
+    fn adversary_sg_concurrent_writers_never_pass_the_cap() {
+        const WRITERS: usize = 8;
+        const CAP: usize = 3;
+        for shared in [true, false] {
+            let site = site();
+            let grant = Grant {
+                max_per_hour: CAP as u32,
+                ..channel_grant("g1", NOW + 600_000)
+            };
+            granted(&site, &[grant]);
+            let input = write();
+            let one = shared.then(|| Uses::open(&site.state).unwrap());
+            let barrier = std::sync::Barrier::new(WRITERS);
+            let outcomes: Vec<Outcome> = std::thread::scope(|scope| {
+                let threads: Vec<_> = (0..WRITERS)
+                    .map(|_| {
+                        scope.spawn(|| {
+                            barrier.wait();
+                            let own;
+                            let uses = match &one {
+                                Some(one) => one,
+                                None => match Uses::open(&site.state) {
+                                    Ok(opened) => {
+                                        own = opened;
+                                        &own
+                                    }
+                                    Err(UsesUnavailable) => return Outcome::Unavailable,
+                                },
+                            };
+                            let admitted =
+                                super::admit(&site.path, &key(), call(&input), Some(now()), uses);
+                            match admitted {
+                                Ok(admitted) => match admitted.bind(Uuid::new_v4()) {
+                                    Ok(()) => Outcome::Admitted(admitted.grant_id().to_owned()),
+                                    Err(UsesUnavailable) => Outcome::Unavailable,
+                                },
+                                Err(NotAdmitted::AtCap { .. }) => Outcome::RateLimited,
+                                Err(NotAdmitted::UsesUnavailable) => Outcome::Unavailable,
+                                Err(other) => panic!("{other:?}"),
+                            }
+                        })
+                    })
+                    .collect();
+                threads
+                    .into_iter()
+                    .map(|thread| thread.join().unwrap())
+                    .collect()
+            });
+            let count = |wanted: &Outcome| outcomes.iter().filter(|o| *o == wanted).count();
+            let admitted = count(&Outcome::Admitted("g1".into()));
+            let unavailable = count(&Outcome::Unavailable);
+            assert_eq!(
+                admitted + count(&Outcome::RateLimited) + unavailable,
+                WRITERS,
+                "shared {shared}: {outcomes:?}"
+            );
+            assert!(admitted <= CAP, "shared {shared}: {outcomes:?}");
+            if unavailable == 0 {
+                assert_eq!(admitted, CAP, "shared {shared}: {outcomes:?}");
+            }
+            // What the store holds afterwards is what was answered: the cap
+            // is reached after exactly the uses that are left, on a new handle.
+            let mut total = admitted;
+            loop {
+                match admit(&site, &key(), &input) {
+                    Outcome::Admitted(_) => total += 1,
+                    Outcome::RateLimited => break,
+                    other => panic!("shared {shared}: {other:?}"),
+                }
+                assert!(total <= CAP, "shared {shared}: {total}");
+            }
+            assert_eq!(total, CAP, "shared {shared}");
+        }
+    }
+
+    /// Four processes at once on one state directory and one grant file, as
+    /// two owners or an owner and a second host would be: each is this test
+    /// again in a process of its own, creates or opens the use store in the
+    /// race and tries four writes. Together they never pass a cap of five.
+    #[test]
+    fn adversary_sg_processes_on_one_state_directory_never_pass_the_cap() {
+        const NAME: &str = "local::standing::signed_tests::adversary_sg_processes_on_one_state_directory_never_pass_the_cap";
+        const STATE: &str = "ADVERSARY_SG_STATE";
+        const FILE: &str = "ADVERSARY_SG_FILE";
+        const GO: &str = "ADVERSARY_SG_GO";
+        const PROCESSES: usize = 4;
+        const TRIES: usize = 4;
+        const CAP: usize = 5;
+        let patience = std::time::Duration::from_secs(20);
+        let pause = std::time::Duration::from_millis(2);
+        let input = write();
+        let child = (
+            std::env::var_os(STATE),
+            std::env::var_os(FILE),
+            std::env::var_os(GO),
+        );
+        if let (Some(state), Some(file), Some(go)) = child {
+            // The child: says it is ready, waits for the parent's signal,
+            // then races the others for the store and the uses.
+            let go = PathBuf::from(go);
+            let ready = go.with_extension(format!("ready-{}", std::process::id()));
+            std::fs::write(ready, b"").unwrap();
+            let started = std::time::Instant::now();
+            while !go.exists() {
+                assert!(started.elapsed() < patience, "no signal");
+                std::thread::sleep(pause);
+            }
+            let (mut admitted, mut unavailable) = (0, 0);
+            match Uses::open(Path::new(&state)) {
+                Ok(uses) => {
+                    for _ in 0..TRIES {
+                        let taken = super::admit(
+                            Path::new(&file),
+                            &key(),
+                            call(&input),
+                            Some(now()),
+                            &uses,
+                        );
+                        match taken {
+                            Ok(taken) => match taken.bind(Uuid::new_v4()) {
+                                Ok(()) => admitted += 1,
+                                Err(UsesUnavailable) => unavailable += 1,
+                            },
+                            Err(NotAdmitted::AtCap { .. }) => {}
+                            Err(NotAdmitted::UsesUnavailable) => unavailable += 1,
+                            Err(other) => panic!("{other:?}"),
+                        }
+                    }
+                }
+                Err(UsesUnavailable) => unavailable = TRIES,
+            }
+            println!("\nadversary_sg child admitted={admitted} unavailable={unavailable}");
+            return;
+        }
+        let site = site();
+        let grant = Grant {
+            max_per_hour: CAP as u32,
+            ..channel_grant("g1", NOW + 600_000)
+        };
+        granted(&site, &[grant]);
+        let go = site.path.with_extension("go");
+        let children: Vec<_> = (0..PROCESSES)
+            .map(|_| {
+                std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+                    .env(STATE, &site.state)
+                    .env(FILE, &site.path)
+                    .env(GO, &go)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .spawn()
+                    .unwrap()
+            })
+            .collect();
+        let ready = || {
+            std::fs::read_dir(site.path.parent().unwrap())
+                .unwrap()
+                .filter(|entry| {
+                    let name = entry.as_ref().unwrap().file_name();
+                    name.to_string_lossy().starts_with("leaf.ready-")
+                })
+                .count()
+        };
+        let started = std::time::Instant::now();
+        while ready() < PROCESSES && started.elapsed() < patience {
+            std::thread::sleep(pause);
+        }
+        std::fs::write(&go, b"").unwrap();
+        let (mut admitted, mut unavailable) = (0, 0);
+        for child in children {
+            let output = child.wait_with_output().unwrap();
+            assert!(output.status.success(), "{output:?}");
+            let text = String::from_utf8_lossy(&output.stdout).into_owned();
+            let number = |name: &str| -> usize {
+                text.split_whitespace()
+                    .find_map(|part| part.strip_prefix(name))
+                    .unwrap_or_else(|| panic!("no {name} in {text}"))
+                    .parse()
+                    .unwrap()
+            };
+            assert!(text.contains("adversary_sg child "), "{text}");
+            admitted += number("admitted=");
+            unavailable += number("unavailable=");
+        }
+        assert_eq!(ready(), PROCESSES);
+        assert!(
+            admitted <= CAP,
+            "{admitted} admitted, {unavailable} unavailable"
+        );
+        if unavailable == 0 {
+            assert_eq!(admitted, CAP);
+            assert_eq!(admit(&site, &key(), &input), Outcome::RateLimited);
+            // Every admitted write holds one bound use; a refusal holds none.
+            assert_eq!(uses(&site) as usize, admitted);
+        }
+    }
+
+    /// The count is the store's, not the handle's and not the file's: it is
+    /// there on a new handle, and `grant-standing` and `revoke-standing` of
+    /// another grant, which replace the file, leave it where it was.
+    #[test]
+    fn adversary_sg_the_count_outlives_the_handle_and_a_rewrite_of_the_file() {
+        let site = site();
+        let (signer, key) = (signer(), key());
+        let lock = lock(&site.state).unwrap();
+        let add = |request: &Value| {
+            grant(
+                &lock,
+                &site.path,
+                &signer,
+                &key,
+                "leaf",
+                now(),
+                &bytes(request),
+            )
+            .unwrap()
+        };
+        let first = add(&request());
+        // `admit` opens a new handle for every write.
+        assert_eq!(
+            admit(&site, &key, &write()),
+            Outcome::Admitted(first.clone())
+        );
+        assert_eq!(
+            admit(&site, &key, &write()),
+            Outcome::Admitted(first.clone())
+        );
+        assert_eq!(admit(&site, &key, &write()), Outcome::RateLimited);
+        // A grant for another channel: the file is replaced, the first grant
+        // keeps its id and its count, and the new one counts on its own.
+        let mut elsewhere = request();
+        elsewhere["target"] = json!([{"pointer": "/body/channel", "value": "C2"}]);
+        let second = add(&elsewhere);
+        assert_eq!(admit(&site, &key, &write()), Outcome::RateLimited);
+        let other_channel = json!({"body": {"channel": "C2", "text": "hello"}});
+        assert_eq!(
+            admit(&site, &key, &other_channel),
+            Outcome::Admitted(second.clone())
+        );
+        revoke(&lock, &site.path, &signer, &key, now(), &second).unwrap();
+        assert_eq!(admit(&site, &key, &write()), Outcome::RateLimited);
+        assert_eq!(
+            admit(&site, &key, &other_channel),
+            Outcome::ApprovalRequired
+        );
+        assert_eq!(uses(&site), 3);
+    }
+
+    /// The hour is counted from the upper bound of each reading, whatever the
+    /// reading's width, and a clock that steps back frees nothing.
+    #[test]
+    fn adversary_sg_the_hour_is_counted_from_the_upper_bound_of_each_reading() {
+        let site = site();
+        let key = ConfiguredApprovalKey {
+            not_after_unix_ms: NOW + 3 * WINDOW_MS,
+            ..key()
+        };
+        let grant = Grant {
+            max_per_hour: 1,
+            ..channel_grant("g1", NOW + 2 * WINDOW_MS)
+        };
+        put(
+            &site.path,
+            &sign(&signer(), &key, now(), &[grant]).unwrap(),
+            0o600,
+        );
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let at = |lower_unix_ms: i64, upper_unix_ms: i64| {
+            let reading = ClockInterval {
+                lower_unix_ms,
+                upper_unix_ms,
+            };
+            super::admit(&site.path, &key, call(&input), Some(reading), &uses).map(|admitted| {
+                admitted.bind(Uuid::new_v4()).unwrap();
+                admitted.grant_id().to_owned()
+            })
+        };
+        // The first use, at the widest reading the clock rule admits.
+        let first = NOW + MAX_CLOCK_WIDTH_MS;
+        assert_eq!(at(NOW, first), Ok("g1".to_owned()));
+        // An exact reading 3,600 s after that upper bound is inside the hour,
+        // though it is 3,608 s after the first reading's lower bound.
+        assert_eq!(
+            at(first + WINDOW_MS, first + WINDOW_MS),
+            Err(NotAdmitted::AtCap {
+                retry_after_seconds: 1
+            })
+        );
+        // One millisecond later the use has left it.
+        assert_eq!(
+            at(first + WINDOW_MS + 1, first + WINDOW_MS + 1),
+            Ok("g1".to_owned())
+        );
+        // The clock steps back an hour: both uses count, none is freed.
+        assert_eq!(
+            at(NOW, NOW + 2_000),
+            Err(NotAdmitted::AtCap {
+                retry_after_seconds: 3600
+            })
+        );
+        assert_eq!(uses.rows().unwrap(), 2);
+    }
+
+    /// A use is given back once, whatever ends the write before `bind`, and a
+    /// use that was given back or bound cannot be moved again.
+    #[test]
+    fn adversary_sg_a_use_is_given_back_once_whatever_ends_the_write() {
+        let site = site();
+        let grant = Grant {
+            max_per_hour: 1,
+            ..channel_grant("g1", NOW + 600_000)
+        };
+        granted(&site, &[grant]);
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let admit = || super::admit(&site.path, &key(), call(&input), Some(now()), &uses);
+        // A panic between `admit` and `bind` unwinds through the guard.
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let held = admit().unwrap();
+            assert_eq!(held.grant_id(), "no such grant", "the write panics here");
+        }));
+        assert!(unwound.is_err());
+        // The grant's one use of the hour is free again.
+        let held = admit().unwrap();
+        assert!(matches!(admit(), Err(NotAdmitted::AtCap { .. })));
+        // Given back by hand, twice, and once more by the drop: one use is
+        // free afterwards, not three. A use given back is not bound.
+        let taken = held.taken.clone();
+        uses.release(&taken).unwrap();
+        uses.release(&taken).unwrap();
+        assert_eq!(held.bind(Uuid::new_v4()), Err(UsesUnavailable));
+        drop(held);
+        let bound = admit().unwrap();
+        assert!(matches!(admit(), Err(NotAdmitted::AtCap { .. })));
+        // A bound use stays counted when it is released, and stays with its
+        // attempt when it is bound again.
+        let attempt = Uuid::new_v4();
+        bound.bind(attempt).unwrap();
+        uses.release(&bound.taken).unwrap();
+        assert_eq!(bound.bind(Uuid::new_v4()), Err(UsesUnavailable));
+        drop(bound);
+        assert!(matches!(admit(), Err(NotAdmitted::AtCap { .. })));
+        assert_eq!(uses.grant_of(attempt).unwrap().as_deref(), Some("g1"));
+        assert_eq!(uses.rows().unwrap(), 3);
+    }
+
+    /// The recheck refuses every file the admission refuses: an unsafe one, one
+    /// that does not verify, and one whose grant of the same id no longer
+    /// covers the write. It takes no use.
+    #[test]
+    fn adversary_sg_a_recheck_refuses_every_file_the_admission_refuses() {
+        let input = write();
+        let signed = sign(
+            &signer(),
+            &key(),
+            now(),
+            &[channel_grant("g1", NOW + 600_000)],
+        )
+        .unwrap();
+        /// The file's claims after `change`, signed again by the test key.
+        fn resigned(signed: &[u8], change: impl FnOnce(&mut Value)) -> Vec<u8> {
+            let mut claims: Value = serde_json::from_slice(&claims_of(signed)).unwrap();
+            change(&mut claims);
+            let header = json!({"alg": "Ed25519", "kid": "key-1", "typ": SIGNED_TYPE});
+            compact(&header, &connectors_core::canonical(&claims))
+        }
+        // The control of `resigned`: with no change it is the file itself.
+        assert_eq!(resigned(&signed, |_| {}), signed);
+        fn group_writable(site: &Site, signed: &[u8]) {
+            put(&site.path, signed, 0o620);
+        }
+        fn linked(site: &Site, signed: &[u8]) {
+            std::fs::remove_file(&site.path).unwrap();
+            let real = site.path.with_extension("real");
+            put(&real, signed, 0o600);
+            std::os::unix::fs::symlink(&real, &site.path).unwrap();
+        }
+        fn directory(site: &Site, _: &[u8]) {
+            std::fs::remove_file(&site.path).unwrap();
+            std::fs::create_dir(&site.path).unwrap();
+        }
+        fn emptied(site: &Site, _: &[u8]) {
+            put(&site.path, b"", 0o600);
+        }
+        fn cut(site: &Site, signed: &[u8]) {
+            put(&site.path, &signed[..signed.len() / 2], 0o600);
+        }
+        fn oversized(site: &Site, signed: &[u8]) {
+            let mut bytes = signed.to_vec();
+            bytes.resize(FILE_LIMIT + 1, b'A');
+            put(&site.path, &bytes, 0o600);
+        }
+        fn by_another_key(site: &Site, _: &[u8]) {
+            let (signer, key) = other("key-1");
+            let grants = [channel_grant("g1", NOW + 600_000)];
+            put(
+                &site.path,
+                &sign(&signer, &key, now(), &grants).unwrap(),
+                0o600,
+            );
+        }
+        fn listed_revoked(site: &Site, signed: &[u8]) {
+            let file = resigned(signed, |claims| {
+                claims["document"]["revoked"] = json!(["g1"]);
+            });
+            put(&site.path, &file, 0o600);
+        }
+        /// The grant `g1` with one member changed.
+        fn regranted(site: &Site, signed: &[u8], member: &str, value: Value) {
+            let file = resigned(signed, |claims| {
+                claims["document"]["grants"][0][member] = value;
+            });
+            put(&site.path, &file, 0o600);
+        }
+        fn other_channel(site: &Site, signed: &[u8]) {
+            let target = json!([{"pointer": "/body/channel", "value": "C2"}]);
+            regranted(site, signed, "target", target);
+        }
+        fn other_instance(site: &Site, signed: &[u8]) {
+            regranted(site, signed, "instance", json!("other"));
+        }
+        fn other_operation(site: &Site, signed: &[u8]) {
+            regranted(site, signed, "operation", json!("chat.update"));
+        }
+        fn ending_sooner(site: &Site, signed: &[u8]) {
+            regranted(site, signed, "not_after_unix_ms", json!(NOW + 10_000));
+        }
+        fn closed(site: &Site, signed: &[u8]) {
+            regranted(site, signed, "input_keys", json!([]));
+        }
+        fn joined(site: &Site, _: &[u8]) {
+            granted(
+                site,
+                &[
+                    channel_grant("g0", NOW + 600_000),
+                    channel_grant("g1", NOW + 600_000),
+                ],
+            );
+        }
+        type Change = fn(&Site, &[u8]);
+        let cases: [(&str, Change, Result<(), NotAdmitted>); 14] = [
+            (
+                "mode 0620",
+                group_writable,
+                Err(NotAdmitted::FileUnavailable),
+            ),
+            (
+                "a symlink at the path",
+                linked,
+                Err(NotAdmitted::FileUnavailable),
+            ),
+            (
+                "a directory at the path",
+                directory,
+                Err(NotAdmitted::FileUnavailable),
+            ),
+            ("no byte", emptied, Err(NotAdmitted::Unverified)),
+            ("half the file", cut, Err(NotAdmitted::Unverified)),
+            ("over 64 KiB", oversized, Err(NotAdmitted::Unverified)),
+            (
+                "another key under the same kid",
+                by_another_key,
+                Err(NotAdmitted::Unverified),
+            ),
+            (
+                "the grant listed in revoked",
+                listed_revoked,
+                Err(NotAdmitted::Uncovered(Uncovered::Revoked)),
+            ),
+            (
+                "the same id for another channel",
+                other_channel,
+                Err(NotAdmitted::Uncovered(Uncovered::OtherTarget)),
+            ),
+            (
+                "the same id for another instance",
+                other_instance,
+                Err(NotAdmitted::Uncovered(Uncovered::NoGrant)),
+            ),
+            (
+                "the same id for another operation",
+                other_operation,
+                Err(NotAdmitted::Uncovered(Uncovered::OtherOperation)),
+            ),
+            (
+                "the same id ending sooner",
+                ending_sooner,
+                Err(NotAdmitted::Uncovered(Uncovered::Expired)),
+            ),
+            (
+                "the same id with its input closed",
+                closed,
+                Err(NotAdmitted::Uncovered(Uncovered::OutsideInput)),
+            ),
+            // The control: the grant is still there, behind a new one.
+            ("a second grant before it", joined, Ok(())),
+        ];
+        /// Removes whatever a case left at the path and beside it.
+        fn clear(site: &Site) {
+            for path in [site.path.clone(), site.path.with_extension("real")] {
+                match std::fs::symlink_metadata(&path) {
+                    Ok(found) if found.is_dir() => std::fs::remove_dir(&path).unwrap(),
+                    Ok(_) => std::fs::remove_file(&path).unwrap(),
+                    Err(_) => {}
+                }
+            }
+        }
+        // One write, admitted once; every case is a recheck of that write.
+        let site = site();
+        put(&site.path, &signed, 0o600);
+        let uses = Uses::open(&site.state).unwrap();
+        let admitted = super::admit(&site.path, &key(), call(&input), Some(now()), &uses).unwrap();
+        let recheck = || {
+            still_admitted(
+                &site.path,
+                &key(),
+                call(&input),
+                Some(ending(NOW + 30_000)),
+                &admitted,
+            )
+        };
+        for (case, change, expected) in cases {
+            change(&site, &signed);
+            assert_eq!(recheck(), expected, "{case}");
+            // The control: with the file as it was, the same recheck passes.
+            clear(&site);
+            put(&site.path, &signed, 0o600);
+            assert_eq!(recheck(), Ok(()), "after {case}");
+        }
+        assert_eq!(uses.rows().unwrap(), 1);
+    }
+
+    /// While `grant-standing` and `revoke-standing` replace the file for
+    /// another grant, a write under the first grant is admitted and rechecked
+    /// every time: no reader meets a file that is half written or missing.
+    #[test]
+    fn adversary_sg_a_file_being_replaced_is_never_read_half_written() {
+        let site = site();
+        let key = key();
+        let lock = lock(&site.state).unwrap();
+        let mut wide = request();
+        wide["max_per_hour"] = json!(10_000);
+        let first = grant(
+            &lock,
+            &site.path,
+            &signer(),
+            &key,
+            "leaf",
+            now(),
+            &bytes(&wide),
+        )
+        .unwrap();
+        let mut elsewhere = request();
+        elsewhere["target"] = json!([{"pointer": "/body/channel", "value": "C2"}]);
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let done = std::sync::atomic::AtomicBool::new(false);
+        let (written, refusals) = std::thread::scope(|scope| {
+            let readers: Vec<_> = (0..2)
+                .map(|_| {
+                    scope.spawn(|| {
+                        // One write admitted while the file is being
+                        // replaced, then rechecked until the last replacement.
+                        let mut refusals: Vec<String> = Vec::new();
+                        let admitted =
+                            super::admit(&site.path, &key, call(&input), Some(now()), &uses);
+                        let admitted = match admitted {
+                            Ok(admitted) => admitted,
+                            Err(refusal) => return vec![format!("admit: {refusal:?}")],
+                        };
+                        if admitted.grant_id() != first.as_str() {
+                            refusals.push(format!("under {}", admitted.grant_id()));
+                        }
+                        let mut rounds = 0;
+                        while rounds < 50 || !done.load(std::sync::atomic::Ordering::SeqCst) {
+                            rounds += 1;
+                            let recheck = still_admitted(
+                                &site.path,
+                                &key,
+                                call(&input),
+                                Some(now()),
+                                &admitted,
+                            );
+                            if let Err(refusal) = recheck {
+                                refusals.push(format!("recheck {rounds}: {refusal:?}"));
+                            }
+                        }
+                        refusals
+                    })
+                })
+                .collect();
+            let signer = signer();
+            let written: Result<(), Refused> = (0..6).try_for_each(|_| {
+                let id = grant(
+                    &lock,
+                    &site.path,
+                    &signer,
+                    &key,
+                    "leaf",
+                    now(),
+                    &bytes(&elsewhere),
+                )?;
+                revoke(&lock, &site.path, &signer, &key, now(), &id)
+            });
+            done.store(true, std::sync::atomic::Ordering::SeqCst);
+            let refusals: Vec<String> = readers
+                .into_iter()
+                .flat_map(|reader| reader.join().unwrap())
+                .collect();
+            (written, refusals)
+        });
+        assert_eq!(written, Ok(()));
+        assert_eq!(refusals, Vec::<String>::new());
+        assert_eq!(
+            list(&site.path, &key, now())
+                .unwrap()
+                .into_iter()
+                .map(|grant| grant.id)
+                .collect::<Vec<_>>(),
+            [first]
+        );
+    }
+
+    /// A target member is its exact JSON value at its exact pointer, compared
+    /// on the input as the owner reads it (`connectors_core::read_json`).
+    #[test]
+    fn adversary_sg_a_target_value_is_compared_exactly() {
+        fn read(text: &str) -> Value {
+            connectors_core::read_json(text.as_bytes())
+                .ok()
+                .expect("one JSON document")
+        }
+        // An open grant of one target member, through the signed file.
+        let covers = |pointer: &str, value: Value, input: &str| {
+            let site = site();
+            let grant = Grant {
+                target: vec![TargetMember {
+                    pointer: pointer.into(),
+                    value,
+                }],
+                input_keys: None,
+                ..channel_grant("g1", NOW + 600_000)
+            };
+            granted(&site, &[grant]);
+            let grants = verify(&site.path, &key(), now()).unwrap().unwrap();
+            grants
+                .covering("leaf", "chat.postMessage", &read(input), NOW)
+                .map(|covering| covering.len())
+        };
+        let other = Err(Uncovered::OtherTarget);
+        let missing = Err(Uncovered::MissingMember);
+        for (case, pointer, value, input, expected) in [
+            ("1", "/body/n", json!(1), r#"{"body":{"n":1}}"#, Ok(1)),
+            ("\"1\"", "/body/n", json!(1), r#"{"body":{"n":"1"}}"#, other),
+            ("1.0", "/body/n", json!(1), r#"{"body":{"n":1.0}}"#, other),
+            ("1e0", "/body/n", json!(1), r#"{"body":{"n":1e0}}"#, other),
+            ("true", "/body/n", json!(1), r#"{"body":{"n":true}}"#, other),
+            ("[1]", "/body/n", json!(1), r#"{"body":{"n":[1]}}"#, other),
+            ("null", "/body/n", json!(1), r#"{"body":{"n":null}}"#, other),
+            ("no member", "/body/n", json!(1), r#"{"body":{}}"#, missing),
+            ("N", "/body/n", json!(1), r#"{"body":{"N":1}}"#, missing),
+            ("an array", "/body/n", json!(1), r#"{"body":[1]}"#, missing),
+            (
+                "the string for a flag",
+                "/body/flag",
+                json!(true),
+                r#"{"body":{"flag":"true"}}"#,
+                other,
+            ),
+            (
+                "the flag",
+                "/body/flag",
+                json!(true),
+                r#"{"body":{"flag":true}}"#,
+                Ok(1),
+            ),
+            (
+                "null for a granted null",
+                "/body/thread",
+                Value::Null,
+                r#"{"body":{"thread":null}}"#,
+                Ok(1),
+            ),
+            (
+                "no member for a granted null",
+                "/body/thread",
+                Value::Null,
+                r#"{"body":{}}"#,
+                missing,
+            ),
+            (
+                "another case",
+                "/body/channel",
+                json!("C1"),
+                r#"{"body":{"channel":"c1"}}"#,
+                other,
+            ),
+            (
+                "a trailing space",
+                "/body/channel",
+                json!("C1"),
+                r#"{"body":{"channel":"C1 "}}"#,
+                other,
+            ),
+            (
+                "a trailing NUL",
+                "/body/channel",
+                json!("C1"),
+                r#"{"body":{"channel":"C1\u0000"}}"#,
+                other,
+            ),
+            (
+                "the same string, escaped",
+                "/body/channel",
+                json!("C1"),
+                r#"{"body":{"channel":"C1"}}"#,
+                Ok(1),
+            ),
+            (
+                "the decomposed form of a composed letter",
+                "/body/channel",
+                json!("\u{e9}"),
+                r#"{"body":{"channel":"é"}}"#,
+                other,
+            ),
+            (
+                "a member named a/b",
+                "/body/a~1b",
+                json!("x"),
+                r#"{"body":{"a/b":"x"}}"#,
+                Ok(1),
+            ),
+            (
+                "b below a, for a member named a/b",
+                "/body/a~1b",
+                json!("x"),
+                r#"{"body":{"a":{"b":"x"}}}"#,
+                missing,
+            ),
+            (
+                "a member named m~n",
+                "/body/m~0n",
+                json!("x"),
+                r#"{"body":{"m~n":"x"}}"#,
+                Ok(1),
+            ),
+            (
+                "a member named m~0n, for one named m~n",
+                "/body/m~0n",
+                json!("x"),
+                r#"{"body":{"m~0n":"x"}}"#,
+                missing,
+            ),
+            (
+                "the first element",
+                "/body/to/0",
+                json!("x"),
+                r#"{"body":{"to":["x","y"]}}"#,
+                Ok(1),
+            ),
+            (
+                "the elements in another order",
+                "/body/to/0",
+                json!("x"),
+                r#"{"body":{"to":["y","x"]}}"#,
+                other,
+            ),
+            (
+                "an index with a leading zero",
+                "/body/to/00",
+                json!("x"),
+                r#"{"body":{"to":["x"]}}"#,
+                missing,
+            ),
+        ] {
+            assert_eq!(covers(pointer, value, input), expected, "{case}");
+        }
+        // A member named twice never reaches a grant: the owner's reader
+        // refuses the input.
+        let twice = br#"{"body":{"channel":"C1","channel":"C2","text":"hello"}}"#;
+        assert!(connectors_core::read_json::<Value>(twice).is_err());
+    }
+
+    /// `check_request` refuses, without a clock, a key or a file, what `grant`
+    /// refuses for the request alone, and takes the smallest and largest
+    /// values `grant` takes.
+    #[test]
+    fn adversary_sg_check_request_refuses_without_a_clock() {
+        let with = |member: &str, value: Value| {
+            let mut request = request();
+            request[member] = value;
+            bytes(&request)
+        };
+        assert_eq!(check_request(&bytes(&request()), "leaf"), Ok(()));
+        for (case, refused) in [
+            (
+                "a zero not_after_unix_ms",
+                with("not_after_unix_ms", json!(0)),
+            ),
+            (
+                "a negative not_after_unix_ms",
+                with("not_after_unix_ms", json!(-1)),
+            ),
+            (
+                "a not_after_unix_ms past the JSON-safe range",
+                with("not_after_unix_ms", json!(TIME_LIMIT + 1)),
+            ),
+            ("a zero max_per_hour", with("max_per_hour", json!(0))),
+            ("max_per_hour 10,001", with("max_per_hour", json!(10_001))),
+            ("a fraction of a use", with("max_per_hour", json!(1.5))),
+            ("an id member", with("id", json!("g1"))),
+            ("no target", with("target", json!([]))),
+        ] {
+            assert_eq!(
+                check_request(&refused, "leaf"),
+                Err(Refused::InvalidInput),
+                "{case}"
+            );
+        }
+        for (case, taken) in [
+            ("not_after_unix_ms 1", with("not_after_unix_ms", json!(1))),
+            (
+                "the last JSON-safe not_after_unix_ms",
+                with("not_after_unix_ms", json!(TIME_LIMIT)),
+            ),
+            ("max_per_hour 1", with("max_per_hour", json!(1))),
+            ("max_per_hour 10,000", with("max_per_hour", json!(10_000))),
+        ] {
+            assert_eq!(check_request(&taken, "leaf"), Ok(()), "{case}");
+        }
+        assert_eq!(
+            check_request(&bytes(&request()), "not an id"),
+            Err(Refused::InvalidInput)
+        );
+    }
+
+    /// The file is one compact JWS in its one spelling: a byte before or
+    /// after it, padding, or a signature whose last character carries other
+    /// unused bits does not verify, though the signed bytes are the same.
+    #[test]
+    fn adversary_sg_the_file_is_one_canonical_jws_and_no_byte_more() {
+        let signed = String::from_utf8(
+            sign(
+                &signer(),
+                &key(),
+                now(),
+                &[channel_grant("g1", NOW + 600_000)],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        // 64 signature bytes are 86 characters; the last one carries four
+        // unused bits, zero in the canonical spelling.
+        let (rest, last) = signed.split_at(signed.len() - 1);
+        let alias = match last {
+            "A" => "B",
+            "Q" => "R",
+            "g" => "h",
+            "w" => "x",
+            other => panic!("the signature ends in {other}"),
+        };
+        let site = site();
+        let uses = Uses::open(&site.state).unwrap();
+        let input = write();
+        let admit = || {
+            super::admit(&site.path, &key(), call(&input), Some(now()), &uses)
+                .map(|admitted| admitted.grant_id().to_owned())
+        };
+        for (case, file) in [
+            ("a newline after it", format!("{signed}\n")),
+            ("a space before it", format!(" {signed}")),
+            ("a NUL after it", format!("{signed}\0")),
+            ("padding", format!("{signed}==")),
+            ("a fourth part", format!("{signed}.")),
+            ("the file twice", format!("{signed}{signed}")),
+            ("other unused bits", format!("{rest}{alias}")),
+        ] {
+            put(&site.path, file.as_bytes(), 0o600);
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unverified),
+                "{case}"
+            );
+            assert_eq!(admit(), Err(NotAdmitted::Unverified), "{case}");
+        }
+        assert_eq!(uses.rows().unwrap(), 0);
+        // The control: the file as signed, at the same path, is admitted.
+        put(&site.path, signed.as_bytes(), 0o600);
+        assert_eq!(admit(), Ok("g1".to_owned()));
+        assert_eq!(uses.rows().unwrap(), 1);
+    }
+
+    /// Bytes in an approval file that are no proof stay on the per-input
+    /// path and are refused there. The owner reads only a file of no byte as
+    /// no proof (`owner::transport::write_action`).
+    #[test]
+    fn adversary_sg_an_approval_file_that_is_no_proof_is_refused_as_a_proof() {
+        let member = Path::new("leaf.grants");
+        let documents: [&[u8]; 8] = [
+            b" ",
+            b"\n",
+            b"\t\r\n",
+            b"\0",
+            b"{}",
+            b"null",
+            b"\"\"",
+            br#"{"reference":"","evidence":""}"#,
+        ];
+        for document in documents {
+            assert_eq!(
+                route(Some(document), Some("k"), Some(member)),
+                Route::PerInput(document)
+            );
+            assert!(
+                Evidence::from_document(Secret(document.to_vec())).is_err(),
+                "{document:?}"
+            );
+        }
     }
 }
