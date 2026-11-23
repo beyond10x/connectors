@@ -13,6 +13,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  scope:
+    name: change scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Decide whether this change needs the code build
+        id: scope
+        run: sh .github/ci/changed-scope.sh github code
+
   gate:
     name: repository gate
     runs-on: ubuntu-24.04
@@ -21,9 +36,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 2
+      - name: Decide whether this change needs the code build
+        id: scope
+        run: sh .github/ci/changed-scope.sh github code
       - name: Check required system tools
+        if: steps.scope.outputs.run != 'false'
         run: for tool in gzip sha256sum sqlite3 jq; do command -v "$tool"; done
       - name: Install Rust 1.98.1
+        if: steps.scope.outputs.run != 'false'
         run: |
           rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
           rustup default 1.98.1
@@ -31,6 +52,7 @@ jobs:
           cargo fmt --version
           cargo clippy --version
       - name: Install the pinned ess release
+        if: steps.scope.outputs.run != 'false'
         working-directory: ${{ runner.temp }}
         run: |
           version="$(jq -r .ess "$GITHUB_WORKSPACE/crates/connectors-spec/toolchain.json")"
@@ -42,6 +64,7 @@ jobs:
           tar -xzf "$archive"
           echo "$PWD/ess-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
       - name: Install the pinned aep release
+        if: steps.scope.outputs.run != 'false'
         working-directory: ${{ runner.temp }}
         run: |
           version="$(jq -r .aep "$GITHUB_WORKSPACE/crates/connectors-build/aep-toolchain.json")"
@@ -53,6 +76,7 @@ jobs:
           tar -xzf "$archive"
           echo "$PWD/aep-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
       - name: Install the pinned cargo-nextest release
+        if: steps.scope.outputs.run != 'false'
         working-directory: ${{ runner.temp }}
         run: |
           version=0.9.143
@@ -62,15 +86,19 @@ jobs:
           tar -xzf "$archive" -C "$HOME/.cargo/bin" cargo-nextest
           cargo nextest --version
       - name: Fetch locked dependencies
+        if: steps.scope.outputs.run != 'false'
         run: cargo fetch --locked
       - name: Permit unprivileged user namespaces
+        if: steps.scope.outputs.run != 'false'
         run: |
           if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
       - name: Run the repository gate
+        if: steps.scope.outputs.run != 'false'
         run: cargo run --locked -p connectors-build -- gate
       - name: Run the ignored tests a built catalog provider suffices for
+        if: steps.scope.outputs.run != 'false'
         run: cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider
       - name: Report disk use
         if: always()
@@ -80,6 +108,8 @@ jobs:
 
   journeys:
     name: ignored CLI journeys
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.run != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:

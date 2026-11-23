@@ -2016,9 +2016,39 @@ fn selected_fixture() {{
             }
             for holder in [job, step] {
                 assert!(holder.get("continue-on-error").is_none(), "{name}");
+            }
+            assert!(
+                step.get("if").is_none(),
+                "{name}: a conditional journey step can pass a pull request unrun"
+            );
+            // The one condition the job may carry: a pull request that changes only
+            // planning or prose files skips it (`~/beyond10x/AGENTS.md`, "Planning-only
+            // pull requests skip the tests"). The `scope` job decides that with
+            // `.github/ci/changed-scope.sh`, whose own test pins the path list; any other
+            // condition could pass a pull request unrun.
+            if let Some(condition) = job.get("if") {
+                assert_eq!(
+                    condition.as_str(),
+                    Some("${{ !cancelled() && needs.scope.outputs.run != 'false' }}"),
+                    "{name}: a conditional journey job can pass a pull request unrun"
+                );
+                assert_eq!(
+                    job.get("needs").and_then(Value::as_str),
+                    Some("scope"),
+                    "{name}"
+                );
+                let scope_steps = jobs
+                    .get("scope")
+                    .and_then(|scope| scope.get("steps"))
+                    .and_then(Value::as_sequence)
+                    .expect("the scope job the journeys depend on");
                 assert!(
-                    holder.get("if").is_none(),
-                    "{name}: a conditional journey step can pass a pull request unrun"
+                    scope_steps.iter().any(|scope_step| {
+                        scope_step.get("id").and_then(Value::as_str) == Some("scope")
+                            && scope_step.get("run").and_then(Value::as_str)
+                                == Some("sh .github/ci/changed-scope.sh github code")
+                    }),
+                    "{name}: the scope job decides with the code lane of changed-scope.sh"
                 );
             }
             let report = evaluate(classified(&[JOURNEY]), &options, |_| vec![], |_| Ok(false));
