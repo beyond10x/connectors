@@ -146,8 +146,11 @@ mod jailed {
     const REFUSED: u64 = 999;
     /// A ticket whose second page the fixture refuses as rate limited.
     const LIMITED: u64 = 429;
+    /// A ticket whose comments come one to a page, on three pages.
+    const PAGED: u64 = 303;
     const AUDIT_CURSOR: &str = "fixture-audit-cursor-2";
     const COMMENT_CURSOR: &str = "fixture-comment-cursor-2";
+    const LAST_COMMENT_CURSOR: &str = "fixture-comment-cursor-3";
 
     /// The adapter child the owner starts: this binary, filtered to this test.
     /// The ordinary run does nothing.
@@ -336,10 +339,31 @@ mod jailed {
                     .unwrap();
                 writeln!(log, "{line}").unwrap();
             }
+            // `/work/page_ms`, when a test writes it, is how long the provider
+            // takes to answer each page.
+            if let Some(took) = fs::read_to_string("/work/page_ms")
+                .ok()
+                .and_then(|text| text.trim().parse().ok())
+            {
+                std::thread::sleep(std::time::Duration::from_millis(took));
+            }
             let id = input["ticket_id"].as_u64().unwrap_or(0);
             let after = input.get("page[after]").and_then(Value::as_str);
             match (operation, id, after) {
                 (_, REFUSED, _) => Err(runtime::Failure::ProviderNotFound),
+                (COMMENTS, PAGED, after) => {
+                    let (page, next) = match after {
+                        None => (0, json!(COMMENT_CURSOR)),
+                        Some(COMMENT_CURSOR) => (1, json!(LAST_COMMENT_CURSOR)),
+                        Some(LAST_COMMENT_CURSOR) => (2, Value::Null),
+                        Some(_) => return Err(runtime::Failure::Unsupported),
+                    };
+                    Ok(catalog(
+                        "/api/v2/tickets/{ticket_id}/comments",
+                        json!({"comments": comments()[page..=page],
+                               "meta": {"after_cursor": next}}),
+                    ))
+                }
                 (AUDITS, LIMITED, Some(_)) => Err(runtime::Failure::ProviderRateLimited),
                 (AUDITS, id, None) => Ok(catalog(
                     "/api/v2/tickets/{ticket_id}/audits",
@@ -746,6 +770,42 @@ mod jailed {
                     "complete":true,"out":"-","missing":["due_at"]}}),
             ],
             "story:invoke-walks-declared-pages"
+        );
+    }
+
+    /// story:invoke-admission-queues-under-load: with `--walk`,
+    /// `--deadline-seconds` is each page's deadline, as the 30 seconds are
+    /// without it. Three pages of 3 s each under `--deadline-seconds 8` all
+    /// answer; one cutoff for the whole walk would refuse the third page,
+    /// which cannot answer before 9 s. A page has 5 s for everything but the
+    /// provider: with 1.5 s pages under `--deadline-seconds 2` it has 0.5 s,
+    /// which a loaded host takes before a page is sent.
+    #[test]
+    fn each_page_of_a_walk_has_the_named_deadline_to_itself() {
+        let container = connected();
+        container.set_knob("page_ms", 3_000);
+        let output = invoke(
+            &container,
+            COMMENTS,
+            &json!({"ticket_id": PAGED}),
+            &[
+                "--walk",
+                "--out",
+                "/work/paged.ndjson",
+                "--deadline-seconds",
+                "8",
+            ],
+        );
+        assert_eq!(
+            success(&output),
+            json!({"pages":3,"records":3,"end":"no_cursor","complete":true,
+                "out":"/work/paged.ndjson"}),
+            "story:invoke-admission-queues-under-load"
+        );
+        assert_eq!(lines_of(&container, "/work/paged.ndjson"), comments());
+        assert_eq!(
+            container.seen("invocations"),
+            [COMMENTS, COMMENTS, COMMENTS]
         );
     }
 }

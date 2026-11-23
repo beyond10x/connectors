@@ -172,7 +172,8 @@ admitted client.
 
 An owner verifies the whole store before it answers its startup greeting, so its
 start takes longer as the store grows. A read on `invoke` that starts
-the owner waits for its greeting up to the read's own 30 seconds. A command without a
+the owner waits for its greeting up to the read's own deadline (30 seconds, or
+its `--deadline-seconds`), the one cutoff the read itself then ends by. A command without a
 deadline of its own reaches a running owner within 10 seconds and waits for the
 greeting of an owner it started up to 60 seconds from that start, which counts
 the time the command spends launching the owner (reading and sealing its own
@@ -248,7 +249,7 @@ and its admission through that owner, so a cold read verifies the store once,
 in the owner before its greeting (story:cold-owner-start-verifies-once). That owner
 starts its `automatic` adapters as any start does, so such an `invoke` refused
 afterwards, a write refused `approval_required` included, leaves it running.
-Only a start that outlasts the read's 30 seconds answers the `invoke`
+Only a start that outlasts the read's deadline answers the `invoke`
 (`timeout`); a start that fails otherwise leaves the `invoke` to the direct
 read, which refuses by its own code before any provider call
 (`metadata_unavailable` for a store that fails verification). An `invoke`

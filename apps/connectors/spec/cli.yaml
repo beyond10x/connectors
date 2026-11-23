@@ -672,3 +672,5 @@ commands:
         source: {kind: option, long: max-pages}
       - field: out
         source: {kind: option, long: out}
+      - field: deadline_seconds
+        source: {kind: option, long: deadline-seconds}

@@ -44,12 +44,46 @@ const APPROVAL_STEPS: [&str; 3] = [
 ];
 /// The connections one page of an instance's listing reads.
 const LISTED: u16 = 500;
-/// A read's own deadline, the 30 seconds its input phase sets
-/// (`session.rs`): a cold read waits for the greeting of the owner it starts
-/// within it, never within a shorter fixed bound, and a start that outlasts it
-/// answers `timeout`, as before the read started the owner first
-/// (owner.md; story:owner-start-outlasts-a-fixed-bound).
-const READ_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
+/// A read's deadline when `--deadline-seconds` is left out, in milliseconds.
+const READ_DEADLINE_MS: u64 = 30_000;
+/// The most seconds `--deadline-seconds` names: the owner admits no request
+/// with more left.
+const MAX_DEADLINE_SECONDS: u64 = 120;
+
+/// A read's deadline as `--deadline-seconds` names it, in milliseconds: a
+/// whole number of seconds from 1 to [`MAX_DEADLINE_SECONDS`], and
+/// [`READ_DEADLINE_MS`] when it is left out. `None` for anything else.
+fn read_window(text: Option<&str>) -> Option<u64> {
+    let Some(text) = text else {
+        return Some(READ_DEADLINE_MS);
+    };
+    if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    match text.parse::<u64>() {
+        Ok(seconds) if (1..=MAX_DEADLINE_SECONDS).contains(&seconds) => Some(seconds * 1_000),
+        _ => None,
+    }
+}
+
+/// A read's one cutoff (story:invoke-admission-queues-under-load), in
+/// milliseconds since the epoch: `window_ms` after `instant_ms`, the instant
+/// taken once. A cold read waits for the greeting of the owner it starts until
+/// it, never within a shorter fixed bound (owner.md;
+/// story:owner-start-outlasts-a-fixed-bound), and the read's own deadline
+/// (`session.rs`) is the same cutoff, not a second window after the start.
+fn cutoff(instant_ms: u64, window_ms: u64) -> u64 {
+    instant_ms.saturating_add(window_ms)
+}
+
+/// The cutoff `window_ms` from now, and the instant an owner start waits
+/// until, derived from it.
+fn cutoff_now(window_ms: u64) -> (u64, std::time::Instant) {
+    let now = connectors_sdk::now_ms();
+    let at = cutoff(now, window_ms);
+    let until = std::time::Instant::now() + std::time::Duration::from_millis(at - now);
+    (at, until)
+}
 
 /// `<connector>` or `<connector>/<instance>`, each part an admitted id.
 pub(super) fn target(text: &str) -> Option<(&str, Option<&str>)> {
@@ -437,6 +471,8 @@ struct Request {
     walk: bool,
     max_pages: Option<String>,
     out: Option<String>,
+    /// `--deadline-seconds` as given.
+    deadline_seconds: Option<String>,
 }
 
 /// Where an `invoke`'s input document comes from.
@@ -587,6 +623,7 @@ fn parse(args: &[OsString]) -> Option<Request> {
         walk,
         max_pages: text("max_pages"),
         out: text("out"),
+        deadline_seconds: text("deadline_seconds"),
     })
 }
 
@@ -610,15 +647,18 @@ fn naming(mut reply: HandlerReply, field: &str) -> HandlerReply {
     reply
 }
 
+/// What the generated runner is given: the command line, the shaping of its
+/// answer, and a read's cutoff in milliseconds since the epoch.
+pub(super) type Runnable = (Vec<OsString>, Option<Shaping>, Option<u64>);
+
 /// The arguments the generated runner reads: `args` unchanged unless they are
 /// an `invoke`, which is prepared and answered as the rewritten command line,
-/// with the shaping its answer takes when `--fields` or `--each` is given;
-/// `--describe` is answered here, and a refusal is the one failure envelope.
-pub(super) fn prepare(
-    args: Vec<OsString>,
-) -> Result<(Vec<OsString>, Option<Shaping>), ProcessOutput> {
+/// with the shaping its answer takes when `--fields` or `--each` is given and
+/// the cutoff of a read, in milliseconds since the epoch; `--describe` is
+/// answered here, and a refusal is the one failure envelope.
+pub(super) fn prepare(args: Vec<OsString>) -> Result<Runnable, ProcessOutput> {
     let Some(request) = parse(&args) else {
-        return Ok((args, None));
+        return Ok((args, None, None));
     };
     let json = request.json;
     let prepared = match protected::Signals::install() {
@@ -633,7 +673,7 @@ pub(super) fn prepare(
         Err(error) => Err(owner_failure(error)),
     };
     match prepared {
-        Ok(Prepared::Run(args, shaping)) => Ok((args, shaping)),
+        Ok(Prepared::Run(args, shaping, cutoff)) => Ok((args, shaping, cutoff)),
         Ok(Prepared::Described(result)) => Err(success(result, json)),
         Ok(Prepared::Walk(walking)) => Err(walking.run()),
         Err(reply) => Err(definition::render(reply, json)),
@@ -641,7 +681,9 @@ pub(super) fn prepare(
 }
 
 enum Prepared {
-    Run(Vec<OsString>, Option<Shaping>),
+    /// The rewritten command line, its shaping, and a read's cutoff in
+    /// milliseconds since the epoch.
+    Run(Vec<OsString>, Option<Shaping>, Option<u64>),
     Described(Value),
     Walk(Box<Walking>),
 }
@@ -737,6 +779,8 @@ pub(super) struct Walking {
     /// `--out` as given, which the summary names.
     named: String,
     json: bool,
+    /// Each page's deadline, in milliseconds from the page's start.
+    window_ms: u64,
 }
 
 impl Walking {
@@ -753,12 +797,15 @@ impl Walking {
             mut out,
             named,
             json,
+            window_ms,
         } = self;
+        // Each page is a read with a cutoff of its own, taken once.
         let page = |input: OsString| {
             let mut args = before.clone();
             args.push(input);
             args.extend(after.iter().cloned());
-            super::run_selected(args, None)
+            let cutoff = cutoff(connectors_sdk::now_ms(), window_ms);
+            super::run_selected(args, None, Some(cutoff))
         };
         let caller = match caller {
             Caller::Json(caller) => caller,
@@ -916,6 +963,14 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     {
         return Err(refused("idempotency_key"));
     }
+    // `--deadline-seconds` is a read's (story:invoke-admission-queues-under-load).
+    // Whether this is a read is decided from the arguments, as the owner
+    // start below is, before anything is read, started or sent.
+    let reads =
+        !request.describe && request.idempotency_key.is_none() && request.approval_file.is_none();
+    let window_ms = read_window(request.deadline_seconds.as_deref())
+        .filter(|_| reads || request.deadline_seconds.is_none())
+        .ok_or_else(|| refused("deadline_seconds"))?;
     // The paths are parsed once, before anything is read; `--describe` reads
     // no result to shape.
     let fields = match request.fields.as_deref() {
@@ -972,7 +1027,9 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
         config: request.config.clone(),
         state: request.state.clone(),
     };
-    let (connector, instance, adapter, bootstrap, connection) = match &request.definition {
+    let (connector, instance, adapter, bootstrap, connection, read_cutoff) = match &request
+        .definition
+    {
         // A definition is described from its lowering: nothing is recorded,
         // and no connection is resolved, asked for or created.
         Some(definition) if request.describe => {
@@ -989,12 +1046,16 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
                 lowered.adapter,
                 bootstrap,
                 None,
+                None,
             )
         }
         Some(definition) => {
             let prepared = definition::prepare_with(&lowering(), definition, signals)
                 .map_err(|reply| naming(reply, "definition"))?;
             let connection = Some(prepared.connection);
+            // The definition's connection is resolved, a first connect's
+            // questions answered: the read's cutoff is taken here, once.
+            let read_cutoff = reads.then(|| cutoff_now(window_ms).0);
             let (adapter, bootstrap) = bound(&paths, &prepared.alias, connection.as_deref())?;
             (
                 prepared.connector,
@@ -1002,6 +1063,7 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
                 adapter,
                 bootstrap,
                 connection,
+                read_cutoff,
             )
         }
         None => {
@@ -1021,14 +1083,16 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
             // its connections without `--connection`, the description, the
             // admission and the read are then answered from that owner's held
             // handle; a cold read verifies the store once, in the owner
-            // (story:cold-owner-start-verifies-once).
-            if !request.describe
-                && request.idempotency_key.is_none()
-                && request.approval_file.is_none()
-            {
-                owner::start_for_read(&paths, std::time::Instant::now() + READ_DEADLINE)
-                    .map_err(owner_failure)?;
-            }
+            // (story:cold-owner-start-verifies-once). The read's cutoff is
+            // taken here, once: the start waits until it, and the read ends
+            // by it too.
+            let read_cutoff = if reads {
+                let (at, until) = cutoff_now(window_ms);
+                owner::start_for_read(&paths, until).map_err(owner_failure)?;
+                Some(at)
+            } else {
+                None
+            };
             let connection = match &request.connection {
                 Some(connection) => Some(connection.clone()),
                 // `--describe` uses the one usable connection's binding when
@@ -1037,7 +1101,14 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
                 None => Some(decide(&held(&paths, &config, &alias, adapter)?)?),
             };
             let (adapter, bootstrap) = bound(&paths, &alias, connection.as_deref())?;
-            (connector, instance, adapter, bootstrap, connection)
+            (
+                connector,
+                instance,
+                adapter,
+                bootstrap,
+                connection,
+                read_cutoff,
+            )
         }
     };
     let requirement =
@@ -1137,6 +1208,7 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
             out: out_file,
             named: out.to_owned(),
             json: request.json,
+            window_ms,
         })));
     }
     rewritten.extend(input);
@@ -1150,7 +1222,7 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
         each,
         json: request.json,
     });
-    Ok(Prepared::Run(rewritten, shaping))
+    Ok(Prepared::Run(rewritten, shaping, read_cutoff))
 }
 
 /// `invoke --describe`'s answer (`connectors.cli.InvokeDescription`).
@@ -1583,5 +1655,49 @@ mod tests {
         assert_eq!(data["code"], "instance_ambiguous");
         assert_eq!(data["stage"], "arguments");
         assert_eq!(data["next_action"], "none");
+    }
+
+    fn requested(extra: &[&str]) -> Request {
+        let args: Vec<OsString> = ["connectors", "invoke", "jira/forge", "issue.show"]
+            .iter()
+            .chain(extra)
+            .map(OsString::from)
+            .collect();
+        parse(&args).expect("an invoke command line")
+    }
+
+    /// story:invoke-admission-queues-under-load: the cutoff of a read whose
+    /// arguments name no `--deadline-seconds` is 30,000 ms after its instant;
+    /// one that names it is that many seconds after it.
+    #[test]
+    fn the_cutoff_of_a_read_without_the_flag_is_30_000_ms_after_its_instant() {
+        let request = requested(&["--input-json", "{}"]);
+        assert_eq!(request.deadline_seconds, None);
+        let window = read_window(request.deadline_seconds.as_deref()).unwrap();
+        assert_eq!(cutoff(1_000, window), 31_000);
+        let request = requested(&["--input-json", "{}", "--deadline-seconds", "2"]);
+        let window = read_window(request.deadline_seconds.as_deref()).unwrap();
+        assert_eq!(cutoff(1_000, window), 3_000);
+    }
+
+    /// `--deadline-seconds` is a whole number of seconds from 1 to 120.
+    #[test]
+    fn a_deadline_is_a_whole_number_of_seconds_from_1_to_120() {
+        assert_eq!(read_window(Some("1")), Some(1_000));
+        assert_eq!(read_window(Some("120")), Some(120_000));
+        for refused in [
+            "0",
+            "121",
+            "x",
+            "",
+            "-1",
+            "+3",
+            "1.5",
+            " 5",
+            "5 ",
+            "99999999999999999999999",
+        ] {
+            assert_eq!(read_window(Some(refused)), None, "{refused:?}");
+        }
     }
 }

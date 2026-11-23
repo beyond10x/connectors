@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `connectors invoke --deadline-seconds <n>` names a read's deadline, 1 to 120 seconds; left out,
+  it is 30 as before. Reads of one instance are served one at a time, so a read behind slow ones
+  ended `timeout` at `admission` after 30 seconds, unsent; a caller that can wait now says so.
+  With `--walk` it is each page's deadline. It is refused `invalid_input` naming
+  `deadline_seconds`, before an owner is started, when it is out of range or stands beside
+  `--idempotency-key`, `--approval-file` or `--describe`.
+
+### Changed
+
+- A read on `invoke` has one cutoff, taken before its owner is started: the owner start, the wait
+  for the read's turn and the provider's answer end by it. Before, a read that started its owner
+  had up to 30 seconds for the start and 30 more for the read.
+- A read that validates its stored credential again because only the provider executable changed
+  ends that validation and its retries at the earlier of its deadline and the validation's
+  30-second capture lease: no validation is sent that the registry would no longer record.
+
 ## 0.74.2 — 2026-11-23
 
 ### Changed

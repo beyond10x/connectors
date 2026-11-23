@@ -1512,13 +1512,14 @@ fn worker(
                         // validation records is fresh, so the read it admits
                         // recollects nothing.
                         Err(registry::Failure::ExecutableChanged) => {
-                            super::follow_executable(
-                                &paths,
-                                &config.selection(),
+                            let selection = config.selection();
+                            super::follow_executable_within(
                                 &registry,
                                 &binding,
                                 &connection,
                                 read_deadline,
+                                super::EXECUTABLE_LEASE_MS,
+                                super::stored_material(&paths, &selection),
                                 || {
                                     let guard = lock_before(&control, bounded_until)?;
                                     guard.check(job.epoch)?;
@@ -1527,14 +1528,18 @@ fn worker(
                                     }
                                     Ok(guard)
                                 },
-                                |material| {
+                                // `until` is the earlier of the read's deadline
+                                // and the capture's lease: no attempt is sent,
+                                // and no pause taken, past the instant the
+                                // registry stops recording its result.
+                                |material, until| {
                                     revalidate_with_retries(
-                                        read_deadline,
+                                        until,
                                         || {
                                             let result = active.validate(
                                                 &requirement.profile,
                                                 material,
-                                                read_deadline,
+                                                until,
                                             );
                                             (result, active.running().unwrap_or(false))
                                         },
@@ -3336,6 +3341,165 @@ mod revalidation_retry_tests {
         );
         let error = retried(F::InvalidCredential, 1, None);
         assert_eq!((error.cause, error.attempts), (None, None));
+    }
+}
+
+/// story:invoke-admission-queues-under-load: a read whose connection's
+/// provider executable changed validates the stored credential again under a
+/// capture the registry leases for at most 30 seconds, while the read may
+/// name a deadline of 120. The validation and its retries end at the earlier
+/// of the two.
+#[cfg(test)]
+mod executable_lease_tests {
+    use super::*;
+    use crate::local::{keyring::custody, metadata::Metadata};
+    use runtime::Failure as F;
+    use std::collections::BTreeSet;
+
+    /// The capture's lease in this test; 30 seconds in production
+    /// (`EXECUTABLE_LEASE_MS`). The retry pauses only when the first pause
+    /// (200 ms) and its margin (500 ms) fit what the lease has left once the
+    /// capture and its dispatch are recorded. A 3-second lease leaves 2.3
+    /// seconds for the two records; a 1-second lease leaves 0.3, which a
+    /// loaded host exceeds.
+    const LEASE_MS: u64 = 3_000;
+    /// The read's deadline: longer than the lease.
+    const READ_MS: u64 = 10_000;
+    /// The pause between two validations: longer than the lease, shorter than
+    /// the read's deadline.
+    const PAUSE: Duration = Duration::from_millis(3_500);
+
+    fn binding(executable: &str) -> registry::Binding {
+        registry::Binding {
+            credential_revision: Some("credential-1".into()),
+            executable: Some(executable.repeat(64)),
+            instance_id: "fixture-instance".into(),
+            adapter_id: "fixture-adapter".into(),
+            configuration_revision: "config-1".into(),
+            provider_authority: "https://fixture.invalid/fixed-authority".into(),
+            profile: registry::StaticProfile {
+                id: "fixture-token".into(),
+                revision: "profile-1".into(),
+                purpose: registry::Purpose::DelegatedUser,
+                subject: registry::Subject::User,
+                minimum_scopes: BTreeSet::from(["read".to_owned()]),
+                evidence_lifetime_ms: 60_000,
+                declaration: None,
+                oauth2: None,
+            },
+            token_recipient: None,
+        }
+    }
+
+    fn baseline(now: u64) -> runtime::Baseline {
+        runtime::Baseline {
+            identity: registry::ExternalIdentity {
+                kind: "fixture-account".into(),
+                subject: "one".into(),
+            },
+            granted_scopes: Some(BTreeSet::from(["read".into()])),
+            credential_expires_at_ms: Some(now + 3_600_000),
+            collected_at_ms: now,
+            valid_until_ms: now + 60_000,
+            binding: None,
+        }
+    }
+
+    /// A 3-second lease, a 10-second read deadline, and a provider that fails
+    /// the first validation transiently; the pause before the second takes 3.5
+    /// seconds. The second validation is not sent: the capture's lease ended
+    /// during the pause. The read is refused once, `timeout`, the code a
+    /// capture that expired before its result was recorded answers
+    /// (`registry::Failure::Expired`), and the registry recorded no
+    /// validation: the connection is still the one saved under the replaced
+    /// executable.
+    #[test]
+    fn a_validation_is_not_sent_after_its_capture_lease_ended() {
+        let root = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(
+            root.path(),
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )
+        .unwrap();
+        #[cfg(windows)]
+        crate::local::filesystem::windows::owner_only(root.path());
+        drop(Metadata::initialize(root.path()).unwrap());
+        let registry = registry::Registry::new(root.path());
+        let now = connectors_sdk::now_ms();
+        let acquisition = registry.begin(&binding("a"), now).unwrap();
+        let claim = registry.consume(acquisition, now).unwrap();
+        let candidate = registry
+            .prepare(&claim, baseline(now).into_registry(), 12, now)
+            .unwrap();
+        let receipt = custody::WrittenVersion::fixture(candidate.version());
+        let stored = registry.acknowledge(candidate, receipt, now).unwrap();
+        let connection = registry.publish(stored, now).unwrap();
+        // Only the provider executable was replaced since.
+        let configured = binding("b");
+        let scopes = BTreeSet::from(["read".to_owned()]);
+        let changed = |registry: &registry::Registry| {
+            let now = connectors_sdk::now_ms();
+            matches!(
+                registry.capture_read(&configured, &connection, &scopes, now, now + 1_000),
+                Err(registry::Failure::ExecutableChanged)
+            )
+        };
+        assert!(changed(&registry));
+
+        // When each validation was sent, and when the pauses ended.
+        let mut sent = Vec::new();
+        let mut pauses = 0;
+        let refused = super::super::follow_executable_within(
+            &registry,
+            &configured,
+            &connection,
+            connectors_sdk::now_ms() + READ_MS,
+            LEASE_MS,
+            |_| Ok(Secret(b"fixture-token".to_vec())),
+            || Ok(()),
+            |_, until| {
+                revalidate_with_retries(
+                    until,
+                    || {
+                        // As the adapter child answers: a request whose
+                        // deadline passed is `timeout` and is not sent.
+                        let now = connectors_sdk::now_ms();
+                        let result = if now >= until {
+                            Err(F::Timeout)
+                        } else {
+                            sent.push(now);
+                            if sent.len() == 1 {
+                                Err(F::Unavailable)
+                            } else {
+                                Ok(baseline(now))
+                            }
+                        };
+                        (result, true)
+                    },
+                    || false,
+                    |_| {
+                        pauses += 1;
+                        std::thread::sleep(PAUSE);
+                    },
+                )
+            },
+        )
+        .expect_err("the read is refused");
+        assert_eq!(pauses, 1, "the pause the lease ended in was not taken");
+        // The lease ended at most `LEASE_MS` after the first validation was
+        // sent: the capture precedes it.
+        let lease_ended = sent[0] + LEASE_MS;
+        assert_eq!(
+            sent.iter().filter(|at| **at > lease_ended).count(),
+            0,
+            "story:invoke-admission-queues-under-load: a validation was sent after the capture's lease ended ({lease_ended}): {sent:?}"
+        );
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(refused.code, Code::Timeout);
+        // No validation was recorded: the registry did not follow the
+        // executable.
+        assert!(changed(&registry));
     }
 }
 

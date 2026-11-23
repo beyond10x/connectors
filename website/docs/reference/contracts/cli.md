@@ -851,6 +851,23 @@ installed provider reports for it: nothing is recorded, no connection is
 resolved, asked for or created, `--credential-file` is not read, and nothing is
 asked on the terminal.
 
+`--deadline-seconds <n>` (story:invoke-admission-queues-under-load) names a
+read's deadline: a whole number of seconds from 1 to 120; left out, it is 30.
+The deadline is one cutoff, taken once before the instance's owner is started:
+that start, the wait for the read's turn behind the instance's other reads and
+the provider's answer all end by it. A read still waiting for its turn at the
+cutoff is `timeout` at `admission` and was never sent to the provider. With
+`--walk` it is each page's deadline, as the 30 seconds are without it. It
+belongs to a read and is decided from the arguments alone: a value that is not
+a whole number from 1 to 120, and the flag beside `--idempotency-key`,
+`--approval-file` or `--describe`, are `invalid_input` naming
+`deadline_seconds` at `arguments`, before an owner is started or anything is
+sent. With `--definition` it sets the read's deadline as for a named instance,
+the cutoff taken once the definition's connection is resolved. A read that
+validates its stored credential again because only the provider executable
+changed ends that validation and its retries at the earlier of this deadline
+and the validation's 30-second capture lease.
+
 The result is `InvokeResult`: `connector`, `instance`, `operation`, `revision`
 and the provider's `result`, with `request_id`, `mutation` and `source_audit` when
 the invoke produced them. No answer of `invoke` (result, refusal or
@@ -858,7 +875,7 @@ help) names a configured entry by its alias. Every `invalid_input` of `invoke`
 names the argument it refused in `Failure.field`: `target`, `operation`,
 `connection`, `schema`, `revision`, `input`, `approval_file`,
 `idempotency_key`, `definition`, `definitions_root`, `credential_file`,
-`fields`, `each`, `walk`, `max_pages` or `out`.
+`fields`, `each`, `walk`, `max_pages`, `out` or `deadline_seconds`.
 
 ### Shaping a result
 
