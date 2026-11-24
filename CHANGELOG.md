@@ -23,7 +23,15 @@
   `executable.args` therefore resolves against `/` in the provider the owner starts. In the
   CLI's own `--print-*` and `--version` calls of that provider it resolves against the
   directory the CLI was called from, as before. `executable.path` is absolute, as before.
-  Windows is not changed.
+  The working directory on Windows is not changed.
+- On Windows every tool call through the MCP stdio server (`tools/call`) answered `timeout`,
+  while `initialize` and `tools/list` answered. The bounded read, introduced in 0.57.0, was
+  built for Unix only: its budget had no clock on Windows, the owner's watcher for a read's
+  cancellation refused there, and the server answered a budget that did not start as
+  `timeout`. A budget on Windows now counts the unbiased interrupt time, the owner watches a
+  read's cancellation on a duplicate of the request's pipe handle, and a platform with no
+  budget clock answers `unsupported`. No Windows binary was released, so no released binary
+  had the defect (story:windows-mcp-tool-call-answers-timeout).
 
 ## 0.76.1 — 2026-11-23
 

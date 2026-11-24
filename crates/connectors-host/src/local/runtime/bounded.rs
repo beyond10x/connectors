@@ -94,12 +94,28 @@ impl ReadBudget {
     }
 }
 
-/// The bounded read is served on Unix only: a budget is this boot's
-/// CLOCK_MONOTONIC nanoseconds, which another platform does not share.
-#[cfg(not(unix))]
+/// A budget's clock, in nanoseconds: one clock of this boot that the client,
+/// the owner and the child all read (contracts/service/clock.md). No such
+/// clock is named for a platform that is neither Unix nor Windows, and a
+/// budget there refuses as unsupported.
+#[cfg(not(any(unix, windows)))]
 fn ticks() -> Result<u64> {
     Err(Failure::Unsupported)
 }
+/// The unbiased interrupt time, which Windows counts in units of 100 ns for
+/// the whole system.
+#[cfg(windows)]
+fn ticks() -> Result<u64> {
+    let mut units = 0u64;
+    // SAFETY: writes one u64 through a valid pointer.
+    unsafe {
+        windows_sys::Win32::System::WindowsProgramming::QueryUnbiasedInterruptTimePrecise(
+            &mut units,
+        )
+    };
+    units.checked_mul(100).ok_or(Failure::Unavailable)
+}
+/// `CLOCK_MONOTONIC`.
 #[cfg(unix)]
 fn ticks() -> Result<u64> {
     let mut stamp = libc::timespec {
@@ -213,9 +229,27 @@ pub(super) fn serve_read(
     channel::write(channel, &reply, None, &document, until)
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
+    /// The budget clock counts nanoseconds of real time on every platform
+    /// that has one: 100 ms of sleep is at least 100 ms and less than 5 s of
+    /// it.
+    #[test]
+    fn the_budget_clock_counts_nanoseconds_of_real_time() {
+        let started = Instant::now();
+        let before = ticks().unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        // A timer may wake a thread a little early by another clock's count.
+        while started.elapsed() < Duration::from_millis(105) {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        let passed = ticks().unwrap().checked_sub(before).unwrap();
+        assert!(
+            (100_000_000..5_000_000_000).contains(&passed),
+            "{passed} ns passed in a sleep of 100 ms"
+        );
+    }
     #[test]
     fn declared_limits_are_checked_without_clipping() {
         let selected = ReadBudget::start(40_000, 30_000, 262_144, 4_194_304).unwrap();
@@ -265,17 +299,5 @@ mod tests {
         assert_eq!(invalid.until().unwrap_err(), Failure::Timeout);
         value["unreviewed"] = serde_json::json!(true);
         assert!(serde_json::from_value::<ReadBudget>(value).is_err());
-    }
-}
-
-#[cfg(all(test, not(unix)))]
-mod unsupported_tests {
-    use super::*;
-    #[test]
-    fn a_budget_cannot_start_off_unix() {
-        assert_eq!(
-            ReadBudget::start(40_000, 30_000, 262_144, 4_194_304).unwrap_err(),
-            Failure::Unsupported
-        );
     }
 }
