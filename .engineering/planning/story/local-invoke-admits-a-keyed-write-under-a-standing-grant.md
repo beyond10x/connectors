@@ -100,7 +100,7 @@ scope:
   path: website/docs/guides/guarded-write.md
 - confidence: inferred
   path: website/docs/reference
-revision: 65
+revision: 67
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:03:26Z", actor: "human:timo", revision: 61, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:03:27Z", actor: "human:timo", revision: 62, decided_on: {"recorded":{"review_outcome":8}}}
@@ -702,3 +702,61 @@ and run 1 fixed there, confirmed in review:
   `..data` volume link), not a flat `unavailable`.
 - Not edited by run 1: `contracts/operations/v1alpha1/verification.md:11` says "Nine authored
   scenarios"; there are 56.
+
+## Corrected by runs 3 and 4, 2026-11-23 and 2026-11-24
+
+What the text above says and the build found different. The lines above are left as written;
+this section is what holds.
+
+- Acceptance 18 cannot hold as a CLI test without a keyring: the keyed lookup at
+  `apps/connectors/src/local/operations.rs:223` refuses with `not_found` before the approval
+  file is read, as `contracts/cli/v1alpha1/semantics.md` orders the refusals. The assertion
+  is made in the journey.
+- `attempts()` over a table `mutation_attempts` in `<state>/metadata.sqlite3` always reads 0:
+  the store is an Entity Runtime projection and has no such table. The journeys count
+  `connectors.mutations.AttemptRecord` through `recorded_state::Reader`.
+- Acceptance 23 says `cargo test -p connectors-build --tests` passes; the generated-file checks
+  in it stay red until the generated files are regenerated after the merge of main. They
+  are regenerated once, on the merged tree, before the pull request.
+- Acceptance 21 asks for a run "at the merge base"; no run switched the branch. The sibling
+  ran on the story's branch.
+- The journey's `TMPDIR` is at most 76 bytes long: `dbus-daemon` refuses a socket path over 99
+  bytes.
+- An `invoke` with neither `--approval-file` nor `--idempotency-key` starts an owner before
+  the gate (`apps/connectors/src/local/invoke.rs`); "no owner is started" holds for the keyed
+  call only.
+- Tests 1 to 13 of the acceptance are in the module `signed_tests` of
+  `crates/connectors-host/src/local/standing.rs`, not in `local::standing::tests`.
+- The journey is five tests in `adapters/catalog/tests/local_runtime/slack_standing.rs`, not
+  the one test `a_slack_bot_post_is_admitted_under_a_standing_grant_and_refused_outside_it`
+  (the one journey ran 121 s at host load 46 to 51 and 196 s at load 56 to 71; a test may
+  run 60 s):
+  `a_slack_bot_post_is_admitted_under_a_standing_grant_and_replayed_by_its_key`,
+  `a_refused_proof_and_a_failed_preflight_take_no_use_of_a_standing_grant`,
+  `a_write_sent_under_a_standing_grant_keeps_its_use_and_the_next_is_rate_limited`,
+  `a_slack_bot_post_outside_the_standing_grant_or_after_its_revocation_is_refused` and
+  `an_expired_standing_grant_admits_nothing_new_and_its_writes_still_replay`. Each has the
+  classification acceptance 23 names (`crates/connectors-build/src/ignored.rs`).
+- Acceptance 24 ("under 60 s") did not hold on the workstation at host load 53 to 84: a
+  journey ran 38 to 112 s, and four of ten runs failed with `outcome_unknown` or
+  `not_granted`. A write through the owner took 11 to 22 s in those runs, against the CLI's
+  write deadline of 20 s. story:a-write-through-the-owner-takes-seconds-under-load carries
+  it. No run on an unloaded host exists; the CI job `ignored CLI journeys` of the pull
+  request is that run.
+- `contracts/operations/v1alpha1/verification.md:11` now says "19 authored scenarios": the
+  line links `contracts/operations/v1alpha1/scenarios`, which holds 19 files. The count 56 in
+  "Settled by run 1" is not that directory's.
+
+Run 4 answered review-result:standing-grant-local-adversary-1 and
+review-result:standing-grant-local-security-1 (both `needs-change`):
+
+- Only `approvals grant-standing` creates `<state>/standing-grants.sqlite3`. The owner's
+  admission opens it and creates nothing: an absent store or table is `unavailable` and
+  takes no use. After a removal the next `grant-standing` starts the count at zero, and a
+  replay no longer names `mutation.standing`. A process of the owner's UID that replaces or
+  edits the store's rows can free the cap; the contract says so.
+- Two tests (`mod recheck` in `crates/connectors-host/src/local/owner/mutation/tests.rs`) fail
+  when the owner's recheck before dispatch is removed.
+- A number in a grant's target value is an exact i64 or u64; any other is refused by
+  `grant-standing` (`invalid_input`), by the file's parser, and covers no input.
+- `outcome_unknown` is listed for `grant-standing` and `revoke-standing`.
