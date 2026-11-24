@@ -2,14 +2,24 @@
 format: aep.planning-md/3
 id: story:the-local-gate-lints-the-windows-target
 kind: story
-status: proposed
+status: active
 title: The local gate lints the host and the CLI for a Windows target
 relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:one-pinned-rust-toolchain-for-the-local-gate-and-the-forge
-revision: 5
+scope:
+- confidence: cited
+  path: .github/workflows/rust-gate.yml
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: cited
+  path: crates/connectors-build/src/gate.rs
+- confidence: cited
+  path: docs/development.md
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T05:19:08Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-11-24T07:27:52Z", actor: "human:timo", revision: 10}
 ---
 ## Defect
 

@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.77.2 — 2026-11-24
+
+### Changed
+
+- The local gate (`connectors-build gate`) lints the host and the CLI (`connectors-host`,
+  `connectors`) for `x86_64-pc-windows-gnu` after the Linux lint, so code that is dead or
+  does not compile on Windows fails on the workstation, before a push. The gate needs the Rust
+  target `x86_64-pc-windows-gnu` on the pinned toolchain and the C compiler
+  `x86_64-w64-mingw32-gcc`; without one of them it ends non-zero at its start and names what
+  is missing
+  ([development](docs/development.md#the-windows-lint)).
 
 ### Fixed
 
