@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0771-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: Scope of connectors 0.77.1
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-24T10:26:44Z", actor: "human:timo", revision: 3}
 ---
 ## Scope of connectors 0.77.1
 
@@ -61,3 +63,24 @@ released install reads `mysql/<env>` and `loki/<env>` without a build from sourc
   operator's).
 - `connections list` and `describe` through a running owner (branch
   `story/connections-through-owner`).
+
+## Verified after the release
+
+- Pull request 291 merged 2026-11-24 09:39 CET as df1f2c5b1c3; tag `v0.77.1` is on that
+  commit. Release page published 09:41 CET.
+- Checks of pull request 291: "repository gate" passed in 1 h 0 min 56 s (run 45347833336).
+- The release page holds no archive. In the release-binaries run 45358347732 the four build
+  jobs and the image job ended `success`, and the job "Upload binaries to the release page"
+  failed in both attempts (10:50 and 11:06 CET). Cause, read in its log: the job downloads
+  every artifact of the run; the image job had ended first and had uploaded two build records
+  (`*.dockerbuild`), so the job found six files where it checks for four. In the run of
+  0.77.0 the upload job started one second before the image job.
+- The fix is in 0.78.0: the download step of that job names the archive artifacts
+  (`pattern`), with two tests in `crates/connectors-build/tests/release_artifact_selection.rs`.
+  The archives of 0.77.1 were not published by another path.
+- The image `ghcr.io/beyond10x/connectors:0.77.1` (digest sha256:3d434f06c046) is built for
+  linux/amd64 and linux/arm64.
+- Not verified on a released archive: that it holds `connectors-sql`. Each build job's
+  packaging step lists its archive and checks the name of every binary, `connectors-sql`
+  included, and the four build jobs passed.
+- No install was moved to 0.77.1; the workstation install goes from 0.77.0 to 0.78.0.

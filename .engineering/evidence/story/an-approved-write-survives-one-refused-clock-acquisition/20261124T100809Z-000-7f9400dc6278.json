@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-24T10:08:09Z",
+  "actor": "human:timo",
+  "artifact": "story:an-approved-write-survives-one-refused-clock-acquisition",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate of pull request 292 (merged as 7626141, released as 0.77.2): 4379 tests passed",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45360621432/job/138329455972"
+  }
+}
