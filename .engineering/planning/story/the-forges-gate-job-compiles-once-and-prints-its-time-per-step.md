@@ -7,7 +7,7 @@ title: The forge's gate job compiles its test binaries once and prints its time 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
@@ -131,6 +131,15 @@ two tests there). What the forge's job takes after it is read from the first run
 
 1. The gate and the ignored step print one line per step with its wall time, and a closing table
    of the steps, so the split above is read from one place and not from timestamps.
+   Made 2026-11-24 (`crates/connectors-build/src/steps.rs`): `gate: step ran <seconds> s: <name>`
+   when a step ends, then `gate: time per step` with one row per step and `sum of <n> steps`;
+   27 steps without `--msrv`, 8 of them the library-boundary builds, 4 the test step's. A run an
+   error ended prints the table too and names the step that did not end. `connectors-build
+   ignored` prints the same on standard error with four rows: the build of the test binaries, the
+   listing of the ignored tests, the ignored tests, the report. The row "build of the test
+   binaries" of the ignored step is the measurement change 2 asks for. Not in a row: the build
+   of `connectors-build` itself by `cargo run`, which cargo prints as ``Finished `dev` profile``.
+   The numbers of a forge run with it are not read yet.
 2. Measure the 688 s of the ignored step (a run with the build's output shown). Then remove them:
    the step reads the test binaries the gate built, or the gate hands their list over, so that the
    job compiles the test binaries once.

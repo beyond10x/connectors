@@ -198,9 +198,12 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     // Asked first: the Windows lint runs late, and a host that cannot run it should not
     // learn so after the build and the tests.
     windows_lint_ready(&host_probe(root))?;
+    // One line per step with its wall time and a closing table, printed for a failed run too.
+    let mut steps = crate::steps::Steps::new("gate", crate::steps::Stream::Out);
     // The CI's path list for pull requests that change only planning or prose files, both
     // sides of it, and its guard against a planning file a test reads (`~/beyond10x/AGENTS.md`,
     // "Planning-only pull requests skip the tests").
+    steps.begin("changed-scope test");
     let scope_test = ".github/ci/changed-scope-test.sh";
     if !Command::new("sh")
         .arg(scope_test)
@@ -211,6 +214,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         return Err(format!("gate: {scope_test} failed").into());
     }
     println!("gate: {scope_test}; exit=0");
+    steps.begin("generation and source checks");
     connectors_spec::v2::check_ess(ess)?;
     super::metadata_entities::run(root, true)?;
     let base = root.join(".local/tmp");
@@ -225,6 +229,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     super::service_metadata::run(root, ess, true)?;
     // The website build's examples step, without its WASM build: a target refusing the
     // example model fails here rather than only in `npm run build`.
+    steps.begin("website example model");
     super::docs::synthesize_examples(root, ess, &temp.path().join("examples"))?;
     println!("gate: website example model synthesizes for rust and web; exit=0");
     let command = |toolchain: Option<&str>| cargo(root, temp.path(), ess, toolchain);
@@ -242,6 +247,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     };
     // `fmt --all` follows excluded path dependencies too. Only authored workspace
     // members belong to rustfmt; generated dependencies retain their pinned bytes.
+    steps.begin("format check");
     let metadata: serde_json::Value = serde_json::from_slice(
         &super::run(command(None)?.args([
             "metadata",
@@ -275,6 +281,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         return Err("incomplete Cargo formatting selection".into());
     }
     execute(format.args(["--", "--check"]))?;
+    steps.begin("descriptor drift");
     for adapter in [
         "grafana",
         "kubernetes",
@@ -293,10 +300,12 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         println!("gate: {adapter} descriptor matches; exit=0");
     }
     // Generation fixtures verify the full pinned bundle, reproducibility and refusals.
+    steps.begin("build of the workspace");
     execute(command(None)?.args(["build", "--workspace", "--locked", "--offline"]))?;
-    test_step(root, &|| command(None), &execute)?;
+    test_step(root, &|| command(None), &execute, &mut steps)?;
     // Each adapter's committed tool contract (contracts/tools/v1alpha1) from its descriptor
     // and the tool profiles authored beside it.
+    steps.begin("tool contracts check");
     execute(command(None)?.args([
         "run",
         "--locked",
@@ -307,6 +316,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "generate",
         "--check",
     ]))?;
+    steps.begin("clippy of the workspace");
     execute(command(None)?.args([
         "clippy",
         "--workspace",
@@ -317,8 +327,10 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
+    steps.begin("windows lint");
     execute(&mut windows_lint(root, temp.path(), ess)?)?;
     println!("gate: windows lint holds; exit=0");
+    steps.begin("documentation drift check");
     execute(&mut docs_check(root, temp.path(), ess)?)?;
     for adapter in [
         "grafana",
@@ -331,6 +343,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "mcp",
     ] {
         let package = format!("connectors-{adapter}");
+        steps.begin(&format!("library boundary of {package}"));
         execute(command(None)?.args([
             "build",
             "--locked",
@@ -374,8 +387,10 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         }
         println!("gate: {package} library boundary holds; exit=0");
     }
+    steps.begin("library boundary of the OAuth2 crate");
     oauth2_boundary(root, temp.path(), ess)?;
     println!("gate: {OAUTH2} library boundary holds; exit=0");
+    steps.begin("generic CLI boundary");
     let output = super::run(command(None)?.args([
         "tree",
         "--locked",
@@ -406,6 +421,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     }
     println!("gate: generic CLI boundary holds; exit=0");
     if msrv {
+        steps.begin("minimum Rust versions");
         // Keep compiler metadata separate. The Eventlog-backed host graph needs
         // Rust 1.91; libraries which do not select that graph retain 1.88.
         let target = std::env::var_os("CARGO_TARGET_DIR")
@@ -470,15 +486,19 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
                 .env("CARGO_TARGET_DIR", target.join("msrv-1.91")),
         )?;
     }
+    steps.begin("authored scenarios");
     authored_scenarios(root, ess, temp.path())?;
     // Execute the local metadata authority's synthesized scenarios against the lowered
     // definitions the host runs, not only the model.
+    steps.begin("metadata conformance");
     let metadata_conformance = temp.path().join("metadata-conformance");
     std::fs::create_dir_all(&metadata_conformance)?;
     super::metadata_conformance::gate(root, &metadata_conformance)?;
+    steps.begin("planning validation");
     let mut planning = Command::new(aep);
     planning.current_dir(root).env("TMPDIR", temp.path());
     execute(planning.args(["plan", "artifact", "validate"]))?;
+    steps.finish();
     println!("gate: all checks passed");
     Ok(())
 }
@@ -499,6 +519,7 @@ fn test_step(
     root: &Path,
     command: &dyn Fn() -> Result<Command>,
     execute: &dyn Fn(&mut Command) -> Result<()>,
+    steps: &mut crate::steps::Steps,
 ) -> Result<()> {
     let nextest = |extra: &[&str]| -> Result<Command> {
         let mut cmd = command()?;
@@ -521,9 +542,11 @@ fn test_step(
             .args(extra);
         Ok(cmd)
     };
+    steps.begin("build of the test binaries");
     execute(&mut nextest(&["--no-run"])?)?;
     // The setup step: the metadata authority's baseline suite is synthesized once into its
     // digest-keyed cache under `target/`, so no test pays for it.
+    steps.begin("metadata baseline suite");
     let synthesis = std::time::Instant::now();
     super::metadata_emissions::baseline_suite(root)?;
     println!(
@@ -535,6 +558,7 @@ fn test_step(
         Err(error) if error.kind() != std::io::ErrorKind::NotFound => return Err(error.into()),
         _ => {}
     }
+    steps.begin("tests");
     let started = std::time::Instant::now();
     let outcome = execute(&mut nextest(&[])?);
     let elapsed = started.elapsed();
@@ -553,6 +577,7 @@ fn test_step(
         TEST_STEP_BUDGET.as_secs()
     );
     outcome?;
+    steps.begin("doctests");
     execute(command()?.args(["test", "--workspace", "--doc", "--locked", "--offline"]))
 }
 
@@ -990,7 +1015,13 @@ mod tests {
                 .push(cmd.get_args().map(OsStr::to_owned).collect::<Vec<_>>());
             Err("stop after the first command".into())
         };
-        let _ = test_step(Path::new("/checkout"), &|| Ok(build(None)), &execute);
+        let mut steps = crate::steps::Steps::new("gate", crate::steps::Stream::Err);
+        let _ = test_step(
+            Path::new("/checkout"),
+            &|| Ok(build(None)),
+            &execute,
+            &mut steps,
+        );
         let commands = commands.into_inner();
         let first = commands.first().expect("the test step runs nextest");
         let run = first
