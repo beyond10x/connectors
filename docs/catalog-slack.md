@@ -800,7 +800,7 @@ public_key = "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE="
 version = "roughtime-0x8000000c"
 
 [[approval_clock.sources]]
-address = "148.113.255.71:2002"
+address = "149.56.214.17:2002"
 public_key = "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
 version = "roughtime-0x8000000c"
 ```
