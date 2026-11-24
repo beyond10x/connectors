@@ -6,7 +6,7 @@ status: draft
 title: An approved binary write through the local CLI holds the operation's 2 MiB (draft, waits for the owner's pick)
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## State
 
@@ -27,10 +27,15 @@ text, so an upload through it is bounded by them; the served host reads the whol
 - `crates/connectors-host/src/local/owner/approval_issuance.rs`: `REQUEST_LIMIT` is 278,528
   (272 KiB).
 - Base64 adds one third: a request of 272 KiB holds a file of about 200 KiB.
+- Measured on 2026-11-24 14:19 CET with connectors 0.78.0, `invoke --describe` and `approvals
+  prepare` only, a short title and no comment: a file of 196,243 bytes (an input of 261,913
+  bytes) is prepared, a file of 196,475 bytes (an input of 262,221 bytes) is refused as
+  `invalid_input`. The input is bounded at 262,144 bytes.
 
 Met on 2026-11-24: a screen recording of 0.96 MB for a team channel, ordered by the owner, could
 not be uploaded by the workstation's bot install, which approves each write through the local CLI.
-The operator re-encodes it under 200 KiB for this one upload.
+A second order the same day, an image and a video of under 2 MiB each into three channels, was
+posted by the operator outside connectors under the owner's one-time exception.
 
 ## Question for the owner
 
@@ -41,7 +46,9 @@ What does an approval of a binary write bind?
 - B: the input without the content's text, and the content's `sha256` and length, which the input
   already carries (`content.sha256`) and which the provider checks against the bytes before any
   request. The local CLI's input limit for an operation with `binary.max_bytes` follows that
-  bound. The approval then names the file by its digest and no longer holds its bytes.
+  bound. The approval then names the file by its digest and no longer holds its bytes. The
+  operator's form of it (2026-11-24 14:26 CET): the approval binds the file's `sha256` and
+  length, and the bytes are read from a file path the caller names.
 - C: raise `REQUEST_LIMIT` and `INPUT_LIMIT` to hold 2 MiB of base64 (about 2.8 MiB). The approval
   binds what it binds today; every prepare, issue and invoke reads and hashes that much.
 
