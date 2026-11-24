@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:entity-runtime-0330-records-name-definition-by-digest
 kind: story
-status: active
+status: implemented
 title: 'connectors pins Entity Runtime 0.33.0: a record names its definition by digest'
 relations:
 - decomposes: epic:review-20261123-findings
@@ -37,10 +37,11 @@ scope:
   path: crates/connectors-host/tests/metadata_reopen_adversary.rs
 - confidence: cited
   path: docs/development.md
-revision: 26
+revision: 27
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T07:21:33Z", actor: "human:timo", revision: 24, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T07:21:34Z", actor: "human:timo", revision: 25, decided_on: {"recorded":{"review_outcome":8}}}
+- {from: "active", to: "implemented", at: "2026-11-23T12:27:21Z", actor: "human:timo", revision: 27, decided_on: {"recorded":{"test_result":3,"review_outcome":8}}}
 ---
 ## Outcome
 

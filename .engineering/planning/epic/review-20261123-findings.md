@@ -7,7 +7,7 @@ title: Findings of the 2026-11-23 connectors review (0.74.1 with Definitions 0.8
 summary: '11 findings: catalog ownership, pagination, tool contracts, two broken callers, setup, inventory, docs'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -21,6 +21,12 @@ Source: the connectors review of 2026-11-23 (Connectors 0.74.1 with Definitions 
 ## Stories
 
 One story per finding (11), plus the timing test that failed once on pull request #276.
+
+Also under this epic, from issue #267 (2026-11-16, the store grows by 0.9 MB per read; consumer
+dev-operator), which the review did not list: story:invoke-admission-queues-under-load,
+story:entity-runtime-0330-records-name-definition-by-digest,
+story:settled-read-uses-leave-the-store, story:connections-list-answers-through-the-owner and
+story:owner-observe-request-is-modelled-in-ess.
 
 ## Out of scope
 

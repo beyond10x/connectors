@@ -20,6 +20,7 @@ use connectors_host::local::runtime;
 use mounted::*;
 use serde_json::json;
 use std::{
+    os::unix::process::CommandExt,
     path::PathBuf,
     process::{Output, Stdio},
     time::{Duration, Instant},
@@ -384,5 +385,145 @@ fn a_cold_describe_and_read_of_a_large_store_answer_within_60_seconds() {
     assert!(
         next <= warm + Duration::from_secs(1),
         "the next read took {next:?}, a warm one {warm:?}"
+    );
+}
+
+/// story:owner-and-providers-run-in-root-directory: the directory inside the
+/// jail the CLI is called from.
+const CALLER: &str = "/work/D";
+
+/// The CLI in the jail, as [`Container::run`] runs it, called from
+/// `directory`, a path inside the jail. The jail's own hook ends with a
+/// change of root and of directory to `/`, and hooks run in the order they
+/// were added, so the directory is changed by a second hook;
+/// `Command::current_dir` is applied before both and would be undone.
+fn run_from(container: &Container, directory: &str, args: &[&str]) -> Output {
+    let directory = std::ffi::CString::new(directory).unwrap();
+    let mut command = container.jail.command("/bin-test/connectors", Map::Own);
+    command
+        .args(["--output", "json", "--config", CONFIG, "--state-dir", STATE])
+        .args(args)
+        .env_clear()
+        .stdin(Stdio::null());
+    // SAFETY: the hook makes one system call, on a string prepared before fork.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::chdir(directory.as_ptr()) < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    Jail::output(&mut command)
+}
+
+/// The pids whose parent is `parent`. After the last `)` of
+/// `/proc/<pid>/stat` come the state and then the parent's pid.
+fn children(parent: i32) -> Vec<i32> {
+    let mut pids = Vec::new();
+    for entry in std::fs::read_dir("/proc").into_iter().flatten().flatten() {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<i32>().ok())
+        else {
+            continue;
+        };
+        let Ok(stat) = std::fs::read_to_string(entry.path().join("stat")) else {
+            continue;
+        };
+        let of = stat
+            .rsplit_once(')')
+            .and_then(|(_, rest)| rest.split_whitespace().nth(1))
+            .and_then(|field| field.parse::<i32>().ok());
+        if of == Some(parent) {
+            pids.push(pid);
+        }
+    }
+    pids
+}
+
+/// Whether `pid` is an adapter child the owner started: this binary run as
+/// [`ADAPTER_FIXTURE`] with a private channel.
+fn serves_the_fixture(pid: i32) -> bool {
+    let command = std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
+    let words: Vec<&[u8]> = command.split(|byte| *byte == 0).collect();
+    words.contains(&ADAPTER_FIXTURE.as_bytes()) && words.contains(&&b"--connectors-private-fd"[..])
+}
+
+/// The working directory of `pid` as this test, outside the jail, reads it:
+/// a host path. `None` when the process is gone.
+fn working_directory(pid: i32) -> Option<PathBuf> {
+    match std::fs::read_link(format!("/proc/{pid}/cwd")) {
+        Ok(directory) => Some(directory),
+        Err(error) if matches!(error.raw_os_error(), Some(libc::ENOENT | libc::ESRCH)) => None,
+        Err(error) => panic!("the working directory of process {pid}: {error}"),
+    }
+}
+
+/// story:owner-and-providers-run-in-root-directory, acceptance 1 and 2. A
+/// cold read called from a directory of the caller's starts an owner, and the
+/// owner a provider; both outlive the call. Each runs in the jail's `/`, not
+/// in the caller's directory, which they would otherwise keep in use. The
+/// same cold read called from `/` exits and answers alike.
+#[test]
+fn the_owner_and_its_provider_run_in_the_root_directory_not_in_the_caller_s() {
+    let (container, connection) = connected();
+    let root = container.path("/");
+    let caller = container.jail.directory(CALLER, 0o700);
+    let schema = container.schema();
+    let target = format!("{CONNECTOR}/{ALIAS}");
+    let args = read_args(&connection, &schema, &target);
+    assert_eq!(container.owners(), Vec::<i32>::new(), "an owner runs");
+
+    let read = run_from(&container, CALLER, &args);
+    let from_caller = (read.status.code(), success(&read));
+    assert_eq!(
+        from_caller.1["result"]["credential"],
+        digest(SECRET),
+        "{from_caller:?}"
+    );
+    let owners = container.owners();
+    assert_eq!(owners.len(), 1, "{owners:?}");
+    let owner = owners[0];
+    let mut running = vec![(
+        format!("owner {owner}"),
+        working_directory(owner).expect("the owner the read started runs"),
+    )];
+    let providers: Vec<(String, PathBuf)> = children(owner)
+        .into_iter()
+        .filter(|pid| serves_the_fixture(*pid))
+        .filter_map(|pid| Some((format!("provider {pid}"), working_directory(pid)?)))
+        .collect();
+    assert!(
+        !providers.is_empty(),
+        "owner {owner} has no child that serves {ADAPTER_FIXTURE}: its children are {:?}",
+        children(owner)
+    );
+    running.extend(providers);
+    let elsewhere: Vec<&(String, PathBuf)> = running
+        .iter()
+        .filter(|(_, directory)| directory != &root)
+        .collect();
+    assert!(
+        elsewhere.is_empty(),
+        "a read called from {} left processes that run outside the jail's root {}: \
+         {elsewhere:?} (all: {running:?})",
+        caller.display(),
+        root.display()
+    );
+
+    success(&container.run(&["setup", "owner-stop"]));
+    assert_eq!(container.owners(), Vec::<i32>::new(), "an owner runs");
+    let read = run_from(&container, "/", &args);
+    assert_eq!(
+        (read.status.code(), success(&read)),
+        from_caller,
+        "the same cold read called from the jail's / and from {CALLER}"
+    );
+    assert_eq!(
+        container.owners().len(),
+        1,
+        "the read from / started no owner"
     );
 }

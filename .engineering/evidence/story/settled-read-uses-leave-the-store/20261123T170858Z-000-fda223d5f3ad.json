@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-23T17:08:58Z",
+  "actor": "human:timo",
+  "artifact": "story:settled-read-uses-leave-the-store",
+  "kind": "story",
+  "revision": 45,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "read_invoke_cost_by_store_size, release profile, 50 events, 100 invokes: 3d38f77b99f appended 3 records and 24500 blob bytes per invoke (median_cpu_ms 207, load 108); cfd7e016c on a copy of that store appended 0 and 0 (median_cpu_ms 154, median_ms 733, peak_rss_mb 63, load 97); same-load run of e535fc5f924: 3 and 24500, median_ms 1039, median_cpu_ms 197"
+  }
+}

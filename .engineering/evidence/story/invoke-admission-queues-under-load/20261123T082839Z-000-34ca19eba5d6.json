@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-23T08:28:39Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-admission-queues-under-load",
+  "kind": "story",
+  "revision": 38,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "16 parallel reads with --deadline-seconds 120, connectors 0.75.0 release binary, Slack read-only instance: 16 answered, 0 timeout, 9.2 to 38.5 s",
+    "reference": "https://github.com/beyond10x/connectors/issues/267#issuecomment-7095515304"
+  }
+}

@@ -121,6 +121,14 @@ impl Pipe {
         })
     }
 
+    /// A second handle to this end of the pipe, so that one thread reads it
+    /// while another writes it: a duplicate with the same access that is not
+    /// inheritable, with an event of its own, since each operation signals
+    /// its pipe's event. The clone has not read the peer.
+    pub(crate) fn try_clone(&self) -> Result<Self> {
+        Self::from_owned(self.handle.try_clone().map_err(|_| Failure::Unavailable)?)
+    }
+
     pub(crate) fn raw(&self) -> HANDLE {
         self.handle.as_raw_handle() as HANDLE
     }

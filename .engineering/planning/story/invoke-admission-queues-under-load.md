@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:invoke-admission-queues-under-load
 kind: story
-status: active
+status: implemented
 title: 'A read on invoke names its deadline: --deadline-seconds, 1 to 120, default 30'
 relations:
 - decomposes: epic:review-20261123-findings
@@ -62,10 +62,11 @@ scope:
   path: website/docs/reference/contracts/model
 - confidence: cited
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 38
+revision: 39
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T04:15:21Z", actor: "human:timo", revision: 31, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T04:15:23Z", actor: "human:timo", revision: 32, decided_on: {"recorded":{"review_outcome":8}}}
+- {from: "active", to: "implemented", at: "2026-11-23T08:30:56Z", actor: "human:timo", revision: 39, decided_on: {"recorded":{"test_result":3,"review_outcome":8}}}
 ---
 ## Outcome
 

@@ -2388,7 +2388,7 @@ report `timeout` / `capacity` at `stage = dispatch` with
 and is not one of them. The host's own deadline and limits, and an adapter's
 own connect or work deadline and result bounds, keep `stage = admission`
 (`retry_explicitly`). An `invoke` read whose deadline passes after
-the owner dispatched it (its read use recorded dispatched) is the provider's
+the owner dispatched it (its read use dispatched) is the provider's
 `timeout` at `stage = dispatch`; one whose deadline passes before is the host's
 at `stage = admission`, and the owner dispatches nothing for it afterwards. The
 owner answers by the deadline; an invoke the CLI sent whose answer it never

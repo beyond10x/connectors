@@ -15,7 +15,9 @@ replacement and in-place writes to the original cannot change the admitted
 snapshot. A kernel policy that supplies non-executable memfds is a refusal; this
 binding does not override that policy. It launches
 without a shell, PATH search, inherited credential environment or diagnostic
-forwarding. The only private channel is an inherited Unix socket. Its peer UID
+forwarding. On Unix the child starts with `/` as its current directory, whatever
+directory the owner runs in, so a relative path in its configured arguments
+resolves against `/`. The only private channel is an inherited Unix socket. Its peer UID
 must match the current owner. Socketpair peer credentials identify its creator,
 not a later child: the supervisor's Child/pidfd ownership establishes the exact
 spawned process. A fresh challenge and child incarnation bind the bootstrap to
@@ -261,7 +263,8 @@ states:
   (`GetNamedPipeServerProcessId`) to equal its parent's process id and to run as
   the current user.
 - **Current directory.** The adapter starts with the copy's owner-only
-  directory as its current directory, never the owner's. A Windows adapter is
+  directory as its current directory, never the owner's; a Unix adapter starts
+  in `/` (Admission and bootstrap). A Windows adapter is
   self-contained: a DLL beside the original executable is not beside the copy
   and is not found.
 - **Parent death** (`parent_death_kill`: holds). Every adapter is created

@@ -27,6 +27,9 @@ the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
 and metadata authority before the parent releases startup ownership. The daemon
 keeps the inherited lock and owns its children after the launching CLI exits.
+On Unix the CLI starts the owner with `/` as its working directory, whatever
+directory the CLI was called from: the owner outlives the call and keeps no
+directory of the caller in use.
 An owner that refuses to start or to keep serving exits with status 1 and writes
 its refusal code to standard error (`connectors owner: "<code>"`), which the
 launching CLI discards, and to the owner log (below).
@@ -212,7 +215,8 @@ the source to be published, Live, not Stale and under the fence and version it
 read (`revoked`, `lifecycle_conflict`). A refused dispatch cancels the read use. Every refusal after the allocation fails
 that acquisition; a lost acknowledgement is `outcome_unknown` with the acquisition
 to follow. The CLI never receives, prints or logs the material, and the source
-connection's record is not written by any step but its read use.
+connection's record is not written by any step: its read use is held in the owner process and is not recorded.
+A `connections revoke` run by another process does not release that use; its dispatch then answers `revoked`.
 
 A `begin` request of a definition's connect
 (story:definition-connect-begin-carries-selection) carries

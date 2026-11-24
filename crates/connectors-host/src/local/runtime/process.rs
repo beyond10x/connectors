@@ -412,10 +412,14 @@ impl Child {
         let mut command = Command::new(launch.path());
         // Standard error goes to the owner's pipe until the handshake ends
         // (`Child::start`); the SDK's `serve` then points it at /dev/null.
+        // The child runs in `/`, whatever directory its parent runs in: it can
+        // outlive the call that started the owner and keeps no directory of
+        // that caller in use.
         #[cfg(unix)]
         command
             .args(&config.executable.args)
             .args(["--connectors-private-fd", "3"])
+            .current_dir("/")
             .env_clear()
             .stdin(Stdio::null())
             .stdout(Stdio::null())

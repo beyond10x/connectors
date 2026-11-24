@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-23T08:57:19Z",
+  "actor": "human:timo",
+  "artifact": "story:connections-list-answers-through-the-owner",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:connections-through-owner-acceptance-round-2",
+    "review": "review-result:connections-through-owner-acceptance-round-2",
+    "outcome": "fixed"
+  }
+}

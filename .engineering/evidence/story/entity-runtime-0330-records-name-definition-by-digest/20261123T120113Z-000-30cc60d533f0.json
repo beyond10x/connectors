@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-23T12:01:13Z",
+  "actor": "human:timo",
+  "artifact": "story:entity-runtime-0330-records-name-definition-by-digest",
+  "kind": "story",
+  "revision": 26,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate on pull request 286, head e535fc5f924, tree equal to merge 2e5ddabe9d8",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45160888609/job/137645725474"
+  }
+}

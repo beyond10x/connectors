@@ -1,12 +1,12 @@
 {
-  "digest": "08d0e45f8e66d38cedb63e9a6e6aa79c0da95b703e3297ae23c48ccc02e1b3ec",
+  "digest": "1aac0f3d2b1ba9e4392692087b4b1fc00017948381dfe69f72aebd15d4a12f5f",
   "ess_crates": [
     "entity-core 0.28.0",
-    "entity-core 0.33.0",
-    "entity-eventlog 0.33.0",
-    "entity-executor 0.33.0",
-    "entity-query 0.33.0",
-    "entity-store 0.33.0",
+    "entity-core 0.33.1",
+    "entity-eventlog 0.33.1",
+    "entity-executor 0.33.1",
+    "entity-query 0.33.1",
+    "entity-store 0.33.1",
     "ess-compiler 0.97.4",
     "ess-conformance 0.97.4",
     "ess-domain 0.97.4",
@@ -54,7 +54,7 @@
     },
     {
       "path": "ess/domains/cli.yaml",
-      "sha256": "97a0bb7acc24dfabe47ab330d3c084cfbbec1d27c3a52eac2ff0b5579f537aee"
+      "sha256": "e3046b42e933d7266f00bf413e1a5ad845ee93fc43b1ff63e76a42712395926b"
     },
     {
       "path": "ess/domains/clock.yaml",

@@ -49,6 +49,71 @@
   served host now refuses a mounted grant file whose target holds one (a fraction, an
   exponent, `-0`) as malformed, answering every write `unavailable`.
 
+## 0.76.2 — 2026-11-24
+
+### Changed
+
+- Entity Runtime 0.33.1 (from 0.33.0). No change of the store's form: a store that 0.76.0 wrote
+  opens as before. Measured 2026-11-23 on the code of 0.76.0, where a read invoke still recorded
+  its uses, on a store of 50 recorded events, 100 read invokes per run, release profile, three
+  runs per pin at host load 52 to 67: the median time of `er.execute_batch` per read invoke is
+  110.3 ms with 0.33.1, 129.5 ms with 0.33.0 and 122.9 ms with 0.32.0, and a read invoke
+  appended 24,500 blob bytes with 0.33.1 and 0.33.0, and 78,488 with 0.32.0. From 0.76.1 a read
+  invoke appends nothing; the pin was not measured again on that code.
+
+### Fixed
+
+- On Linux and macOS the owner and every provider process it starts run in `/`. They kept the
+  working directory of the CLI call that started the owner, and they outlive that call (the
+  owner ends after 10 idle minutes, and it keeps an idle provider after a read), so the
+  caller's directory stayed in use by processes the caller does not know. Reported on 0.65.2:
+  an owner and two providers, up to 27 minutes old, had as working directory a checkout whose
+  run had ended, and that checkout could not be removed. A relative path in a provider's
+  `executable.args` therefore resolves against `/` in the provider the owner starts. In the
+  CLI's own `--print-*` and `--version` calls of that provider it resolves against the
+  directory the CLI was called from, as before. `executable.path` is absolute, as before.
+  The working directory on Windows is not changed.
+- On Windows every tool call through the MCP stdio server (`tools/call`) answered `timeout`,
+  while `initialize` and `tools/list` answered. The bounded read, introduced in 0.57.0, was
+  built for Unix only: its budget had no clock on Windows, the owner's watcher for a read's
+  cancellation refused there, and the server answered a budget that did not start as
+  `timeout`. A budget on Windows now counts the unbiased interrupt time, the owner watches a
+  read's cancellation on a duplicate of the request's pipe handle, and a platform with no
+  budget clock answers `unsupported`. No Windows binary was released, so no released binary
+  had the defect (story:windows-mcp-tool-call-answers-timeout).
+
+## 0.76.1 — 2026-11-23
+
+### Changed
+
+- A read invoke records nothing per read in the local metadata store (issue #267, item 1). A
+  read use, the reservation a read, a credential reuse or a revalidation takes between capture
+  and release, is held in the memory of the owner process and is no longer recorded. Before,
+  one read invoke appended 3 events and 24,500 blob bytes (0.76.0, a store of 50 recorded
+  events). What differs:
+  1. The store holds no record that a read was captured, dispatched or released. The
+     clock-floor event stays: a registry transaction more than 60,000 ms past the recorded
+     floor records one, so an instance that reads all day adds at most one event per 60 s of
+     use.
+  2. A read use that is open when the owner process ends is gone with the owner. The read was
+     not resumed before either. A dispatch of its id by the next owner answers
+     `Failure::Conflict`, the answer for an unknown id.
+  3. A read use is visible only to the process that captured it. One owner serves a state
+     directory, so the bound of 1,000 open read uses counts as before.
+  4. A `connections revoke` run by the CLI process no longer releases the owner's
+     undispatched read uses of that connection. Such a use stays in the owner's bound until
+     its deadline, at most 120 s. The owner's dispatch of it answers `revoked` where it
+     answered `Failure::Conflict`, and an undispatched revalidation of it likewise; after the
+     deadline both answer `Expired` as before.
+  5. A store written by an earlier release gets one Expired event for each read use left in
+     it, recorded by the first capture after that use's deadline, and keeps the records it
+     has: such stores do not shrink.
+  6. The uses a process holds are not written in one step with a recorded batch. When a batch
+     commits and its persist then answers an error, the process keeps the uses it held, so a
+     release by connection or by version that the same transaction made does not reach them.
+     Their dispatch is still refused (`Failure::Conflict`, the publication fence), and they
+     count in the bound until their deadline.
+
 ## 0.76.0 — 2026-11-23
 
 ### Breaking
