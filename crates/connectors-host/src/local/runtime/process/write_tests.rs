@@ -72,7 +72,11 @@ impl Adapter for Fixture {
         input: Value,
     ) -> Result<Box<dyn PreparedWrite>> {
         assert_eq!(operation, "write");
-        assert_eq!(partition, "partition");
+        // `owned` is driven by the owner's executor, whose partition is the
+        // registry's own name for the connection.
+        if self.mode != "owned" {
+            assert_eq!(partition, "partition");
+        }
         assert_eq!(document.0, b"fictional-only");
         record(&self.root, "prepare");
         if self.mode == "preflight-refused" {

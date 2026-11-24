@@ -312,7 +312,10 @@ actors:
 # Release: a Counted use that is not bound is released on every exit (a
 # refusal, a failed preflight, a failed PrepareAttempt, a failed BindUse).
 # Store: `standing-grants.sqlite3` in the local state directory, one for all
-# its instances; the grant id is bound to the attempt there, and the ledger
+# its instances. `approvals grant-standing` creates it; the owner's admission
+# opens it and creates nothing, so an absent store or table is `unavailable`
+# and takes no use. After a removal the next `grant-standing` starts the count
+# at zero. The grant id is bound to the attempt there, and the ledger
 # records `not_required` (connectors.mutations, "The local owner's keyed write
 # under a standing grant").
 # Clock: the approval clock's trusted reading (connectors.clock), never the

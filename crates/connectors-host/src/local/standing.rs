@@ -135,6 +135,7 @@ fn listed<'de, D: serde::Deserializer<'de>>(
 }
 
 /// One target member: an RFC 6901 pointer into the input and its exact value.
+/// Every number in the value is an integer in the range of `i64` or `u64`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TargetMember {
@@ -182,7 +183,10 @@ pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
         }
         let mut pointers = BTreeSet::new();
         for member in &grant.target {
-            if !valid_pointer(&member.pointer) || !pointers.insert(member.pointer.as_str()) {
+            if !valid_pointer(&member.pointer)
+                || !pointers.insert(member.pointer.as_str())
+                || !exact(&member.value)
+            {
                 return Err(Unreadable::Malformed);
             }
         }
@@ -214,6 +218,22 @@ pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
         grants: document.grants,
         revoked: document.revoked.into_iter().collect(),
     })
+}
+
+/// Whether every number in `value` is one its reader holds digit for digit:
+/// an integer in the range of `i64` or `u64`. `connectors_core::read_json`
+/// holds every other number (a fraction, an exponent, `-0`, an integer
+/// outside that range) as the nearest `f64`, so two numbers written with
+/// different digits can be one value. A grant's target value holds no such
+/// number ([`parse`]), and an input that holds one at a target pointer
+/// matches no grant ([`Grants::covering`]).
+fn exact(value: &Value) -> bool {
+    match value {
+        Value::Number(number) => number.is_i64() || number.is_u64(),
+        Value::Array(elements) => elements.iter().all(exact),
+        Value::Object(members) => members.values().all(exact),
+        Value::Null | Value::Bool(_) | Value::String(_) => true,
+    }
 }
 
 /// A nonempty RFC 6901 pointer: starts with `/`, and `~` only as `~0` or `~1`.
@@ -306,7 +326,8 @@ fn within(value: &Value, depth: usize) -> bool {
 impl Grants {
     /// The grants that cover a write of `operation` on `instance` with `input`
     /// at `now_ms`, in file order: same instance and operation, every target
-    /// member present with its exact value, nothing in `input` outside the
+    /// member present with its exact value (a number only as an integer in
+    /// the range of `i64` or `u64`), nothing in `input` outside the
     /// grant's `target` and `input_keys` when it lists them
     /// ([`Uncovered::OutsideInput`]), `now_ms < not_after_unix_ms`, and
     /// not revoked. Empty means no grant covers it; the reason is the most
@@ -333,7 +354,9 @@ impl Grants {
                         matched = false;
                         break;
                     }
-                    Some(value) if *value != member.value => {
+                    // A number the reader holds as an `f64` is no exact
+                    // value: it matches nothing, whatever the grant holds.
+                    Some(value) if !exact(value) || *value != member.value => {
                         reason = reason.max_specific(Uncovered::OtherTarget);
                         matched = false;
                         break;
@@ -537,19 +560,15 @@ impl Uses {
     /// an owner-only file (0600), as the metadata authority's are. An existing
     /// store that is not an owner-only regular file with one link, owned by
     /// the effective user, is refused (`UsesUnavailable`).
-    pub fn open(directory: &Path) -> Result<Self, UsesUnavailable> {
-        let path = directory.join(USES_FILE);
+    ///
+    /// A store begins in two places only: a served host creates its own when
+    /// it starts, and in the local CLI binding [`grant`] creates it, under
+    /// the instance's signing key. The local owner never calls this: a store
+    /// created where a write is admitted would start the hourly count at
+    /// zero for whoever removed the file ([`Uses::open`]).
+    pub fn create(directory: &Path) -> Result<Self, UsesUnavailable> {
         create_private(directory)?;
-        let connection = Connection::open_with_flags(
-            &path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(|_| UsesUnavailable)?;
-        connection
-            .busy_timeout(BUSY_TIMEOUT)
-            .map_err(|_| UsesUnavailable)?;
+        let connection = Self::writable(directory)?;
         connection
             .execute_batch(
                 "BEGIN IMMEDIATE;
@@ -570,6 +589,51 @@ impl Uses {
         Ok(Self {
             connection: std::sync::Mutex::new(connection),
         })
+    }
+
+    /// The store the state directory `directory` already holds, for taking
+    /// uses, under the custody check of [`Uses::create`]. Nothing is created
+    /// here, neither the file nor its table: a directory without the store,
+    /// or with a file that holds no `grant_uses` table, is `UsesUnavailable`.
+    /// The local owner admits a write through this, so a removed store
+    /// refuses every write under a grant until [`grant`] creates it again.
+    pub fn open(directory: &Path) -> Result<Self, UsesUnavailable> {
+        let name = std::ffi::OsStr::new(USES_FILE);
+        let parent = fs::directory(directory, false, false).map_err(|_| UsesUnavailable)?;
+        if !fs::private_file_metadata_if_present_at(&parent, name).map_err(|_| UsesUnavailable)? {
+            return Err(UsesUnavailable);
+        }
+        let connection = Self::writable(directory)?;
+        let table: bool = connection
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM sqlite_master WHERE type='table' AND name='grant_uses')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|_| UsesUnavailable)?;
+        if !table {
+            return Err(UsesUnavailable);
+        }
+        Ok(Self {
+            connection: std::sync::Mutex::new(connection),
+        })
+    }
+
+    /// A read-write connection to the store file, which SQLite never creates
+    /// here (no `SQLITE_OPEN_CREATE`).
+    fn writable(directory: &Path) -> Result<Connection, UsesUnavailable> {
+        let connection = Connection::open_with_flags(
+            directory.join(USES_FILE),
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .map_err(|_| UsesUnavailable)?;
+        connection
+            .busy_timeout(BUSY_TIMEOUT)
+            .map_err(|_| UsesUnavailable)?;
+        Ok(connection)
     }
 
     /// The store of the state directory `directory` for reading, when it
@@ -774,8 +838,9 @@ pub enum FileRefusal {
     Unverified,
 }
 
-/// Why [`sign`], [`grant`], [`revoke`] or [`list`] refused. Nothing was
-/// written, except on [`Refused::OutcomeUnknown`].
+/// Why [`sign`], [`grant`], [`revoke`] or [`list`] refused. The grant file
+/// is as it was, except on [`Refused::OutcomeUnknown`]; a [`grant`] refused
+/// after it signed may leave the empty use store it created.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refused {
     /// The grant request, or the file it would make: `invalid_input`.
@@ -794,16 +859,21 @@ pub enum Refused {
     OutcomeUnknown,
 }
 
-/// The exclusive lock of the commands that write the grant file.
+/// The exclusive lock of the commands that write the grant file, and the
+/// state directory it was taken in, whose use store [`grant`] creates.
 pub struct Lock {
     _lease: Lease,
+    state: std::path::PathBuf,
 }
 
 /// The exclusive `flock` on [`LOCK`] in the state directory `state`, held
 /// until the value is dropped. A command takes it before the key lease; the
 /// executor holds the shared key lease and never takes this lock.
 pub fn lock(state: &Path) -> super::approval_keys::Result<Lock> {
-    Lease::acquire(state, LOCK, true).map(|lease| Lock { _lease: lease })
+    Lease::acquire(state, LOCK, true).map(|lease| Lock {
+        _lease: lease,
+        state: state.to_owned(),
+    })
 }
 
 /// One reading of `clock` a grant file is signed and verified at: inside
@@ -946,21 +1016,15 @@ fn current(
     })
 }
 
-/// Signs `grants` and replaces the file at `path` (mode 0600), or creates it.
-fn publish(
-    path: &Path,
-    signer: &Signer,
-    key: &ConfiguredApprovalKey,
-    now: ClockInterval,
-    grants: &[Grant],
-) -> Result<(), Refused> {
-    let signed = sign(signer, key, now, grants)?;
+/// Replaces the file at `path` with the signed file `signed` (mode 0600), or
+/// creates it.
+fn publish(path: &Path, signed: &[u8]) -> Result<(), Refused> {
     fs::validate_path(path).map_err(|_| Refused::InvalidConfiguration)?;
     let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
         return Err(Refused::InvalidConfiguration);
     };
     let directory = fs::directory(parent, false, false).map_err(|_| Refused::Unavailable)?;
-    fs::publish_replace(&directory, name, &signed).map_err(|failure| match failure {
+    fs::publish_replace(&directory, name, signed).map_err(|failure| match failure {
         super::Failure::OutcomeUnknown => Refused::OutcomeUnknown,
         _ => Refused::Unavailable,
     })
@@ -1035,8 +1099,16 @@ pub fn check_request(request: &[u8], instance: &str) -> Result<(), Refused> {
 /// `not_after_unix_ms` at or before the reading's upper bound, 256 grants
 /// left in the file, a signed file over [`FILE_LIMIT`]. The caller holds
 /// `lock` until this returns.
+///
+/// This is where the use store of the lock's state directory begins
+/// ([`Uses::create`]): once the file is signed, so only under the instance's
+/// signing key, and before it is replaced. A store that is there is left as
+/// it is. The owner refuses a write under a grant while the directory holds
+/// no store, so after a removal the next grant is what admits writes again,
+/// and their count starts at zero. A store that cannot be created or fails
+/// its custody rule is `Unavailable`, and the grant file is left as it was.
 pub fn grant(
-    _lock: &Lock,
+    lock: &Lock,
     path: &Path,
     signer: &Signer,
     key: &ConfiguredApprovalKey,
@@ -1057,13 +1129,16 @@ pub fn grant(
     }
     let id = new.id.clone();
     grants.push(new);
-    publish(path, signer, key, now, &grants)?;
+    let signed = sign(signer, key, now, &grants)?;
+    Uses::create(&lock.state).map_err(|UsesUnavailable| Refused::Unavailable)?;
+    publish(path, &signed)?;
     Ok(id)
 }
 
 /// Removes the grant `grant_id` from the signed file at `path` and replaces
 /// the file. `NotFound`: the file holds no grant with that id, or the path
-/// holds no file. The caller holds `lock` until this returns.
+/// holds no file. The caller holds `lock` until this returns. The use store
+/// is neither read nor created.
 pub fn revoke(
     _lock: &Lock,
     path: &Path,
@@ -1080,7 +1155,7 @@ pub fn revoke(
     }
     let mut grants = file.kept();
     grants.retain(|grant| grant.id != grant_id);
-    publish(path, signer, key, now, &grants)
+    publish(path, &sign(signer, key, now, &grants)?)
 }
 
 /// The grants of the verified file at `path` in file order, expired ones
@@ -1249,8 +1324,24 @@ pub fn admit<'a>(
     now: Option<ClockInterval>,
     uses: &'a Uses,
 ) -> Result<Admitted<'a>, NotAdmitted> {
+    admit_in(path, key, call, now, || Ok(uses))
+}
+
+/// [`admit`] with the use store asked for only once a grant covers the
+/// write: `uses` is not called for a write no grant covers, which is refused
+/// as it is without a store, and its refusal is `UsesUnavailable`. The local
+/// owner passes [`Uses::open`], so a state directory without a store answers
+/// a covered write `unavailable` and admits none.
+pub fn admit_in<'a>(
+    path: &Path,
+    key: &ConfiguredApprovalKey,
+    call: Call<'_>,
+    now: Option<ClockInterval>,
+    uses: impl FnOnce() -> Result<&'a Uses, UsesUnavailable>,
+) -> Result<Admitted<'a>, NotAdmitted> {
     let now = now.ok_or(NotAdmitted::ClockUnavailable)?;
     let covering = covering_now(path, key, call, now)?;
+    let uses = uses().map_err(|UsesUnavailable| NotAdmitted::UsesUnavailable)?;
     let covering: Vec<&Grant> = covering.iter().collect();
     match uses.take(call.instance, &covering, now.upper_unix_ms) {
         Ok(Taken::Slot(taken)) => Ok(Admitted {
@@ -1425,7 +1516,7 @@ mod tests {
     #[test]
     fn the_cap_counts_the_window_and_a_released_use_frees_its_slot() {
         let (_root, state) = state_directory();
-        let uses = Uses::open(&state).unwrap();
+        let uses = Uses::create(&state).unwrap();
         let parsed: Grant = serde_json::from_value(grant("g1", 2)).unwrap();
         let grants = [&parsed];
         let Taken::Slot(first) = uses.take("leaf", &grants, 10_000).unwrap() else {
@@ -1463,7 +1554,7 @@ mod tests {
     #[test]
     fn uses_past_their_hour_that_name_no_attempt_are_deleted() {
         let (_root, state) = state_directory();
-        let uses = Uses::open(&state).unwrap();
+        let uses = Uses::create(&state).unwrap();
         let parsed: Grant = serde_json::from_value(grant("g1", 10)).unwrap();
         let grants = [&parsed];
         let slot = |now| match uses.take("leaf", &grants, now).unwrap() {
@@ -1493,11 +1584,33 @@ mod tests {
     fn the_use_store_is_owner_only() {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         let (_root, state) = state_directory();
-        drop(Uses::open(&state).unwrap());
+        drop(Uses::create(&state).unwrap());
         let store = state.join(USES_FILE);
         assert_eq!(std::fs::metadata(&store).unwrap().mode() & 0o777, 0o600);
         std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o644)).unwrap();
         assert!(Uses::open(&state).is_err());
+        assert!(Uses::create(&state).is_err());
+    }
+
+    /// `Uses::open` takes the store a directory holds and creates nothing:
+    /// without the file it refuses and leaves none, and a file without the
+    /// table (an empty one is a database to SQLite) is refused as it is.
+    #[cfg(unix)]
+    #[test]
+    fn open_never_creates_the_use_store_or_its_table() {
+        use std::os::unix::fs::PermissionsExt;
+        let (_root, state) = state_directory();
+        assert!(Uses::open(&state).is_err());
+        assert!(Uses::existing(&state).unwrap().is_none());
+        assert_eq!(std::fs::read_dir(&state).unwrap().count(), 0);
+        let store = state.join(USES_FILE);
+        std::fs::write(&store, b"").unwrap();
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(Uses::open(&state).is_err());
+        assert_eq!(std::fs::metadata(&store).unwrap().len(), 0);
+        // `create` is what makes the table, and then `open` takes the store.
+        drop(Uses::create(&state).unwrap());
+        assert_eq!(Uses::open(&state).unwrap().rows().unwrap(), 0);
     }
 
     #[cfg(unix)]
@@ -1971,7 +2084,16 @@ mod signed_tests {
         path: PathBuf,
     }
 
+    /// A site whose state directory holds the use store, as the instance's
+    /// first `grant-standing` leaves it: the owner admits writes there.
     fn site() -> Site {
+        let site = bare_site();
+        drop(Uses::create(&site.state).unwrap());
+        site
+    }
+
+    /// A site no grant was ever made in: its state directory is empty.
+    fn bare_site() -> Site {
         let root = tempfile::tempdir().unwrap();
         let state = root.path().join("state");
         std::fs::create_dir(&state).unwrap();
@@ -2066,12 +2188,17 @@ mod signed_tests {
         }
     }
 
-    /// `standing::admit` for that write at `now()`, by the code the owner
-    /// answers. An admitted use is bound to a new attempt, so it stays
-    /// counted after the guard is dropped.
+    /// The owner's admission of that write at `now()`, by the code the owner
+    /// answers: `standing::admit_in` with the store the state directory
+    /// holds, opened as the owner opens it and never created. An admitted
+    /// use is bound to a new attempt, so it stays counted after the guard is
+    /// dropped.
     fn admit(site: &Site, key: &ConfiguredApprovalKey, input: &Value) -> Outcome {
-        let uses = Uses::open(&site.state).unwrap();
-        match super::admit(&site.path, key, call(input), Some(now()), &uses) {
+        let store = std::cell::OnceCell::new();
+        let admitted = super::admit_in(&site.path, key, call(input), Some(now()), || {
+            Uses::open(&site.state).map(|opened| store.get_or_init(|| opened))
+        });
+        match admitted {
             Ok(admitted) => {
                 admitted.bind(Uuid::new_v4()).unwrap();
                 Outcome::Admitted(admitted.grant_id().to_owned())
@@ -3359,45 +3486,81 @@ mod signed_tests {
     /// Security review: the hourly cap is not lost with the use store. The
     /// store file is in the state directory of the host's own UID; removing
     /// it needs no key and no signature and leaves the grant file untouched.
-    /// A host that then finds no store must not admit the grant's write of
-    /// the hour a second time: `rate_limited` or `unavailable`.
+    /// The owner creates no store: from the removal on it answers a write a
+    /// grant covers `unavailable` and admits none, whatever `revoke-standing`
+    /// and `list-standing` do meanwhile; neither creates a store, and no
+    /// refused `grant-standing` does. Only a `grant-standing` the signing key
+    /// signed creates it again, and the count then starts at zero.
     #[test]
     fn security_sg_a_removed_use_store_does_not_free_the_hourly_cap() {
-        let site = site();
-        granted(
-            &site,
-            &[Grant {
-                max_per_hour: 1,
-                ..channel_grant("g1", NOW + 600_000)
-            }],
-        );
+        let site = bare_site();
+        let store = site.state.join("standing-grants.sqlite3");
+        let lock = lock(&site.state).unwrap();
+        // A request for one write an hour to `channel`.
+        let capped = |channel: &str| {
+            let mut request = request();
+            request["target"][0]["value"] = json!(channel);
+            request["max_per_hour"] = json!(1);
+            bytes(&request)
+        };
+        let grant = |signer: &Signer, request: &[u8]| {
+            grant(&lock, &site.path, signer, &key(), "leaf", now(), request)
+        };
+        // Before the first grant nothing covers the write, and the owner's
+        // refusal leaves no store behind.
+        assert_eq!(admit(&site, &key(), &write()), Outcome::ApprovalRequired);
+        assert!(!store.exists());
+        // The first `grant-standing` creates the store.
+        let kept = grant(&signer(), &capped("C1")).unwrap();
+        let gone = grant(&signer(), &capped("C9")).unwrap();
+        assert!(store.exists());
+        assert_eq!(mode(&store), 0o600);
         assert_eq!(
             admit(&site, &key(), &write()),
-            Outcome::Admitted("g1".into())
+            Outcome::Admitted(kept.clone())
         );
         // The control: with the store in place the next write is at the cap.
         assert_eq!(admit(&site, &key(), &write()), Outcome::RateLimited);
-        std::fs::remove_file(site.state.join("standing-grants.sqlite3")).unwrap();
-        // The next write of the same hour, as the owner admits it: it opens
-        // the store of the state directory and asks for a use.
-        let input = write();
-        let reopened = Uses::open(&site.state);
-        let after = match &reopened {
-            Err(UsesUnavailable) => Outcome::Unavailable,
-            Ok(uses) => match super::admit(&site.path, &key(), call(&input), Some(now()), uses) {
-                Ok(admitted) => Outcome::Admitted(admitted.grant_id().to_owned()),
-                Err(NotAdmitted::AtCap { .. }) => Outcome::RateLimited,
-                Err(NotAdmitted::Uncovered(_) | NotAdmitted::Unverified) => {
-                    Outcome::ApprovalRequired
-                }
-                Err(_) => Outcome::Unavailable,
-            },
+        std::fs::remove_file(&store).unwrap();
+        // The next writes of the same hour, as the owner admits them: never
+        // admitted, and no store is made for them.
+        let refused = |step: &str| {
+            assert_eq!(
+                admit(&site, &key(), &write()),
+                Outcome::Unavailable,
+                "{step}"
+            );
+            assert!(!store.exists(), "{step}");
         };
-        assert!(
-            matches!(after, Outcome::RateLimited | Outcome::Unavailable),
-            "a grant of one write an hour admitted a second write in the same hour after the \
-             use store was removed: {after:?}"
+        refused("after the removal");
+        refused("a second time");
+        // A write no grant covers is refused as it is with a store.
+        let outside = json!({"body": {"channel": "C2", "text": "hello"}});
+        assert_eq!(admit(&site, &key(), &outside), Outcome::ApprovalRequired);
+        // `list-standing` and `revoke-standing` create nothing.
+        assert_eq!(list(&site.path, &key(), now()).unwrap().len(), 2);
+        refused("after list-standing");
+        revoke(&lock, &site.path, &signer(), &key(), now(), &gone).unwrap();
+        refused("after revoke-standing");
+        // Neither does a `grant-standing` that is refused: for its request,
+        // or because the signer is not the instance's key.
+        assert_eq!(grant(&signer(), b"{}").err(), Some(Refused::InvalidInput));
+        refused("after a refused request");
+        let (stranger, _) = other("key-1");
+        assert_eq!(
+            grant(&stranger, &capped("C9")).err(),
+            Some(Refused::Forbidden)
         );
+        refused("after a grant another pair signed");
+        // The key holder grants again: the store is created, and writes are
+        // admitted again with the count at zero, so the kept grant admits
+        // one more write in the hour it had already spent.
+        let again = grant(&signer(), &capped("C9")).unwrap();
+        assert!(store.exists());
+        assert_ne!(again, gone);
+        assert_eq!(admit(&site, &key(), &write()), Outcome::Admitted(kept));
+        assert_eq!(admit(&site, &key(), &write()), Outcome::RateLimited);
+        assert_eq!(uses(&site), 1);
     }
 
     /// Security review: what bounds an older signed file put back at the path
@@ -3462,57 +3625,142 @@ mod signed_tests {
         assert_eq!(uses.rows().unwrap(), 2);
     }
 
-    /// Security review: a target member holds "the exact JSON value". A
-    /// grant for the number 18446744073709551616 must not admit a write whose
-    /// member is 18446744073709551617; the adapter is sent the caller's bytes.
+    /// Security review: a target member holds "the exact JSON value", and
+    /// the reader holds an integer outside `i64` and `u64` and every fraction
+    /// as the nearest `f64`: 18446744073709551616 and 18446744073709551617
+    /// are one value to it, while the adapter is sent the caller's bytes. So
+    /// a target value holds no such number. `grant-standing` refuses a
+    /// request that has one, a file that has one is refused whole, and an
+    /// input that has one at a target pointer is covered by no grant.
     #[test]
     fn security_sg_a_bound_number_is_matched_digit_for_digit() {
+        const LARGEST: &str = "18446744073709551615";
+        const INEXACT: [&str; 7] = [
+            "18446744073709551616",
+            "-9223372036854775809",
+            "1.5",
+            "1.0",
+            "1e2",
+            "-0",
+            r#"{"ids":[7,2.5]}"#,
+        ];
         let site = site();
         let lock = lock(&site.state).unwrap();
-        let request = format!(
-            r#"{{"operation":"chat.postMessage","target":[{{"pointer":"/body/id","value":18446744073709551616}}],"not_after_unix_ms":{},"max_per_hour":2}}"#,
-            NOW + 600_000
-        );
-        let id = grant(
-            &lock,
+        // A grant request whose one target member holds `value` as written.
+        let request = |value: &str| {
+            format!(
+                r#"{{"operation":"chat.postMessage","target":[{{"pointer":"/body/id","value":{value}}}],"not_after_unix_ms":{},"max_per_hour":2}}"#,
+                NOW + 600_000
+            )
+        };
+        let add = |value: &str| {
+            grant(
+                &lock,
+                &site.path,
+                &signer(),
+                &key(),
+                "leaf",
+                now(),
+                request(value).as_bytes(),
+            )
+        };
+        // A value as the reader holds it.
+        let read = |text: &str| -> Value { connectors_core::read_json(text.as_bytes()).unwrap() };
+
+        // One: the request is refused as any other invalid one, before the
+        // clock, the key or the file are read, and nothing is written.
+        for value in INEXACT {
+            assert_eq!(
+                check_request(request(value).as_bytes(), "leaf").err(),
+                Some(Refused::InvalidInput),
+                "{value}"
+            );
+            assert_eq!(add(value).err(), Some(Refused::InvalidInput), "{value}");
+            assert!(!site.path.exists(), "{value}");
+        }
+        // The controls: the ends of the two ranges, and integers below
+        // other JSON, are taken.
+        for value in ["-9223372036854775808", r#"{"ids":[7,-2]}"#] {
+            assert!(check_request(request(value).as_bytes(), "leaf").is_ok());
+        }
+        let id = add(LARGEST).unwrap();
+
+        // Two: a file that holds such a number is refused whole, bare and
+        // signed by the instance's key (as a build before this rule wrote
+        // it): it admits nothing, not even under its other grants.
+        let signed = std::fs::read(&site.path).unwrap();
+        let header = json!({"alg": "Ed25519", "kid": "key-1", "typ": SIGNED_TYPE});
+        let holding = |value: &str| {
+            let mut claims = read(std::str::from_utf8(&claims_of(&signed)).unwrap());
+            let mut second = claims["document"]["grants"][0].clone();
+            second["id"] = json!("g2");
+            second["target"][0]["value"] = read(value);
+            claims["document"]["grants"]
+                .as_array_mut()
+                .unwrap()
+                .push(second);
+            claims
+        };
+        let exact_write = read(&format!(r#"{{"body":{{"id":{LARGEST}}}}}"#));
+        // The control: the same file with an exact number verifies and admits.
+        let control = holding("7");
+        assert!(parse(&bytes(&control["document"])).is_ok());
+        put(
             &site.path,
-            &signer(),
-            &key(),
-            "leaf",
-            now(),
-            request.as_bytes(),
-        )
-        .unwrap();
-        // A write's input as the owner reads it.
-        let input =
-            |bytes: &str| -> Value { connectors_core::read_json(bytes.as_bytes()).unwrap() };
-        // The controls: the granted number is admitted, a far one is not.
-        assert_eq!(
-            admit(
-                &site,
-                &key(),
-                &input(r#"{"body":{"id":18446744073709551616}}"#)
-            ),
-            Outcome::Admitted(id)
+            &compact(&header, &connectors_core::canonical(&control)),
+            0o600,
         );
+        assert_eq!(list(&site.path, &key(), now()).unwrap().len(), 2);
         assert_eq!(
-            admit(
-                &site,
-                &key(),
-                &input(r#"{"body":{"id":18446744073709559808}}"#)
-            ),
-            Outcome::ApprovalRequired
+            admit(&site, &key(), &exact_write),
+            Outcome::Admitted(id.clone())
         );
-        assert_eq!(
-            admit(
-                &site,
-                &key(),
-                &input(r#"{"body":{"id":18446744073709551617}}"#)
-            ),
-            Outcome::ApprovalRequired,
-            "a write whose member is 18446744073709551617 was admitted under a grant for \
-             18446744073709551616"
-        );
+        for value in INEXACT {
+            let claims = holding(value);
+            assert_eq!(
+                parse(&bytes(&claims["document"])).err(),
+                Some(Unreadable::Malformed),
+                "{value}"
+            );
+            put(
+                &site.path,
+                &compact(&header, &connectors_core::canonical(&claims)),
+                0o600,
+            );
+            assert_eq!(
+                verify(&site.path, &key(), now()).err(),
+                Some(FileRefusal::Unverified),
+                "{value}"
+            );
+            assert_eq!(
+                admit(&site, &key(), &exact_write),
+                Outcome::ApprovalRequired,
+                "{value}"
+            );
+        }
+
+        // Three: under the grant for the largest exact number, an input
+        // whose member is a number the reader does not hold exactly is
+        // covered by no grant, the nearest one included.
+        put(&site.path, &signed, 0o600);
+        for member in [
+            "18446744073709551616",
+            "18446744073709551617",
+            "18446744073709551615.0",
+            "1.8446744073709551615e19",
+        ] {
+            assert_eq!(
+                admit(
+                    &site,
+                    &key(),
+                    &read(&format!(r#"{{"body":{{"id":{member}}}}}"#))
+                ),
+                Outcome::ApprovalRequired,
+                "a write whose member is {member} was admitted under a grant for {LARGEST}"
+            );
+        }
+        assert_eq!(admit(&site, &key(), &exact_write), Outcome::Admitted(id));
+        assert_eq!(admit(&site, &key(), &exact_write), Outcome::RateLimited);
     }
 
     /// Security review: fail closed. The custody of the grant file is decided
@@ -4269,9 +4517,7 @@ mod signed_tests {
     #[test]
     fn adversary_sg_a_target_value_is_compared_exactly() {
         fn read(text: &str) -> Value {
-            connectors_core::read_json(text.as_bytes())
-                .ok()
-                .expect("one JSON document")
+            connectors_core::read_json(text.as_bytes()).expect("one JSON document")
         }
         // An open grant of one target member, through the signed file.
         let covers = |pointer: &str, value: Value, input: &str| {

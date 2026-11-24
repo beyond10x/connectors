@@ -122,7 +122,10 @@ connectors approvals revoke-standing --connector slack --instance bot "$grant_id
 ```
 
 - `target` holds 1 to 16 members; a write is covered only when its input has each pointer
-  with exactly that value.
+  with exactly that value. A number in a target value is an integer from
+  -9223372036854775808 to 18446744073709551615: `grant-standing` refuses any other number
+  (a fraction, an exponent, `-0`) as `invalid_input`, a grant file that holds one does not
+  verify, and a write whose input holds one at a target pointer is covered by no grant.
 - `input_keys`, at most 16 pointers, closes the input: a write that sets any other member
   is outside the grant. Without `input_keys` the rest of the input is open.
 - `not_after_unix_ms` has no upper bound and `max_per_hour` is 1 to 10,000. Both are read
@@ -130,6 +133,9 @@ connectors approvals revoke-standing --connector slack --instance bot "$grant_id
 - `grant-standing` answers `{grant_id, path}`, creates the file with mode 0600 or replaces
   it, and drops the grants that expired. `list-standing` prints the grants of the file.
   `revoke-standing` removes one grant; nothing new is admitted under it afterwards.
+- `grant-standing` and `revoke-standing` answer `outcome_unknown` when the host could not
+  confirm that the new file is durably in place: the path holds the new file or the old
+  one, and `list-standing` shows which.
 
 A keyed write with no `--approval-file` then runs under the grant:
 
@@ -153,7 +159,8 @@ What the grant refuses, each before any provider request and with no attempt rec
 - `rate_limited` with `retry_after_seconds` (1 to 3,600): every covering grant admitted
   `max_per_hour` writes in the last hour.
 - `unavailable`: the grant file or its directory is not private to the operator, the use
-  count cannot be kept, or the clock gives no reading.
+  count cannot be kept, the state directory holds no use store, or the clock gives no
+  reading.
 
 The same key with the same input replays the original answer with no grant check, also
 after the grant expired, was revoked or reached its cap.
@@ -165,6 +172,13 @@ its expiry. A grant bounds what a caller that only invokes can write. Rotating o
 revoking the approval key ends every grant it signed. A revoked grant comes back when an
 older signed file is put back at the path (a backup, a file sync or a snapshot restore
 running as the operator can do that); rotating the key ends it for certain.
+
+The hourly count is the file `standing-grants.sqlite3` in the state directory.
+`grant-standing` creates it and nothing else does. Removing it frees no cap: the owner
+answers every write a grant covers `unavailable` until the key holder runs
+`grant-standing` again, and the count then starts at zero. A process of the operator's
+UID that replaces the file or edits its rows can free the cap; that is the same-user
+boundary, which a grant does not close.
 
 The implementation is exercised through the generated production CLI with a
 disposable qualified Secret Service and independent synthetic clock responder,

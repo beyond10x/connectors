@@ -970,9 +970,12 @@ The command sets the grant's `id`, a new UUID, and its `instance`, the
 selected instance's `instance_id`. Before it adds the grant it drops every
 grant of the file whose `not_after_unix_ms` is at or before the lower bound of
 the clock reading; a dropped grant changes no replay. It then signs the
-document and replaces the file, or creates it when the path holds none. Its
-result is `StandingGrantResult`: `{grant_id, path}`, the new grant's id and
-the grant file's path.
+document, creates the use store `<state>/standing-grants.sqlite3` (mode 0600)
+when the state directory holds none, and replaces the file, or creates it when
+the path holds none. This command is the only one that creates the use store
+("What removing the use store does", at the end of this section). Its result
+is `StandingGrantResult`: `{grant_id, path}`, the new grant's id and the
+grant file's path.
 
 - `invalid_input` naming `input_file` (exit 2), nothing written: a document
   that is not one JSON object; a member not named above, `id` and `instance`
@@ -981,12 +984,20 @@ the grant file's path.
   bound of the clock reading; a grant the served file's rules refuse (a
   pointer that is not RFC 6901 or is over 256 bytes, no target or more than
   16, a pointer of `target` and `input_keys` that equals or lies below
-  another, an `input_keys` that is not an array of at most 16 pointers); 256
-  grants left in the file after the expired ones are dropped; a signed file
-  that would be larger than 64 KiB.
+  another, an `input_keys` that is not an array of at most 16 pointers, a
+  target `value` that holds a number other than an integer from
+  -9223372036854775808 to 18446744073709551615); 256 grants left in the file
+  after the expired ones are dropped; a signed file that would be larger than
+  64 KiB.
 - `invalid_configuration` (exit 2), nothing written: the instance's entry has
   no `standing_grants`; the path holds a file that does not verify.
-- `unavailable` (exit 1): the file or its directory fails the custody rule.
+- `unavailable` (exit 1): the file or its directory fails the custody rule;
+  the use store cannot be created or fails its own custody rule (the grant
+  file is then as it was).
+- `outcome_unknown` (exit 1, `stage = publication`, `next_action =
+  retry_status`): the host could not confirm that the new file is durably in
+  place. The path holds the new file or the old one; `list-standing` shows
+  which.
 
 `approvals revoke-standing <grant id>` takes the grant's id as its one
 positional argument, removes that grant from the file, signs the document
@@ -1000,6 +1011,9 @@ grant.
 - `invalid_configuration` (exit 2), nothing written: no `standing_grants`; a
   file that does not verify.
 - `unavailable` (exit 1): the custody rule.
+- `outcome_unknown` (exit 1, `stage = publication`, `next_action =
+  retry_status`): the host could not confirm that the new file is durably in
+  place; `list-standing` shows whether the grant is gone.
 
 `approvals list-standing` prints the grants of the verified file in file
 order, expired ones included. Its result is `StandingListResult`: `{grants:
@@ -1070,7 +1084,19 @@ Its codes:
   `rate_limited` is the failure's `code`, not a `service_code`.
 - `idempotency_conflict`: the key is held by a write with another input.
 - `unavailable`: the grant file fails the custody rule, the use count cannot
-  be kept, or the clock gives no reading.
+  be kept, the state directory holds no use store for a write a grant covers
+  ("What removing the use store does", at the end of this section), or the
+  clock gives no reading.
+
+Numbers in a target value. A target `value` holds a number only as an integer
+from -9223372036854775808 to 18446744073709551615, at any depth of the value.
+The host reads every other number (a fraction, an exponent, `-0`, an integer
+outside that range) as the nearest double, so two numbers written with
+different digits can be one value to it, while the adapter is sent the
+caller's bytes. So `grant-standing` refuses a request whose target value holds
+such a number (`invalid_input`), a grant file that holds one does not verify
+and admits nothing, and an input that holds one at a target pointer is covered
+by no grant (`approval_required`), whatever the grant holds there.
 
 The grant is checked twice more, where a per-input write verifies its proof
 again, and each recheck reads the clock and the file afresh. A refusal at the
@@ -1103,6 +1129,23 @@ an older signed file put back at the path admits again, until its grants'
 it back. The operator's UID can, and so can a backup, a file sync or a
 snapshot restore that runs as that UID, with no caller involved. Rotating the
 approval key ends every grant for certain.
+
+What removing the use store does. The hourly count is the file
+`<state>/standing-grants.sqlite3`. `grant-standing` creates it, under the
+signing key, and nothing else does: not the owner, not `revoke-standing`, not
+`list-standing`, and not a `grant-standing` that is refused before it signs.
+On a state directory without the file, or with a file that holds no use
+table, the owner answers every write a grant covers `unavailable` and takes no
+use; a write no grant covers stays `approval_required`. Removing the file
+therefore frees no cap: it refuses the grant's writes until the key holder
+runs `grant-standing` again. That run creates the store, and the count then
+starts at zero for every grant in the file. A key that replayed before the
+removal still replays, but its answer no longer names the grant: the row that
+bound `mutation.standing.grant_id` to its attempt went with the file. The
+store belongs to the operator's UID, as the grant file does: a process of that
+UID that replaces the store with another one or edits its rows can free the
+cap, with no key. That is the same-user boundary above, not one this binding
+closes.
 
 ### Shaping a result
 
@@ -1965,6 +2008,7 @@ never replay a possible write after interruption, timeout or lost response.
 | `invoke` keyed write whose covering grants are at their hourly cap (`stage = admission`, `next_action = retry_status`, `retry_after_seconds` 1 to 3,600) | `rate_limited` | 1 |
 | `approvals grant-standing`, `revoke-standing`, `list-standing`: no `standing_grants` on the instance, or a grant file that does not verify; nothing written (`stage = configuration`, `next_action = check_configuration`) | `invalid_configuration` | 2 |
 | `approvals revoke-standing`: an id the grant file does not hold, or no grant file (`stage = admission`, `next_action = check_configuration`) | `not_found` | 1 |
+| `approvals grant-standing`, `revoke-standing`: the new grant file is not confirmed durably in place; `list-standing` shows which file the path holds (`stage = publication`, `next_action = retry_status`) | `outcome_unknown` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
 | connect whose acquisition failed before publication (`stage = dispatch`, `next_action = retry_explicitly`) | the acquisition owner's code | 1 |
 | known revoked connection | `revoked` | 1 |

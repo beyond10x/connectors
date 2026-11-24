@@ -41,6 +41,13 @@
   `not_required`; the grant's id is bound to it in `<state>/standing-grants.sqlite3`
   ([standing grants](docs/local-approvals.md#standing-grants); contract:
   `contracts/cli/v1alpha1/semantics.md`, "Standing grants").
+  Only `approvals grant-standing` creates `<state>/standing-grants.sqlite3`, the hourly count:
+  when the file is removed, every write a grant covers is `unavailable` until the key holder
+  runs `grant-standing` again, and the count then starts at zero.
+  A number in a grant's target `value` is an integer from -9223372036854775808 to
+  18446744073709551615: `grant-standing` refuses any other number (`invalid_input`), and a
+  served host now refuses a mounted grant file whose target holds one (a fraction, an
+  exponent, `-0`) as malformed, answering every write `unavailable`.
 
 ## 0.76.0 — 2026-11-23
 

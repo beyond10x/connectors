@@ -179,7 +179,8 @@ fn still_admitted(
 /// The grant path's admission, in place of the proof check and before the
 /// audit anchor and the preflight: the published policy and the instance's
 /// current key as the proof check holds them, then one call to
-/// `standing::admit`, which takes one use. The leases end with this call.
+/// `standing::admit_in`, which takes one use in the store the state
+/// directory holds. The leases end with this call.
 fn admit<'a>(
     paths: &Paths,
     current: &issuance::Resolved,
@@ -205,15 +206,7 @@ fn admit<'a>(
     // The value `resolve` checked, from the bytes the adapter is sent.
     let input: Value =
         connectors_core::read_json(request.input.as_bytes()).map_err(|_| Code::InvalidInput)?;
-    let uses = match uses.get() {
-        Some(uses) => uses,
-        None => {
-            let opened = standing::Uses::open(&paths.state)
-                .map_err(|_| standing_error(paths, standing::NotAdmitted::UsesUnavailable))?;
-            uses.get_or_init(|| opened)
-        }
-    };
-    let taken = standing::admit(
+    let taken = standing::admit_in(
         path,
         keys.key().map_err(issuance::key_error)?,
         standing::Call {
@@ -222,7 +215,14 @@ fn admit<'a>(
             input: &input,
         },
         standing::reading(clock),
-        uses,
+        // The store the state directory holds, asked for once a grant covers
+        // the write. The owner never creates it: `approvals grant-standing`
+        // does, under the signing key, so a removed store answers
+        // `unavailable` here and cannot start the hourly count again.
+        || match uses.get() {
+            Some(uses) => Ok(uses),
+            None => standing::Uses::open(&paths.state).map(|opened| uses.get_or_init(|| opened)),
+        },
     )
     .map_err(|refusal| standing_error(paths, refusal))?;
     Ok(Approval::Grant { taken, input })
@@ -304,6 +304,8 @@ pub(in crate::local::owner) fn execute(
             }
             None => admit(paths, &current, request, &clock, &uses)?,
         };
+        #[cfg(test)]
+        seam::reached(seam::Step::Admitted);
         let bootstrap = child.bootstrap().clone();
         if serde_json::to_value(&bootstrap).map_err(|_| Code::Unavailable)?
             != serde_json::to_value(super::super::cached(paths, alias)?)
@@ -382,8 +384,15 @@ pub(in crate::local::owner) fn execute(
         let captured = connection_use.captured.as_ref().ok_or(Code::Unavailable)?;
         let version = captured.version();
         let selection = current.config.selection();
-        let material = custody::Store::open_for(version.scope(), &selection, &paths.state)
-            .and_then(|store| store.read(version));
+        #[cfg(test)]
+        let seamed = seam::credential();
+        #[cfg(not(test))]
+        let seamed = None;
+        let material = match seamed {
+            Some(material) => Ok(material),
+            None => custody::Store::open_for(version.scope(), &selection, &paths.state)
+                .and_then(|store| store.read(version)),
+        };
         let material = match material {
             Ok(value) => value,
             Err(error) => {
@@ -594,6 +603,8 @@ pub(in crate::local::owner) fn execute(
                 taken
                     .bind(attempt.attempt_id)
                     .map_err(|_| standing_error(paths, standing::NotAdmitted::UsesUnavailable))?;
+                #[cfg(test)]
+                seam::reached(seam::Step::Bound);
                 None
             }
         };
@@ -779,4 +790,47 @@ pub(in crate::local::owner) fn execute(
         Err(error) => return Err(error),
     }
     Ok(value)
+}
+
+/// What a test of `execute` sets on its own thread: the credential, in place
+/// of the custody read (a unit test has no Secret Service and no mount), and
+/// a hook called between two steps of the grant path. No production build
+/// holds this module.
+#[cfg(test)]
+pub(super) mod seam {
+    use connectors_sdk::Secret;
+    use std::cell::RefCell;
+
+    /// A point of `execute` a test acts at.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Step {
+        /// The write is admitted; nothing is prepared and no recheck has run.
+        Admitted,
+        /// The use is bound to the attempt; the recheck before the gate is next.
+        Bound,
+    }
+    pub struct Seam {
+        pub credential: Vec<u8>,
+        pub at: Box<dyn Fn(Step)>,
+    }
+    thread_local! {
+        static SEAM: RefCell<Option<Seam>> = const { RefCell::new(None) };
+    }
+    pub fn set(seam: Option<Seam>) {
+        SEAM.with(|slot| *slot.borrow_mut() = seam);
+    }
+    pub(super) fn credential() -> Option<Secret> {
+        SEAM.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .map(|seam| Secret(seam.credential.clone()))
+        })
+    }
+    pub(super) fn reached(step: Step) {
+        SEAM.with(|slot| {
+            if let Some(seam) = slot.borrow().as_ref() {
+                (seam.at)(step);
+            }
+        });
+    }
 }

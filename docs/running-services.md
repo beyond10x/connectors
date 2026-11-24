@@ -302,7 +302,10 @@ A grant covers a write when it names the host's instance and the operation, is n
 in `revoked`, its `not_after_unix_ms` is still in the future, and every `target` member holds
 in the input: the JSON pointer finds that exact value. `max_per_hour` (1 to 10,000) caps the
 writes admitted under the grant in any 3,600 seconds. A file holds at most 256 grants, each
-with 1 to 16 target members.
+with 1 to 16 target members. A number in a target `value` is an integer from
+-9223372036854775808 to 18446744073709551615; a file whose target holds any other number (a
+fraction, an exponent, `-0`) is refused as malformed, and an input that holds one at a target
+pointer is covered by no grant.
 
 A grant may also close the input with `input_keys`, a list of at most 16 JSON pointers
 (it may be empty) naming the members a caller may set beside the target:
