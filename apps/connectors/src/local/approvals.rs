@@ -75,20 +75,7 @@ pub(super) fn execute(call: &Invocation<'_>, until: Instant) -> owner::Result<Va
     if call.callable == "approval-list-standing" {
         let grants: Vec<Value> = issuance::list_standing(&paths, alias, until)?
             .into_iter()
-            .map(|grant| {
-                let mut view = json!({
-                    "grant_id": grant.id,
-                    "operation": grant.operation,
-                    "target": grant.target,
-                    "not_after_unix_ms": grant.not_after_unix_ms,
-                    "max_per_hour": grant.max_per_hour,
-                });
-                // Absent for a grant that leaves the rest of its input open.
-                if let Some(keys) = grant.input_keys {
-                    view["input_keys"] = json!(keys);
-                }
-                view
-            })
+            .map(standing_view)
             .collect();
         return Ok(json!({"grants":grants}));
     }
@@ -117,5 +104,66 @@ pub(super) fn execute(call: &Invocation<'_>, until: Instant) -> owner::Result<Va
             )
         }
         _ => Err(Code::Unsupported.into()),
+    }
+}
+
+/// One grant as `approvals list-standing` shows it.
+fn standing_view(grant: standing::Grant) -> Value {
+    // A pattern member is shown with `max_value_bytes`.
+    let target: Vec<Value> = grant.target.iter().map(|member| member.listed()).collect();
+    let mut view = json!({
+        "grant_id": grant.id,
+        "operation": grant.operation,
+        "target": target,
+        "not_after_unix_ms": grant.not_after_unix_ms,
+        "max_per_hour": grant.max_per_hour,
+    });
+    // Absent for a grant that leaves the rest of its input open.
+    if let Some(keys) = grant.input_keys {
+        view["input_keys"] = json!(keys);
+    }
+    view
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// contracts/cli/v1alpha1/semantics.md, "Standing grants": the answer of
+    /// `approvals list-standing` shows each target member with the key it was
+    /// written with, and a pattern member also with `max_value_bytes`, which
+    /// the file does not hold.
+    #[test]
+    fn a_listed_standing_grant_shows_max_value_bytes_on_its_pattern_member_only() {
+        let target = json!([
+            {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"},
+            {"pointer": "/project", "value": "DEV"},
+            {"pointer": "/target_status", "one_of": ["10000", "10235"]}
+        ]);
+        let file = json!({
+            "format": standing::FORMAT,
+            "grants": [{
+                "id": "g1", "instance": "leaf", "operation": "issue.transition.run",
+                "target": target, "input_keys": ["/body"],
+                "not_after_unix_ms": 2_000_000_000_000_i64, "max_per_hour": 3
+            }],
+            "revoked": []
+        });
+        let grants = standing::parse(&serde_json::to_vec(&file).unwrap()).unwrap();
+        assert_eq!(
+            standing_view(grants.grants()[0].clone()),
+            json!({
+                "grant_id": "g1",
+                "operation": "issue.transition.run",
+                "target": [
+                    {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$", "max_value_bytes": 22055},
+                    {"pointer": "/project", "value": "DEV"},
+                    {"pointer": "/target_status", "one_of": ["10000", "10235"]}
+                ],
+                "input_keys": ["/body"],
+                "not_after_unix_ms": 2_000_000_000_000_i64,
+                "max_per_hour": 3
+            })
+        );
     }
 }

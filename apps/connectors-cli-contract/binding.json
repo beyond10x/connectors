@@ -10057,11 +10057,35 @@
                     "of": {
                       "kind": "struct",
                       "fields": {
+                        "max_value_bytes": {
+                          "kind": "optional",
+                          "of": {
+                            "kind": "integer"
+                          }
+                        },
+                        "one_of": {
+                          "kind": "optional",
+                          "of": {
+                            "kind": "list",
+                            "of": {
+                              "kind": "json"
+                            }
+                          }
+                        },
+                        "pattern": {
+                          "kind": "optional",
+                          "of": {
+                            "kind": "string"
+                          }
+                        },
                         "pointer": {
                           "kind": "string"
                         },
                         "value": {
-                          "kind": "json"
+                          "kind": "optional",
+                          "of": {
+                            "kind": "json"
+                          }
                         }
                       }
                     }

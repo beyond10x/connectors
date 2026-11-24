@@ -1,5 +1,5 @@
 {
-  "digest": "6cf736dff69980475033cfbe584b4ec33627fb4d6b181fda47eec84c662c2ace",
+  "digest": "b52e6000cd3f528c40bfc3dea74bf5ad4044537aaf999f4af4f7c5b595949f2e",
   "ess_crates": [
     "entity-core 0.28.0",
     "entity-core 0.33.1",
@@ -54,7 +54,7 @@
     },
     {
       "path": "ess/domains/cli.yaml",
-      "sha256": "cab561fc381f56e3a6852d8ba8bd5e27a9a00356e2777dbf2d84916331ebeb0d"
+      "sha256": "d51ad2e2fdcfb651db5f16c46c87a16a0a061b40aa17d45449ee83558a6af7d4"
     },
     {
       "path": "ess/domains/clock.yaml",
@@ -130,7 +130,7 @@
     },
     {
       "path": "ess/domains/standing_approvals.yaml",
-      "sha256": "4fdb13f19633fba51e26a76ef66024495241139a01f2fdca850e7709eb2195c0"
+      "sha256": "e2e463e3712186dcdc1e57b7cb6ab94694dbf3fbc1e0e3ae5c22bf30a2dbe6ab"
     },
     {
       "path": "ess/domains/tool_contracts.yaml",

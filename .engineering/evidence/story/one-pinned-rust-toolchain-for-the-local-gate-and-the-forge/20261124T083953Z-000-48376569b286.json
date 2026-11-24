@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-24T08:39:53Z",
+  "actor": "human:timo",
+  "artifact": "story:one-pinned-rust-toolchain-for-the-local-gate-and-the-forge",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate of pull request 291 (merged as df1f2c5b1, released as 0.77.1)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45347833336/job/138286605895"
+  }
+}

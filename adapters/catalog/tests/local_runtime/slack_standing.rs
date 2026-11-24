@@ -526,18 +526,25 @@ impl Bot {
     /// writes an hour, the text and the thread open: the new grant's id.
     #[track_caller]
     fn grant(&self, not_after_unix_ms: i64, max_per_hour: u64, name: &str) -> String {
-        let request = self.private_dir.join(name);
-        private(
-            &request,
-            &serde_json::to_vec(&json!({
+        self.grant_request(
+            &json!({
                 "operation": "chat.postMessage",
                 "target": [{"pointer": "/body/channel", "value": CHANNEL}],
                 "input_keys": ["/body/text", "/body/thread_ts"],
                 "not_after_unix_ms": not_after_unix_ms,
                 "max_per_hour": max_per_hour
-            }))
-            .unwrap(),
-        );
+            }),
+            name,
+        )
+    }
+
+    /// `approvals grant-standing` for the document `request`, written to the
+    /// private file `name`: the new grant's id.
+    #[track_caller]
+    fn grant_request(&self, request: &Value, name: &str) -> String {
+        let document = request;
+        let request = self.private_dir.join(name);
+        private(&request, &serde_json::to_vec(document).unwrap());
         let granted = success(self.run(&[
             "approvals",
             "grant-standing",
@@ -548,13 +555,16 @@ impl Bot {
         granted["grant_id"].as_str().unwrap().to_owned()
     }
 
+    /// 3600 s after the fixture clock's midpoint, in milliseconds.
+    fn in_an_hour() -> i64 {
+        i64::try_from(clock_fixture::Fixture::default().midpoint * 1000).unwrap() + 3_600_000
+    }
+
     /// The first grant of a journey: it ends 3600 s after the fixture clock's
     /// midpoint.
     #[track_caller]
     fn grant_for_an_hour(&self, max_per_hour: u64) -> String {
-        let not_after =
-            i64::try_from(clock_fixture::Fixture::default().midpoint * 1000).unwrap() + 3_600_000;
-        self.grant(not_after, max_per_hour, "grant-1.json")
+        self.grant(Self::in_an_hour(), max_per_hour, "grant-1.json")
     }
 
     #[track_caller]
@@ -625,6 +635,54 @@ fn a_slack_bot_post_is_admitted_under_a_standing_grant_and_replayed_by_its_key()
     let held = bot.listed();
     assert_eq!(held.as_array().unwrap().len(), 1, "{held}");
     assert_eq!(held[0]["grant_id"], first.as_str(), "{held}");
+    // The answer shows each target member with the key it was written with,
+    // and a pattern member also with `max_value_bytes`, the longest value it
+    // is matched against (contracts/cli/v1alpha1/semantics.md, "Standing
+    // grants"): 22,055 bytes for `^DEV-[0-9]+$`. An exact member and a value
+    // set hold no such key. The second grant covers no send of this journey:
+    // none holds `thread_ts`.
+    assert_eq!(
+        held[0]["target"],
+        json!([{"pointer": "/body/channel", "value": CHANNEL}]),
+        "{held}"
+    );
+    let many = bot.grant_request(
+        &json!({
+            "operation": "chat.postMessage",
+            "target": [
+                {"pointer": "/body/channel", "value": CHANNEL},
+                {"pointer": "/body/text", "pattern": "^DEV-[0-9]+$"},
+                {"pointer": "/body/thread_ts", "one_of": [POSTED_TS, "1780000701.000701"]}
+            ],
+            "not_after_unix_ms": Bot::in_an_hour(),
+            "max_per_hour": 3
+        }),
+        "grant-many.json",
+    );
+    let held = bot.listed();
+    assert_eq!(held.as_array().unwrap().len(), 2, "{held}");
+    let target_of = |id: &str| {
+        let grant = held
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|grant| grant["grant_id"] == id);
+        grant.unwrap_or_else(|| panic!("{id} is not listed: {held}"))["target"].clone()
+    };
+    assert_eq!(
+        target_of(&first),
+        json!([{"pointer": "/body/channel", "value": CHANNEL}]),
+        "{held}"
+    );
+    assert_eq!(
+        target_of(&many),
+        json!([
+            {"pointer": "/body/channel", "value": CHANNEL},
+            {"pointer": "/body/text", "pattern": "^DEV-[0-9]+$", "max_value_bytes": 22055},
+            {"pointer": "/body/thread_ts", "one_of": [POSTED_TS, "1780000701.000701"]}
+        ]),
+        "{held}"
+    );
     bot.stamp("b");
 
     // c. A keyed send to the granted channel is admitted and names the grant.

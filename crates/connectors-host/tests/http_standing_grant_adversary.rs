@@ -64,6 +64,7 @@ impl Adapter for Fixture {
                 operation("issue.read", "read"),
                 operation("issue.create", "mutation"),
                 operation("issue.close", "mutation"),
+                operation("issue.transition.run", "mutation"),
             ],
         }
     }
@@ -757,4 +758,307 @@ fn adversary_the_last_slot_is_taken_once_and_the_window_is_one_hour() {
             .unwrap(),
         Taken::Slot(_)
     ));
+}
+
+// story:standing-grant-binds-a-pattern-or-a-value-set, the served placement:
+// a target member holds one of `value`, `pattern` and `one_of`.
+
+/// The transition grant of that story's consumer, as an operator mounts it.
+fn transition_grant() -> Value {
+    json!({
+        "id": "g-transition", "instance": INSTANCE, "operation": "issue.transition.run",
+        "target": [
+            {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"},
+            {"pointer": "/target_status",
+             "one_of": ["10000", "10235", "3", "10234", "10223", "10001"]}
+        ],
+        "input_keys": ["/current_status", "/body/transition/id"],
+        "not_after_unix_ms": LATER, "max_per_hour": 500
+    })
+}
+/// One hop of `ticket` to the status 10234, as the consumer sends it.
+fn transition(ticket: &str) -> Value {
+    json!({
+        "issueIdOrKey": ticket, "current_status": "3", "target_status": "10234",
+        "body": {"transition": {"id": "31"}}
+    })
+}
+
+/// Acceptance 5a, the served half, and 13: a write the pattern refuses is
+/// refused with the code `a_write_to_another_target_is_refused_with_no_request`
+/// asserts, before any attempt, use or provider request; the write the grant
+/// covers is sent once, and its replay takes no second use.
+#[tokio::test]
+async fn a_served_write_outside_a_pattern_grant_reaches_no_provider() {
+    let root = tempfile::tempdir().unwrap();
+    let grants = root.path().join("grants.json");
+    put(&grants, &grant_file(json!([transition_grant()]), json!([])));
+    let store = root.path().join("state");
+    let host = start(root, grants).await;
+    let rows = || {
+        Uses::existing(&store)
+            .unwrap()
+            .map(|uses| uses.rows().unwrap())
+    };
+    let run = |request_id: &str, key: &str, ticket: &str| {
+        write(
+            request_id,
+            Some(key),
+            "issue.transition.run",
+            transition(ticket),
+        )
+    };
+
+    let (status, refused) = invoke(&host.endpoint, &run("w-1", "key-1", "OPS-12")).await;
+    assert_eq!(
+        (status, code(&refused)),
+        (403, Some(ErrorCode::ApprovalRequired)),
+        "{refused:?}"
+    );
+    assert!(refused.audit_ref.is_none() && refused.mutation.is_none());
+    assert_eq!(host.state.attempt_count().unwrap(), 0);
+    assert_eq!(host.requests(), 0, "a refused write reached the provider");
+    assert_eq!(rows(), Some(0));
+
+    // The control: the same write to a ticket the pattern matches.
+    let (status, admitted) = invoke(&host.endpoint, &run("w-2", "key-2", "DEV-12")).await;
+    assert_eq!((status, code(&admitted)), (200, None), "{admitted:?}");
+    assert!(!admitted.mutation.unwrap().replayed);
+    assert_eq!(host.requests(), 1);
+    assert_eq!(rows(), Some(1));
+
+    // Its replay: the original outcome, no request and no use.
+    let (status, replay) = invoke(&host.endpoint, &run("w-3", "key-2", "DEV-12")).await;
+    assert_eq!((status, code(&replay)), (200, None), "{replay:?}");
+    assert!(replay.mutation.unwrap().replayed);
+    assert_eq!(host.requests(), 1, "the replay reached the provider");
+    assert_eq!(rows(), Some(1), "the replay took a use");
+}
+
+/// Acceptance 11: a served grant file that holds one member or grant the
+/// local `grant-standing` refuses is unreadable as a whole, so every keyed
+/// write is `unavailable`, also the write another grant of the file covers.
+#[tokio::test]
+async fn a_served_file_with_a_bad_member_is_unavailable() {
+    // A pattern of at most 256 bytes that compiles to more than the size
+    // limit: `OVER_THE_SIZE_LIMIT` of `local::standing`'s tests.
+    const OVER_THE_SIZE_LIMIT: &str = "^[a-z]{907}$";
+    let other = |id: &str, target: Value, input_keys: Option<Value>| {
+        let mut grant = json!({
+            "id": id, "instance": INSTANCE, "operation": "issue.close",
+            "target": target, "not_after_unix_ms": LATER, "max_per_hour": 1
+        });
+        if let Some(input_keys) = input_keys {
+            grant["input_keys"] = input_keys;
+        }
+        grant
+    };
+    let member = |member: Value| other("g-other", json!([member]), None);
+    let exact = |pointer: &str| json!({"pointer": pointer, "value": "x"});
+    let patterns = |id: &str, count: usize| {
+        let target: Vec<Value> = (0..count)
+            .map(|n| json!({"pointer": format!("/k{n}"), "pattern": "^a$"}))
+            .collect();
+        other(id, json!(target), None)
+    };
+    let values = |count: usize| -> Value { (0..count).map(|n| json!(format!("v{n}"))).collect() };
+    let dev = "^DEV-[0-9]+$";
+
+    // The control: a file that holds every form beside the grant for
+    // `widgets` is read, and that grant admits its write.
+    let readable = grant_file(
+        json!([
+            grant("g-widgets", 100),
+            other(
+                "g-pattern",
+                json!([{"pointer": "/k", "pattern": dev}]),
+                None
+            ),
+            other(
+                "g-set",
+                json!([{"pointer": "/k", "one_of": values(64)}]),
+                None
+            ),
+            other("g-null", json!([{"pointer": "/k", "value": null}]), None),
+            other(
+                "g-index",
+                json!([{"pointer": "/a/list/0/text", "pattern": "^x$"}]),
+                Some(json!(["/a/list"]))
+            ),
+            patterns("g-many", 15),
+        ]),
+        json!([]),
+    );
+    let root = tempfile::tempdir().unwrap();
+    let grants = root.path().join("grants.json");
+    put(&grants, &readable);
+    let host = start(root, grants.clone()).await;
+    let (status, admitted) = invoke(
+        &host.endpoint,
+        &write("w-0", Some("key-0"), "issue.create", widgets("first")),
+    )
+    .await;
+    assert_eq!((status, code(&admitted)), (200, None), "{admitted:?}");
+    assert_eq!(host.requests(), 1);
+
+    let bad: Vec<(&str, Vec<Value>)> = vec![
+        // Acceptance 6.
+        (
+            "a pattern that does not compile",
+            vec![member(json!({"pointer": "/k", "pattern": "^(a$"}))],
+        ),
+        (
+            "no leading ^",
+            vec![member(json!({"pointer": "/k", "pattern": "DEV-[0-9]+$"}))],
+        ),
+        (
+            "no trailing $",
+            vec![member(json!({"pointer": "/k", "pattern": "^DEV-[0-9]+"}))],
+        ),
+        (
+            "a pattern of 257 bytes",
+            vec![member(
+                json!({"pointer": "/k", "pattern": format!("^{}$", "a".repeat(255))}),
+            )],
+        ),
+        (
+            "a pattern over the size limit",
+            vec![member(
+                json!({"pointer": "/k", "pattern": OVER_THE_SIZE_LIMIT}),
+            )],
+        ),
+        // Acceptance 7.
+        (
+            "an empty set",
+            vec![member(json!({"pointer": "/k", "one_of": []}))],
+        ),
+        (
+            "65 values",
+            vec![member(json!({"pointer": "/k", "one_of": values(65)}))],
+        ),
+        (
+            "one value twice",
+            vec![member(json!({"pointer": "/k", "one_of": ["a", "a"]}))],
+        ),
+        // Acceptance 8.
+        (
+            "value and pattern",
+            vec![member(
+                json!({"pointer": "/k", "value": "DEV-1", "pattern": dev}),
+            )],
+        ),
+        (
+            "a null value and a pattern",
+            vec![member(
+                json!({"pointer": "/k", "value": null, "pattern": dev}),
+            )],
+        ),
+        (
+            "pattern and one_of",
+            vec![member(
+                json!({"pointer": "/k", "pattern": dev, "one_of": ["DEV-1"]}),
+            )],
+        ),
+        ("none of the three", vec![member(json!({"pointer": "/k"}))]),
+        (
+            "pattern null",
+            vec![member(json!({"pointer": "/k", "pattern": null}))],
+        ),
+        (
+            "one_of null",
+            vec![member(json!({"pointer": "/k", "one_of": null}))],
+        ),
+        // Acceptance 9: 65 pattern members in the file.
+        (
+            "65 pattern members",
+            vec![
+                patterns("g-1", 16),
+                patterns("g-2", 16),
+                patterns("g-3", 16),
+                patterns("g-4", 16),
+                patterns("g-5", 1),
+            ],
+        ),
+        // Acceptance 10.
+        (
+            "an object member below an input key",
+            vec![other(
+                "g-other",
+                json!([exact("/a/b")]),
+                Some(json!(["/a"])),
+            )],
+        ),
+        (
+            "an index with a leading zero below an input key",
+            vec![other(
+                "g-other",
+                json!([exact("/a/01")]),
+                Some(json!(["/a"])),
+            )],
+        ),
+        (
+            "an input key equal to a target",
+            vec![other("g-other", json!([exact("/a")]), Some(json!(["/a"])))],
+        ),
+        (
+            "a target above an input key",
+            vec![other(
+                "g-other",
+                json!([exact("/a")]),
+                Some(json!(["/a/0"])),
+            )],
+        ),
+        (
+            "two input keys, one above the other",
+            vec![other(
+                "g-other",
+                json!([exact("/b")]),
+                Some(json!(["/a", "/a/0"])),
+            )],
+        ),
+        (
+            "two targets, one above the other, on a closed grant",
+            vec![other(
+                "g-other",
+                json!([exact("/a/0"), exact("/a/0/text")]),
+                Some(json!([])),
+            )],
+        ),
+    ];
+    for (index, (case, more)) in bad.into_iter().enumerate() {
+        let mut all = vec![grant("g-widgets", 100)];
+        all.extend(more);
+        let document = grant_file(json!(all), json!([]));
+        assert_eq!(
+            standing::parse(&serde_json::to_vec(&document).unwrap()).err(),
+            Some(Unreadable::Malformed),
+            "{case}"
+        );
+        put(&grants, &document);
+        let (status, refused) = invoke(
+            &host.endpoint,
+            &write(
+                &format!("w-bad-{index}"),
+                Some(&format!("key-bad-{index}")),
+                "issue.create",
+                widgets("next"),
+            ),
+        )
+        .await;
+        assert_eq!(
+            (status, code(&refused)),
+            (503, Some(ErrorCode::Unavailable)),
+            "{case}: {refused:?}"
+        );
+        assert_eq!(host.requests(), 1, "{case}");
+    }
+    // The file is read on every call: the readable one admits again.
+    put(&grants, &readable);
+    let (status, admitted) = invoke(
+        &host.endpoint,
+        &write("w-last", Some("key-last"), "issue.create", widgets("last")),
+    )
+    .await;
+    assert_eq!((status, code(&admitted)), (200, None), "{admitted:?}");
+    assert_eq!(host.requests(), 2);
 }
