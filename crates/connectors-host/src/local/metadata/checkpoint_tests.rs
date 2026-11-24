@@ -3,7 +3,7 @@
 //! answers before the whole store was verified, so a raw edit of the file made
 //! while no handle was open is refused before the first command after it
 //! (`decision-blocker:checkpoint-offline-edit-detection`, option B).
-use super::{Checkpoints, Metadata, NAME, er, exit_process, simulate_process};
+use super::{Checkpoints, Metadata, NAME, er, exit_process, own_processes, simulate_process};
 use crate::local::{Failure, filesystem as fs};
 use entity_eventlog::OpenVerification;
 use rusqlite::{Connection, OpenFlags, params};
@@ -173,6 +173,7 @@ fn an_offline_raw_edit_is_refused_when_the_owner_starts() {
 /// verifies nothing again (story:cold-owner-start-verifies-once).
 #[test]
 fn a_fresh_open_verifies_once_and_a_reopen_in_its_process_not_again() {
+    let _processes = own_processes();
     let (_root, path) = store();
     simulate_process(50);
     drop(Metadata::initialize(&path).unwrap());
@@ -203,6 +204,7 @@ fn a_fresh_open_verifies_once_and_a_reopen_in_its_process_not_again() {
 /// another afresh at once, never waiting for itself.
 #[test]
 fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again() {
+    let processes = own_processes();
     let (_root, path) = store();
     simulate_process(60);
     drop(Metadata::initialize(&path).unwrap());
@@ -216,7 +218,9 @@ fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again()
     let held = Metadata::inspect(&path).unwrap();
     let other = {
         let path = path.clone();
+        let namespace = processes.namespace();
         std::thread::spawn(move || {
+            namespace.enter();
             simulate_process(62);
             let started = Instant::now();
             drop(Metadata::inspect(&path).unwrap());
@@ -258,6 +262,7 @@ fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again()
 /// store a second time (story:cold-owner-start-verifies-once).
 #[test]
 fn a_locked_open_waits_for_the_handle_an_inspection_uses_instead_of_verifying_again() {
+    let processes = own_processes();
     let (_root, path) = store();
     simulate_process(90);
     drop(Metadata::initialize(&path).unwrap());
@@ -271,7 +276,9 @@ fn a_locked_open_waits_for_the_handle_an_inspection_uses_instead_of_verifying_ag
     let held = Metadata::inspect(&path).unwrap();
     let locked = {
         let path = path.clone();
+        let namespace = processes.namespace();
         std::thread::spawn(move || {
+            namespace.enter();
             simulate_process(92);
             let started = Instant::now();
             let opened = Metadata::update(&path, false).map(drop);
@@ -302,6 +309,7 @@ fn a_locked_open_waits_for_the_handle_an_inspection_uses_instead_of_verifying_ag
 /// relocked after it; now one of the two waits out its bound.
 #[test]
 fn a_locked_open_never_waits_for_a_handle_whose_user_waits_for_its_lock() {
+    let processes = own_processes();
     let (_root, path) = store();
     simulate_process(80);
     drop(Metadata::initialize(&path).unwrap());
@@ -317,7 +325,9 @@ fn a_locked_open_never_waits_for_a_handle_whose_user_waits_for_its_lock() {
     let mut observation = Metadata::update_observation(&path).unwrap();
     let locked = {
         let path = path.clone();
+        let namespace = processes.namespace();
         std::thread::spawn(move || {
+            namespace.enter();
             simulate_process(82);
             super::set_lifecycle_lock_wait(lock_wait);
             let started = Instant::now();
@@ -347,6 +357,7 @@ fn a_locked_open_never_waits_for_a_handle_whose_user_waits_for_its_lock() {
 /// the store, and is the store's authority; a missing store has none.
 #[test]
 fn the_greeting_authority_is_read_without_a_replay() {
+    let _processes = own_processes();
     let (_root, path) = store();
     simulate_process(40);
     drop(Metadata::initialize(&path).unwrap());
@@ -371,6 +382,7 @@ fn the_greeting_authority_is_read_without_a_replay() {
 /// of a different store never waits for that handle.
 #[test]
 fn a_wait_for_a_used_handle_ends_at_the_callers_deadline_and_never_spans_stores() {
+    let processes = own_processes();
     let (_root, path) = store();
     let (_other_root, other) = store();
     simulate_process(91_701);
@@ -389,7 +401,9 @@ fn a_wait_for_a_used_handle_ends_at_the_callers_deadline_and_never_spans_stores(
     let deadline = Duration::from_millis(500);
     let waiter = {
         let path = path.clone();
+        let namespace = processes.namespace();
         std::thread::spawn(move || {
+            namespace.enter();
             simulate_process(91_704);
             let started = Instant::now();
             let opened = super::deadline::within(Instant::now() + deadline, || {
@@ -400,7 +414,9 @@ fn a_wait_for_a_used_handle_ends_at_the_callers_deadline_and_never_spans_stores(
     };
     let across = {
         let other = other.clone();
+        let namespace = processes.namespace();
         std::thread::spawn(move || {
+            namespace.enter();
             simulate_process(91_704);
             let started = Instant::now();
             let opened = Metadata::inspect(&other).map(drop);

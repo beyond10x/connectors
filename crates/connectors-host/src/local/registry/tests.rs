@@ -2275,6 +2275,7 @@ fn replay_fixture(events: i64) -> (tempfile::TempDir, Registry, String) {
 
 #[test]
 fn a_read_invoke_against_a_grown_store_replays_it_at_most_once() {
+    let _processes = super::super::metadata::own_processes();
     let (root, registry, reference) = replay_fixture(150);
     assert!(recorded_events(root.path()) >= 150);
     let replays = read_invoke(root.path(), &registry, &reference, NOW + 2);
@@ -2296,6 +2297,78 @@ fn a_read_invoke_against_a_grown_store_replays_it_at_most_once() {
     let replayed = Metadata::inspect(root.path()).unwrap().recorded_rows();
     assert!(!held.is_empty());
     assert_eq!(held, replayed);
+}
+
+/// The complete replays of a read invoke against a store whose owner has
+/// served one before (`read_invoke`, the helper of
+/// `a_read_invoke_against_a_grown_store_replays_it_at_most_once`), with
+/// `between` run between the two and handed the process id the second
+/// invoke's CLI acts as. The store is not grown: what is counted is whether
+/// the owner's handle is used again, which no store size changes.
+fn replays_of_the_read_invoke_after(between: impl FnOnce(u64)) -> u64 {
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    read_invoke(root.path(), &registry, &reference, NOW + 1);
+    between(NOW + 2);
+    read_invoke(root.path(), &registry, &reference, NOW + 2)
+}
+
+/// `cargo test -p connectors-host` (`.github/workflows/macos-host.yml`,
+/// `windows-host.yml`) runs the tests of this binary as threads of one process,
+/// and the idle handles of all of them are in one pool, bounded per process id.
+/// Here five threads do between two read invokes what other tests do: each
+/// pools a handle of a store of its own as process 1, the owner of every
+/// invoke helper, and as the process id the next invoke's CLI acts as. That
+/// evicted the owner's handle of this test's store, whose next open was then a
+/// second complete replay (release 0.76.2, "host and CLI on windows-latest").
+/// The test acts in a namespace of process ids of its own (`own_processes`);
+/// the five threads act outside it, as the threads of other tests do.
+#[test]
+fn a_read_invoke_replays_at_most_once_while_other_tests_pool_handles_as_its_process_ids() {
+    let _processes = super::super::metadata::own_processes();
+    let replays = replays_of_the_read_invoke_after(|cli| {
+        let others = (0..5)
+            .map(|_| {
+                std::thread::spawn(move || {
+                    let (root, _registry) = fixture();
+                    for process in [1, cli] {
+                        super::super::metadata::simulate_process(process);
+                        drop(Metadata::inspect(root.path()).unwrap());
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for other in others {
+            other.join().unwrap();
+        }
+    });
+    assert!(
+        replays <= 1,
+        "a read invoke replayed the whole store {replays} times after other test threads pooled five handles as process 1 and as its CLI's process id"
+    );
+}
+
+/// As above for the other way one test closed another's idle handles: a test
+/// that ends the process it acts as (`exit_process`) closes every idle handle
+/// of that process id, whichever test thread opened it.
+#[test]
+fn a_read_invoke_replays_at_most_once_after_another_test_ends_its_process_ids() {
+    let _processes = super::super::metadata::own_processes();
+    let replays = replays_of_the_read_invoke_after(|cli| {
+        std::thread::spawn(move || {
+            for process in [1, cli] {
+                super::super::metadata::simulate_process(process);
+                super::super::metadata::exit_process();
+            }
+        })
+        .join()
+        .unwrap();
+    });
+    assert!(
+        replays <= 1,
+        "a read invoke replayed the whole store {replays} times after another test thread ended process 1 and its CLI's process id"
+    );
 }
 
 /// A seeded store, reused from `saved` when it holds one so that two builds

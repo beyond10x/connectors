@@ -7,7 +7,7 @@
 //! the held authority refuses too, and what a held authority accounts for after
 //! catching up equals what a fresh replay reads.
 use super::Failure;
-use super::metadata::{Metadata, full_replays, simulate_process};
+use super::metadata::{Metadata, full_replays, own_processes, simulate_process};
 use rusqlite::params;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -73,6 +73,7 @@ fn events(root: &Path) -> Vec<(i64, String, String)> {
 /// At base every open was a fresh open, so this held by construction.
 #[test]
 fn a_held_authority_refuses_every_in_place_alteration_a_fresh_open_refuses() {
+    let _processes = own_processes();
     let root = store();
     seed(root.path(), &["sec-a", "sec-b", "sec-c", "sec-d"]);
     flip(root.path(), "sec-c");
@@ -135,6 +136,7 @@ fn a_held_authority_refuses_every_in_place_alteration_a_fresh_open_refuses() {
 /// for afterwards equals a complete replay in a fresh process.
 #[test]
 fn an_owner_batch_over_a_subject_another_process_wrote_equals_a_fresh_replay() {
+    let _processes = own_processes();
     let root = store();
     seed(root.path(), &["cu-a", "cu-b", "cu-c"]);
     let owner = 0x5ec_2001_u64;
