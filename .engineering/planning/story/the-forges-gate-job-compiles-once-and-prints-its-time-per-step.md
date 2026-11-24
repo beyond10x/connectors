@@ -2,12 +2,15 @@
 format: aep.planning-md/3
 id: story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step
 kind: story
-status: draft
+status: active
 title: The forge's gate job compiles its test binaries once and prints its time per step
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
 ---
 ## Defect
 
@@ -77,6 +80,52 @@ its output, then starts each test executable with `--list`. The gate compiled th
 12 minutes earlier with another command line (`cargo nextest`, a `--config` for the target's
 runner). Whether the 688 s are a second compile of the 240 test binaries with 2 jobs, or the
 listing, is the first measurement of this story.
+
+### Measured 2026-11-24: a build script runs again at each change of cargo's caller
+
+Job 138385972600 of run 45377042383 (pull request 293, 52 min 55 s, 3,175 s). Each line is read
+from the job's log; times in CET.
+
+- 11:54:56 `Compiling ring v0.17.14`: the first build, `cargo run --locked -p connectors-build --
+  gate` started by the workflow's shell (``Finished `dev` profile`` in 5 min 43 s).
+- 12:00:34 `Compiling ring v0.17.14` again, 1 s after the gate started its own `cargo build
+  --workspace`, then `rustls`, `reqwest`, `connectors-client`, `connectors-host` and what depends
+  on them (``Finished `dev` profile`` in 3 min 29 s, 209 s).
+- 12:35:35 `Compiling ring v0.17.14` again, when the workflow's shell starts `cargo run --locked
+  -p connectors-build -- ignored …`, then `connectors-host`, `connectors-spec` and
+  `connectors-build` (48 s).
+- 12:36:23 to 12:45:50: that program's `cargo test --workspace --no-run`, 567 s without a line,
+  then 4 tests in 2 s.
+- Two more compiles of `ring` belong to steps that build another unit: 12:29:27 the Windows
+  lint (`--target x86_64-pc-windows-gnu`), 12:33:20 `cargo build -p connectors-sql --lib
+  --no-default-features`.
+
+Cause, measured on the workstation in the tree of 0.78.0 with cargo 1.98.1:
+
+- `ring` 0.17.14 reads its environment through a wrapper (`build.rs`, `mod env`) that prints
+  `cargo:rerun-if-env-changed=<name>` for every variable it reads, among them
+  `CARGO_MANIFEST_DIR`, `CARGO_PKG_NAME` and `CARGO_PKG_VERSION_MAJOR`, `_MINOR`, `_PATCH` and
+  `_PRE`.
+- cargo compares a watched variable with its own environment. `cargo run` hands the program it
+  starts the package's `CARGO_MANIFEST_DIR` and `CARGO_PKG_*`, so a cargo that `connectors-build`
+  starts sees them set, and a cargo the shell starts sees them unset.
+- `cargo build --locked --offline -p ring -v`, twice from the shell: `Fresh ring v0.17.14`.
+- The same command with `CARGO_MANIFEST_DIR`, `CARGO_PKG_NAME` and the four version variables
+  set: `Dirty ring v0.17.14: the env variable CARGO_MANIFEST_DIR changed`, and `ring` is
+  compiled.
+- The same command from the shell again: the same `Dirty` line, and `ring` is compiled again.
+
+So each change between a cargo of the shell and a cargo of `connectors-build` compiles `ring`
+and everything that depends on it. In the job above that is the second build inside the gate
+(209 s) and the build at the start of the ignored step (48 s). Inferred, not read from a line:
+the 567 s without a line are the same thing once more, the test binaries of the workspace built
+again with 2 jobs after the shell's `cargo run` had made `ring` new (the gate's own build of the
+test binaries took 615 s). Together 824 s of the job's 3,175 s (26 %).
+
+Change made with this measurement: every cargo that `connectors-build` starts for a build
+(`gate`, `ignored`, the documentation build) is started without the `CARGO_MANIFEST_*` and
+`CARGO_PKG_*` variables it inherited (`cargo_program` in `crates/connectors-build/src/main.rs`;
+two tests there). What the forge's job takes after it is read from the first run that has it.
 
 ## Change
 

@@ -33,7 +33,7 @@ fn cargo(root: &Path, temp: &Path, ess: &Path, toolchain: Option<&str>) -> Resul
         .ok_or("gate temporary root is not valid UTF-8")?;
     let runner = serde_json::to_string(&["sh", "-c", r#"export TMPDIR="$0"; exec "$@""#, temp])?;
     let host = serde_json::to_string(host_triple()?)?;
-    let mut cmd = Command::new("cargo");
+    let mut cmd = super::cargo_program();
     if let Some(toolchain) = toolchain {
         cmd.arg(format!("+{toolchain}"));
     }
