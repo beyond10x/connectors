@@ -173,10 +173,20 @@ pub(super) fn run(
     // attempt on the same instance to make a background pass require time.
     let clock_calls = clock.count.load(Ordering::SeqCst);
     seed_unkeyed(cli, provider, subject);
-    let until = Instant::now() + Duration::from_secs(8);
+    // Two background passes, 5 s apart, and 3 s for the runner. The background keeps a scan
+    // cursor between its passes: when a pass already ended on the dispatching attempt and the
+    // seeded attempt's random identifier sorts before it, the next pass finds nothing after
+    // the cursor and starts over, and the pass after it asks for time
+    // (`a_pending_attempt_before_the_scans_cursor_is_returned_by_the_second_pass`). The loop
+    // ends at the first clock request, so a seeded attempt the next pass sees costs no wait.
+    let until = Instant::now() + Duration::from_secs(13);
     while clock.count.load(Ordering::SeqCst) == clock_calls {
         assert!(running.0.try_wait().unwrap().is_none());
-        assert!(Instant::now() < until, "background did not request time");
+        assert!(
+            Instant::now() < until,
+            "background did not request time within 13 s; attempts in scan order: {:?}",
+            cli.recorded().attempts_in_scan_order()
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
     // Allow the independent signed response and queue handoff to finish while
