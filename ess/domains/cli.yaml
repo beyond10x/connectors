@@ -114,15 +114,27 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
+  # One listed target member: connectors.standing_approvals.TargetMember as it
+  # is written, and a `pattern` member with `max_value_bytes` beside it, the
+  # longest value in bytes the pattern is matched against. The command
+  # computes it from the pattern; the file does not hold it.
+  - name: connectors.cli.StandingTargetView
+    kind: struct
+    fields:
+      - {name: pointer, type: String}
+      - {name: value, type: "Optional<Json>"}
+      - {name: pattern, type: "Optional<String>"}
+      - {name: one_of, type: "Optional<List<Json>>"}
+      - {name: max_value_bytes, type: "Optional<Integer>"}
   # One listed grant: connectors.standing_approvals.StandingGrant without its
-  # instance, its id under `grant_id`. `input_keys` is absent for a grant that
-  # has none.
+  # instance, its id under `grant_id`, each target member as a
+  # StandingTargetView. `input_keys` is absent for a grant that has none.
   - name: connectors.cli.StandingGrantView
     kind: struct
     fields:
       - {name: grant_id, type: String}
       - {name: operation, type: String}
-      - {name: target, type: "List<connectors.standing_approvals.TargetMember>"}
+      - {name: target, type: "List<connectors.cli.StandingTargetView>"}
       - {name: input_keys, type: "Optional<List<String>>"}
       - {name: not_after_unix_ms, type: Integer}
       - {name: max_per_hour, type: Integer}
@@ -2042,7 +2054,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1750, docs/local-connection-registry.md:235-236;
+    # contracts/cli/v1alpha1/semantics.md:1798, docs/local-connection-registry.md:235-236;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -2202,7 +2214,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1797) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1802) and the host
     # removal path (er.rs:5015-5017) only expires Active cursors. The error name is
     # the decision; no source names one.
 

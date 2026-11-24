@@ -35,3 +35,4 @@ mod template;
 mod template_adversarial;
 mod template_adversarial_two;
 mod walk_import_adversary;
+mod whole_value_patterns;

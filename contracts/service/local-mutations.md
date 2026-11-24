@@ -333,7 +333,7 @@ store by attempt: on a fresh write, on its replay and on a failure that has an
 attempt. A replay in the CLI process reads the store read-only and never
 creates it; with no store or no row the member is absent.
 
-What a grant covers is the served rule, and two parts of it matter to a
+What a grant covers is the served rule, and four parts of it matter to a
 reader of a grant:
 
 - A closed list limits its own grant only. Each covering grant is a
@@ -343,7 +343,20 @@ reader of a grant:
 - Arrays are leaves. A pointer does not reach into an array: a listed array
   admits any elements, a pointer into one (`/body/blocks/0`) covers nothing,
   and a grant with `input_keys` whose target points into an array covers no
-  input.
+  input unless an `input_keys` pointer lists that array (the array-index
+  relaxation of the served rule).
+- A target member binds an exact `value`, a `pattern` or a `one_of`
+  (story:standing-grant-binds-a-pattern-or-a-value-set). A pattern admits a
+  string only, and only when all of it matches; a `one_of` admits each of
+  its 1 to 64 values as `value` admits its one. One grant with a pattern
+  covers writes to many targets, and they share its one hourly count: the
+  use is counted by grant, whatever the member matched. A write a member
+  does not admit takes no use and is `approval_required`, as for another
+  exact value.
+- The owner reads the file up to three times per write (the admission and
+  the two rechecks). Each read compiles the file's patterns again, at most
+  64 of them, each within the compiled-size limit of the served rule, and
+  keeps none.
 
 Revocation and its limit. The grant file is the one authority: revoking
 removes the grant from the file, the file is signed again, and nothing is

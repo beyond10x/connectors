@@ -300,12 +300,58 @@ not start.
 
 A grant covers a write when it names the host's instance and the operation, is not listed
 in `revoked`, its `not_after_unix_ms` is still in the future, and every `target` member holds
-in the input: the JSON pointer finds that exact value. `max_per_hour` (1 to 10,000) caps the
+in the input: the JSON pointer finds a value the member admits, in the example that exact
+value. `max_per_hour` (1 to 10,000) caps the
 writes admitted under the grant in any 3,600 seconds. A file holds at most 256 grants, each
 with 1 to 16 target members. A number in a target `value` is an integer from
 -9223372036854775808 to 18446744073709551615; a file whose target holds any other number (a
 fraction, an exponent, `-0`) is refused as malformed, and an input that holds one at a target
 pointer is covered by no grant.
+
+A target member binds its pointer in one of three ways, and holds exactly one of the three
+keys:
+
+```json
+{"pointer": "/owner", "value": "acme"}
+{"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"}
+{"pointer": "/target_status", "one_of": ["10000", "10235"]}
+```
+
+- `value` is the exact value. It may be `null` and then admits `null` only.
+- `pattern` is a regular expression in the syntax of the Rust `regex` crate. It admits a
+  string only, and only when the whole string matches: `^DEV-[0-9]+$` admits `DEV-12` and
+  refuses `DEV-12x`, `OPS-12` and the number 12. A pattern starts with `^` and ends with `$`.
+  Matching is case-sensitive, and `\d`, `\w`, `\s` and `\b` are Unicode-aware, so write an
+  ASCII class such as `[0-9]` where you mean ASCII digits. A pattern folds case
+  only with Unicode matching off. Write the fold as a group around the letters only:
+  `^(?i-u:sk)-[0-9]+$` folds `s` and `k` over the ASCII letters. Behind a bare `(?i-u)`, and
+  inside the group, the pattern is in byte mode: `\d`, `\w` and `\s` are ASCII only, and `.`,
+  a negated class such as `[^/]` and `\W` make the file malformed, as the `regex` crate
+  refuses them. Every class that can match a byte outside ASCII is refused there, also one
+  written inside another class: `\D`, `\S`, a negated POSIX class such as `[[:^alpha:]]` and
+  `[^\W]` are refused as `.`, a negated class and `\W` are, and a difference from an ASCII
+  class such as `[\x00-\x7f--a]` is taken. So `^(?i-u)dev$` is taken, and
+  `^(?i-u)Release review of (?s:.*)$` is not: write
+  `^(?i-u:release review of )(?s:.*)$`. A pattern that folds while Unicode matching is
+  on, such as `^(?i)dev$`, `^(?i:dev)$` or `^(?i-u)de(?u)v$`, makes the file malformed: the
+  Unicode case fold also admits look-alikes (U+017F for `s`, U+212A for `k`).
+- A pattern is matched against a value of at most its `max_value_bytes`. The host computes
+  the figure from the pattern's compiled program at every read (the service contract, § 2.1,
+  has the formula), and `approvals list-standing` shows it for a local signed file. A longer
+  string is covered by no grant through that member: the write is answered
+  `approval_required`, and the host's log names the reason. `^DEV-[0-9]+$` is
+  matched against 22,055 bytes, `^Release review of (?s:.*)$` against 8,192 and
+  `^(?i-u:sk)-[0-9]+$` against 23,405.
+- `one_of` lists 1 to 64 distinct values; the input must hold one of them exactly.
+- One grant with a pattern covers many targets, and its `max_per_hour` counts the writes
+  to all of them together.
+- Bounds: a pattern is at most 256 bytes and its compiled program at most 65,536 bytes (a
+  larger one, such as several Unicode classes with large repetitions, is refused), and a file
+  holds at most 64 pattern members over all its grants. A file outside these bounds is
+  malformed.
+- A host older than 0.78.0 refuses a file that has a `pattern` or `one_of` member as
+  malformed and answers every write `unavailable`. Upgrade the host before you mount such a
+  file. A file with `value` members only reads on both.
 
 A grant may also close the input with `input_keys`, a list of at most 16 JSON pointers
 (it may be empty) naming the members a caller may set beside the target:
@@ -331,10 +377,15 @@ A grant may also close the input with `input_keys`, a list of at most 16 JSON po
 - Pointers do not reach into arrays. An array is admitted or refused whole, by a pointer
   that names it or a member above it. A pointer into one, such as `"/labels/0"`, covers
   nothing, so a grant that lists it refuses every input that has `labels`. A `target`
-  pointer into an array does the same on a grant that has `input_keys`.
+  pointer into an array does the same on a grant that has `input_keys`, unless `input_keys`
+  lists the array.
 - On a grant with `input_keys`, no pointer of `target` and `input_keys` may repeat another
-  or lie below another (`"/body"` beside `"/body/channel"`); such a file is malformed. An
-  input nested more than 64 levels deep is outside the grant.
+  or lie below another (`"/body"` beside `"/body/channel"`); such a file is malformed. One
+  form is allowed: a `target` pointer below an `input_keys` pointer through an array index,
+  such as the target `"/labels/0"` beside `"/labels"` in `input_keys`. The list then admits
+  the array as before, and the target member binds that one element. A host older than
+  0.78.0 refuses such a file as malformed. An input nested more than 64 levels deep is
+  outside the grant.
 - A closed list limits its own grant only. A second grant for the same instance, operation
   and target without `input_keys`, or with a longer list, admits what the first refuses.
 - A host built before `input_keys` existed refuses a file that has it as malformed and

@@ -38,8 +38,9 @@ flowchart TB
         who15["connectors.mutations.LocalHost"]
         who16["connectors.mutations.ServiceHost"]
         who17["connectors.oauth2.LocalHost"]
-        who18["connectors.standing_approvals.ServiceHost"]
-        who19["connectors.tool_contracts.LocalHost"]
+        who18["connectors.standing_approvals.LocalOwner"]
+        who19["connectors.standing_approvals.ServiceHost"]
+        who20["connectors.tool_contracts.LocalHost"]
     end
     subgraph unit0["feed-binding"]
         cmd60["connectors.feed.AddContainer"]
@@ -327,7 +328,10 @@ flowchart TB
     who18 -->|"may invoke"| cmd98
     who18 -->|"may invoke"| cmd99
     who18 -->|"may invoke"| cmd100
-    who19 -->|"may invoke"| cmd101
+    who19 -->|"may invoke"| cmd98
+    who19 -->|"may invoke"| cmd99
+    who19 -->|"may invoke"| cmd100
+    who20 -->|"may invoke"| cmd101
     cmd0 -->|"advanced"| evt1
     cmd1 -->|"bound"| evt0
     cmd2 -->|"deleted"| evt2
@@ -443,7 +447,7 @@ A command is accepted by the component that owns its context, emits the events o
 - **[artifact_provenance](./domains/connectors-artifact_provenance.md)** (`connectors.artifact_provenance`) — Immutable shared source and bundle declarations; optional distribution publication is separate. Nine types, two entities, no views, no commands, no events, no errors and no actors.
 - **[auth_access](./domains/connectors-auth_access.md)** (`connectors.auth_access`) — Proposed access selection, acquisition declaration and exact permission-budget values; no runtime or persistent owner. 15 types, no entities, no views, no commands, no events, no errors and no actors.
 - **[auth_bindings](./domains/connectors-auth_bindings.md)** (`connectors.auth_bindings`) — Proposed host-private auth records and acknowledged lifecycle boundaries. Eight types, four entities, seven views, 17 commands, 17 events, eight errors and one actor.
-- **[cli](./domains/connectors-cli.md)** (`connectors.cli`) — Selected local CLI presentation values and the existing local configuration owner's durable runtime facts. 164 types, three entities, two views, seven commands, seven events, one error and one actor.
+- **[cli](./domains/connectors-cli.md)** (`connectors.cli`) — Selected local CLI presentation values and the existing local configuration owner's durable runtime facts. 173 types, three entities, two views, seven commands, seven events, one error and one actor.
 - **[clock](./domains/connectors-clock.md)** (`connectors.clock`) — Explicitly trusted local clock configuration, bounded observations and owner anti-regression floors. Eight types, one entity, one view, two commands, two events, one error and one actor.
 - **[connection_admission](./domains/connectors-connection_admission.md)** (`connectors.connection_admission`) — Proposed connection viability, request eligibility and host management target values; no runtime checker or persistent connection lifecycle. 13 types, no entities, no views, no commands, no events, no errors and no actors.
 - **[credential_evidence](./domains/connectors-credential_evidence.md)** (`connectors.credential_evidence`) — Proposed generation-bound evidence values and transient dispatch admission decisions. Eight types, two entities, two views, eight commands, eight events, three errors and one actor.
@@ -462,7 +466,7 @@ A command is accepted by the component that owns its context, emits the events o
 - **[refresh](./domains/connectors-refresh.md)** (`connectors.refresh`) — Proposed host-owned durable authorization of one rotating refresh per credential generation. Nine types, one entity, one view, nine commands, nine events, four errors and no actors.
 - **[service_wire](./domains/connectors-service_wire.md)** (`connectors.service_wire`) — Public service envelope, observation and operation metadata values; the first v1alpha2 binding is served and read, no persisted entity. 22 types, no entities, no views, no commands, no events, no errors and no actors.
 - **[sessions](./domains/connectors-sessions.md)** (`connectors.sessions`) — Proposed supervising session lifecycle; timed enforcement remains a binding obligation. 11 types, one entity, one view, eight commands, 10 events, one error and no actors.
-- **[standing_approvals](./domains/connectors-standing_approvals.md)** (`connectors.standing_approvals`) — Standing write grants an operator mounts for a served instance, and the hourly count of writes admitted under each. Three types, one entity, one view, three commands, three events, one error and one actor.
+- **[standing_approvals](./domains/connectors-standing_approvals.md)** (`connectors.standing_approvals`) — Standing write grants of an instance, as a file the served host mounts or a file the local owner's approval key signs, and the hourly count of writes admitted under each. Six types, one entity, one view, three commands, three events, one error and two actors.
 - **[tool_contracts](./domains/connectors-tool_contracts.md)** (`connectors.tool_contracts`) — A tool-contract/1 document an instance's descriptor revision publishes for its admitted operations, with the profile authored beside the adapter, and the refusals of its publisher. 11 types, one entity, one view, one command, one event, five errors and one actor.
 - **[transport](./domains/connectors-transport.md)** (`connectors.transport`) — Bounded private transport values without credential or dispatch authority. Six types, no entities, no views, no commands, no events, no errors and no actors.
 - **[websearch](./domains/connectors-websearch.md)** (`connectors.websearch`) — Proposed provider-independent web search, fetch and crawl values; no runtime or persistent provider owner. 14 types, no entities, no views, no commands, no events, no errors and no actors.
@@ -515,4 +519,4 @@ A component is a unit of ownership, not a deployment. How many of each runs, and
 
 ---
 
-Generated from connectors v1 · contract digest `c4766afcfc4483e0365231a34bb84cdd1fd96bc93aed562f35bf399c26b5fcbf`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · contract digest `b85184caf133ad3101dcb11a70e98e4750614aeaeb8538498a71cb7126aaf8d3`. Do not edit this file; change the specification and regenerate it with `ess generate`.

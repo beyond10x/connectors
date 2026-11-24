@@ -4,6 +4,37 @@
 
 ### Added
 
+- A standing grant can bind a target member to a pattern or to a set of values
+  (story:standing-grant-binds-a-pattern-or-a-value-set), so one grant covers a caller whose
+  target changes on every call. A target member of a `connectors.standing-grants/1` grant holds
+  exactly one of `value` (the exact value, as before), `pattern` and `one_of`:
+  `{"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"}` admits every string the pattern
+  matches whole, and `{"pointer": "/target_status", "one_of": ["10000", "10235"]}` admits each
+  listed value. A pattern is written in the syntax of the Rust `regex` crate, starts with `^`,
+  ends with `$`, and matches the whole value, case-sensitively; `\d` and `\w` are
+  Unicode-aware, so write `[0-9]` for ASCII digits. A pattern folds case only with
+  Unicode matching off, written as a group around the letters (`^(?i-u:sk)-[0-9]+$`, which
+  folds ASCII letters only); inside the group and behind a bare `(?i-u)` the pattern is in
+  byte mode, where `.`, a negated class, `\W` and every other class that can match a byte
+  outside ASCII (`\D`, `\S`) are refused. `^(?i)dev$` is refused, since
+  the Unicode case fold admits look-alikes. `.` matches every character but U+000A. A pattern
+  is matched against a value of at most its `max_value_bytes`, which falls as the pattern's
+  compiled program grows (`^DEV-[0-9]+$`: 22,055 bytes; `^Release review of (?s:.*)$`:
+  8,192); a longer string is outside the grant. The writes one such grant covers share its
+  `max_per_hour`. Bounds: a pattern of at most 256 bytes and 65,536 bytes compiled, at most 64
+  pattern members in a grant file, 1 to 64 distinct values in a `one_of`. On a grant with
+  `input_keys`, a target pointer may now lie below an `input_keys` pointer through an array
+  index (`/a/list/0/text` beside `/a/list`), which is how a closed grant binds a member inside
+  an array. This holds for the served grant file and for the local signed file
+  (`approvals grant-standing`); no command or flag is added, and
+  `list-standing` shows each member with the key it was written with and a pattern member
+  also with `max_value_bytes`, the one added result member. A grant file with
+  `value` members only is read and written as before. A host or CLI older than this release
+  does not read a file that has a `pattern` member, a `one_of` member or such a pointer pair:
+  the served host answers every write `unavailable`, the local `invoke` answers
+  `approval_required` and the `approvals` commands `invalid_configuration`. Upgrade before you
+  mount or sign such a file ([running services](docs/running-services.md#standing-write-grants),
+  [local approvals](docs/local-approvals.md#a-grant-for-many-targets)).
 - A standing grant can close a write's input: the optional member `input_keys` of a grant in a
   `connectors.standing-grants/1` file lists, as JSON pointers (at most 16, the list may be
   empty), the input members a caller may set beside the grant's target. A write whose input

@@ -42,7 +42,7 @@ scope:
   path: docs/running-services.md
 - confidence: cited
   path: ess/domains/standing_approvals.yaml
-revision: 32
+revision: 33
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T14:44:21Z", actor: "human:timo", revision: 31, decided_on: {"recorded":{"review_outcome":14}}}
 - {from: "proposed", to: "active", at: "2026-11-23T14:44:22Z", actor: "human:timo", revision: 32, decided_on: {"recorded":{"review_outcome":14}}}
@@ -334,8 +334,12 @@ The record, the texts and the gate.
     members per file, counted after expired grants are dropped), in `K` in the file-bounds
     sentence of line 56.
 21a. `git diff --name-only <merged 0.77.0 head>` lists neither `ess/domains/cli.yaml` nor
-    `apps/connectors/spec/cli.yaml`, and no file under `crates/connectors-core` or
-    `crates/connectors-catalog/src`.
+    `apps/connectors/spec/cli.yaml`, and no file under `crates/connectors-catalog/src`. Under
+    `crates/connectors-core` it lists three generated files and no other:
+    `generated/operation-types/source.schema.json`, `types-report.json` and `types.rs`. Their
+    difference is the source digest and the projection digest of the model (5 lines); no type
+    changes (security review, round 2, note F6: the first text of this statement said no file
+    under `crates/connectors-core` changes).
 22. `docs/local-approvals.md` says the comment grant bounds the first text node only.
 23. With `CONNECTORS_ESS` set to the pinned `ess`, the metadata emissions are regenerated and
     `cargo test --locked -p connectors-build --bin connectors-build

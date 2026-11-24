@@ -98,6 +98,9 @@ management wire payload or a persistent record.
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
 | `approvals prepare` | local subject coordinator | `ApprovalPrepareInput` → `ApprovalPrepareResult` | no / no |
 | `approvals issue` | local issuer coordinator | `ApprovalIssueInput` → `ApprovalIssueResult` | no / no |
+| `approvals grant-standing` | the instance's signed grant file ([standing grants](#standing-grants)) | `StandingGrantInput` → `StandingGrantResult` | no / no |
+| `approvals revoke-standing` | the instance's signed grant file ([standing grants](#standing-grants)) | `StandingRevokeInput` → `StandingRevokeResult` | no / no |
+| `approvals list-standing` | the instance's signed grant file, read and verified ([standing grants](#standing-grants)) | `StandingListInput` → `StandingListResult` | no / no |
 | `list` | the shipped connector declarations and, when one exists, the configuration's `[connectors]` table ([listing connectors](#listing-connectors)) | inputless Context → `ConnectorListResult` | no / no |
 | `definitions install` | the configuration's `definitions.lock` and the state directory's read-only definitions cache ([installing a definitions release](#installing-a-definitions-release)) | `DefinitionsInstallInput` → `DefinitionsInstallResult` | no / no |
 | `instances list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
@@ -156,7 +159,10 @@ one of `--input-json`, `--input-file` or `--input-stdin` for nonsecret business 
 `issue` additionally requires `--approve-subject` and `--proof-output`. Their
 authority, publication boundaries and helper limits belong to the
 local mutation binding. Proof bytes never
-enter the ordinary successful CLI result.
+enter the ordinary successful CLI result. `approvals grant-standing` accepts
+only `--input-file` too, `approvals revoke-standing` takes the grant's id as
+its one positional argument, and `approvals list-standing` takes the instance
+selectors alone ([standing grants](#standing-grants)).
 
 Inventory and status commands use configured/cached descriptions and safe persisted metadata
 or query an already-running owner without provider authentication; `operations describe`
@@ -436,7 +442,10 @@ directory is an infrastructure binding, not a locator. A default adapter
 must name exactly one entry, and so must a default instance
 ([selecting an instance](#selecting-an-instance)); connection defaults, if used by a future binding,
 must be explicitly recorded and cannot be inferred from last usage. This first
-binding requires an explicit connection for a credentialed operation.
+binding requires an explicit connection for a credentialed operation. An
+`[adapters.<alias>]` entry and a `[connectors.<connector>.instances.<instance>]`
+table may each carry `standing_grants`, the absolute path of the instance's
+signed grant file ([standing grants](#standing-grants)).
 
 The configuration stage needs an absolute configuration and state path, an
 owner-only file and `owner_uid` equal to the effective user, and no other
@@ -832,7 +841,7 @@ refuses a differing pin as above.
 `Failure.approval_steps` names the commands that produce the proof, in order:
 `approvals prepare`, `approvals clock-check`, `approvals issue`. A read given
 `--approval-file` or `--idempotency-key` is `invalid_input` naming that
-argument. A write with its proof is admitted and dispatched under the local mutation binding.
+argument. A write with its proof is admitted and dispatched under the local mutation binding. One write without `--approval-file` is not refused here: a write with `--idempotency-key` on an instance whose configuration names a grant file goes on to the owner, which admits it under a [standing grant](#standing-grants) or refuses it there.
 
 `connectors invoke --definition <file> <operation>` invokes a
 `connectors-definition/1` file read on the fly
@@ -876,6 +885,287 @@ names the argument it refused in `Failure.field`: `target`, `operation`,
 `connection`, `schema`, `revision`, `input`, `approval_file`,
 `idempotency_key`, `definition`, `definitions_root`, `credential_file`,
 `fields`, `each`, `walk`, `max_pages`, `out` or `deadline_seconds`.
+
+### Standing grants
+
+A standing grant
+(story:local-invoke-admits-a-keyed-write-under-a-standing-grant) admits a keyed
+write of `invoke` that carries no `--approval-file`. The operator signs a grant
+once, and every later write the grant covers needs no proof of its own. A grant
+names one instance, one operation, what each target member binds (an exact value, a pattern or a set of values), the
+input members a call may carry beside them (`input_keys`), an expiry
+(`not_after_unix_ms`) and a cap of writes per hour (`max_per_hour`). The grant
+document, its limits and the rule by which a grant covers an input are those
+of the first HTTP binding ([compatibility §2.1](./compatibility.md),
+row "Keyed writes under a standing grant"). The order of the checks is
+[operations §4.3](./mutations.md#43-standing-grant-in-the-local-cli-binding),
+and what the owner does is in keyed writes under a standing
+grant.
+
+The same-user boundary and the size of a grant. The grant file, the approval
+key that signs it and the state directory belong to the operator's UID. A
+process of that UID can run `approvals grant-standing` itself, as it can run
+`approvals issue`: this is the same-user boundary a per-input approval has.
+The two differ in size. One approval admits one write of one input. One grant
+admits up to 10,000 writes an hour, until a `not_after_unix_ms` that has no
+upper bound. A grant bounds what a caller that only invokes can write; it is
+no boundary against the operator's own UID. `grant-standing` asks for no
+second confirmation, as `approvals policy-set` asks for none.
+
+Configuration. An instance takes grants only when its entry names its grant
+file: `standing_grants = "<absolute path>"`, an optional member of
+`[adapters.<alias>]` and of `[connectors.<connector>.instances.<instance>]`. A
+relative path refuses the entire configuration (§3). The configuration format
+does not change, and a binary built before the member existed refuses a
+configuration that carries it, as it refuses any unknown key (§3). The member
+is outside the selection a policy and an approval key are bound to, so setting
+or changing it needs no new policy and no new key. Every command that rewrites
+the configuration keeps it. One file holds one instance's grants: it is signed
+by that instance's approval key, whose issuer and audience are the instance's
+own, so a second instance pointed at the same path does not verify it.
+
+The grant file is exactly one compact JWS, `<header>.<payload>.<signature>`:
+three parts of unpadded base64url in canonical encoding, no byte before or
+after, at most 64 KiB in all, written with mode 0600.
+
+- The header is exactly `{"alg": "Ed25519", "kid": <kid>, "typ":
+  "b10x.connectors-standing-grants.v1+jws"}`, at most 512 bytes decoded; `kid`
+  is the id of the instance's approval key.
+- The payload is exactly `{"iss": <issuer>, "aud": <audience>, "document":
+  <document>}`. `iss` and `aud` are the issuer and audience of the instance's
+  approval key, as in an approval proof. `document` is a
+  `connectors.standing-grants/1` document, `{format, grants, revoked}`, under
+  every rule of the served grant file. Each grant's `instance` is the
+  instance's `instance_id`; a grant that names another instance covers no
+  write. The commands below write `revoked: []`; a reader honours an id listed
+  there as the served host does.
+- Header and payload are each the canonical JSON of the value they decode to
+  (the form an approval proof uses), with no member twice and no member other
+  than those named here.
+- The signature is the 64-byte Ed25519 signature of the approval key over
+  `<header>.<payload>`.
+
+One decoder reads the file for the commands and for `invoke`. It admits the
+file only when all of this holds: the three parts decode; `alg` and `typ` are
+the two values above; header and payload are canonical; `iss`, `aud` and `kid`
+equal the instance's approval key's; that key is not revoked and the clock
+reading lies inside its window (`not_before_unix_ms` at or before the
+reading's lower bound, its upper bound before `not_after_unix_ms`); the
+signature verifies; and `document` passes the served file's rules. A file that
+fails any of these does not verify. A bare `connectors.standing-grants/1`
+document at the path, the served host's form, does not verify and admits
+nothing. A grant file is not a proof and a proof is not a grant file: each
+decoder refuses the other's `typ`. Rotating or revoking the approval key ends
+every grant it signed. A grant binds instance, operation and target, and
+neither the connection nor the configuration revision: a connection
+authorised again keeps its grants.
+
+The file is read under the custody rule of the served grant file
+(compatibility §2.1): a path with a symbolic link the rule does not admit, a
+file that is not regular, is group- or world-writable or belongs to another
+user than the caller or root, a directory at the path, and a parent directory
+the rule refuses are `unavailable`, for the commands and for `invoke`.
+
+The three commands run in the CLI process, start no owner and no adapter, and
+select their instance as every command does ([selecting an
+instance](#selecting-an-instance)): `--connector <connector> --instance
+<instance>`, the deprecated `--adapter <alias>`, or the default instance. They
+read the clock as `approvals issue` does: no `[approval_clock]` table, or a
+retired one, is `invalid_configuration`, and a clock that forms no reading is
+`unavailable`. All three need the instance's approval key and refuse an
+instance without one as `approvals issue` does; the two that sign also need
+the keyring, and refuse without it as `approvals issue` does.
+
+`approvals grant-standing --input-file <file>` adds one grant.
+The file holds one JSON object with exactly these members: `operation`; `target`, 1 to 16 members; `input_keys`, optional, at most 16 pointers; `not_after_unix_ms`; `max_per_hour`, 1 to 10,000.
+A target member holds `pointer` and exactly one of `value`, `pattern` and `one_of` (story:standing-grant-binds-a-pattern-or-a-value-set): `value` is the exact JSON value and may be `null`; `one_of` holds 1 to 64 distinct JSON values, each compared as `value` is; `pattern` and `one_of` are never `null`.
+`pattern` is a regular expression in the syntax of the Rust `regex` crate under whole-value matching: it starts with `^`, ends with an unescaped `$`, is matched as `\A(?:pattern)\z`, and admits a string only, and only when all of it matches.
+Matching is case-sensitive, and `\d`, `\w`, `\s` and `\b` are Unicode-aware, so a grant writes an ASCII class such as `[0-9]`.
+A pattern that turns case-insensitive matching on while Unicode matching is on (`(?i)`, `(?i:...)`, or `(?u)` under a fold) is refused, since the Unicode case fold admits look-alikes (`s` also U+017F, `k` also U+212A).
+A fold is written with Unicode matching off, as a group around the letters only: `^(?i-u:sk)-[0-9]+$` folds `s` and `k` over the ASCII letters.
+Behind a bare `(?i-u)`, and inside `(?i-u:...)`, the pattern is in byte mode: `\d`, `\w` and `\s` are ASCII only, and `.`, a negated class such as `[^/]` and `\W` are refused, as the `regex` crate refuses them in a pattern over text; every class that can match a byte outside ASCII is refused there, also one written inside another class: `\D`, `\S`, a negated POSIX class such as `[[:^alpha:]]` and `[^\W]` are refused as `.`, a negated class and `\W` are, and a difference from an ASCII class such as `[\x00-\x7f--a]` is taken; so `^(?i-u)dev$` is taken, and `^(?i-u)Release review of (?s:.*)$` is refused and is written `^(?i-u:release review of )(?s:.*)$`.
+The three bounds of a pattern: it is at most 256 bytes; its compiled program is within the compiled-size limit of 65,536 bytes (the NFA size limit of the `regex-automata` crate, what `size_limit` of the `regex` crate sets, for the forward program and the reverse one); and the file holds at most 64 pattern members over all its grants, counted after the expired grants are dropped.
+A pattern member has a longest value it is matched against, `max_value_bytes`, which the reader computes from the pattern's compiled program at every read (compatibility §2.1 has the formula) and `approvals list-standing` shows: a string longer than that is covered by no grant through that member, and `invoke` answers `approval_required`. `^DEV-[0-9]+$` is matched against 22,055 bytes, `^Release review of (?s:.*)$` against 8,192 and `^(?i-u:sk)-[0-9]+$` against 23,405.
+The command refuses, as `invalid_input`, a pattern whose `max_value_bytes` is under 64, such as `^(?:\B\B\B\B\B\B\B\B-){200}$`, which is matched against 43 bytes. A reader takes a file that holds such a member, and the member covers no value longer than its own figure.
+The array-index relaxation: on a grant with `input_keys`, an `input_keys` pointer may lie above a `target` pointer when the reference token of the `target` pointer that follows it is an array index in canonical decimal form (`0`, or digits with no leading `0`), as `/a/list` beside the target `/a/list/0/text`; it holds for every member form, opens no input, and leaves every other overlap refused.
+One grant with a pattern covers writes to many targets under its one `max_per_hour`; each read of the file, up to three per write, compiles at most 64 patterns and keeps none; one check of 64 pattern members, each on a value of its `max_value_bytes`, took 157 ms to 399 ms of CPU time for the costliest patterns found, such as `^x*x{150}$` (measured, not a proven ceiling); one read of a file of 64 pattern members took about 360 ms of CPU time for the costliest read found, `^[^\P{age=16.0}...a]$` with `\P{age=16.0}` written 20 times (246 bytes), and 611 ms in one run under more load (measured, not a proven ceiling), and the served host reads the file on every keyed write; the compiled-size limit is no proven ceiling on what a compiled pattern holds: 64 members of the costliest pattern found hold 3,950,582 bytes after one read and one checked write, and one read and one checked write no more than 5 MiB at any moment (measured, not a proven ceiling), and compatibility §2.1 has the patterns, the host and the figures.
+Older binaries: a file with a `pattern` member, a `one_of` member or an `input_keys` pointer above a `target` pointer is unreadable to a binary built before 0.78.0: there the file does not verify, so `invoke` answers `approval_required` and the three commands answer `invalid_configuration` and leave the file; a file with exact members only and no such overlap reads on both, and an exact member is written as before.
+Without `input_keys` the grant leaves the rest of the input open, as a served grant without it does.
+The command sets the grant's `id`, a new UUID, and its `instance`, the selected instance's `instance_id`.
+Before it adds the grant it drops every grant of the file whose `not_after_unix_ms` is at or before the lower bound of the clock reading; a dropped grant changes no replay.
+It then signs the document, creates the use store `<state>/standing-grants.sqlite3` (mode 0600) when the state directory holds none, and replaces the file, or creates it when the path holds none.
+This command is the only one that creates the use store ("What removing the use store does", at the end of this section).
+Its result is `StandingGrantResult`: `{grant_id, path}`, the new grant's id and the grant file's path.
+
+- `invalid_input` naming `input_file` (exit 2), nothing written: a document
+  that is not one JSON object; a member not named above, `id` and `instance`
+  included; a missing or zero `not_after_unix_ms` or `max_per_hour`; a
+  `max_per_hour` over 10,000; a `not_after_unix_ms` at or before the upper
+  bound of the clock reading; a grant the served file's rules refuse (a
+  pointer that is not RFC 6901 or is over 256 bytes, no target or more than
+  16, a pointer of `target` and `input_keys` that equals or lies below
+  another outside the array-index relaxation, an `input_keys` that is not an array of at most 16 pointers, a
+  target member with none or more than one of `value`, `pattern` and `one_of` or with any other member, a `pattern` or `one_of` that is `null`, a pattern outside its form or its bounds or one that does not compile, a `one_of` that is empty, holds more than 64 values or holds one twice, a `value` or `one_of` that holds a number other than an integer from
+  -9223372036854775808 to 18446744073709551615); 256 grants left in the file
+  after the expired ones are dropped; more than 64 pattern members in the file with the new grant, after the expired ones are dropped; a signed file that would be larger than
+  64 KiB.
+- `invalid_configuration` (exit 2), nothing written: the instance's entry has
+  no `standing_grants`; the path holds a file that does not verify.
+- `unavailable` (exit 1): the file or its directory fails the custody rule;
+  the use store cannot be created or fails its own custody rule (the grant
+  file is then as it was).
+- `outcome_unknown` (exit 1, `stage = publication`, `next_action =
+  retry_status`): the host could not confirm that the new file is durably in
+  place. The path holds the new file or the old one; `list-standing` shows
+  which.
+
+`approvals revoke-standing <grant id>` takes the grant's id as its one
+positional argument, removes that grant from the file, signs the document
+again and replaces the file. Nothing else is written: the file is the one
+authority for revocation. Its result is `StandingRevokeResult`: `{grant_id,
+path}`. A key that replayed before still replays after: a replay reads no
+grant.
+
+- `not_found` (exit 1): the file holds no grant with that id, or the path
+  holds no file.
+- `invalid_configuration` (exit 2), nothing written: no `standing_grants`; a
+  file that does not verify.
+- `unavailable` (exit 1): the custody rule.
+- `outcome_unknown` (exit 1, `stage = publication`, `next_action =
+  retry_status`): the host could not confirm that the new file is durably in
+  place; `list-standing` shows whether the grant is gone.
+
+`approvals list-standing` prints the grants of the verified file in file
+order, expired ones included. Its result is `StandingListResult`: `{grants:
+[{grant_id, operation, target, input_keys, not_after_unix_ms,
+max_per_hour}]}`, `input_keys` absent for a grant that has none, each `target` member with `pointer` and the one key it was written with (`value`, `pattern` or `one_of`), and a `pattern` member also with `max_value_bytes`, the longest value in bytes the pattern is matched against, which the command computes from the pattern and the file does not hold. A path that
+holds no file prints `grants: []`. It writes nothing and signs nothing.
+
+- `invalid_configuration` (exit 2): no `standing_grants`; a file that does
+  not verify.
+- `unavailable` (exit 1): the custody rule.
+
+A file that does not verify is left in place by all three, byte for byte. The
+operator removes it and grants again, and so sees that every grant in it ended
+before a new file is written. The two commands that write hold one exclusive
+lock, the file `standing-grants.lock` in the state directory, from reading the
+file to its replacement, so concurrent grants all stay in the file.
+
+`invoke` under a grant. A write is sent on the grant path when it carries
+`--idempotency-key` and no `--approval-file`, on an instance whose entry has
+`standing_grants`. Every other write keeps its path:
+
+- A write with `--approval-file` is a per-input write, in every byte as
+  before. A proof that is refused is final: the write does not fall back to a
+  grant.
+- A write without `--approval-file` and without `--idempotency-key`, or on an
+  instance without `standing_grants`, is `approval_required` with
+  `approval_steps` as above, unchanged.
+- On an instance with `standing_grants`, an `--approval-file` that holds no
+  byte is answered as no `--approval-file` is: the same `approval_required`
+  with `approval_steps`, `next_action = none`, after the lookup of the key (a
+  settled key still replays) and with no owner started. On an instance
+  without the member the owner answers it, as before.
+- A key whose earlier attempt is still pending is sent without its proof, as
+  before. If that attempt is gone when the owner looks, the owner goes by what
+  it received, which is no proof, and may take the grant path; the write is
+  then one the grant covers.
+
+A published approval policy that lists the operation, an approval key and
+`[approval_clock]` stay prerequisites of every keyed write and replay. The
+grant is not part of the `approvals policy-set` document.
+
+The answer of a write admitted under a grant is the answer of any guarded
+write, and its `mutation` names the grant: `mutation.standing.grant_id`. The
+member is present on a fresh write, on its replay, and on a failure that has
+an attempt (`.error.data.mutation.standing.grant_id`). It is absent on a
+per-input write, on a write that needs no approval and on every refusal made
+before the attempt is recorded. `--idempotency-key` keeps its meaning: the
+same key with the same input replays the original answer with no grant check,
+also after the grant expired, was revoked or reached its cap; the same key
+with another input is `idempotency_conflict`.
+
+A refusal on the grant path is written to stderr with exit 1 and an empty
+stdout, at `stage = admission` with `next_action = retry_status`, as every
+refusal of a guarded write the host makes before it sends anything, and its
+`mutation.classification` is `not_attempted`. The grant is checked first
+before the audit anchor: a refusal there carries no `standing` member, no
+provider request was made, and no attempt and no audit anchor were recorded.
+Its codes:
+
+- `approval_required`: no grant covers the write. The cause is not named, and
+  the failure has no member named `axis`: another instance, another operation,
+  a target value its member does not admit (another value, a string its pattern does not match, a value outside its set), a target member missing, an input member outside
+  `input_keys`, a grant expired or revoked, a file that does not verify and no
+  file at the path all answer alike. The reason is in the owner's log.
+- `rate_limited` with `retry_after_seconds`, a whole number from 1 to 3,600:
+  every covering grant admitted `max_per_hour` writes in the last 3,600
+  seconds; the number says when the earliest use leaves that window. Here
+  `rate_limited` is the failure's `code`, not a `service_code`.
+- `idempotency_conflict`: the key is held by a write with another input.
+- `unavailable`: the grant file fails the custody rule, the use count cannot
+  be kept, the state directory holds no use store for a write a grant covers
+  ("What removing the use store does", at the end of this section), or the
+  clock gives no reading.
+
+Numbers in a target value. A target `value` holds a number only as an integer
+from -9223372036854775808 to 18446744073709551615, at any depth of the value.
+The host reads every other number (a fraction, an exponent, `-0`, an integer
+outside that range) as the nearest double, so two numbers written with
+different digits can be one value to it, while the adapter is sent the
+caller's bytes. So `grant-standing` refuses a request whose target value holds
+such a number (`invalid_input`), a grant file that holds one does not verify
+and admits nothing, and an input that holds one at a target pointer is covered
+by no grant (`approval_required`), whatever the grant holds there.
+
+The grant is checked twice more, where a per-input write verifies its proof
+again, and each recheck reads the clock and the file afresh. A refusal at the
+first recheck, before the attempt is recorded, has the codes above; it comes
+after the audit anchor and after the provider reads of the write's preflight,
+records no attempt and gives the use back. A refusal at the second recheck,
+just before dispatch, leaves an aborted attempt: the answer is
+`not_attempted`, has `mutation.attempt`, names the grant in
+`mutation.standing.grant_id`, and its use stays counted. After that recheck
+nothing reads the grant again: a grant revoked or expired between it and the
+dispatch does not stop that one write.
+
+Expiry and the hour are read from the trusted clock (`[approval_clock]`), not
+the system clock: a grant is expired once the upper bound of a fresh reading
+reaches its `not_after_unix_ms`, and the hour window is counted from that
+upper bound.
+
+What the ledger records. The attempt of a write under a grant records
+`approval_mode = not_required`, as the served host's attempts under a grant
+do, and the grant's id is bound to the attempt in
+`<state>/standing-grants.sqlite3`, not in the ledger. Three things follow.
+The ledger alone cannot tell a write under a grant from a write that needs no
+approval. A local ledger now holds `not_required` for a write whose policy
+requires approval. The ledger's dispatch gate does not enforce the grant; the
+owner's order of checks does.
+
+What revocation does not undo. The grant file carries no sequence number, so
+an older signed file put back at the path admits again, until its grants'
+`not_after_unix_ms` or until the approval key is rotated. No other UID can put
+it back. The operator's UID can, and so can a backup, a file sync or a
+snapshot restore that runs as that UID, with no caller involved. Rotating the
+approval key ends every grant for certain.
+
+What removing the use store does. The hourly count is the file
+`<state>/standing-grants.sqlite3`. `grant-standing` creates it, under the
+signing key, and nothing else does: not the owner, not `revoke-standing`, not
+`list-standing`, and not a `grant-standing` that is refused before it signs.
+On a state directory without the file, or with a file that holds no use
+table, the owner answers every write a grant covers `unavailable` and takes no
+use; a write no grant covers stays `approval_required`. Removing the file
+therefore frees no cap: it refuses the grant's writes until the key holder
+runs `grant-standing` again. That run creates the store, and the count then
+starts at zero for every grant in the file. A key that replayed before the
+removal still replays, but its answer no longer names the grant: the row that
+bound `mutation.standing.grant_id` to its attempt went with the file. The
+store belongs to the operator's UID, as the grant file does: a process of that
+UID that replaces the store with another one or edits its rows can free the
+cap, with no key. That is the same-user boundary above, not one this binding
+closes.
 
 ### Shaping a result
 
@@ -1734,6 +2024,11 @@ never replay a possible write after interruption, timeout or lost response.
 | `invoke` target naming a connector with several instances and no instance, or a `<connector>/<instance>` a `[connectors]` instance and a legacy entry both derive, as does `--connector`/`--instance` or `default_instance` naming it (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
 | `invoke` without `--connection` on an instance with no usable connection, several `ready`, or several usable and none `ready` (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
 | `invoke` write without `--approval-file` (`stage = admission`, `next_action = none`, `approval_steps` named) | `approval_required` | 1 |
+| `invoke` keyed write no [standing grant](#standing-grants) covers (`stage = admission`, `next_action = retry_status`, `mutation.classification = not_attempted`, no cause named) | `approval_required` | 1 |
+| `invoke` keyed write whose covering grants are at their hourly cap (`stage = admission`, `next_action = retry_status`, `retry_after_seconds` 1 to 3,600) | `rate_limited` | 1 |
+| `approvals grant-standing`, `revoke-standing`, `list-standing`: no `standing_grants` on the instance, or a grant file that does not verify; nothing written (`stage = configuration`, `next_action = check_configuration`) | `invalid_configuration` | 2 |
+| `approvals revoke-standing`: an id the grant file does not hold, or no grant file (`stage = admission`, `next_action = check_configuration`) | `not_found` | 1 |
+| `approvals grant-standing`, `revoke-standing`: the new grant file is not confirmed durably in place; `list-standing` shows which file the path holds (`stage = publication`, `next_action = retry_status`) | `outcome_unknown` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
 | connect whose acquisition failed before publication (`stage = dispatch`, `next_action = retry_explicitly`) | the acquisition owner's code | 1 |
 | known revoked connection | `revoked` | 1 |
@@ -1782,7 +2077,11 @@ admits no other user, every ancestor is writable only by its owner (the
 caller or root), and the directory holds no entry of that name; an existing
 file is never replaced. A path relative to the working directory is refused,
 not resolved. Every `invalid_input` of `invoke` names its argument too
-([invoking an operation](#invoking-an-operation)).
+([invoking an operation](#invoking-an-operation)). `approvals grant-standing`
+names `input_file` for its grant document and `adapter` for the instance
+selection, as `policy-set` does; `revoke-standing` and `list-standing` name
+`adapter` for the selection and decide no other `invalid_input`
+([standing grants](#standing-grants)).
 
 `connections connect` names `target` for a refused `<connector>/<instance>`
 and `endpoint` for a refused `--endpoint`, on `invalid_input`, and `endpoint`
@@ -1912,8 +2211,11 @@ that margin; if it does not finish, the first answer's refusal and delay
 stand. A failure carrying `retry_after_seconds` therefore names a delay that
 did not leave such time, a delay whose second request did not finish, or the
 delay the second `429` named. A guarded write is never sent again and carries
-none. The field never decides `code`, `stage` or
-`next_action`.
+none from a provider. The field never decides `code`, `stage` or
+`next_action`. One failure carries it with another meaning: a keyed write
+refused at a standing grant's cap, `code = rate_limited` at
+`stage = admission`, where it is a whole number from 1 to 3,600 and says when
+the grant's earliest use leaves the hour ([standing grants](#standing-grants)).
 
 The stage names who refused, because the same code can come from either side.
 A refusal made before any provider request — by the host's admission (an

@@ -55,8 +55,8 @@
       }
     ],
     "scenarios": 430,
-    "spec_digest": "ee0005d8e0285a52364441edae699bccc026f9c3c3afaa528bddbee408583639",
-    "suite_digest": "sha256:209901aee5fa9f070f408019b09c4ba78833c5bf13b29c7d444eebf5f25f814a"
+    "spec_digest": "ec931923c024290fa54593142ca9ba2fc658155b529e8075a7ea928193572c27",
+    "suite_digest": "sha256:f4baa7fe751325a53f3061744e981c64d84e1eab41045ecb4d2c80014add32d8"
   },
   "component": "local-metadata-authority",
   "format": "ess-mutation-manifest/4",
@@ -121,8 +121,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict/revision-reused",
-      "spec_digest": "ad5884619e641060cb8919670c906b4d6681748eb9e41146cb9feede7cd94b5d",
-      "suite_digest": "sha256:30b53029519434f1ab9b432538c64a948a64404b44226d60d582b4c64f6ad232"
+      "spec_digest": "eb754ed90d12f02739f57c148cb1d9a31838bf7f037b524db944cf2cba07c97e",
+      "suite_digest": "sha256:3a29590e776436d262fdf34b7503028756cd588c241b1a7a10e5c250260ea838"
     },
     {
       "change": "`name-taken` (`(defined(connector_id) and defined(name) and defined(name_held_by))`) and `endpoint-required` (`(defined(connector_id) and not (defined(endpoint)) and not (defined(connector_default_endpoint)) and (not (defined(name)) or not (defined(name_held_by))))`) change places, so `endpoint-required` answers where both hold",
@@ -184,8 +184,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.declarations.RecordServiceConfiguration/name-taken/endpoint-required",
-      "spec_digest": "326c26b87f2b356e23ba7e665334fd5c95ea24987fd6e6be934062f0339acd6a",
-      "suite_digest": "sha256:504542fea8e1392ac9d3cb152f7feb06a150ce59cdf054fd17cf17d91c2d1e9a",
+      "spec_digest": "025689e62cee0d0e926afbab41b59b6b761948d36fedee01b8b349ad379fdcfe",
+      "suite_digest": "sha256:2622875175fba28581bbf1e609bf79a293e1310f5d7eef38e3a52872e8c686b1",
       "unsatisfiable_guard": "((defined(connector_id) and defined(name) and defined(name_held_by)) and (defined(connector_id) and not (defined(endpoint)) and not (defined(connector_default_endpoint)) and (not (defined(name)) or not (defined(name_held_by)))))"
     },
     {
@@ -248,8 +248,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.execution_audit.LinkAnchorAttempt/linked-elsewhere/already-linked",
-      "spec_digest": "fab7e132e02a1b20161505dd1197f462203a864abf547a9ea2b608e67f5895ac",
-      "suite_digest": "sha256:7b9f86eeb60f0d2f48ba83a1976b51b5fb75e1b5bd417ca385fc601a5aed9e0d"
+      "spec_digest": "aa7b19b8569e0ef7134f7f25ebcde7b1e0f7c0392d7d86e409fb58d7e1163674",
+      "suite_digest": "sha256:3f3b894eb29978406b7fa410fc4d192a24d31d191cd7b927eda93e68636d35e5"
     },
     {
       "change": "`read-anchor` (`(not (defined(access)) or not (access == write))`) and `linked-elsewhere` (`(defined(attempt_id) and attempt_id != input.attempt_id)`) change places, so `linked-elsewhere` answers where both hold",
@@ -311,8 +311,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.execution_audit.LinkAnchorAttempt/read-anchor/linked-elsewhere",
-      "spec_digest": "6621604ccd4669a508e96322a1776552828700a478543b937b3809e216e1931f",
-      "suite_digest": "sha256:1904d93069c49514c29d0efdcbb5682e313b82bdcab253366fba3d348bd37a66"
+      "spec_digest": "81e7e2cead42b58e45f640dfde5177ae7685d477d6ca0ddf0fb5a5047fdfbdc6",
+      "suite_digest": "sha256:0964942178954c69199708f01590f4bb7694cea311fb56531d2af3fcbf0a3b3b"
     },
     {
       "change": "`nil-identity` (`policy_id in [00000000-0000-0000-0000-000000000000]`) and `too-many-operations` (`operations.count > 256`) change places, so `too-many-operations` answers where both hold",
@@ -374,8 +374,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.local_approval_policy.ConfigureLocalApprovalPolicy/nil-identity/too-many-operations",
-      "spec_digest": "579043cdc3472411c313d62d23628fd7de835e703d6cd1901e7131f6bc2a6cb9",
-      "suite_digest": "sha256:b55c4cc9936f939d9c4271a1e6f68c96d05f3c8e8c7346a67f8e5088ef80ad76"
+      "spec_digest": "1089baadb2c0ea9982ecc9bca9eb3e4d0df13c24196e065e6fc7130beb1976e5",
+      "suite_digest": "sha256:4e4cee62d4215d485d1631a743c1c32870edf90ae77a22e0ebbebf08233b2c49"
     },
     {
       "change": "`revision-conflict` (`revision != input.expected_revision`) and `exhausted` (`revision >= 9007199254740991`) change places, so `exhausted` answers where both hold",
@@ -437,8 +437,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.local_approval_policy.ReviseLocalApprovalPolicy/revision-conflict/exhausted",
-      "spec_digest": "a67b87e5ed382e02a7f2406dd5dcae26d9782818b2b32448b0e35734fe8fdf0c",
-      "suite_digest": "sha256:5051e3d8f94e320cd23d4b9186b9e61121d2572f362ca0b3b09cbefac8dfd1f1"
+      "spec_digest": "ce8568b3ec56717544105585499d44c2fbcd8ad2c922d4619627294968756d88",
+      "suite_digest": "sha256:8df2eca04bbf7b6e8e8285581043e55e88fc9437b553781c4c7b6b99ba78902d"
     },
     {
       "change": "`issued-current` (`(decision == current and not (defined(refresh_attempt_id)))`) and `issued-refreshed` (`(decision == refreshed and defined(refresh_attempt_id))`) change places, so `issued-refreshed` answers where both hold",
@@ -500,8 +500,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/issued-current/issued-refreshed",
-      "spec_digest": "82237a0275f9a50ce618584fbb74cf57ee9bedb6036fbbb1774de4d8e4c2fbae",
-      "suite_digest": "sha256:4de3748c0af17f0919017c13e1dc2bd3ce9e7703f9591e87120840890c8b2055",
+      "spec_digest": "3a3e4fce553d2b5e53f8aef84ce9d97c04c35bd24c742b75d03d67a457b4b771",
+      "suite_digest": "sha256:5d4b43cf7e03b3b7dad1ee8658753446df06e68cee639eeebdb6b8d9b2345af7",
       "unsatisfiable_guard": "((decision == current and not (defined(refresh_attempt_id))) and (decision == refreshed and defined(refresh_attempt_id)))"
     },
     {
@@ -564,8 +564,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/not-ready/reauthorization-required",
-      "spec_digest": "5eace8db9083bf05489a0c97023ddc8f112781db5288462e54a8b229d76d3272",
-      "suite_digest": "sha256:5894bae45edf5b015c92cab6d46ee761d6f00b4958c415e0e09ae4b46ceccbb4",
+      "spec_digest": "1d67d2f48363c62364dc28f128ec873806845bd45b15b0135798b1b75fd4aeb0",
+      "suite_digest": "sha256:125d642cf6ce2fc0650a9a8003791bb7e2475298d34ea26dab449657d9fde411",
       "unsatisfiable_guard": "(decision == not_ready and decision == reauthorization_required)"
     },
     {
@@ -628,8 +628,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/reauthorization-required/refresh-uncertain",
-      "spec_digest": "3e47172ea64b267cefe971ca5c36782af6fef99bcad3bcde1ebdea9924effb24",
-      "suite_digest": "sha256:a13a074a5b8dc03800abb1fae35330751558639e792538965ecef118bd42be64",
+      "spec_digest": "7b74c3b4dd751d2692594587db1e3ae79804e293876bd302bc4c6d4d86cf166d",
+      "suite_digest": "sha256:bd3e2dc8c94d60dd421d3b9c479aa9ac9881de919a45aaa90230d4ccd1d11307",
       "unsatisfiable_guard": "(decision == reauthorization_required and decision == refresh_uncertain)"
     },
     {
@@ -692,8 +692,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.oauth2.IssueAccessToken/refresh-uncertain/rate-limited",
-      "spec_digest": "bf69cfbde2ee420191fa3ee5fbcfa338b7dc852f08b0d5d2903706f0d1ed6c56",
-      "suite_digest": "sha256:edf17d47614bd97c51e750be43516c3679aa8033a990681cfb19bb5ce35d4b96",
+      "spec_digest": "1bf5d07af21e878290dc8f2587fe614a3f2f48d6d9a8c3ca7d324b45c52579eb",
+      "suite_digest": "sha256:51ff5556f00388dbbd16041354d6f20afa107aa5963d9c80d15ba011d694059c",
       "unsatisfiable_guard": "(decision == refresh_uncertain and decision == rate_limited)"
     },
     {
@@ -756,8 +756,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.AuthorizeExchange/ownership-conflict/source-binding-changed",
-      "spec_digest": "92b2b34a4adc4a55a339fe782f83be4a49ecf5f9e59b3023f6178618badd3afe",
-      "suite_digest": "sha256:960378674abbb9724682305eb5129197bbc852667d34014553200898e88078db",
+      "spec_digest": "ce82f173683256a07a22bcd01660fba7f9152ed4a6ffd7a7ade23cabc378d115",
+      "suite_digest": "sha256:176aa81bab3ba81e3e3fb51accfdc42651f47a2df1c719a48d6a315dc856b967",
       "unsatisfiable_guard": "(decision == ownership_conflict and decision == source_binding_changed)"
     },
     {
@@ -820,8 +820,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.AuthorizeExchange/source-binding-changed/source-revoked",
-      "spec_digest": "9a564b4ca7578433872d445d0dd6f912b26528acfdfcec94cfb02adeb33deb32",
-      "suite_digest": "sha256:5cd332b1b749f86e131d0475ded5190677c6f54b9b4256514fcc8812b6b69b33",
+      "spec_digest": "c2efd9ceae879a0925b2f3426c79209cfb8989db72a7c04a79b59f43f2c3821d",
+      "suite_digest": "sha256:b2c700d283a81f629e37a93e31c7c1e8fc312fbb070f69703b1420c7ba51a9c3",
       "unsatisfiable_guard": "(decision == source_binding_changed and decision == source_revoked)"
     },
     {
@@ -884,8 +884,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/ownership-conflict/publication-binding-changed",
-      "spec_digest": "30850d438cbf2387f8bd07f443a05b91f8859235cd209944ab14018efc0ed7b6",
-      "suite_digest": "sha256:3733045ba21e6c0ac81665d42b4c2a9e0c91753b4e331edad5bb1611559c6ba4",
+      "spec_digest": "cdf1cd358581645e84d4196ca15b9d6bdd264b8ebd6b92115dbfd3bc5c090928",
+      "suite_digest": "sha256:25d3a61ceb093f304d840b9a5927e148826f47e8de65e8de8fe16acd28882142",
       "unsatisfiable_guard": "(decision == ownership_conflict and decision == publication_binding_changed)"
     },
     {
@@ -948,8 +948,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/publication-binding-changed/publication-revoked",
-      "spec_digest": "4c72819bdc060245309cb07bcedb093065ceea6f9686d9c94c8f70f564cafa0f",
-      "suite_digest": "sha256:4852658438dd8a3d9fce4984a4d0f5015be54c14d588e9edcc826c6ffaa3ffbb",
+      "spec_digest": "04e62f3aa5bcfc3e20e3124b475ec2de81249c74f6f165c0f199141a6fd4d64e",
+      "suite_digest": "sha256:7456c8a49889084bc23971150fd1ca76b7905393c8345cfcccc00d86155b9a73",
       "unsatisfiable_guard": "(decision == publication_binding_changed and decision == publication_revoked)"
     },
     {
@@ -1012,8 +1012,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/publication-evidence-invalid/publication-candidate-unavailable",
-      "spec_digest": "0a61451fbbfd40bd2d5b6d883d29714647dc8c1025f4cf811d391daf03688295",
-      "suite_digest": "sha256:794758ce08bd35fd7b2bca16f82883ee3bab5d6de34b3843304f8edab34e6ecc",
+      "spec_digest": "aa600380010a6dc6384afe90bd6ce5295d2e0cb14c7036594c7bb0dff0e19fef",
+      "suite_digest": "sha256:828aedc730d2c814484134c8426887c79e8e0f065d68b2bf2a7fb45a2dfc8f4b",
       "unsatisfiable_guard": "(decision == publication_evidence_invalid and decision == publication_candidate_unavailable)"
     },
     {
@@ -1076,8 +1076,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.PublishRefresh/publication-revoked/publication-evidence-invalid",
-      "spec_digest": "82412c208d3feb26894ffd906cc3d9ef309aa7412f004d83b49e2b617949ea3f",
-      "suite_digest": "sha256:16c2601c770aa2d756840ddfc8af80d5163f05b12442ec3ede0776e5e0b26364",
+      "spec_digest": "73a5cc02675c0d2121f26bd9c26425d3311d7c573ecad94bf8a22f6d1bd3fbca",
+      "suite_digest": "sha256:84e89c5e7d51e7ebdc83ad05906ff232e6be3a81e527cf0d821c879cd8b774fb",
       "unsatisfiable_guard": "(decision == publication_revoked and decision == publication_evidence_invalid)"
     },
     {
@@ -1140,8 +1140,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.ReserveRefresh/source-binding-changed/source-revoked",
-      "spec_digest": "035387912ac7b9403533e98bc63a58731d4915f415011d5ab3f21b83e77ebe09",
-      "suite_digest": "sha256:8ad8f0a61fc170182c5e98e81221741914f7e00f00317e6aa86774025db0d8da",
+      "spec_digest": "7fffbe6b59abeaeb5ca1b1c878a6de6627dcdb74341c6c4f7813f546ca573e35",
+      "suite_digest": "sha256:256c08cf4864cac0d3623a018aff46060de8e263722434c6ad8237c0e7029dfe",
       "unsatisfiable_guard": "(decision == source_binding_changed and decision == source_revoked)"
     },
     {
@@ -1204,8 +1204,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.ReserveRefresh/source-exchange-authorized/source-binding-changed",
-      "spec_digest": "cc47e525d030f408f948afe9595212bb194b1dcd0e36a2115e41b1e6bf706129",
-      "suite_digest": "sha256:7bfbec75fcff575d5fb13a141705aad0ad264d84c5dc29e124ea689db5d47d2f",
+      "spec_digest": "15bf70a32feb4e2e05c2374c6746f5f1397632698b6466db12fdb837c5fe741f",
+      "suite_digest": "sha256:1e9dd36c077c3dff1b0f9da1e2365c9a88878cd36d5565f81ff346bc2f755cad",
       "unsatisfiable_guard": "(decision == source_exchange_authorized and decision == source_binding_changed)"
     },
     {
@@ -1268,8 +1268,8 @@
       ],
       "scenarios": 430,
       "site": "connectors.refresh.ReserveRefresh/source-reserved/source-exchange-authorized",
-      "spec_digest": "e94f73ce35ee62be50d4ecad5848fdca479420ff02f6c17dc9c91e389b0d6279",
-      "suite_digest": "sha256:83478d13ec42fa176c6bab5569779d30fa1d2a040dac0faf25baeaeef7e05461",
+      "spec_digest": "5ff686d67a8d3cced40addaa80ac3c7dcbf3d7a4c41afb0f4aa14ccafff49a3e",
+      "suite_digest": "sha256:489cc8889d48bdb3019802ba56f6966f15f6c3fc6d115b3ea4410c9fc16e75bb",
       "unsatisfiable_guard": "(decision == source_reserved and decision == source_exchange_authorized)"
     },
     {
@@ -1294,6 +1294,6 @@
       "site": "connectors.tool_contracts.PublishToolContract/schema-unrepresentable/risk-below-floor"
     }
   ],
-  "spec_digest": "ee0005d8e0285a52364441edae699bccc026f9c3c3afaa528bddbee408583639",
+  "spec_digest": "ec931923c024290fa54593142ca9ba2fc658155b529e8075a7ea928193572c27",
   "specification": "connectors v1"
 }
