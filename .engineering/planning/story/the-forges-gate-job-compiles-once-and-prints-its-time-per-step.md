@@ -7,7 +7,7 @@ title: The forge's gate job compiles its test binaries once and prints its time 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
@@ -216,6 +216,45 @@ Also read: the test build makes 241 test binaries: 106 of `apps/connectors`, 34 
 other packages. The folder rule names one integration-test binary per crate. That is the
 test-step story's, not this one's.
 
+### Measured 2026-11-24: the first forge run that prints its steps
+
+Job 138646969126 of run 45450782257 (pull request 295), 18:39:42 to 19:19:43 CET, 40 min 1 s
+(2,401 s). The table is the job's own (`gate: time per step`); the rows around it are read from
+the job's step times and cargo's `Finished` line.
+
+| part | s |
+|---|---|
+| the job's steps before the gate (toolchain, ESS, AEP, nextest, fetch) | 99 |
+| build of `connectors-build` by `cargo run -p` (``Finished `dev` profile … in 5m 44s``) | 344 |
+| build of the workspace | 203.2 |
+| build of the test binaries | 599.3 |
+| tests (`Summary [ 637.457s] 4495 tests run: 4495 passed (9 slow), 223 skipped`) | 638.6 |
+| documentation drift check | 134.9 |
+| clippy of the workspace | 91.8 |
+| library boundary of `connectors-sql` | 67.3 |
+| windows lint | 53.2 |
+| tool contracts check | 50.7 |
+| library boundary of `connectors-catalog-provider` | 44.4 |
+| library boundary of `connectors-grafana` | 25.6 |
+| library boundary of `connectors-mcp` | 13.8 |
+| the 16 other steps, each under 5 s | 25.3 |
+| sum of the gate's 27 steps, as printed | 1,948.1 |
+| the step of the ignored tests (its table: 0.4, 2.2, 1.3, 0.0) | 4.0 |
+
+344 s and 1,948.1 s are 2,292 s; the workflow step of the gate ran 2,293 s.
+
+- Compiling takes 1,147 s of the 2,401 s before one test runs: 344 + 203.2 + 599.3.
+- The four steps change 3 is about (the first build, the build of the workspace, the tool
+  contracts, the documentation drift check) take 733 s. How much of the 134.9 s of the
+  documentation check is a compile is not in the log (`-q`).
+- The lints and the boundary builds of change 4 take 304.2 s: clippy 91.8, the Windows lint 53.2,
+  the ten boundary steps 159.2. Three boundary builds hold 137.3 s of those: `connectors-sql`,
+  `connectors-catalog-provider`, `connectors-grafana`.
+- The step of the ignored tests spends 2.6 s before its first test. Acceptance 2 holds.
+- This runner was faster than the one of pull request 294 in every row (first build 344 s
+  against 449 s, tests 638.6 s against 856.7 s). A comparison of two pull requests needs the
+  same rows from both, not the job's total.
+
 ## Change
 
 1. The gate and the ignored step print one line per step with its wall time, and a closing table
@@ -228,7 +267,8 @@ test-step story's, not this one's.
    listing of the ignored tests, the ignored tests, the report. The row "build of the test
    binaries" of the ignored step is the measurement change 2 asks for. Not in a row: the build
    of `connectors-build` itself by `cargo run`, which cargo prints as ``Finished `dev` profile``.
-   The numbers of a forge run with it are not read yet.
+   Read from the forge the same day (pull request 295): 27 rows, 1,948.1 s, in the section on
+   the first forge run that prints its steps.
 2. Measure the 688 s of the ignored step (a run with the build's output shown). Then remove them:
    the step reads the test binaries the gate built, or the gate hands their list over, so that the
    job compiles the test binaries once.
