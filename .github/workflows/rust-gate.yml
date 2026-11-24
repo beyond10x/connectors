@@ -47,10 +47,19 @@ jobs:
         if: steps.scope.outputs.run != 'false'
         run: |
           rustup toolchain install
+          rustup target add x86_64-pc-windows-gnu
           rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
           cargo fmt --version
           cargo clippy --version
+      # The gate lints the host and the CLI for x86_64-pc-windows-gnu; the build scripts of
+      # ring and libsqlite3-sys compile C for that target.
+      - name: Install the C compiler of the Windows lint
+        if: steps.scope.outputs.run != 'false'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gcc-mingw-w64-x86-64
+          x86_64-w64-mingw32-gcc --version
       - name: Install the pinned ess release
         if: steps.scope.outputs.run != 'false'
         working-directory: ${{ runner.temp }}

@@ -338,6 +338,18 @@ impl Quiescent<'_> {
         self.instance
     }
 }
+// The one caller is a Unix-only test (`mutation::tests::recheck`).
+#[cfg(all(test, unix))]
+impl<'a> Quiescent<'a> {
+    /// For a test that calls recovery on its own thread: no worker serves
+    /// `instance`, and `child` is the test's own.
+    pub(super) fn for_test(instance: &'a str, child: &'a mut Option<runtime::Child>) -> Self {
+        Self {
+            instance,
+            _child: child,
+        }
+    }
+}
 #[derive(Default)]
 struct Launches {
     active: Mutex<usize>,

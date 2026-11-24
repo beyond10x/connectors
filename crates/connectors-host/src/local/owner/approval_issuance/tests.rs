@@ -592,6 +592,101 @@ impl ClockServer {
     }
 }
 
+/// Two sources at quorum two, keyed by fixture seeds 7 and 8, each of which
+/// drops as many of its next requests as a test stores in `drops`.
+fn dropping_sources() -> [clock_fixture::Server; 2] {
+    [7, 8].map(|seed| {
+        clock_fixture::Server::dropping(clock_fixture::Fixture {
+            seed,
+            ..Default::default()
+        })
+    })
+}
+fn source_requests(sources: &[clock_fixture::Server; 2]) -> [usize; 2] {
+    [0, 1].map(|i| {
+        sources[i]
+            .requests
+            .load(std::sync::atomic::Ordering::SeqCst)
+    })
+}
+
+/// story:an-approved-write-survives-one-refused-clock-acquisition: `issue`
+/// in two sites built the same way. In the second every source drops its
+/// first request, and the command asks again and ends as in the first. No
+/// proof is asked for: signing needs platform custody, which the fake issuer
+/// has none of, so both calls end at the key lease.
+#[test]
+fn issue_asks_again_when_every_source_drops_its_first_request() {
+    crate::local::clock::set_test_query_timeout(std::time::Duration::from_millis(500));
+    let ended = |drops: usize| {
+        let root = root();
+        let sources = dropping_sources();
+        let t = setup(
+            root.path(),
+            None,
+            [&sources[0].address, &sources[1].address],
+        );
+        t.fake_issuer();
+        t.policy();
+        let approved = prepare(&t.paths, "fixture", &t.request(), until()).unwrap();
+        for source in &sources {
+            source
+                .drops
+                .store(drops, std::sync::atomic::Ordering::SeqCst);
+        }
+        let output = root.path().join("proof.json");
+        let result = issue(
+            &t.paths,
+            "fixture",
+            &t.request(),
+            &approved.subject_sha256,
+            &output,
+            until(),
+        );
+        (
+            result.map(|_| ()).map_err(|error| error.code),
+            source_requests(&sources),
+        )
+    };
+    let (answered, asked) = ended(0);
+    assert_eq!(asked, [1, 1]);
+    let (dropped, asked_again) = ended(1);
+    assert_eq!(
+        (dropped, asked_again),
+        (answered, [2, 2]),
+        "the second site ends as the first, {answered:?}"
+    );
+    assert_ne!(answered, Err(Code::Unavailable));
+}
+
+/// The reading of the three standing commands, the same way: every source
+/// drops its first request and the reading is taken from the second attempt.
+#[test]
+fn the_standing_reading_asks_again_when_every_source_drops_its_first_request() {
+    crate::local::clock::set_test_query_timeout(std::time::Duration::from_millis(500));
+    let root = root();
+    let sources = dropping_sources();
+    let t = setup(
+        root.path(),
+        None,
+        [&sources[0].address, &sources[1].address],
+    );
+    let config = Config::load(&t.paths.config).unwrap();
+    let grants = root.path().join("fixture.grants");
+    let adapter = Adapter {
+        standing_grants: Some(grants.clone()),
+        ..t.adapter.clone()
+    };
+    for source in &sources {
+        source.drops.store(1, std::sync::atomic::Ordering::SeqCst);
+    }
+    let reading = standing_reading(&config, &adapter, until());
+    assert_eq!(source_requests(&sources), [2, 2]);
+    let (path, now) = reading.unwrap_or_else(|error| panic!("{:?}", error.code));
+    assert_eq!(path, grants);
+    assert!(now.lower_unix_ms <= now.upper_unix_ms);
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 #[ignore = "requires built production CLI and qualified disposable GNOME Secret Service"]

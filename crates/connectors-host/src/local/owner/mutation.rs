@@ -9,6 +9,8 @@ use uuid::Uuid;
 mod custody;
 mod execution;
 mod recovery;
+#[cfg(all(test, unix))]
+mod second_attempt_security_tests;
 #[cfg(test)]
 mod tests;
 pub(super) use execution::{Control, Invocation, execute};
