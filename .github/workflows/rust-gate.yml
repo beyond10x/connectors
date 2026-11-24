@@ -43,11 +43,11 @@ jobs:
       - name: Check required system tools
         if: steps.scope.outputs.run != 'false'
         run: for tool in gzip sha256sum sqlite3 jq; do command -v "$tool"; done
-      - name: Install Rust 1.98.1
+      - name: Install the Rust toolchain of rust-toolchain.toml
         if: steps.scope.outputs.run != 'false'
         run: |
-          rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
-          rustup default 1.98.1
+          rustup toolchain install
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
           cargo fmt --version
           cargo clippy --version
@@ -136,10 +136,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Install Rust 1.98.1
+      - name: Install the Rust toolchain of rust-toolchain.toml
         run: |
-          rustup toolchain install 1.98.1 --profile minimal
-          rustup default 1.98.1
+          rustup toolchain install
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
       - name: Fetch locked dependencies
         run: cargo fetch --locked

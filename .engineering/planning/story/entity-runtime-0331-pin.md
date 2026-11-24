@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:entity-runtime-0331-pin
 kind: story
-status: active
+status: implemented
 title: 'connectors pins Entity Runtime 0.33.1: the execute slowdown of 0.33.0 is gone'
 summary: Cargo pins the four Entity Runtime crates at tag 0.33.1; emissions inputs regenerated; execute time measured on 0.32.0, 0.33.0 and 0.33.1; ships as 0.76.2
 relations:
@@ -20,10 +20,11 @@ scope:
   path: crates/connectors-build/generated/metadata-emissions
 - confidence: cited
   path: docs/development.md
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T11:40:49Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-11-23T11:40:49Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-11-24T06:33:43Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Outcome
 

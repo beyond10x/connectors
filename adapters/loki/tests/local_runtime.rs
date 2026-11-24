@@ -40,6 +40,8 @@ const START: &str = "1788822000000000000";
 const END: &str = "1788825600000000000";
 const LOGQL: &str = r#"{app="api"} |= "error""#;
 const METRIC: &str = r#"sum by (app) (count_over_time({app="api"}[1m]))"#;
+/// Grafana's data-source proxy path of one Loki data source.
+const PROXY: &str = "/api/datasources/proxy/uid/P8E80F9AEF21F6940/";
 
 fn fixture(name: &str) -> Vec<u8> {
     fs::read(format!(
@@ -279,6 +281,33 @@ fn private(path: &std::path::Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
 }
+/// The decoded name and value pairs of a received query string, in the order sent.
+fn parameters(query: &str) -> Vec<(String, String)> {
+    let decode = |text: &str| {
+        let bytes = text.as_bytes();
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'+' => out.push(b' '),
+                b'%' => {
+                    out.push(u8::from_str_radix(&text[i + 1..i + 3], 16).unwrap());
+                    i += 2;
+                }
+                byte => out.push(byte),
+            }
+            i += 1;
+        }
+        String::from_utf8(out).unwrap()
+    };
+    query
+        .split('&')
+        .map(|pair| {
+            let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (decode(name), decode(value))
+        })
+        .collect()
+}
 fn token(value: &str) -> Secret {
     Secret(serde_json::to_vec(&json!({ "token": value })).unwrap())
 }
@@ -515,7 +544,6 @@ fn a_changed_configuration_refuses_the_cached_selection_before_provider_work() {
 /// sends its probe and every read below the prefix, with the token as its bearer.
 #[test]
 fn a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix() {
-    const PROXY: &str = "/api/datasources/proxy/uid/P8E80F9AEF21F6940/";
     let provider = Provider::under(PROXY);
     let mut child = Child::spawn(&provider.selection()).unwrap();
     let baseline = child
@@ -557,6 +585,42 @@ fn a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefi
             .unwrap()
             .iter()
             .all(|c| c.method == "GET" && c.authorization == format!("Bearer {TOKEN_ONE}"))
+    );
+}
+
+/// An instant metric query through the same proxy: the caller's LogQL text and its instant
+/// reach `GET <proxy>loki/api/v1/query` unchanged, under the Grafana token, and the answer
+/// is the vector Loki returned. The window's unit (`s`, `m`, `h`, `d`) and the selector are
+/// part of that text, so they are sent as given.
+#[test]
+fn a_metric_query_reads_through_a_grafana_proxy() {
+    const COUNT: &str = r#"sum(count_over_time({namespace="fixture"}[1h]))"#;
+    let provider = Provider::under(PROXY);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let answer = invoke(
+        &mut child,
+        "logs.query_metric",
+        json!({"query": COUNT, "time_unix_ns": END}),
+    )
+    .unwrap();
+    assert_eq!(answer["result_type"], "vector", "{answer}");
+    assert_eq!(answer["series"].as_array().unwrap().len(), 1, "{answer}");
+    assert_eq!(answer["series"][0]["labels"], json!({"level": "error"}));
+    assert_eq!(answer["series"][0]["samples"][0]["value"], "7");
+
+    let calls = provider.calls.lock().unwrap();
+    assert_eq!(calls.len(), 1, "{calls:?}");
+    let call = &calls[0];
+    assert_eq!(call.method, "GET");
+    assert_eq!(call.authorization, format!("Bearer {TOKEN_ONE}"));
+    let (route, query) = call.target.split_once('?').unwrap();
+    assert_eq!(route, format!("{PROXY}loki/api/v1/query"));
+    assert_eq!(
+        parameters(query),
+        [
+            ("query".to_owned(), COUNT.to_owned()),
+            ("time".to_owned(), END.to_owned()),
+        ]
     );
 }
 

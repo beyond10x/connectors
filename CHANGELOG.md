@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.77.1 — 2026-11-24
+
+### Added
+
+- The release archives hold `connectors-sql`, the program of the `mysql` and `postgres`
+  connectors, beside the six programs they held, and the container image holds it with them:
+  a released install reads `mysql/<instance>` and `postgres/<instance>` without a build from
+  source. `connectors-sql --version` prints `connectors-sql <version>`; before, the option was
+  refused. The MySQL guide has a section on a managed read replica and says what `query.read`
+  does with a statement's own `LIMIT … OFFSET …`
+  ([MySQL guide](docs/local-mysql-cli.md#a-managed-mysql-replica)); the Loki guide says that a
+  Loki without a credential is not served and names the route through Grafana
+  ([Loki guide](adapters/loki/README.md#through-grafana)).
+
+### Changed
+
+- A build from source uses the Rust toolchain that the new file `rust-toolchain.toml` names:
+  1.98.1 with rustfmt and clippy. rustup installs it on the first `cargo` call in the
+  checkout. The released binaries were built with 1.98.1 before and do not change, and no
+  manifest changes its `rust-version`. The release workflow refuses to build a tag whose
+  commit has no `rust-toolchain.toml`, so it no longer rebuilds the archives of 0.77.0 or an
+  earlier tag
+  ([development](docs/development.md)).
+- The clock example names `time.txryan.com` at 149.56.214.17 (before: 148.113.255.71; the
+  name moved, the key is the same). An installation that copied the old address reads that
+  source as `unreachable` in `clock-check`
+  ([local clock](docs/local-clock.md)).
+
 ## 0.77.0 — 2026-11-24
 
 ### Added

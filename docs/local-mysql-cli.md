@@ -11,6 +11,9 @@ the [PostgreSQL guide](local-postgres-cli.md).
 
 Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
+The release archives hold `connectors-sql` beside `connectors`; archives of 0.77.0 and
+earlier do not, and this guide writes the path of a build from source:
+
 ```sh
 CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-sql
 ```
@@ -142,6 +145,23 @@ prepares with columns but cannot be a derived table (`SHOW`, `EXPLAIN`) is refus
 by the server's syntax check of the wrapper, which the instance answers
 `unsupported`, as it does a statement that returns no columns.
 
+A statement's own `LIMIT … OFFSET …` is sent inside the derived table, unchanged:
+`SELECT id, name FROM item ORDER BY id LIMIT 100 OFFSET 100` with `"limit":100` runs as
+`SELECT * FROM (SELECT id, name FROM item ORDER BY id LIMIT 100 OFFSET 100) AS result (c0,c1) LIMIT 101`.
+The server applies the statement's own limit first, and the input `limit` bounds what
+comes back: when the statement returns more rows than `limit`, the answer holds `limit`
+rows and `truncated` is true. A page selected by `LIMIT 100 OFFSET 100` and read with
+`"limit":100` is therefore never `truncated`, also when more rows follow it; a caller that
+pages this way learns the end from a page shorter than its page size, or from a count
+(`SELECT COUNT(*) AS n FROM (<statement>) AS matched` with `"limit":1`). The statement is
+at most 8,192 characters, the paging text and such a `COUNT(*)` wrapper included. The
+instance adds no `ORDER BY` of its own to a `query.read`. On a MySQL 8.4.13 server, a
+statement over four tables that ends in `ORDER BY id` returned the first page (no `LIMIT`
+of its own, `"limit":100`) as the ids 1 to 100 and the page `LIMIT 100 OFFSET 100` as the
+ids 101 to 200, each in ascending order of `id`
+(`adapters/sql/tests/mysql_replica.rs`, run on 2026-11-24); the tests hold the rows of a
+page as a set and print their sequence.
+
 What this guarantees is a read-only session plus one result-returning
 statement. A write to a table, including one inside a stored function, is
 refused by the server (error 1792, reported as `forbidden`). It does **not**
@@ -169,6 +189,46 @@ Errors are classified without the server's message: access refusals (1044, 1142,
 many connections (1040, 1203) is `capacity`, both marked as the server's answer;
 otherwise the SQLSTATE class decides, as on PostgreSQL (`42000` syntax errors are
 `invalid_input`).
+
+## A managed MySQL replica
+
+A read replica of a managed MySQL service is configured like any other server. `host` is
+the replica's reader endpoint, and `ca_file` is the provider's CA bundle, saved as an
+owner-only PEM file. The bundle replaces the public roots, so it must hold the authority
+that signed the endpoint's certificate:
+
+```json
+{
+  "format": "connectors-sql-local/1",
+  "engine": "mysql",
+  "instance": "mysql-staging-reader",
+  "host": "reader.db.example",
+  "port": 3306,
+  "database": "incidents",
+  "user": "reader",
+  "allow_plaintext": false,
+  "ca_file": "/absolute/path/provider-ca-bundle.pem"
+}
+```
+
+Write one native file and pin one instance per environment: each has its own `instance`,
+configuration revision and password, and is read as `mysql/<instance>`.
+
+Grant the user `SELECT` on what it may read and nothing else. The two session statements
+above need no privilege of their own. `EXECUTE` is needed only for a function a statement
+calls; grant it on no routine with side effects.
+
+The session is `READ ONLY` on a replica as on any server, so a write is refused in the
+same way on both, and before the server's own read-only setting is asked. A write that
+reaches the server, such as a stored function that inserts a row, called as `SELECT f()`,
+is answered by the read-only session of the instance: the server's error 1792, reported as
+`forbidden`. The same call from a session that is not `READ ONLY` is refused by the server
+itself with error 1290, which no reader meets through the instance.
+
+This was tested on a disposable MySQL 8.4.13 server with `super_read_only = ON`
+(`adapters/sql/tests/mysql_replica.rs`, ignored tests, run on 2026-11-24), not on a
+managed service: how a managed service refuses a write on a reader, and its certificates,
+are not tested.
 
 ## How values are written: the `mysql-native-text` profile
 
@@ -292,8 +352,12 @@ the scripted fixture with a server that returns fewer rows than the limit asks f
 
 - Verified against a scripted MySQL wire fixture on loopback (handshake, TLS,
   authentication, the session statements, prepared statements with typed binary
-  rows, `information_schema` reads and `KILL QUERY`), not against a live MySQL
-  server. There is no real-provider acceptance evidence for MySQL yet.
+  rows, `information_schema` reads and `KILL QUERY`). There is no real-provider
+  acceptance evidence for MySQL yet.
+- On 2026-11-24 the ignored tests of `adapters/sql/tests/mysql_replica.rs` ran against a
+  disposable MySQL 8.4.13 server in `super_read_only`: the session statements, a read, the
+  refusal of a write through a function, and pages selected with `LIMIT … OFFSET …`
+  ([a managed MySQL replica](#a-managed-mysql-replica)). No managed service was tested.
 - MySQL 8.0 or later is assumed: the derived-table column list and
   `max_execution_time` are MySQL features. MariaDB is not tested.
 - `schema.list` gives column metadata only; keys, indexes, views and row estimates come from

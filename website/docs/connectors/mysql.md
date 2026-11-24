@@ -29,11 +29,19 @@ without output.
 
 MySQL 8.0 or later, and a user that logs in with a password, granted `SELECT` only and no
 `EXECUTE` on routines with side effects. Without `allow_plaintext` the server must offer TLS.
-Build the executable:
+
+Take the executable from the release archive: `connectors-<version>-<target>.tar.gz` holds
+`connectors-sql` beside `connectors`
+([install a release binary](../getting-started.md#or-install-a-release-binary)); archives of
+0.77.0 and earlier do not hold it. Use its path in the extracted directory wherever this page
+writes `target/release/connectors-sql`. Or build it from source:
 
 ```sh
 cargo build --release --locked -p connectors -p connectors-sql
 ```
+
+A managed read replica (a reader endpoint, the provider's CA bundle, the grants) is in the
+[full guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mysql-cli.md#a-managed-mysql-replica).
 
 ## Enable the connector and add an instance
 

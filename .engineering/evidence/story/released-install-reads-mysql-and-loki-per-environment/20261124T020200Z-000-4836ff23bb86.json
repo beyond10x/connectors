@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-24T02:02:00Z",
+  "actor": "human:timo",
+  "artifact": "story:released-install-reads-mysql-and-loki-per-environment",
+  "kind": "story",
+  "revision": 26,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "acceptance 5 and 8: CONNECTORS_MYSQL_REPLICA_PORT=<port> cargo test --locked -p connectors-sql --test mysql_replica -- --ignored --nocapture, against a local container of mysql:8 (server 8.4.13, super_read_only 1): 5 passed, 0 failed, finished in 0.09 s; the write through a function answered MySQL error 1792 in the READ ONLY session and query.read answered forbidden"
+  }
+}

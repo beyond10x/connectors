@@ -38,11 +38,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Install Rust 1.98.1
+      - name: Install the Rust toolchain of rust-toolchain.toml
         shell: bash
         run: |
-          rustup toolchain install 1.98.1 --profile minimal --component clippy
-          rustup default 1.98.1
+          rustup toolchain install
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
       - name: Build the workspace
         shell: bash

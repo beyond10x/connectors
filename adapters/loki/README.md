@@ -197,10 +197,18 @@ The uid is the `uid` member of the [Grafana connector's](../grafana/README.md) `
 record whose `type` is `loki` and `access` is `proxy`. The probe and every read then go to
 `<base_url>loki/api/v1/...` with `Authorization: Bearer <Grafana token>`
 (`tests/local_runtime.rs`,
-`a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). Grafana,
+`a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). An instant
+`logs.query_metric`, such as `sum(count_over_time({namespace="fixture"}[1h]))` with
+`time_unix_ns`, goes to `<base_url>loki/api/v1/query` with the LogQL text as given
+(`a_metric_query_reads_through_a_grafana_proxy`). Grafana,
 not Connectors, decides which data sources the token reaches and which credentials Grafana
 adds toward Loki. The identity is still the configured `instance`: use one per Grafana and
 data source.
+
+A Loki that accepts requests without a credential is not served: the `loki.bearer` profile
+is the only one, a connection needs a token to exist, and every request carries it. If you
+have no token that Loki or its gateway accepts, read through Grafana as above, with a
+Grafana service-account token.
 
 Recent logs, such as the last fifteen minutes, are `logs.query_range` with `start_unix_ns`
 fifteen minutes before now and no `end_unix_ns`, which ends the window at the receiver clock.

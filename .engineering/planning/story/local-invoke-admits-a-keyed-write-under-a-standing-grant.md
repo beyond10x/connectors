@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:local-invoke-admits-a-keyed-write-under-a-standing-grant
 kind: story
-status: active
+status: implemented
 title: A keyed write through the local CLI is admitted under a standing grant
 summary: 'invoke with --idempotency-key and no --approval-file runs under a signed grant file: one instance, one operation, exact target, closed input, expiry, hourly cap'
 relations:
@@ -100,10 +100,11 @@ scope:
   path: website/docs/guides/guarded-write.md
 - confidence: inferred
   path: website/docs/reference
-revision: 67
+revision: 68
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:03:26Z", actor: "human:timo", revision: 61, decided_on: {"recorded":{"review_outcome":8}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:03:27Z", actor: "human:timo", revision: 62, decided_on: {"recorded":{"review_outcome":8}}}
+- {from: "active", to: "implemented", at: "2026-11-24T06:33:44Z", actor: "human:timo", revision: 68, decided_on: {"recorded":{"test_result":1,"review_outcome":10}}}
 ---
 ## Outcome
 

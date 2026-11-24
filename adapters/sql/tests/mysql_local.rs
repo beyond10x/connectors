@@ -72,6 +72,25 @@ fn profiles(bootstrap: &Bootstrap) -> Vec<String> {
         .collect()
 }
 
+/// The release workflow runs `<binary> --version` for every program it packages.
+#[test]
+fn connectors_sql_prints_its_version() {
+    let output = Command::new(env!("CARGO_BIN_EXE_connectors-sql"))
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "--version exited {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        concat!("connectors-sql ", env!("CARGO_PKG_VERSION"), "\n")
+    );
+}
+
 #[test]
 fn an_existing_postgresql_configuration_without_an_engine_is_unchanged() {
     let (_root, directory) = private_directory();

@@ -302,15 +302,17 @@ independent libraries are also checked on Rust 1.88.0:
 cargo build --workspace --locked
 ```
 
-Ordinary builds use checked-in generated Rust. They do not require ESS or refresh
-vendor specifications; Cargo may need to download dependencies on the first build.
+Ordinary builds use checked-in generated Rust, need no ESS and refresh no vendor
+specification; Cargo may download dependencies on the first build.
 
 Or install a release binary: each release page carries `connectors-<version>-<target>.tar.gz`
-for Linux and macOS, whose directory holds `connectors` and `connectors-catalog-provider`
+for Linux and macOS, whose directory holds `connectors`, `connectors-catalog-provider`,
+`connectors-grafana`, `connectors-prometheus`, `connectors-loki`, `connectors-kubernetes` and
+`connectors-sql`
 ([Getting started](https://beyond10x.github.io/connectors/docs/getting-started#or-install-a-release-binary)).
-Keep the two binaries in one directory: an instance that pins nothing is derived by the provider
+Keep the first two in one directory: an instance that pins nothing is derived by the provider
 beside `connectors`, which `setup check` lists as the `installed_provider` prerequisite. The macOS
-binaries are not signed: the linked page says how to remove Gatekeeper's quarantine attribute.
+binaries are not signed: the linked page says how to remove the quarantine attribute.
 
 Or run the container image: releases from 0.70.0 on publish `ghcr.io/beyond10x/connectors:<version>`
 for `linux/amd64` and `linux/arm64`, with the Linux archive's binaries, running as a non-root user
@@ -318,7 +320,7 @@ and starting `connectors-catalog-provider` ([In a container](docs/running-servic
 
 To use the local CLI, configure an instance as [Vocabulary](#vocabulary) shows and follow the
 [Getting started](https://beyond10x.github.io/connectors/docs/getting-started) page and the
-guide of its connector. To run a connector as a standalone service instead, choose a service
+guide of its connector. To run a connector as a standalone service, choose a service
 configuration from [examples](examples/), set its permitted resources and private credential
 references, then follow [Run connector services](docs/running-services.md). For an end-to-end local
 exercise with disposable Kubernetes and PostgreSQL services, use the
