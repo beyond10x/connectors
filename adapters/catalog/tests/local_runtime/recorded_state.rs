@@ -337,6 +337,22 @@ impl Facts {
         rows.sort_by(|a, b| a.0.cmp(&b.0));
         rows
     }
+    /// The attempts of the fixture instance as `(attempt_id, state)`, in the order the owner's
+    /// pending scan reads them: by identifier.
+    pub(super) fn attempts_in_scan_order(&self) -> Vec<(String, String)> {
+        let mut rows: Vec<(String, String)> = self
+            .entities(ATTEMPT)
+            .filter(|row| text(row, "instance_id") == "fixture-gitlab")
+            .map(|row| {
+                (
+                    text(row, "attempt_id").into(),
+                    row.lifecycle_state.to_ascii_lowercase(),
+                )
+            })
+            .collect();
+        rows.sort();
+        rows
+    }
     pub(super) fn audits(&self) -> Vec<Value> {
         self.entities(AUDIT)
             .filter(|row| text(row, "instance_id") == "fixture-gitlab")

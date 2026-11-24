@@ -182,7 +182,11 @@ pub(super) fn run(
     let until = Instant::now() + Duration::from_secs(13);
     while clock.count.load(Ordering::SeqCst) == clock_calls {
         assert!(running.0.try_wait().unwrap().is_none());
-        assert!(Instant::now() < until, "background did not request time");
+        assert!(
+            Instant::now() < until,
+            "background did not request time within 13 s; attempts in scan order: {:?}",
+            cli.recorded().attempts_in_scan_order()
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
     // Allow the independent signed response and queue handoff to finish while
