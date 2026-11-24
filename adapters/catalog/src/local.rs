@@ -3303,29 +3303,40 @@ impl runtime::PreparedWrite for Write {
         outcome
     }
     /// The created credential leaves the answer here, into the protected slot
-    /// of the write's result (design §8a).
+    /// of the write's result (design §8a). The provider child commits every
+    /// write through this method, so an upload is sent here too, with its slot
+    /// and byte ports; its answer holds no credential.
     async fn execute_created(self: Box<Self>) -> connectors_sdk::WriteOutcome<runtime::Created> {
         let Write {
             prepared,
             http,
             reader,
             token,
-            upload: _,
+            upload,
         } = *self;
-        let outcome = prepared
-            .execute_holding(
-                http,
-                reader
-                    .as_ref()
-                    .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp),
-            )
-            .await
-            .try_map(|held| {
-                Ok(runtime::Created {
-                    result: held.value,
-                    secret: held.secret,
-                })
-            });
+        let reader = reader
+            .as_ref()
+            .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp);
+        let outcome = match upload {
+            Some(Upload { slot, hosts }) => prepared
+                .execute_upload(slot, &hosts, http, reader)
+                .await
+                .try_map(|result| {
+                    Ok(runtime::Created {
+                        result,
+                        secret: None,
+                    })
+                }),
+            None => prepared
+                .execute_holding(http, reader)
+                .await
+                .try_map(|held| {
+                    Ok(runtime::Created {
+                        result: held.value,
+                        secret: held.secret,
+                    })
+                }),
+        };
         evict_refused_token(token.as_ref(), &outcome);
         outcome
     }
