@@ -7,7 +7,7 @@ Rust 1.88.0 remains the checked minimum for independent libraries. The local
 Eventlog-backed CLI/host runtime is checked on Rust 1.91.0. The full
 test/generation gate uses the ESS pin in
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
-and the rustfmt recorded in the GitLab generated manifest (currently Rust 1.98.1).
+and the Rust toolchain, rustfmt and Clippy included, that [`rust-toolchain.toml`](../rust-toolchain.toml) pins.
 Planning validation uses the separate [AEP executable pin](../crates/connectors-build/aep-toolchain.json).
 The protocol document pin in `.engineering/project.yaml` selects governance documents;
 it does not identify an installed executable.
@@ -82,7 +82,7 @@ the same way: its crates change the digest, and the files are regenerated with i
 
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
 gate without `--msrv` on every pull request and every push to `main`. It installs
-Rust 1.98.1 with rustfmt and Clippy, installs the pinned ESS and AEP releases after
+the toolchain [`rust-toolchain.toml`](../rust-toolchain.toml) pins, installs the pinned ESS and AEP releases after
 checking each archive against its release's `SHA256SUMS`, installs cargo-nextest 0.9.143 after
 checking its archive against the SHA-256 the workflow pins, fetches the locked
 dependencies and runs `cargo run --locked -p connectors-build -- gate`. It reads the

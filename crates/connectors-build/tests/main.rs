@@ -34,3 +34,4 @@ mod mcp_specification_pin_adversary_pass2;
 mod metadata_conformance_fixture_adversary;
 mod oauth2_declaration_mirrors_ess;
 mod oauth2_refresh_metadata_authority_adversary;
+mod one_pinned_rust_toolchain;
