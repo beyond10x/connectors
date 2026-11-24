@@ -700,7 +700,9 @@ mod recheck {
     /// of `write` for `/value` true, once an hour.
     struct Site {
         child: runtime::Child,
-        _clocks: [clock_fixture::Server; 2],
+        /// The two clock sources. Each drops as many of its next requests as
+        /// a test stores in `drops`, and is silent while `respond` is false.
+        clocks: [clock_fixture::Server; 2],
         paths: Paths,
         /// Where the child records `prepare`, `send` and `destroy`.
         events: PathBuf,
@@ -727,7 +729,7 @@ mod recheck {
         };
         config::Config::initialize(&paths).unwrap();
         let clocks = [7, 8].map(|seed| {
-            clock_fixture::Server::fixture(clock_fixture::Fixture {
+            clock_fixture::Server::dropping(clock_fixture::Fixture {
                 seed,
                 ..Default::default()
             })
@@ -913,7 +915,7 @@ mod recheck {
         };
         Site {
             child,
-            _clocks: clocks,
+            clocks,
             paths,
             events,
             grants,
@@ -930,6 +932,16 @@ mod recheck {
     /// revoked when `execute` reaches the step `revoke_at`; the second value
     /// says how often it was.
     fn write(site: &mut Site, revoke_at: seam::Step) -> (Delivery, u32) {
+        write_within(site, WAIT, Some(revoke_at))
+    }
+
+    /// [`write`] with its deadline `wait` after the call, and the grant
+    /// revoked at `revoke_at` or, with `None`, never.
+    fn write_within(
+        site: &mut Site,
+        wait: Duration,
+        revoke_at: Option<seam::Step>,
+    ) -> (Delivery, u32) {
         let revoked = Rc::new(Cell::new(0));
         let hook = {
             let revoked = revoked.clone();
@@ -940,7 +952,7 @@ mod recheck {
             let (grants, grant_id) = (site.grants.clone(), site.grant_id.clone());
             let (seed, kid) = (site.seed, site.kid.clone());
             move |step: seam::Step| {
-                if step != revoke_at {
+                if Some(step) != revoke_at {
                     return;
                 }
                 let config = config::Config::load(&paths.config).unwrap();
@@ -984,7 +996,7 @@ mod recheck {
                 },
                 key: Some("key-1"),
                 proof: None,
-                until: Instant::now() + WAIT,
+                until: Instant::now() + wait,
             },
             &mut site.child,
             Control {
@@ -1088,5 +1100,193 @@ mod recheck {
                 Some(attempt.to_string())
             )]
         );
+    }
+
+    // story:an-approved-write-survives-one-refused-clock-acquisition: the
+    // second attempt of the clock in the write path and in recovery
+    // (contracts/service/clock.md, "Second attempt"). Each test sets the
+    // query deadline below after `site()`, which acquires under `WAIT`.
+
+    /// The query deadline of the tests below, on the test's thread.
+    const QUERY: Duration = Duration::from_millis(500);
+
+    /// How often each source was asked so far.
+    fn asked(site: &Site) -> [usize; 2] {
+        [0, 1].map(|i| site.clocks[i].requests.load(Ordering::SeqCst))
+    }
+    /// How often each source was asked since `before`.
+    fn asked_since(site: &Site, before: [usize; 2]) -> [usize; 2] {
+        let now = asked(site);
+        [0, 1].map(|i| now[i] - before[i])
+    }
+    /// Each source drops its next request.
+    fn drop_next(site: &Site) {
+        for source in &site.clocks {
+            source.drops.store(1, Ordering::SeqCst);
+        }
+    }
+    /// No source answers from now on.
+    fn silence(site: &Site) {
+        for source in &site.clocks {
+            source.respond.store(false, Ordering::SeqCst);
+        }
+    }
+    fn refused_as_unavailable_before_any_attempt(delivery: &Delivery) {
+        let error = delivery.error.as_ref().expect("the write was not refused");
+        assert_eq!(error.code, FailureCode::Owner(Code::Unavailable));
+        assert!(delivery.result.is_none());
+        assert_eq!(
+            delivery.mutation.classification,
+            Classification::NotAttempted
+        );
+    }
+
+    /// Every source drops the first request of the write. The first reading
+    /// is taken from its second attempt, and the write is admitted under the
+    /// grant and sent once.
+    #[test]
+    fn a_granted_write_is_dispatched_once_when_the_sources_drop_the_first_request_of_the_write() {
+        let mut site = site();
+        clock::set_test_query_timeout(QUERY);
+        let before = asked(&site);
+        drop_next(&site);
+        let (delivery, revoked) = write_within(&mut site, WAIT, None);
+        assert_eq!(revoked, 0);
+        assert!(delivery.error.is_none(), "{:?}", delivery.error);
+        assert_eq!(delivery.mutation.classification, Classification::Applied);
+        assert!(delivery.mutation.attempt.is_some());
+        assert_eq!(
+            delivery
+                .mutation
+                .standing
+                .as_ref()
+                .map(|s| s.grant_id.as_str()),
+            Some(site.grant_id.as_str())
+        );
+        assert_eq!((count(&site, "prepare"), count(&site, "send")), (1, 1));
+        // Two attempts of the first reading, one of the second.
+        assert_eq!(asked_since(&site, before), [3, 3]);
+    }
+
+    /// The reserve of the write's first reading: with 2 s to the deadline,
+    /// about 1.5 s are left after the first attempt and 2 s are needed (one
+    /// deadline, and the reserve before the second reading). No second
+    /// attempt starts, and the refusal is today's, not a timeout.
+    #[test]
+    fn a_write_refused_inside_the_reserve_answers_as_today() {
+        let mut site = site();
+        clock::set_test_query_timeout(QUERY);
+        let before = asked(&site);
+        silence(&site);
+        let (delivery, _) = write_within(&mut site, Duration::from_secs(2), None);
+        refused_as_unavailable_before_any_attempt(&delivery);
+        assert!(delivery.mutation.attempt.is_none());
+        assert_eq!(asked_since(&site, before), [1, 1]);
+        assert_eq!((count(&site, "prepare"), count(&site, "send")), (0, 0));
+    }
+
+    /// The keyed write of [`write`], as recovery is asked for it.
+    fn keyed_write(site: &Site) -> issuance::Request<'_> {
+        issuance::Request {
+            connection: &site.connection,
+            operation: "write",
+            schema: &site.schema,
+            revision: "fixture-private-descriptor",
+            input: r#"{"value":true}"#,
+        }
+    }
+    /// One `Prepared` attempt of that write under `key-1`, made with the two
+    /// functions recovery itself uses (`candidate`, `store`) and the ledger's
+    /// `prepare`. Nothing was sent for it.
+    fn prepared(site: &Site) -> ledger::Candidate {
+        let first = issuance::resolve(
+            &site.paths,
+            "fixture",
+            &keyed_write(site),
+            Instant::now() + WAIT,
+        )
+        .unwrap();
+        let candidate = candidate(&first, Some("key-1"), &Uuid::new_v4().to_string()).unwrap();
+        let preparation = store(&site.paths, NoClock)
+            .unwrap()
+            .prepare(&candidate)
+            .unwrap();
+        assert!(matches!(preparation, ledger::Preparation::Prepared(_)));
+        assert!(still_prepared(site, &candidate));
+        candidate
+    }
+    /// Whether the ledger still holds the attempt of `candidate` as `Prepared`.
+    fn still_prepared(site: &Site, candidate: &ledger::Candidate) -> bool {
+        let original = store(&site.paths, NoClock)
+            .unwrap()
+            .lookup(candidate)
+            .unwrap()
+            .expect("the attempt exists");
+        original.state == ledger::State::Prepared
+    }
+    /// `recover_observation` on this thread, its deadline `wait` after the
+    /// call, with no worker and no child for the instance.
+    fn recover(site: &Site, wait: Duration) -> Delivery {
+        recover_observation(
+            &site.paths,
+            "fixture",
+            &keyed_write(site),
+            "key-1",
+            Instant::now() + wait,
+            crate::local::owner::supervisor::Quiescent::for_test("fixture", &mut None),
+        )
+        .unwrap()
+    }
+    /// The cause recovery names when it could not settle the attempt.
+    fn unavailable_at_observation(delivery: &Delivery) -> bool {
+        delivery.mutation.cause.as_ref().is_some_and(|cause| {
+            cause.code == connectors_core::ErrorCode::Unavailable
+                && cause.stage == Stage::Observation
+        })
+    }
+
+    /// Recovery of a `Prepared` write needs one clock for the settlement
+    /// time. Every source drops its first request; the clock is taken from
+    /// the second attempt and the attempt is settled.
+    #[test]
+    fn recovery_settles_a_prepared_write_when_the_sources_drop_the_first_request() {
+        let site = site();
+        clock::set_test_query_timeout(QUERY);
+        let candidate = prepared(&site);
+        let before = asked(&site);
+        drop_next(&site);
+        let delivery = recover(&site, WAIT);
+        assert!(
+            !unavailable_at_observation(&delivery),
+            "recovery did not settle the attempt"
+        );
+        assert!(!still_prepared(&site, &candidate));
+        assert_eq!(asked_since(&site, before), [2, 2]);
+        assert_eq!(count(&site, "send"), 0);
+    }
+
+    /// The reserve of recovery: with a query deadline of 1.5 s and 3.9 s to
+    /// the deadline, at most 2.4 s are left after the first attempt and 2.5 s
+    /// are needed. No second attempt starts, and the answer is today's. The
+    /// 2.4 s are what recovery's other work has on a loaded host; with the
+    /// 500 ms deadline of the tests beside this one it had 1.2 s and answered
+    /// `Timeout` in one run.
+    #[test]
+    fn recovery_refused_inside_the_reserve_answers_as_today() {
+        let site = site();
+        clock::set_test_query_timeout(Duration::from_millis(1500));
+        let candidate = prepared(&site);
+        let before = asked(&site);
+        silence(&site);
+        let delivery = recover(&site, Duration::from_millis(3900));
+        assert!(unavailable_at_observation(&delivery));
+        assert!(still_prepared(&site, &candidate));
+        assert_eq!(asked_since(&site, before), [1, 1]);
+    }
+
+    // The adversary's cases for the reserve of each caller, in a file of
+    // their own beside this one.
+    mod second_attempt_adversary {
+        include!("second_attempt_adversary_tests.rs");
     }
 }

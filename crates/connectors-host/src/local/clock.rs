@@ -7,6 +7,8 @@
 pub(crate) mod fixture;
 mod protocol;
 #[cfg(test)]
+mod second_attempt_security_tests;
+#[cfg(test)]
 mod tests;
 mod timer;
 
@@ -72,6 +74,25 @@ fn query_timeout() -> Duration {
 #[cfg(not(test))]
 fn query_timeout() -> Duration {
     QUERY_TIMEOUT
+}
+
+/// The reserve of a caller whose work after the acquisition is local: what it
+/// still does inside its deadline once the clock answered.
+pub const RESERVE_AFTER_CLOCK: Duration = Duration::from_secs(1);
+
+/// The reserve of a write's first reading, which a second reading follows:
+/// one attempt of that reading plus [`RESERVE_AFTER_CLOCK`], computed at the
+/// call (3 s with the 2 s query deadline).
+pub fn reserve_before_second_reading() -> Duration {
+    query_timeout() + RESERVE_AFTER_CLOCK
+}
+
+/// Whether a second attempt may start at `now`: `until` is at least one query
+/// deadline plus the caller's reserve away. It reads no clock.
+fn second_attempt_fits(now: Instant, until: Instant, query: Duration, reserve: Duration) -> bool {
+    until
+        .checked_duration_since(now)
+        .is_some_and(|left| left >= query.saturating_add(reserve))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -371,10 +392,40 @@ impl Configuration {
         connectors_core::digest(&serde_json::json!(self))
     }
     /// One parallel exchange per source; never call while holding a metadata
-    /// transaction or a key/policy lease. No host clock modification, DNS,
-    /// fallback, or retry occurs.
+    /// transaction or a key/policy lease. No host clock modification, DNS or
+    /// fallback occurs, and this call makes one attempt: the second attempt
+    /// is [`Self::acquire_within`]'s alone.
     pub fn acquire(&self) -> Result<BoundedClock> {
         self.acquire_explained().map_err(|refused| refused.failure)
+    }
+    /// [`Self::acquire_explained`], and one second attempt when all three
+    /// hold: the first refused [`Refusal::BelowQuorum`], none of its sources
+    /// is [`SourceResult::Unverified`], and one query deadline plus `reserve`
+    /// is left before `until` (`second_attempt_fits`). `reserve` is what the
+    /// caller still does inside `until` after this call. The second attempt
+    /// is a whole acquisition on new sockets with new nonces; its answer or
+    /// refusal is the result, and no reply to the first is counted in it. No
+    /// attempt follows the second (contracts/service/clock.md, "Second
+    /// attempt").
+    pub fn acquire_within(
+        &self,
+        until: Instant,
+        reserve: Duration,
+    ) -> std::result::Result<BoundedClock, Refused> {
+        let refused = match self.acquire_explained() {
+            Ok(clock) => return Ok(clock),
+            Err(refused) => refused,
+        };
+        let dropped = refused.refusal == Some(Refusal::BelowQuorum)
+            && refused
+                .sources
+                .iter()
+                .all(|source| source.result != SourceResult::Unverified);
+        if dropped && second_attempt_fits(Instant::now(), until, query_timeout(), reserve) {
+            self.acquire_explained()
+        } else {
+            Err(refused)
+        }
     }
     /// [`Self::acquire`], naming the combined [`Refusal`] and each source's
     /// result when the quorum is why it refused.
@@ -510,6 +561,18 @@ impl ApprovalClock {
                 retired: true,
                 ..Failure::InvalidConfiguration.into()
             }),
+        }
+    }
+    /// [`Configuration::acquire_within`]; the retired shape refuses as in
+    /// [`Self::acquire_explained`], without an attempt.
+    pub fn acquire_within(
+        &self,
+        until: Instant,
+        reserve: Duration,
+    ) -> std::result::Result<BoundedClock, Refused> {
+        match self {
+            Self::Quorum(configuration) => configuration.acquire_within(until, reserve),
+            Self::Retired(_) => self.acquire_explained(),
         }
     }
 }

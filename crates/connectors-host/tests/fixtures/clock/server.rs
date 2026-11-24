@@ -65,6 +65,9 @@ pub struct Server {
     pub address: String,
     pub requests: Arc<AtomicUsize>,
     pub respond: Arc<AtomicBool>,
+    /// How many of its next requests a [`Server::dropping`] source leaves
+    /// unanswered; a test sets it. No other source reads it.
+    pub drops: Arc<AtomicUsize>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
@@ -90,6 +93,21 @@ impl Server {
             .recv_from(&mut [0u8; 4096])
             .expect("the fixture answers its warm-up request");
         self.requests.store(0, Ordering::SeqCst);
+    }
+    /// [`Server::fixture`], warmed the same way, with a counter the test sets
+    /// (`drops`): while it is over 0 the source counts the request, stays
+    /// silent and lowers the counter by 1.
+    pub fn dropping(fixture: Fixture) -> Self {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let left = drops.clone();
+        let mut server = Self::spawn(Box::new(move |_, request| {
+            let dropped =
+                left.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
+            dropped.is_err().then(|| fixture.reply(request))
+        }));
+        server.drops = drops;
+        server.warm();
+        server
     }
     /// A source that receives and never answers.
     pub fn silent() -> Self {
@@ -145,6 +163,7 @@ impl Server {
             address,
             requests,
             respond,
+            drops: Arc::new(AtomicUsize::new(0)),
             stop,
             thread: Some(thread),
         }

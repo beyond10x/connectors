@@ -364,7 +364,17 @@ fn clock_check_below_quorum_refusal() {
         ),
     ] {
         let root = clock_root(&clock_fixture::quorum_toml(quorum, 10_000, &sources));
+        let asked = silent.requests.load(std::sync::atomic::Ordering::SeqCst);
         let failure = clock_unavailable(&root);
+        // `clock-check` makes one attempt: the silent source, which every row
+        // names, is asked once per check (contracts/service/clock.md, "Second
+        // attempt").
+        assert!(sources.contains(&s));
+        assert_eq!(
+            silent.requests.load(std::sync::atomic::Ordering::SeqCst),
+            asked + 1,
+            "{failure}"
+        );
         assert_eq!(failure["clock_refusal"], "below_quorum", "{failure}");
         assert_eq!(failure["next_action"], action, "{failure}");
         let lines = &failure["clock_sources"];

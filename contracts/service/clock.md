@@ -95,8 +95,8 @@ in parallel, each over its own connected UDP socket; one shared two-second deadl
 starts after every socket is connected and covers every send, receive and
 verification, so the total network wait does not grow with the number of sources.
 A source with no verified reply by the deadline is `unreachable`. A response is no
-larger than the request. Numeric endpoints avoid an unbounded resolver step. There
-are no automatic network retries.
+larger than the request. Numeric endpoints avoid an unbounded resolver step. One acquisition makes
+one attempt, and the callers named under [second attempt](#second-attempt) make at most one more.
 
 Before accepting a response, verify exact framing, bounded/ordered unique tags
 and offsets, required field widths, response TYPE, echoed NONC, signed VER equal
@@ -233,3 +233,36 @@ oversized, unavailable and delayed peers; exact interval/expiry/rate/overflow
 boundaries; process restart/fork and suspend/clock discontinuity; and production
 CLI checks with unchanged read-only lifecycle and no service start or secret access.
 A live exchange establishes interoperability and the observed signed bound only.
+
+### Second attempt
+
+Four callers make a second attempt of an acquisition, each inside the deadline it
+already holds: `approvals issue`; the clock reading of `approvals grant-standing`,
+`revoke-standing` and `list-standing`; each of the two readings of a write through
+`invoke`; and the recovery of a prepared write, which needs the settlement time.
+
+The second attempt starts only when all three hold:
+
+1. the first attempt refused `below_quorum`;
+2. no source of the first attempt is `unverified`;
+3. after the first attempt, at least one query deadline (two seconds) plus the caller's
+   reserve is left before the caller's deadline.
+
+The reserve is what the caller still does inside its deadline after the acquisition.
+It is one second for `approvals issue`, the standing commands, recovery and the second
+reading of a write, and three seconds for the first reading of a write: one attempt of
+the second reading, plus the one second. It keeps a refusal of the second attempt a
+clock refusal and not a timeout of the caller. It is no budget for the provider
+request.
+
+No attempt follows the second, so the network wait of one acquisition is at most two
+query deadlines, four seconds. The attempts are not merged: the second attempt connects
+new sockets and sends a new nonce to every source, and its answer or its refusal is
+that attempt's alone. A reply to the first attempt is never counted in the second. A
+source receives at most two requests per acquisition. `split`, `too_imprecise`, a
+`below_quorum` with an `unverified` source, a local timer, continuity or UTC-midnight
+refusal and an invalid configuration are answered after one attempt.
+
+`approvals clock-check` makes one attempt, so that it shows a source that did not
+answer; the maintenance scan for unsettled writes makes one attempt and scans again
+later.

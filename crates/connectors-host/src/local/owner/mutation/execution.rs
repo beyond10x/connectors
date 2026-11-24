@@ -81,7 +81,15 @@ pub(super) fn ledger_error(error: ledger::Failure) -> Failure {
     }
     .into()
 }
-fn time(current: &issuance::Resolved, until: Instant) -> Result<clock::BoundedClock, Error> {
+/// One reading of the approval clock. A below-quorum attempt is made once
+/// more while one query deadline and `reserve` are left before `until`
+/// (`clock::acquire_within`); `reserve` is what the write still does inside
+/// `until` after this reading, and no budget for the dispatch.
+fn time(
+    current: &issuance::Resolved,
+    until: Instant,
+    reserve: std::time::Duration,
+) -> Result<clock::BoundedClock, Error> {
     issuance::check(until)?;
     let selected = current
         .config
@@ -89,8 +97,8 @@ fn time(current: &issuance::Resolved, until: Instant) -> Result<clock::BoundedCl
         .as_ref()
         .ok_or(Code::InvalidConfiguration)?;
     let clock = selected
-        .acquire()
-        .map_err(|failure| Error::clock(selected, failure))?;
+        .acquire_within(until, reserve)
+        .map_err(|refused| Error::clock(selected, refused.failure))?;
     issuance::check(until)?;
     Ok(clock)
 }
@@ -294,7 +302,8 @@ pub(in crate::local::owner) fn execute(
                 return Err(ApprovalCode::ApprovalRequired.into());
             }
         };
-        let clock = time(&first, until)?;
+        // The second reading below still needs one attempt of its own.
+        let clock = time(&first, until, clock::reserve_before_second_reading())?;
         let current = issuance::resolve(paths, alias, request, until)?;
         unchanged(&first, &current)?;
         let approval = match evidence {
@@ -430,7 +439,7 @@ pub(in crate::local::owner) fn execute(
         issuance::check(until)?;
         // No policy/key/metadata lock is held during native preflight or fresh
         // clock acquisition. Every subsequent decision uses current guards.
-        let clock = time(&current, until)?;
+        let clock = time(&current, until, clock::RESERVE_AFTER_CLOCK)?;
         let final_current = issuance::resolve(paths, alias, request, until)?;
         unchanged(&current, &final_current)?;
         // The commit expects created bytes exactly as the configuration it

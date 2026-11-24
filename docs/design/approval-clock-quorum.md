@@ -130,8 +130,8 @@ its own fresh nonce, one thread per source (`std::thread::scope`; no new depende
 Sockets are bound and connected first, as today (`clock.rs:127-133`); then one shared
 deadline of 2,000 ms starts, and every send, receive and verification must finish
 before it. A source that has not delivered a verified reply by the deadline is
-`unreachable`. There are no retries. The total network wait is therefore 2,000 ms
-whatever the number of sources, the same bound as today.
+`unreachable`. One attempt waits 2,000 ms on the network whatever the number of sources. The four
+callers that make a second attempt (`contracts/service/clock.md`, "Second attempt") wait 4,000 ms at most.
 
 Sequential querying is rejected: its total time grows with the number of sources
 (up to 16 s for eight), and a late source would hold the whole check.
@@ -343,7 +343,7 @@ truth. Within that:
 | One unreachable source | Availability only: an answer while `quorum` others are counted, else `below_quorum`. |
 | One lying and one unreachable source | Safe only if `quorum` honest sources remain counted (four sources, quorum two). With three sources and quorum two, the liar and the remaining honest source form the quorum and a liar overlapping it can set a false answer. |
 | `quorum` or more colluding liars | A false answer. Out of scope: the sources' independence is a deployment assertion. |
-| Network attacker | Cannot forge or replay (signature, fresh nonce per source). Can drop (`unreachable`, `below_quorum`) and delay; delay is inside every interval, so it widens rather than shifts (`too_imprecise`). |
+| Network attacker | Cannot forge or replay (signature, fresh nonce per source). Can drop (`unreachable`, `below_quorum`) and delay; delay is inside every interval, so it widens rather than shifts (`too_imprecise`). One dropped exchange per source refuses a caller that makes one attempt (`clock-check`); a caller that makes a second attempt is refused only when that attempt is dropped too. The second attempt sends new nonces over new sockets and counts no reply to the first, and a forged or replayed datagram that arrives inside the query deadline ends the exchange `unverified`, after which no second attempt is made. |
 | Quorum equal to the number of sources | Every source must answer, and one liar overlapping the others can shift the answer. Allowed, documented as not tolerating a liar. |
 
 Unchanged and still out of scope (`clock.md:24-27`): a compromised local kernel, time

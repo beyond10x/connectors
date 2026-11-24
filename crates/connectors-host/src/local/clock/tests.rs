@@ -1049,3 +1049,213 @@ fn adversary_ipv4_mapped_address_is_the_same_address() {
     );
     assert_eq!(config.validate(), Err(Failure::InvalidConfiguration));
 }
+
+// --- The second attempt (contracts/service/clock.md, "Second attempt";
+// story:an-approved-write-survives-one-refused-clock-acquisition). Every test
+// sets the query deadline to 500 ms on its own thread and acquires there.
+
+/// The query deadline of these tests.
+const QUERY: Duration = Duration::from_millis(500);
+/// The reserve these tests pass.
+const RESERVE: Duration = Duration::from_millis(300);
+
+/// A source signing `T` with key `seed` that drops as many of its next
+/// requests as a test stores in `drops`.
+fn dropping(seed: u8) -> Server {
+    Server::dropping(fixture::Fixture {
+        seed,
+        ..Default::default()
+    })
+}
+fn drop_next(servers: &[&Server]) {
+    for server in servers {
+        server.drops.store(1, Ordering::SeqCst);
+    }
+}
+fn requests(servers: &[&Server]) -> Vec<usize> {
+    servers
+        .iter()
+        .map(|server| server.requests.load(Ordering::SeqCst))
+        .collect()
+}
+/// An `until` no test reaches.
+fn far() -> Instant {
+    Instant::now() + Duration::from_secs(30)
+}
+
+#[test]
+fn a_below_quorum_acquisition_is_repeated_once() {
+    set_test_query_timeout(QUERY);
+    let (a, b) = (dropping(7), dropping(8));
+    drop_next(&[&a, &b]);
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    let clock = config
+        .acquire_within(far(), RESERVE)
+        .expect("the second attempt answers");
+    assert_eq!(
+        results(&clock.observe().unwrap().sources),
+        [SourceResult::Agreed, SourceResult::Agreed]
+    );
+    assert_eq!(requests(&[&a, &b]), [2, 2]);
+}
+
+#[test]
+fn one_attempt_refuses_where_two_answer() {
+    set_test_query_timeout(QUERY);
+    let (a, b) = (dropping(7), dropping(8));
+    drop_next(&[&a, &b]);
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    assert!(matches!(config.acquire(), Err(Failure::Unavailable)));
+    assert_eq!(requests(&[&a, &b]), [1, 1]);
+}
+
+#[test]
+fn sources_that_never_answer_end_after_two_attempts() {
+    set_test_query_timeout(QUERY);
+    let (a, b) = (Server::silent(), Server::silent());
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    let started = Instant::now();
+    let refused = config.acquire_within(far(), RESERVE).err().unwrap();
+    let spent = started.elapsed();
+    assert_eq!(refused.failure, Failure::Unavailable);
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Unreachable, SourceResult::Unreachable]
+    );
+    assert_eq!(requests(&[&a, &b]), [2, 2]);
+    // Two deadlines on the network and no third attempt.
+    assert!(spent >= 2 * QUERY, "{spent:?}");
+    assert!(spent < 2 * QUERY + Duration::from_secs(1), "{spent:?}");
+}
+
+#[test]
+fn an_attempt_with_an_unverified_source_is_not_repeated() {
+    set_test_query_timeout(QUERY);
+    // The first source signs with key 8 and is configured with key 9.
+    let (bad_signature, silent) = (answering(8, T, 1), Server::silent());
+    let config = quorum(2, vec![source(&bad_signature, 9), source(&silent, 7)]);
+    let refused = config.acquire_within(far(), RESERVE).err().unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Unverified, SourceResult::Unreachable]
+    );
+    assert_eq!(requests(&[&bad_signature, &silent]), [1, 1]);
+}
+
+#[test]
+fn a_split_is_not_repeated() {
+    set_test_query_timeout(QUERY);
+    let (a, b) = (answering(7, T, 1), answering(8, T + 20, 1));
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    let refused = config.acquire_within(far(), RESERVE).err().unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::Split));
+    assert_eq!(requests(&[&a, &b]), [1, 1]);
+}
+
+#[test]
+fn the_second_attempt_needs_one_deadline_and_the_reserve() {
+    // Constructed instants; the decision reads no clock.
+    let now = Instant::now();
+    let (query, reserve) = (Duration::from_secs(2), Duration::from_secs(1));
+    let needed = query + reserve;
+    let short = needed - Duration::from_millis(1);
+    assert!(!second_attempt_fits(now, now + short, query, reserve));
+    assert!(second_attempt_fits(now, now + needed, query, reserve));
+    assert!(second_attempt_fits(now, now + 20 * needed, query, reserve));
+    // `until` has passed, and `until` is now.
+    assert!(!second_attempt_fits(now + needed, now, query, reserve));
+    assert!(!second_attempt_fits(now, now, query, reserve));
+    // With no reserve one deadline is enough, and nothing less.
+    let none = Duration::ZERO;
+    assert!(second_attempt_fits(now, now + query, query, none));
+    assert!(!second_attempt_fits(
+        now,
+        now + short - reserve,
+        query,
+        none
+    ));
+    // The two reserves the callers pass.
+    assert_eq!(QUERY_TIMEOUT, Duration::from_secs(2));
+    assert_eq!(RESERVE_AFTER_CLOCK, Duration::from_secs(1));
+    set_test_query_timeout(QUERY);
+    assert_eq!(reserve_before_second_reading(), QUERY + RESERVE_AFTER_CLOCK);
+}
+
+#[test]
+fn no_second_attempt_starts_inside_the_reserve() {
+    set_test_query_timeout(QUERY);
+    let (a, b) = (Server::silent(), Server::silent());
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    // After the first attempt about 500 ms are left; 800 ms are needed.
+    let until = Instant::now() + Duration::from_secs(1);
+    let refused = config.acquire_within(until, RESERVE).err().unwrap();
+    let returned = Instant::now();
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(requests(&[&a, &b]), [1, 1]);
+    assert!(returned < until, "{:?} late", returned - until);
+}
+
+#[test]
+fn the_second_attempt_sends_new_nonces() {
+    set_test_query_timeout(QUERY);
+    // Each source records the NONC field of its requests, stays silent on
+    // request 0 and answers from request 1 on.
+    let recorder = |seed: u8| {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+        let fixture = fixture::Fixture {
+            seed,
+            ..Default::default()
+        };
+        let server = Server::spawn(Box::new(move |n, request| {
+            let fields = fixture::fields(&request[12..]);
+            recorded.lock().unwrap().push(fields[b"NONC"].clone());
+            (n > 0).then(|| fixture.reply(request))
+        }));
+        (server, seen)
+    };
+    let ((a, seen_a), (b, seen_b)) = (recorder(7), recorder(8));
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    config
+        .acquire_within(far(), RESERVE)
+        .expect("the second attempt answers");
+    for seen in [seen_a, seen_b] {
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0].len(), 32);
+        assert_ne!(seen[0], seen[1]);
+    }
+}
+
+#[test]
+fn a_late_reply_to_the_first_attempt_is_not_counted_in_the_second() {
+    set_test_query_timeout(QUERY);
+    // Source A answers request 0 after 600 ms, past the first deadline and
+    // inside the second attempt, and never answers request 1.
+    let late = Server::spawn(Box::new(|n, request| {
+        (n == 0).then(|| {
+            std::thread::sleep(Duration::from_millis(600));
+            fixture::Fixture {
+                seed: 7,
+                ..Default::default()
+            }
+            .reply(request)
+        })
+    }));
+    let b = dropping(8);
+    drop_next(&[&b]);
+    let config = quorum(2, vec![source(&late, 7), source(&b, 8)]);
+    let refused = config.acquire_within(far(), RESERVE).err().unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Unreachable, SourceResult::Verified]
+    );
+    assert_eq!(requests(&[&late, &b]), [2, 2]);
+}
+
+// The adversary's cases for the second attempt, in a file of their own.
+#[path = "second_attempt_adversary_tests.rs"]
+mod second_attempt_adversary_tests;

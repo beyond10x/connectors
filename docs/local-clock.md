@@ -100,6 +100,13 @@ whose `clock_sources` lists each source:
 | `split` | The verified sources disagree: no instant lies in `quorum` of their intervals. | `choose_clock_source`: a source is wrong; find it from the lines and retire its key. |
 | `too_imprecise` | The combined answer is wider than eight seconds. A single source is never too imprecise: it counts at any radius. | `choose_clock_source`: select more precise sources. |
 
+"No automatic retry" above speaks of `clock-check` alone: it makes one attempt, so
+that it shows a source that did not answer. `approvals issue`, the standing commands
+(`grant-standing`, `revoke-standing`, `list-standing`) and a write make a second attempt
+themselves when the first refused `below_quorum` with no `unverified` source and
+their deadline leaves room for it
+([clock contract](../contracts/service/clock.md#second-attempt)).
+
 A line's `result` is `unreachable` (no verified reply within two seconds, or sending
 or receiving failed), `unverified` (the reply did not parse, or its nonce, version,
 signatures or Merkle path did not match the source's key and configured version)
