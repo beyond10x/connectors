@@ -7,7 +7,7 @@ title: The forge's gate job compiles its test binaries once and prints its time 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
@@ -255,6 +255,60 @@ the job's step times and cargo's `Finished` line.
   against 449 s, tests 638.6 s against 856.7 s). A comparison of two pull requests needs the
   same rows from both, not the job's total.
 
+### Measured 2026-11-24: the forge run with `--bin`
+
+Job 138682816066 of run 45460889072 (pull request 296, change 3), 19:42:10 to 20:17:04 CET,
+34 min 54 s (2,094 s), against 2,401 s on pull request 295. Both tables are the jobs' own; the
+crate counts are the `Compiling` lines of each step in the two logs.
+
+| part | 295: s | 296: s | 295: crates | 296: crates |
+|---|---|---|---|---|
+| the job's steps before the gate | 99 | 97 | | |
+| build of `connectors-build` by `cargo run` | 344 | 337 | 314 | 315 |
+| build of the workspace | 203.2 | 80.2 | 100 | 61 |
+| build of the test binaries | 599.3 | 597.8 | 43 | 43 |
+| tests | 638.6 | 641.3 | | |
+| tool contracts check | 50.7 | 0.2 | 51 | 0 |
+| documentation drift check | 134.9 | 1.0 | not in the log (`-q`) | not in the log (`-q`) |
+| clippy of the workspace | 91.8 | 93.1 | 1, and 342 checked | 1, and 342 checked |
+| windows lint | 53.2 | 52.4 | 32, and 244 checked | 32, and 244 checked |
+| library boundary of `connectors-grafana` | 25.6 | 37.9 | 9 | 37 |
+| library boundary of `connectors-kubernetes` | 3.4 | 4.8 | 1 | 5 |
+| library boundary of `connectors-loki` | 2.5 | 2.4 | 1 | 1 |
+| library boundary of `connectors-prometheus` | 0.9 | 0.9 | 1 | 1 |
+| library boundary of `connectors-sql` | 67.3 | 66.4 | 53 | 57 |
+| library boundary of `connectors-tavily` | 1.0 | 0.9 | 1 | 1 |
+| library boundary of `connectors-catalog-provider` | 44.4 | 43.8 | 17 | 18 |
+| library boundary of `connectors-mcp` | 13.8 | 13.5 | 24 | 24 |
+| sum of the gate's 27 steps, as printed | 1,948.1 | 1,653.4 | | |
+| the step of the ignored tests | 4.0 | 3.9 | | |
+
+337 s and 1,653.4 s are 1,990 s; the workflow step of the gate ran 1,991 s (18:43:47 to 19:16:58
+UTC). The tests' line: `Summary [ 640.117s] 4497 tests run: 4497 passed (9 slow), 223 skipped`.
+
+- The four steps of change 3 take 418.4 s, against 732.8 s: the first build 337, the build of
+  the workspace 80.2, the tool contracts 0.2, the documentation check 1.0. The job is 307 s
+  shorter, the sum of the 27 steps 294.7 s.
+- The build of the workspace compiles 61 crates. Two names are in the first build's 315 too:
+  `connectors-catalog-provider` and `toml_edit`. Why is not read. On pull request 294 it compiled
+  100, 40 of them a second time.
+- The tool contracts check compiles nothing. The documentation check ends in 1.0 s.
+- The eight boundary builds compile 144 crates in 170.6 s, against 107 in 158.9 s: 28 more for
+  `connectors-grafana`, 4 for `connectors-kubernetes`, 4 for `connectors-sql`, 1 for
+  `connectors-catalog-provider`. Not established: whether the builds of the tool contracts and
+  of the documentation program by `-p` made those units on pull request 295.
+- The test build compiles 43 crates, 39 of them compiled by a build before it in the same job.
+  That is the part change 3 names as not changed.
+- Compiling takes 1,015 s before one test runs (337 + 80.2 + 597.8), against 1,147 s.
+- Both runs are one runner each. The rows that did not change (test binaries 599.3 and 597.8,
+  clippy 91.8 and 93.1, windows lint 53.2 and 52.4) differ by under 2 s, so the two runners
+  were about equally fast.
+
+For change 4: the lints and the boundary builds take 316.4 s on pull request 296 (clippy 93.1,
+the Windows lint 52.4, the ten boundary steps 170.9). Each boundary step runs `cargo build
+--locked --offline -p <package> --lib --no-default-features` and compiles the package's
+dependencies with that feature set; clippy and the Windows lint check 342 and 244 crates.
+
 ## Change
 
 1. The gate and the ignored step print one line per step with its wall time, and a closing table
@@ -280,12 +334,19 @@ the job's step times and cargo's `Finished` line.
    build program and the gate's calls of `connectors-docs` and `connectors-tool-contracts`
    name the program with `--bin`, which selects the workspace; two tests of
    `crates/connectors-build` fail when one of them selects a package. Expected from the unit
-   graph, not read from a forge run yet: the gate's build of the workspace compiles the 60
-   crates the first build did not need and none a second time, and the tool contracts and the
-   documentation check compile nothing. Not changed: the test build compiles the crates above
-   `tokio` again, because tests ask for `test-util`.
+   graph: the gate's build of the workspace compiles the 60 crates the first build did not
+   need and none a second time, and the tool contracts and the documentation check compile
+   nothing. Read from the forge the same day (pull request 296, the section on the forge run
+   with `--bin`): the build of the workspace compiles 61 crates in 80.2 s (before: 100 in
+   203.2 s), two of them named in the first build too; the tool contracts check takes 0.2 s
+   (50.7 s) and the documentation check 1.0 s (134.9 s); the job ran 2,094 s (2,401 s). Not
+   changed: the test build compiles the crates above `tokio` again, because tests ask for
+   `test-util`.
 4. The three `cargo clippy` runs and the nine boundary checks: time each, and name which of them
    compile again what a step before compiled.
+   Timed and counted 2026-11-24 from the two forge runs (the same section): 316.4 s on pull
+   request 296. Not done: which crates of a boundary build a step before it compiled with
+   another feature set.
 
 Each of 2 to 4 is a measurement first. The stories that change the job are drafted from the
 numbers, not from this list.
