@@ -12,7 +12,10 @@
   of the gate, and compiled `ring` and everything that depends on it again: in the gate job of
   pull request 293, 209 s inside the gate and 48 s at the start of the ignored step were read
   from the log, and the 567 s without a line in that step are inferred to be the same, of
-  3,175 s. Nothing changes for an installed binary.
+  3,175 s. Nothing changes for an installed binary. Corrected after the release, from the gate
+  job of pull request 294, the first with the change: the ignored step took 6 s (617 s on 293)
+  and `ring` was compiled 3 times (5 on 293), but the build inside the gate still took 250 s,
+  so the 209 s above were not a cost of `ring`.
 
 ### Fixed
 

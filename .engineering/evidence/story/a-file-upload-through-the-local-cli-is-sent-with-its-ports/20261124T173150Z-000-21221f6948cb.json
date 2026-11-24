@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-24T17:31:50Z",
+  "actor": "human:timo",
+  "artifact": "story:a-file-upload-through-the-local-cli-is-sent-with-its-ports",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors 0.78.1 release binaries, one file.upload through the workstation's bot install, read back in the thread",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.78.1"
+  }
+}
