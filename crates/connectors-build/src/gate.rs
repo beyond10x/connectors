@@ -1621,6 +1621,81 @@ mod adversary_pass2_tests {
     }
 }
 
+/// The gate prints its wall time per step
+/// (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step). `run` builds and
+/// tests the whole workspace, so these read its source.
+#[cfg(test)]
+mod step_time_tests {
+    use crate::steps::{begun, body};
+
+    const RUN: &str =
+        "pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {\n";
+
+    /// Every part of the gate that the measured split of 2026-11-24 names begins a step, so
+    /// the closing table has a row for it: each build, the tests, each lint, the documentation
+    /// check and each library-boundary build.
+    #[test]
+    fn the_gate_begins_a_step_for_each_part_of_the_measured_split() {
+        let source = include_str!("gate.rs");
+        assert_eq!(
+            begun(body(source, RUN)),
+            [
+                "\"changed-scope test\"",
+                "\"generation and source checks\"",
+                "\"website example model\"",
+                "\"format check\"",
+                "\"descriptor drift\"",
+                "\"build of the workspace\"",
+                "\"tool contracts check\"",
+                "\"clippy of the workspace\"",
+                "\"windows lint\"",
+                "\"documentation drift check\"",
+                "&format!(\"library boundary of {package}\")",
+                "\"library boundary of the OAuth2 crate\"",
+                "\"generic CLI boundary\"",
+                "\"minimum Rust versions\"",
+                "\"authored scenarios\"",
+                "\"metadata conformance\"",
+                "\"planning validation\"",
+            ]
+        );
+        assert_eq!(
+            begun(body(source, "fn test_step(")),
+            [
+                "\"build of the test binaries\"",
+                "\"metadata baseline suite\"",
+                "\"tests\"",
+                "\"doctests\"",
+            ]
+        );
+    }
+
+    /// The test step's steps are rows of the gate's one table: `run` hands it its steps.
+    #[test]
+    fn the_test_step_gets_the_steps_of_the_gate() {
+        let run = body(include_str!("gate.rs"), RUN);
+        assert!(
+            run.lines().any(
+                |line| line == "    test_step(root, &|| command(None), &execute, &mut steps)?;"
+            ),
+            "`run` does not hand its steps to the test step"
+        );
+    }
+
+    /// The last step ends before the gate says it passed, so no row of a green run is named
+    /// as ended by an error.
+    #[test]
+    fn the_gate_finishes_its_steps_before_it_says_all_checks_passed() {
+        let run = body(include_str!("gate.rs"), RUN);
+        let lines: Vec<&str> = run.lines().collect();
+        let passed = lines
+            .iter()
+            .position(|line| *line == "    println!(\"gate: all checks passed\");")
+            .expect("the line that says the gate passed");
+        assert_eq!(lines[passed - 1], "    steps.finish();");
+    }
+}
+
 /// Adversary pass on the Windows lint step: what the six tests beside `windows_lint` leave
 /// open. They test the command builder and the prerequisite list; none of them fails when
 /// `run` stops calling either, or when the probe of the Rust target answers yes for a target

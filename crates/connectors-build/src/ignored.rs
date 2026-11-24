@@ -1347,6 +1347,40 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
     }
     Ok(())
 }
+/// The ignored step prints its wall time per step
+/// (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step): the build of the
+/// test binaries, the listing and the tests are separate rows, so the time before the first
+/// test is read from the log.
+#[cfg(test)]
+mod step_time_tests {
+    use crate::steps::{begun, body};
+
+    const RUN: &str = "pub fn run(root: &Path, options: Options) -> Result<()> {\n";
+
+    #[test]
+    fn the_ignored_step_begins_a_step_for_the_build_the_listing_and_the_tests() {
+        assert_eq!(
+            begun(body(include_str!("ignored.rs"), RUN)),
+            [
+                "\"build of the test binaries\"",
+                "\"listing of the ignored tests\"",
+                "\"ignored tests\"",
+                "\"report\"",
+            ]
+        );
+    }
+
+    /// The report is the program's standard output: the step lines go to standard error.
+    #[test]
+    fn the_step_lines_of_the_ignored_step_go_to_standard_error() {
+        let run = body(include_str!("ignored.rs"), RUN);
+        assert!(
+            run.lines().any(|line| line
+                == "    let mut steps = crate::steps::Steps::new(\"ignored\", crate::steps::Stream::Err);"),
+            "`run` does not print its steps on standard error"
+        );
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
