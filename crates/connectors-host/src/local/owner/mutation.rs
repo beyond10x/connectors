@@ -21,6 +21,9 @@ pub enum ApprovalCode {
     ApprovalRefused,
     ApprovalReplayed,
     IdempotencyConflict,
+    /// A keyed write under a standing grant whose covering grants are all at
+    /// their hourly cap; the failure carries `retry_after_seconds`.
+    RateLimited,
 }
 /// The private write binding extends its error vocabulary independently of the
 /// unchanged owner/1 codec. Neither branch contains native error messages.
@@ -54,8 +57,21 @@ pub struct Failure {
     /// so those entries keep their earlier bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created: Option<std::collections::BTreeMap<String, String>>,
+    /// On `rate_limited` only: the whole seconds, 1 to 3,600, until the
+    /// earliest use leaves the hour of a covering standing grant. Absent on
+    /// every other failure, so those entries keep their earlier bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_after_seconds: Option<u64>,
 }
 impl Failure {
+    /// The refusal of a keyed write whose covering standing grants are all
+    /// at their cap.
+    pub fn rate_limited(retry_after_seconds: u64) -> Self {
+        Self {
+            retry_after_seconds: Some(retry_after_seconds),
+            ..Self::from(ApprovalCode::RateLimited)
+        }
+    }
     /// The stage a write failure reports. The provider's answer is `dispatch`;
     /// the host's refusal before anything was sent is `admission`; a host
     /// failure once the write was sent, or may have been, stays `dispatch`.
@@ -102,6 +118,7 @@ impl From<Error> for Failure {
             origin: error.origin,
             store_version: error.store_version,
             created: None,
+            retry_after_seconds: None,
         }
     }
 }
@@ -118,6 +135,7 @@ impl From<ApprovalCode> for Failure {
             origin: Origin::Host,
             store_version: None,
             created: None,
+            retry_after_seconds: None,
         }
     }
 }
@@ -152,6 +170,13 @@ pub struct Attempt {
     pub instance: String,
     pub id: Uuid,
 }
+/// The standing grant a write's attempt was admitted under
+/// (`crate::local::standing::named`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Standing {
+    pub grant_id: String,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MutationObservation {
@@ -160,6 +185,11 @@ pub struct MutationObservation {
     pub original_request_id: Option<String>,
     pub replayed: bool,
     pub cause: Option<Cause>,
+    /// Present only on a write a standing grant admitted, once its attempt
+    /// is recorded: on the fresh write, its replay and a failure that has an
+    /// attempt. Absent otherwise, so every other answer keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub standing: Option<Standing>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -201,6 +231,17 @@ impl Delivery {
                     .is_some_and(|e| e.code == FailureCode::Owner(Code::OutcomeUnknown)))
             || m.attempt.is_some() != m.original_request_id.is_some()
             || (m.replayed && m.attempt.is_none())
+            // A grant is named only for a recorded attempt, and the cap's
+            // refusal alone says when to retry.
+            || (m.standing.is_some() && m.attempt.is_none())
+            || self.error.as_ref().is_some_and(|e| {
+                (e.code == FailureCode::Approval(ApprovalCode::RateLimited))
+                    != e
+                        .retry_after_seconds
+                        .is_some_and(|seconds| (1..=3600).contains(&seconds))
+                    || (e.retry_after_seconds.is_some()
+                        && e.code != FailureCode::Approval(ApprovalCode::RateLimited))
+            })
             || m.attempt
                 .as_ref()
                 .is_some_and(|a| a.id.is_nil() || a.instance != self.source_audit.instance)
@@ -486,6 +527,7 @@ fn delivery(
             original_request_id: None,
             replayed: false,
             cause: None,
+            standing: None,
         },
         source_audit: SourceAudit {
             instance: current.adapter.instance_id.clone(),
@@ -691,7 +733,14 @@ fn observe_as_original(
     unchanged(&first, &current)?;
     let mut value = match original {
         Ok(None) => return Ok(None),
-        Ok(Some(original)) => project(&current, request_id, original)?,
+        Ok(Some(original)) => {
+            let attempt = original.reference.attempt_id;
+            let mut value = project(&current, request_id, original)?;
+            // A replay reads no grant; it names the one its attempt was
+            // admitted under, also after that grant expired or was revoked.
+            crate::local::standing::named(&mut value.mutation, attempt, &paths.state);
+            value
+        }
         Err(error) => lookup_error(&current, request_id, error),
     };
     if let Some(payload) = &value.result {
@@ -711,6 +760,7 @@ fn observe_as_original(
                 origin: Origin::Host,
                 store_version: None,
                 created: None,
+                retry_after_seconds: None,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,

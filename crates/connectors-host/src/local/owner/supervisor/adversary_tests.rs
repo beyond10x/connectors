@@ -7,6 +7,7 @@ use crate::local::config::{Executable, Startup};
 
 fn adapter(instance: &str) -> Adapter {
     Adapter {
+        standing_grants: None,
         credential_revision: None,
         instance_id: instance.into(),
         adapter_id: "adapter".into(),

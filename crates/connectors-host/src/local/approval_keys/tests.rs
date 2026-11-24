@@ -231,7 +231,7 @@ fn wrong_recovery_material_never_publishes() {
     let old = initial.active().unwrap().key_id;
     let seed = Secret(vec![31; 32]);
     let (candidate, key) = {
-        let _lease = Lease::acquire(&store.path, true).unwrap();
+        let _lease = Lease::acquire(&store.path, LOCK, true).unwrap();
         store
             .stage(
                 Some(initial.revision),
@@ -269,7 +269,7 @@ fn key_crash_child() {
         "cfg-1",
     )
     .unwrap();
-    let _lease = Lease::acquire(&path, true).unwrap();
+    let _lease = Lease::acquire(&path, LOCK, true).unwrap();
     let current = store.current().unwrap();
     let old = current.view.active().unwrap().key_id;
     let mut seed = Secret(vec![0; 32]);
@@ -371,7 +371,7 @@ fn unknown_storage_acknowledgement_requires_exact_reconfirmation() {
     let old = initial.active().unwrap().key_id;
     let seed = Secret(vec![41; 32]);
     let (candidate, key) = {
-        let _lease = Lease::acquire(&store.path, true).unwrap();
+        let _lease = Lease::acquire(&store.path, LOCK, true).unwrap();
         store
             .stage(
                 Some(initial.revision),
@@ -518,7 +518,7 @@ fn production_cli_key_journey() {
     // the recovery itself crosses the production generated CLI/process boundary.
     let seed = Secret(vec![71; 32]);
     let (candidate, candidate_key) = {
-        let _lease = Lease::acquire(&state, true).unwrap();
+        let _lease = Lease::acquire(&state, LOCK, true).unwrap();
         local
             .stage(
                 Some(Uuid::parse_str(revision).unwrap()),
@@ -601,7 +601,7 @@ fn uncertain_deletion_keeps_retirement_fence_and_exact_retry() {
     let rotated = store.rotate(initial.revision, old).unwrap();
     let active = rotated.active().unwrap().key_id;
     let record = {
-        let _lease = Lease::acquire(&store.path, true).unwrap();
+        let _lease = Lease::acquire(&store.path, LOCK, true).unwrap();
         store.prepare_retirement(rotated.revision, old).unwrap()
     };
     let version = record.version(old).unwrap();
@@ -696,7 +696,7 @@ fn read_only_selection_refuses_signing_and_retirement_before_custody() {
         Failure::CustodyReadOnly
     );
     let use_key = KeyUse {
-        lease: Lease::acquire(&state, true).unwrap(),
+        lease: Lease::acquire(&state, LOCK, true).unwrap(),
         key: approvals::ConfiguredApprovalKey {
             issuer: "issuer".into(),
             audience: "audience".into(),

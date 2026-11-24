@@ -255,3 +255,87 @@ impl Signer {
         )
     }
 }
+
+// Compact JWS of a `typ` other than the proof's, under the same key rules
+// (`public_key`): the signed standing-grant file (`crate::local::standing`).
+// The claims are the caller's bytes; a proof's `typ` is refused in both
+// directions, so neither function makes or reads a proof.
+impl Signer {
+    /// `claims` signed as `<header>.<claims>.<signature>` with the header
+    /// `{alg: "Ed25519", kid, typ}`, when this signer holds `key`'s pair and
+    /// `key` admits the reading `t`.
+    pub(in crate::local) fn seal(
+        &self,
+        typ: &str,
+        key: &ConfiguredApprovalKey,
+        t: ClockInterval,
+        claims: &[u8],
+    ) -> Result<Vec<u8>> {
+        if typ == TYPE {
+            return Err(Failure::Refused);
+        }
+        let public = public_key(key, &self.kid, t)?;
+        let pair = signature::Ed25519KeyPair::from_seed_unchecked(&self.seed.0)
+            .map_err(|_| Failure::Unavailable)?;
+        if pair.public_key().as_ref() != public {
+            return Err(Failure::Refused);
+        }
+        let header = canonical(&Header {
+            alg: "Ed25519".into(),
+            kid: self.kid.clone(),
+            typ: typ.into(),
+        })?;
+        if header.len() > 512 {
+            return Err(Failure::Refused);
+        }
+        let input = format!(
+            "{}.{}",
+            URL_SAFE_NO_PAD.encode(header),
+            URL_SAFE_NO_PAD.encode(claims)
+        );
+        let sig = pair.sign(input.as_bytes());
+        Ok(format!("{input}.{}", URL_SAFE_NO_PAD.encode(sig.as_ref())).into_bytes())
+    }
+}
+impl ConfiguredApprovalKey {
+    /// The claims bytes (at most `limit`) of `compact`, when it is one
+    /// compact JWS of exactly `typ` that this key signed and the key admits
+    /// the reading `t`: not revoked, the header's `kid`, inside its window.
+    pub(in crate::local) fn open(
+        &self,
+        typ: &str,
+        compact: &[u8],
+        t: ClockInterval,
+        limit: usize,
+    ) -> Result<Vec<u8>> {
+        if typ == TYPE {
+            return Err(Failure::Refused);
+        }
+        let text = std::str::from_utf8(compact).map_err(|_| Failure::Refused)?;
+        let parts: Vec<_> = text.split('.').collect();
+        if parts.len() != 3 {
+            return Err(Failure::Refused);
+        }
+        let header: Header = strict(&decode64(parts[0], 512)?)?;
+        let claims = decode64(parts[1], limit)?;
+        let signature = decode64(parts[2], 64)?;
+        if header.alg != "Ed25519" || header.typ != typ || signature.len() != 64 {
+            return Err(Failure::Refused);
+        }
+        identifier(&header.kid)?;
+        let public = public_key(self, &header.kid, t)?;
+        signature::UnparsedPublicKey::new(&signature::ED25519, public)
+            .verify(&compact[..parts[0].len() + 1 + parts[1].len()], &signature)
+            .map_err(|_| Failure::Refused)?;
+        Ok(claims)
+    }
+}
+// Its one caller is in the Unix-only tests of the signed grant file
+// (`standing::signed_tests`).
+#[cfg(all(test, unix))]
+impl Evidence {
+    /// Whether the proof decoder takes these bytes as a proof.
+    pub(in crate::local) fn decodes(&self) -> bool {
+        decode(self).is_ok()
+    }
+}

@@ -105,9 +105,10 @@ fn refusal(refused: Refused) -> HandlerReply {
     }
 }
 
-/// [`refusal`] for `callable`: on `approvals policy-set`, `prepare` and
-/// `issue` an `invalid_input` selection names the argument it refused,
-/// `adapter` (contracts/cli/v1alpha1/semantics.md, "The refused argument").
+/// [`refusal`] for `callable`: on `approvals policy-set`, `prepare`, `issue`,
+/// `grant-standing`, `revoke-standing` and `list-standing` an `invalid_input`
+/// selection names the argument it refused, `adapter`
+/// (contracts/cli/v1alpha1/semantics.md, "The refused argument").
 /// Every other command, and every other refusal, is unchanged.
 fn refusal_of(callable: &str, refused: Refused) -> HandlerReply {
     let invalid = refused == Refused::InvalidInput;
@@ -115,7 +116,12 @@ fn refusal_of(callable: &str, refused: Refused) -> HandlerReply {
     if invalid
         && matches!(
             callable,
-            "approval-policy-set" | "approval-prepare" | "approval-issue"
+            "approval-policy-set"
+                | "approval-prepare"
+                | "approval-issue"
+                | "approval-grant-standing"
+                | "approval-revoke-standing"
+                | "approval-list-standing"
         )
         && let HandlerReply::UsageError { data, .. } = &mut reply
     {

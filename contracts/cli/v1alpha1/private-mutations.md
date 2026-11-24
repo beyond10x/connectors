@@ -32,7 +32,13 @@ the selected instance/configuration and exact executable as before.
 Version-two bootstrap uses the existing closed bootstrap fields, including an
 operation requirement's effect. This profile admits `Read` and required-approval
 `Write`; `Unknown` remains unsupported. Every advertised Write requires the
-host's full approval/audit/attempt binding, with no opt-out field. The full
+host's full approval/audit/attempt binding, with no opt-out field. A keyed
+write the host admits under a standing grant
+([semantics, standing grants](semantics.md#standing-grants)) has the same
+audit and attempt binding; the grant check stands in the proof's place, and
+the child sees no difference: the bootstrap, the descriptor and the write
+frames it receives are unchanged, and no grant, grant id or grant file reaches
+it. The full
 private descriptor includes writes and has its own content-derived revision.
 Version-one and public descriptors expose the read-only projection. An operation
 missing from the selected projection is unknown, not a compatibility write path.

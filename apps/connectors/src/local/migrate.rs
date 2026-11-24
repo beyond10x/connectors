@@ -994,4 +994,82 @@ mod tests {
             Err(())
         );
     }
+
+    /// Acceptance 19 of
+    /// story:local-invoke-admits-a-keyed-write-under-a-standing-grant: a
+    /// migrated entry keeps `standing_grants`, among its pins in the pinned
+    /// form and in the instance's table in the short form.
+    #[cfg(unix)]
+    #[test]
+    fn migrate_keeps_standing_grants() {
+        let grants = "/etc/connectors/mail.grants";
+        let pins = |alias: &str, extra: &str| {
+            format!(
+                "[adapters.{alias}]\n{extra}instance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-{alias}'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.{alias}.executable]\npath='/opt/connectors/bin/catalog'\nsha256='{}'\nargs=[]\n",
+                "1".repeat(64)
+            )
+        };
+        let text = format!(
+            "format='connectors-local/5'\nowner_uid={}\n{}{}[connectors.gmail]\nenabled=true\n[connectors.drive]\nenabled=true\n",
+            filesystem::uid(),
+            pins("mail", &format!("standing_grants='{grants}'\n")),
+            pins("files", ""),
+        );
+        let config = Config::parse(&text).unwrap();
+        assert_eq!(
+            config.adapters["mail"].standing_grants.as_deref(),
+            Some(Path::new(grants))
+        );
+        let moved: BTreeMap<String, String> = [("mail", "gmail"), ("files", "drive")]
+            .into_iter()
+            .map(|(a, c)| (a.to_owned(), c.to_owned()))
+            .collect();
+        let member = format!("standing_grants = \"{grants}\"");
+
+        // The pinned form: the member moves with the entry's pins.
+        let written = config.with_instances(&moved).unwrap();
+        let text = written.to_text().unwrap();
+        assert!(text.contains("[connectors.gmail.instances.mail]"), "{text}");
+        assert!(!text.contains("[adapters.mail]"), "{text}");
+        assert_eq!(text.matches(&member).count(), 1, "{text}");
+        let after = Config::parse(&text).unwrap();
+        assert_eq!(
+            after.adapters["mail"].standing_grants.as_deref(),
+            Some(Path::new(grants))
+        );
+        assert_eq!(after.adapters["files"].standing_grants, None);
+        assert_eq!(connectors_differing(&written, &after, &moved), Ok(vec![]));
+        assert_eq!(
+            differing(&config.adapters["mail"], after.adapters.get("mail")),
+            None
+        );
+        // A read-back without the member is a difference: the entry is kept.
+        let mut lost = after.adapters["mail"].clone();
+        lost.standing_grants = None;
+        assert!(differing(&config.adapters["mail"], Some(&lost)).is_some());
+
+        // The short form: the instance's table states the member.
+        let short: BTreeMap<String, ShortForm> = [(
+            "mail".to_owned(),
+            ShortForm {
+                instance_id: "mail-local".into(),
+                endpoint: None,
+                profile: None,
+            },
+        )]
+        .into();
+        let written = config.with_short_instances(&moved, &short).unwrap();
+        assert_eq!(
+            written.connectors.as_ref().unwrap()["gmail"].instances["mail"]
+                .standing_grants
+                .as_deref(),
+            Some(Path::new(grants))
+        );
+        let text = written.to_text().unwrap();
+        assert!(
+            !text.contains("adapter_id = \"catalog\"\nconfiguration_revision = \"cfg-mail\""),
+            "{text}"
+        );
+        assert_eq!(text.matches(&member).count(), 1, "{text}");
+    }
 }

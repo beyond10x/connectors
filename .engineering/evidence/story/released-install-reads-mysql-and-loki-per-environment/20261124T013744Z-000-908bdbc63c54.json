@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-24T01:37:44Z",
+  "actor": "human:timo",
+  "artifact": "story:released-install-reads-mysql-and-loki-per-environment",
+  "kind": "story",
+  "revision": 23,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:mysql-loki-scope-round-1",
+    "review": "review-result:mysql-loki-scope-round-1",
+    "outcome": "fixed"
+  }
+}

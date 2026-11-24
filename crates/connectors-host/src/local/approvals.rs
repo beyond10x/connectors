@@ -8,7 +8,7 @@ pub use proof::{Signer, verify};
 pub use spend::{SpendReceipt, Store};
 pub use types::*;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {

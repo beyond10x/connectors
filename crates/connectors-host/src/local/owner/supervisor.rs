@@ -2483,6 +2483,7 @@ mod bounded_queue_tests {
         });
         let pool = Pool::new(paths.clone(), "owner".into());
         let adapter = Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: "fixture".into(),
             adapter_id: "fixture".into(),
@@ -2567,6 +2568,7 @@ mod idle_tests {
         let mut config = Config::load(&paths.config).unwrap();
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let adapter = Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: "fixture".into(),
             adapter_id: "fixture".into(),
@@ -2648,6 +2650,7 @@ mod idle_tests {
         let mut config = Config::load(&paths.config).unwrap();
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let adapter = Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: "refusing".into(),
             adapter_id: "fixture".into(),
@@ -2718,6 +2721,7 @@ mod idle_tests {
         let mut config = Config::load(&paths.config).unwrap();
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let adapter = |instance: &str, sha256: &str| Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: instance.into(),
             adapter_id: "fixture".into(),
@@ -2792,6 +2796,7 @@ mod revalidate_wait_tests {
 
     fn adapter() -> Adapter {
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
@@ -3103,6 +3108,7 @@ mod dispatch_wait_tests {
 
     fn adapter() -> Adapter {
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
@@ -3513,6 +3519,7 @@ mod pool_lock_tests {
 
     fn adapter(instance: &str) -> Adapter {
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: instance.into(),
             adapter_id: "adapter".into(),

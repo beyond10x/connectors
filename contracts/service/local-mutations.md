@@ -129,6 +129,11 @@ protected-source pattern retains proof bytes outside ordinary parser JSON values
 Provider input contains neither. Reads reject write-only approval/key fields;
 legacy describe/invoke/serve wire values are unchanged and gain no write path.
 Required missing, refused and replayed approvals have distinct safe failures.
+One write needs no approval document: a write that carries an idempotency key
+and no proof, on an instance whose configuration names a grant file, is
+admitted or refused under the instance's standing grants
+([below](#keyed-writes-under-a-standing-grant)). A write that carries a proof
+is never one of these, and neither is a write without a key.
 
 Every local write invocation receives a fresh host request identity. Resolve
 current caller, policy, target, input schema and result-disclosure admission before
@@ -202,7 +207,9 @@ separate durable Prepared-to-Dispatching gate under the still-current binding.
 Only definite acknowledgements and the live gate winner permit the child commit.
 The original monotonic budget covers every phase. Leases, preparation or retries
 never restart it. A failed current check cancels the native preparation and keeps
-all already-spent uniqueness facts intact.
+all already-spent uniqueness facts intact. On the grant path the grant check
+stands where the proof is verified and counting a use where the approval is
+spent ([below](#keyed-writes-under-a-standing-grant)).
 
 Safe success/failure output adds the existing MutationObservation and SourceAudit
 projections where authoritative admission permits them. Native results must pass
@@ -211,6 +218,148 @@ acknowledgement: final audit failure cannot change a known provider effect into
 not-attempted or permit a resend. Store original safe outcome independently of
 each later observation's current audit envelope. No raw input, proof, credential,
 private locator or provider exception belongs in audit or diagnostics.
+
+## Keyed writes under a standing grant
+
+A standing grant (story:local-invoke-admits-a-keyed-write-under-a-standing-grant;
+`architecture-decision-record:standing-scoped-approval`, decisions 1 to 3, 5
+and 6) is the operator's approval of every write of one operation on one
+instance whose input holds the granted target and nothing outside the grant.
+The grant document and the rule by which it covers an input are the served
+host's ([compatibility §2.1](compatibility.md)); the file's signed form, the
+configuration member `standing_grants`, the three commands and the answer are
+in the [local CLI contract](../cli/v1alpha1/semantics.md#standing-grants); the
+steps are [operations §4.3](../operations/v1alpha1/semantics.md#43-standing-grant-in-the-local-cli-binding);
+the model is `connectors.standing_approvals`
+([standing_approvals.yaml](../../ess/domains/standing_approvals.yaml)).
+
+Which path a write takes is decided in the owner, from what the owner
+received and from the instance's configuration, and from nothing else:
+
+- a proof: the per-input path of this document, unchanged in every byte. Its
+  refusal is final. A refused proof never falls back to a grant;
+- no proof and no idempotency key, or an instance without `standing_grants`:
+  `approval_required`, as before;
+- no proof, a key and the member: the grant path.
+
+The CLI sends a write with no proof to the owner only in the third case, and
+it answers an approval file that holds no byte itself, on an instance with the
+member, because the owner reads an empty proof frame as no proof. A published
+policy that lists the operation, an approval key and the approval clock stay
+prerequisites of the grant path: resolving the write and looking up its key
+need them, as on the per-input path.
+
+The input the grant is checked against is the value the owner decodes from the
+request's input bytes with the decoder that resolves the write, which refuses
+a member name twice and nesting deeper than 64 levels. It is never a second
+parse, and the bytes checked are the bytes sent to the provider.
+
+Order on the grant path:
+
+1. The keyed lookup comes first, in the CLI and again in the owner. A settled
+   key replays, and a key held by another input is `idempotency_conflict`,
+   before any grant is read, also after the grant expired, was revoked or is
+   at its cap. A replay counts no use.
+2. Where the per-input path requires and verifies the proof, the owner takes
+   a fresh reading of the approval clock, resolves the write again, and
+   admits it under a grant: it reads the grant file under the served file's
+   custody rule, verifies it against the instance's approval key (signature,
+   `typ`, canonical form, issuer, audience, key window), finds the grants that
+   cover the input, and counts one use on the first covering grant, in file
+   order, that has room in its hour. This is before the audit anchor and
+   before native preflight.
+3. A refusal there is `not_attempted` after the winner recheck: no audit
+   anchor, no attempt, no provider request. No covering grant, an absent file
+   and a file that does not verify are `approval_required` with no axis named;
+   every covering grant at its cap is `rate_limited` with
+   `retry_after_seconds` (1 to 3,600); a file that fails the custody rule, a
+   use count that cannot be kept and a clock with no reading are
+   `unavailable`.
+4. Then the audit anchor and native preflight, as on the per-input path.
+5. The attempt is prepared with `approval_mode = not_required` and its key
+   reservation, and the counted use is bound to the attempt. No approval is
+   spent.
+6. The Prepared-to-Dispatching gate, the child commit and settlement are
+   unchanged.
+
+The grant is checked again at the two places the per-input path verifies its
+proof again: before the attempt is prepared and before the gate. Each recheck
+reads the clock fresh, reads and verifies the file again under the held key
+lease, and requires that the grant whose use was counted is still in the
+file, still covers the input and is not expired. It counts no second use. A
+clock that gives no reading there is `unavailable`, never `approval_required`.
+A refusal at the first recheck leaves no attempt and releases the use; it
+comes after the anchor and after preflight's provider reads. A refusal at the
+second recheck, before the gate, aborts the prepared attempt: the answer is
+`not_attempted`, it has an attempt, that attempt names the grant, and the use
+stays counted. Decision 1 of the record ("no attempt") describes the first
+check and not this case.
+
+After the recheck before the gate nothing reads the grant again. After the
+gate the owner keeps the deadline check and the winner's consumption and
+reads no file. From that recheck through the connection-use dispatch
+admission and the gate's transaction, neither a revocation nor a
+`not_after_unix_ms` that passes stops that write. The per-input path checks
+its proof's expiry once more after the gate; the grant path has no such check
+and no counterpart of the spend.
+
+The use. A counted use that is not yet bound to an attempt is released on
+every exit: a refusal, a failed preflight, a failed preparation, a failed
+bind. Once bound it stays counted whatever the attempt's outcome, as a spent
+approval stays spent. One cap is shared by every caller of a grant, so a
+caller inside the grant can hold a use for the length of a preflight.
+
+Clock. `not_after_unix_ms` and the hour are compared against the upper bound
+of a fresh reading of the approval clock, as a proof is refused once that
+upper bound reaches its `exp`: a reading that straddles `not_after_unix_ms` is
+refused. The hour counts a use while its admission time is at or after that
+upper bound less 3,600,000 ms. The served host keeps its system clock.
+
+What is recorded. The attempt records `approval_mode = not_required`, as the
+served host's attempts under a grant do, and no approval reference; the grant
+id is bound to the attempt in `<state>/standing-grants.sqlite3`, the use
+store one state directory holds for all its instances. The ledger schema does
+not change. Three consequences are part of this contract:
+
+- the ledger alone cannot tell a write under a grant from a write that needs
+  no approval;
+- a local ledger now holds `not_required` for a write whose policy requires
+  approval;
+- the ledger's dispatch gate, which requires `not_required` for an attempt
+  with no approval, does not enforce the grant. The owner's order above does.
+
+The answer names the grant as `mutation.standing.grant_id`, read from the use
+store by attempt: on a fresh write, on its replay and on a failure that has an
+attempt. A replay in the CLI process reads the store read-only and never
+creates it; with no store or no row the member is absent.
+
+What a grant covers is the served rule, and two parts of it matter to a
+reader of a grant:
+
+- A closed list limits its own grant only. Each covering grant is a
+  sufficient permission, so a second grant of the same instance, operation
+  and target without `input_keys`, or with a wider list, admits what the
+  first refuses.
+- Arrays are leaves. A pointer does not reach into an array: a listed array
+  admits any elements, a pointer into one (`/body/blocks/0`) covers nothing,
+  and a grant with `input_keys` whose target points into an array covers no
+  input.
+
+Revocation and its limit. The grant file is the one authority: revoking
+removes the grant from the file, the file is signed again, and nothing is
+written to the use store. The file carries no sequence number, so an older
+signed file put back at the path admits again until its grants'
+`not_after_unix_ms` or until the approval key is rotated. No other UID can
+put it back; the operator's UID can, and so can a backup, a file sync or a
+snapshot restore that runs as it, with no caller involved. Rotating the
+approval key ends every grant for certain.
+
+The boundary is the same-user boundary of this binding. The grant file, the
+signing key and the state directory belong to the configured owner UID, and a
+process of that UID can sign a grant as it can issue an approval. One
+approval is one write of one input; one grant is up to 10,000 writes an hour
+until an expiry with no upper bound. A grant bounds a caller that only
+invokes; it is no boundary against the owner UID itself. MCP stays read-only.
 
 ## Private preparation and one-use dispatch
 

@@ -40,6 +40,13 @@ the old key stays active. After publication, the new key is active and the old k
 is retired, even if the CLI response was lost. Rotation immediately invalidates the
 old key for further proof use; there is no overlap window.
 
+The active key also signs the instance's standing grant file
+([standing grants](local-approvals.md#standing-grants)). Rotating or revoking the key
+ends every grant it signed: the file no longer verifies, a keyed write without a proof
+is `approval_required`, and the three standing commands refuse the file as
+`invalid_configuration` and leave it in place. Remove the file and sign the grants
+again with `approvals grant-standing`.
+
 Recovery confirms the exact staged seed and synchronizes custody again. A missing
 seed cannot be recovered by generating another one; cancel that candidate with
 `key-retire` and explicitly initialize or rotate again. A locked keyring must be

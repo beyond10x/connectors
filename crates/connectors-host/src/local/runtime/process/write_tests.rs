@@ -72,7 +72,11 @@ impl Adapter for Fixture {
         input: Value,
     ) -> Result<Box<dyn PreparedWrite>> {
         assert_eq!(operation, "write");
-        assert_eq!(partition, "partition");
+        // `owned` is driven by the owner's executor, whose partition is the
+        // registry's own name for the connection.
+        if self.mode != "owned" {
+            assert_eq!(partition, "partition");
+        }
         assert_eq!(document.0, b"fictional-only");
         record(&self.root, "prepare");
         if self.mode == "preflight-refused" {
@@ -471,6 +475,7 @@ fn malformed_preparation_cancel_and_result_replies_reap_the_exact_child() {
 fn selection(root: &Path, mode: &str, protocol: PrivateProtocol) -> config::Adapter {
     let (path, hash) = crate::local::test_executable::path_and_sha256();
     config::Adapter {
+        standing_grants: None,
         credential_revision: None,
         instance_id: "fixture".into(),
         adapter_id: "fixture".into(),

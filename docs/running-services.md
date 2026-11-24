@@ -260,6 +260,13 @@ targets a caller may write to and how often. There is no per-call approval. The 
 the [service contract](../contracts/service/compatibility.md#21-first-binding-post-v1alpha2invoke),
 "Keyed writes under a standing grant".
 
+This section is the served host's. The local CLI takes grants too, per instance and beside
+its per-write proofs, and holds them in another form: a file signed by the instance's
+approval key, which `connectors approvals grant-standing` writes
+([standing grants](local-approvals.md#standing-grants)). The two forms do not mix. The bare
+JSON file below does not verify at a local instance's `standing_grants` path, and the served
+host does not read a signed one.
+
 Point the host at the file with `standing_grants` in its service configuration, here the
 `service` member of the catalog example above. It requires `state`; without it the host does
 not start.
@@ -295,7 +302,43 @@ A grant covers a write when it names the host's instance and the operation, is n
 in `revoked`, its `not_after_unix_ms` is still in the future, and every `target` member holds
 in the input: the JSON pointer finds that exact value. `max_per_hour` (1 to 10,000) caps the
 writes admitted under the grant in any 3,600 seconds. A file holds at most 256 grants, each
-with 1 to 16 target members.
+with 1 to 16 target members. A number in a target `value` is an integer from
+-9223372036854775808 to 18446744073709551615; a file whose target holds any other number (a
+fraction, an exponent, `-0`) is refused as malformed, and an input that holds one at a target
+pointer is covered by no grant.
+
+A grant may also close the input with `input_keys`, a list of at most 16 JSON pointers
+(it may be empty) naming the members a caller may set beside the target:
+
+```json
+{
+  "id": "issues-in-widgets",
+  "instance": "gitlab.example-org",
+  "operation": "issue.create",
+  "target": [{"pointer": "/id", "value": "7"}],
+  "input_keys": ["/title", "/description"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 20
+}
+```
+
+- Without `input_keys` a grant admits any input that holds its target, as before.
+- With it, an input that holds a member outside the target and the list is outside that
+  grant: `approval_required`, with nothing recorded or sent. An empty list admits the
+  target members alone.
+- A listed pointer admits everything below it: `"/description"` admits a string, an object
+  or an array there.
+- Pointers do not reach into arrays. An array is admitted or refused whole, by a pointer
+  that names it or a member above it. A pointer into one, such as `"/labels/0"`, covers
+  nothing, so a grant that lists it refuses every input that has `labels`. A `target`
+  pointer into an array does the same on a grant that has `input_keys`.
+- On a grant with `input_keys`, no pointer of `target` and `input_keys` may repeat another
+  or lie below another (`"/body"` beside `"/body/channel"`); such a file is malformed. An
+  input nested more than 64 levels deep is outside the grant.
+- A closed list limits its own grant only. A second grant for the same instance, operation
+  and target without `input_keys`, or with a longer list, admits what the first refuses.
+- A host built before `input_keys` existed refuses a file that has it as malformed and
+  answers every write `unavailable`. Upgrade the host before you mount such a file.
 
 The host reads the file on every write, so an edit, a revocation or a removed grant applies
 from the next call on, without a restart. With no file at the path, no write is admitted.
@@ -451,8 +494,8 @@ docker run --rm --entrypoint /usr/local/bin/connectors-kubernetes "ghcr.io/beyon
 ```
 
 ```text
-connectors-catalog-provider 0.76.2
-connectors-kubernetes 0.76.2
+connectors-catalog-provider 0.77.0
+connectors-kubernetes 0.77.0
 ```
 
 The image carries no configuration and no credential. Mount the configuration file, give the

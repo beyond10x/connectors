@@ -29,6 +29,7 @@ fn entry(executable: Executable) -> Entry {
     Entry {
         digest: "b".repeat(64),
         adapter: Adapter {
+            standing_grants: None,
             credential_revision: Some("credential-1".into()),
             instance_id: definitions::alias("forge"),
             adapter_id: "catalog".into(),

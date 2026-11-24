@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.77.0 — 2026-11-24
+
+### Added
+
+- A standing grant can close a write's input: the optional member `input_keys` of a grant in a
+  `connectors.standing-grants/1` file lists, as JSON pointers (at most 16, the list may be
+  empty), the input members a caller may set beside the grant's target. A write whose input
+  holds any other member, or nests deeper than 64 levels, is outside that grant and is answered
+  `approval_required` with no provider request and no attempt. A listed pointer admits
+  everything below it; an array is admitted or refused whole, so a pointer into an array covers
+  nothing. A closed list limits its own grant only: a second grant for the same instance,
+  operation and target without `input_keys` admits what the first refuses. A grant without
+  `input_keys` admits what it admitted before. A host older than this release refuses a grant
+  file that has the member as malformed and answers every write `unavailable`: upgrade the
+  served host before mounting such a file
+  ([running services](docs/running-services.md#standing-write-grants)).
+- A keyed write through the local CLI runs under a standing grant
+  (story:local-invoke-admits-a-keyed-write-under-a-standing-grant): `connectors invoke
+  <connector>/<instance> <operation> --idempotency-key <key>` with no `--approval-file` is
+  admitted when a grant the operator signed covers it. Three commands manage an instance's
+  grants: `approvals grant-standing --input-file <file>` (`{operation, target, input_keys,
+  not_after_unix_ms, max_per_hour}`; answers `{grant_id, path}`), `approvals revoke-standing
+  <grant id>` and `approvals list-standing`. The grants live in one file signed by the
+  instance's approval key, named by the new optional configuration member `standing_grants =
+  "<absolute path>"` of `[adapters.<alias>]` and `[connectors.<connector>.instances.<instance>]`.
+  An instance without the member is unchanged in every byte. The configuration format does
+  not change, and a binary older than this release refuses a configuration that carries the
+  member, as it refuses any unknown key.
+  The answer of a write under a grant names it in the new member `mutation.standing.grant_id`,
+  on the fresh write, on a replay of its key and on a failure that has an attempt. A write no
+  grant covers is `approval_required` with `mutation.classification` `not_attempted`, no
+  provider request and no attempt; the answer does not say which part of the grant it missed.
+  A write over the grant's hourly cap is answered with the new failure code `rate_limited`
+  and the new member `retry_after_seconds` (1 to 3,600). A proof that is refused stays
+  refused: a write with `--approval-file` never falls back to a grant. On an instance with
+  `standing_grants`, an `--approval-file` that holds no byte is now answered by the CLI as no
+  `--approval-file` is (`approval_required` with `approval_steps`, `next_action` `none`), and
+  no owner is started for it. The attempt of a write under a grant records `approval_mode`
+  `not_required`; the grant's id is bound to it in `<state>/standing-grants.sqlite3`
+  ([standing grants](docs/local-approvals.md#standing-grants); contract:
+  `contracts/cli/v1alpha1/semantics.md`, "Standing grants").
+  Only `approvals grant-standing` creates `<state>/standing-grants.sqlite3`, the hourly count:
+  when the file is removed, every write a grant covers is `unavailable` until the key holder
+  runs `grant-standing` again, and the count then starts at zero.
+  A number in a grant's target `value` is an integer from -9223372036854775808 to
+  18446744073709551615: `grant-standing` refuses any other number (`invalid_input`), and a
+  served host now refuses a mounted grant file whose target holds one (a fraction, an
+  exponent, `-0`) as malformed, answering every write `unavailable`.
+
 ## 0.76.2 — 2026-11-24
 
 ### Changed

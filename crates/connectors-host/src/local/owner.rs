@@ -1507,6 +1507,7 @@ mod cached_tests {
         config.adapters.insert(
             "fixture".into(),
             super::super::config::Adapter {
+                standing_grants: None,
                 credential_revision: None,
                 instance_id: "fixture-instance".into(),
                 adapter_id: "fixture-adapter".into(),
@@ -1603,6 +1604,7 @@ mod reuse_tests {
 
     fn entry(instance: &str) -> Adapter {
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             instance_id: instance.into(),
             adapter_id: "catalog".into(),
@@ -1630,6 +1632,7 @@ mod reuse_tests {
             profile: None,
             allowed_domains: Vec::new(),
             awaiting_profile: None,
+            standing_grants: None,
         }
     }
 

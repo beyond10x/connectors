@@ -5,12 +5,17 @@ use super::{Argument, Code, Error, Result, selected};
 use crate::local::{
     approval_keys, approval_policy, approvals,
     config::{Adapter, Config, Paths},
-    filesystem, protected, registry, runtime,
+    filesystem,
+    mutations::ClockInterval,
+    protected, registry, runtime, standing,
 };
 use connectors_sdk::Secret;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{path::Path, time::Instant};
+use std::{
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 pub const REQUEST_LIMIT: usize = 272 * 1024;
 pub const TARGET_LIMIT: usize = 256 * 1024;
@@ -578,4 +583,137 @@ fn proof_error(error: approvals::Failure) -> Error {
         Capacity => Code::Capacity,
     }
     .into()
+}
+
+// The three standing-grant commands
+// (story:local-invoke-admits-a-keyed-write-under-a-standing-grant;
+// contracts/cli/v1alpha1/semantics.md, "Standing grants"). They run in the
+// CLI process and start no owner. Order: the instance's `standing_grants`
+// member, the clock (before every lock and lease, as `issue` reads it), then
+// `standing-grants.lock`, then the shared key lease.
+
+/// What `approvals grant-standing` and `approvals revoke-standing` print.
+pub struct StandingFile {
+    pub grant_id: String,
+    pub path: PathBuf,
+}
+
+fn standing_error(refused: standing::Refused) -> Error {
+    use standing::Refused::*;
+    match refused {
+        InvalidInput => Error::invalid_input(Argument::InputFile),
+        InvalidConfiguration => Code::InvalidConfiguration.into(),
+        NotFound => Code::NotFound.into(),
+        Unavailable => Code::Unavailable.into(),
+        Forbidden => Code::Forbidden.into(),
+        OutcomeUnknown => Code::OutcomeUnknown.into(),
+    }
+}
+
+/// The grant file the instance's entry names and one clock reading. An entry
+/// without `standing_grants` takes no grant: `invalid_configuration`, before
+/// the clock is read. No `[approval_clock]` is `invalid_configuration` and a
+/// clock that forms no reading is `unavailable`, as for `issue`.
+fn standing_reading(
+    config: &Config,
+    adapter: &Adapter,
+    until: Instant,
+) -> Result<(PathBuf, ClockInterval)> {
+    let path = adapter
+        .standing_grants
+        .clone()
+        .ok_or(Code::InvalidConfiguration)?;
+    check(until)?;
+    let selected = config
+        .approval_clock
+        .as_ref()
+        .ok_or(Code::InvalidConfiguration)?;
+    let clock = selected
+        .acquire()
+        .map_err(|failure| Error::clock(selected, failure))?;
+    let now = standing::reading(&clock).ok_or(Code::Unavailable)?;
+    check(until)?;
+    Ok((path, now))
+}
+
+/// `approvals grant-standing`: adds the grant `request` describes to the
+/// instance's signed grant file and returns its id and the file's path. A
+/// refused `request` is `invalid_input` naming `input_file`, decided before
+/// the member and the clock where it does not depend on them.
+pub fn grant_standing(
+    paths: &Paths,
+    alias: &str,
+    request: &[u8],
+    until: Instant,
+) -> Result<StandingFile> {
+    check(until)?;
+    let (config, adapter) = selected(paths, alias)?;
+    standing::check_request(request, &adapter.instance_id).map_err(standing_error)?;
+    let (path, now) = standing_reading(&config, &adapter, until)?;
+    let lock = standing::lock(&paths.state).map_err(key_error)?;
+    let key = key_store(paths, &config, &adapter)?
+        .acquire_key()
+        .map_err(key_error)?;
+    check(until)?;
+    let grant_id = key
+        .with_signer(|signer| {
+            Ok(standing::grant(
+                &lock,
+                &path,
+                signer,
+                key.key()?,
+                &adapter.instance_id,
+                now,
+                request,
+            ))
+        })
+        .map_err(key_error)?
+        .map_err(standing_error)?;
+    Ok(StandingFile { grant_id, path })
+}
+
+/// `approvals revoke-standing`: removes the grant `grant_id` from the
+/// instance's signed grant file.
+pub fn revoke_standing(
+    paths: &Paths,
+    alias: &str,
+    grant_id: &str,
+    until: Instant,
+) -> Result<StandingFile> {
+    check(until)?;
+    let (config, adapter) = selected(paths, alias)?;
+    let (path, now) = standing_reading(&config, &adapter, until)?;
+    let lock = standing::lock(&paths.state).map_err(key_error)?;
+    let key = key_store(paths, &config, &adapter)?
+        .acquire_key()
+        .map_err(key_error)?;
+    check(until)?;
+    key.with_signer(|signer| {
+        Ok(standing::revoke(
+            &lock,
+            &path,
+            signer,
+            key.key()?,
+            now,
+            grant_id,
+        ))
+    })
+    .map_err(key_error)?
+    .map_err(standing_error)?;
+    Ok(StandingFile {
+        grant_id: grant_id.to_owned(),
+        path,
+    })
+}
+
+/// `approvals list-standing`: the grants of the instance's verified grant
+/// file in file order, expired ones included. It signs and writes nothing.
+pub fn list_standing(paths: &Paths, alias: &str, until: Instant) -> Result<Vec<standing::Grant>> {
+    check(until)?;
+    let (config, adapter) = selected(paths, alias)?;
+    let (path, now) = standing_reading(&config, &adapter, until)?;
+    let key = key_store(paths, &config, &adapter)?
+        .acquire_key()
+        .map_err(key_error)?;
+    standing::list(&path, key.key().map_err(key_error)?, now).map_err(standing_error)
 }

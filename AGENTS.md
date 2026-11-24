@@ -151,6 +151,14 @@ generation and drift steps (`connectors-build metadata-entities --check`, `ess-b
 --check`, `mcp-bindings --check`, `service-metadata --check`, `connectors-docs generate --check`)
 and `cargo test -p connectors-build --tests`, whose line-citation tests read `ess/domains/cli.yaml`:
 in wave D298 four of these failed four full gates one after another.
+A unit that adds or removes a CLI command, an alias, or a failure code, stage or next action
+also runs the three test binaries that pin their number and names: `cargo nextest run --locked
+-p connectors -p connectors-conformance -E 'binary(vocabulary_text) |
+binary(connector_instance_selectors) | binary(cli_surface)'`. And a unit that adds a test-only
+item whose callers are `#[cfg(unix)]` gives the item the same condition; lint the Windows
+target before the push (`cargo clippy --locked -p connectors-host -p connectors --all-targets
+--target x86_64-pc-windows-gnu -- -D warnings`). On 2026-11-24 pull request 290 failed six such
+tests and the Windows lint on the forge after green targeted tests.
 
 For documentation-only changes, check links, factual support claims and AEP
 consistency; do not rerun unrelated live-provider tests. Report actual commands,

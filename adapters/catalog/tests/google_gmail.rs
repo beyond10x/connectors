@@ -1118,6 +1118,7 @@ impl Provider {
     /// The same selection over private protocol two, which carries writes.
     fn write_selection(&self) -> Adapter {
         Adapter {
+            standing_grants: None,
             private_protocol: Some(PrivateProtocol::V2),
             ..self.selection()
         }
@@ -1136,6 +1137,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            standing_grants: None,
             credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),

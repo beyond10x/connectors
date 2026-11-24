@@ -22,6 +22,7 @@ impl Fixture {
         Config::initialize(&paths).unwrap();
         let mut config = Config::load(&paths.config).unwrap();
         let adapter = Adapter {
+            standing_grants: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
             configuration_revision: "config-1".into(),

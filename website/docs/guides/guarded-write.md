@@ -8,7 +8,9 @@ source: docs/local-approvals.md, docs/local-clock.md, docs/local-gitlab-merge.md
 
 # A guarded write
 
-Every write is a required-approval mutation. A provider page gives its policy line, its example
+Every write is a required-approval mutation. It runs with a proof issued for its exact input, or,
+on an instance that names a grant file, [under a standing grant](#under-a-standing-grant) its
+operator signed once. A provider page gives its policy line, its example
 input and what its guard refuses. The steps are the same for every provider. The examples use
 shell variables, so set them first:
 
@@ -66,3 +68,46 @@ connectors invoke "$connector/$instance" "$operation" \
 write whose answer is lost is `unknown` and is never sent again. Repeating the same
 `--idempotency-key` observes the original attempt. A write is never sent again after a `429`
 either.
+
+## Under a standing grant
+
+A standing grant admits every keyed write it covers, with no proof per write: one operation, the
+exact value of each target member, the input members a caller may set beside them, an expiry and a
+cap of writes per hour. The key, the clock and the policy above stay prerequisites. Name the
+instance's grant file in its entry, by an absolute path:
+
+```toml
+[connectors.slack.instances.bot]
+standing_grants = "/absolute/private/slack-bot.grants"
+```
+
+Write the grant to `grant.json`, here posts to one Slack channel, and sign it:
+
+```json
+{
+  "operation": "chat.postMessage",
+  "target": [{"pointer": "/body/channel", "value": "C0000000001"}],
+  "input_keys": ["/body/text", "/body/thread_ts"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 20
+}
+```
+
+```sh
+connectors approvals grant-standing --connector "$connector" --instance "$instance" --input-file grant.json
+connectors approvals list-standing --connector "$connector" --instance "$instance"
+```
+
+Then invoke with a key and no `--approval-file`:
+
+```sh
+connectors --output json invoke "$connector/$instance" "$operation" \
+  --input-stdin --idempotency-key <a key of your own> < "$input"
+```
+
+`mutation.standing.grant_id` in the answer names the grant. A write the grant does not cover is
+`approval_required`, with no provider request and no reason in the answer; a write over the cap is
+`rate_limited` with `retry_after_seconds`. `approvals revoke-standing <grant id>` removes a grant.
+One grant admits up to 10,000 writes an hour until it expires, so grant the narrowest target and
+input that serve the caller
+([standing grants](https://github.com/beyond10x/connectors/blob/main/docs/local-approvals.md#standing-grants)).

@@ -27,6 +27,7 @@ fn production_finish_audit_recovers_a_lost_acknowledgement_on_the_real_clock() {
                 code: connectors_core::ErrorCode::Unavailable,
                 stage: Stage::Response,
             }),
+            standing: None,
         },
         source_audit: SourceAudit {
             instance: "alpha".into(),
@@ -83,6 +84,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         origin: crate::local::owner::Origin::Host,
                         store_version: None,
                         created: None,
+                        retry_after_seconds: None,
                     }),
                     Classification::Unknown => Some(Code::OutcomeUnknown.into()),
                     _ => Some(Code::Forbidden.into()),
@@ -99,6 +101,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         code: connectors_core::ErrorCode::Unavailable,
                         stage: Stage::Response,
                     }),
+                    standing: None,
                 },
                 source_audit: SourceAudit {
                     instance: "alpha".into(),
@@ -504,6 +507,586 @@ fn a_write_failure_names_its_stage_and_never_suggests_retrying_a_possible_effect
             error.next_action(classification),
             action,
             "{error:?} {classification:?}"
+        );
+    }
+}
+
+/// story:local-invoke-admits-a-keyed-write-under-a-standing-grant, acceptance
+/// 15: `standing::named` and the bytes of the observation and of `Failure`.
+#[cfg(unix)]
+#[test]
+fn standing_is_named_for_an_attempt_and_absent_without_a_store() {
+    use crate::local::standing;
+    use serde_json::json;
+    use std::os::unix::fs::PermissionsExt;
+
+    /// A private state directory below a temporary one.
+    fn state() -> (tempfile::TempDir, std::path::PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        std::fs::create_dir(&state).unwrap();
+        std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
+        (root, state)
+    }
+    let delivery = |attempt: Option<Uuid>, error: Option<Failure>| {
+        let classification = match (&error, attempt) {
+            (None, _) => Classification::Applied,
+            (Some(_), Some(_)) => Classification::Refused,
+            (Some(_), None) => Classification::NotAttempted,
+        };
+        Delivery {
+            request_id: Uuid::new_v4().to_string(),
+            result: error.is_none().then(|| json!({"status": 200})),
+            error,
+            mutation: MutationObservation {
+                classification,
+                attempt: attempt.map(|id| Attempt {
+                    instance: "leaf".into(),
+                    id,
+                }),
+                original_request_id: attempt.map(|_| "request-1".to_owned()),
+                replayed: false,
+                cause: None,
+                standing: None,
+            },
+            source_audit: SourceAudit {
+                instance: "leaf".into(),
+                audit_ref: None,
+                audit_status: AuditStatus::Unavailable,
+            },
+        }
+    };
+    let named = |mut value: Delivery, attempt: Uuid, state: &std::path::Path| {
+        standing::named(&mut value.mutation, attempt, state);
+        value.validate().unwrap();
+        // The bytes the owner sends are the bytes the CLI reads back.
+        let bytes = serde_json::to_value(&value).unwrap();
+        let read: Delivery = serde_json::from_value(bytes.clone()).unwrap();
+        assert_eq!(read.mutation.standing, value.mutation.standing);
+        bytes
+    };
+
+    // One use bound to an attempt, one counted and bound to none.
+    let (_root, directory) = state();
+    let grant = standing::Grant {
+        id: "g1".into(),
+        instance: "leaf".into(),
+        operation: "chat.postMessage".into(),
+        target: vec![standing::TargetMember {
+            pointer: "/body/channel".into(),
+            value: json!("C1"),
+        }],
+        input_keys: None,
+        not_after_unix_ms: 1_789_056_600_000,
+        max_per_hour: 2,
+    };
+    let uses = standing::Uses::create(&directory).unwrap();
+    let take = || match uses.take("leaf", &[&grant], 1_789_056_002_000).unwrap() {
+        standing::Taken::Slot(taken) => taken,
+        standing::Taken::AtCap { .. } => panic!("at the cap"),
+    };
+    let (bound, unbound) = (Uuid::new_v4(), Uuid::new_v4());
+    uses.bind(&take(), bound).unwrap();
+    let _counted = take();
+
+    // A bound attempt names its grant, on the success shape and on the
+    // failure shape.
+    let success = named(delivery(Some(bound), None), bound, &directory);
+    assert_eq!(success["mutation"]["standing"], json!({"grant_id": "g1"}));
+    assert!(success["result"].is_object());
+    let failed = named(
+        delivery(Some(bound), Some(Code::ServiceFailure.into())),
+        bound,
+        &directory,
+    );
+    assert_eq!(failed["mutation"]["standing"], json!({"grant_id": "g1"}));
+    assert_eq!(failed["error"]["code"], "service_failure");
+
+    // An attempt with no row has no member, not a null one.
+    let other = named(delivery(Some(unbound), None), unbound, &directory);
+    assert!(other["mutation"].get("standing").is_none(), "{other}");
+
+    // With no store file the member is absent and none is created.
+    let (_empty_root, empty) = state();
+    let absent = named(delivery(Some(bound), None), bound, &empty);
+    assert!(absent["mutation"].get("standing").is_none(), "{absent}");
+    assert!(standing::Uses::existing(&empty).unwrap().is_none());
+    assert!(!empty.join("standing-grants.sqlite3").exists());
+    assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0);
+    // The store that exists is read, not written: a row count as before.
+    assert_eq!(uses.rows().unwrap(), 2);
+
+    // `rate_limited` carries `retry_after_seconds`; no other failure does.
+    let limited = delivery(None, Some(Failure::rate_limited(1800)));
+    limited.validate().unwrap();
+    let limited = serde_json::to_value(&limited).unwrap();
+    assert_eq!(
+        limited["error"],
+        json!({"code": "rate_limited", "retry_after_seconds": 1800})
+    );
+    assert_eq!(limited["mutation"]["classification"], "not_attempted");
+    let read: Failure = serde_json::from_value(limited["error"].clone()).unwrap();
+    assert_eq!(read.code, FailureCode::Approval(ApprovalCode::RateLimited));
+    assert_eq!(read.retry_after_seconds, Some(1800));
+    assert_eq!(read.stage(Classification::NotAttempted), "admission");
+    assert_eq!(
+        read.next_action(Classification::NotAttempted),
+        "retry_status"
+    );
+    assert_eq!(
+        serde_json::to_value(Failure::from(ApprovalCode::ApprovalRequired)).unwrap(),
+        json!({"code": "approval_required"})
+    );
+
+    // What the owner never sends: a grant named without an attempt, a cap
+    // without its number or with one outside 1 to 3,600, the number on
+    // another code.
+    let mut unattempted = delivery(None, Some(ApprovalCode::ApprovalRequired.into()));
+    unattempted.mutation.standing = Some(Standing {
+        grant_id: "g1".into(),
+    });
+    assert!(unattempted.validate().is_err());
+    for refused in [
+        Failure::from(ApprovalCode::RateLimited),
+        Failure::rate_limited(0),
+        Failure::rate_limited(3601),
+        Failure {
+            retry_after_seconds: Some(60),
+            ..Failure::from(ApprovalCode::ApprovalRequired)
+        },
+    ] {
+        assert!(delivery(None, Some(refused)).validate().is_err());
+    }
+}
+
+/// story:local-invoke-admits-a-keyed-write-under-a-standing-grant: the two
+/// rechecks of the grant path, through `execute` itself on a live child of
+/// this test binary. `execution::seam` gives the credential in place of the
+/// custody read, and its hook revokes the grant between two steps as
+/// `approvals revoke-standing` does: under `standing-grants.lock` and the
+/// shared key lease, with the instance's active key.
+#[cfg(unix)]
+mod recheck {
+    use super::super::execution::seam;
+    use super::*;
+    use crate::local::{
+        approvals, clock, clock::fixture as clock_fixture, config, keyring::custody, metadata,
+        owner::lifecycle, registry, runtime, standing,
+    };
+    use base64::{
+        Engine,
+        engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    };
+    use connectors_sdk::Secret;
+    use ring::{
+        rand::{SecureRandom, SystemRandom},
+        signature::{Ed25519KeyPair, KeyPair},
+    };
+    use std::{
+        cell::Cell,
+        collections::BTreeSet,
+        os::unix::fs::PermissionsExt,
+        path::PathBuf,
+        rc::Rc,
+        sync::{Mutex, atomic::AtomicBool},
+    };
+
+    /// Every wait of these tests: a bound only a hang reaches, inside the
+    /// 60 s a test may run.
+    const WAIT: Duration = Duration::from_secs(50);
+
+    /// One instance `fixture` with a live child, a saved connection, a
+    /// published policy, an active approval key generated here and one grant
+    /// of `write` for `/value` true, once an hour.
+    struct Site {
+        child: runtime::Child,
+        _clocks: [clock_fixture::Server; 2],
+        paths: Paths,
+        /// Where the child records `prepare`, `send` and `destroy`.
+        events: PathBuf,
+        grants: PathBuf,
+        connection: String,
+        schema: String,
+        grant_id: String,
+        seed: [u8; 32],
+        kid: String,
+        _root: tempfile::TempDir,
+    }
+
+    fn site() -> Site {
+        metadata::set_lifecycle_lock_wait(WAIT);
+        clock::set_test_query_timeout(WAIT);
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let events = root.path().join("events");
+        std::fs::create_dir(&events).unwrap();
+        let grants = root.path().join("fixture.grants");
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        config::Config::initialize(&paths).unwrap();
+        let clocks = [7, 8].map(|seed| {
+            clock_fixture::Server::fixture(clock_fixture::Fixture {
+                seed,
+                ..Default::default()
+            })
+        });
+        let mut config = config::Config::load(&paths.config).unwrap();
+        config.format = "connectors-local/2".into();
+        config.secret_service_socket = Some(root.path().join("absent-bus"));
+        config.approval_clock = Some(clock::ApprovalClock::Quorum(clock::Configuration {
+            format: "roughtime-quorum/1".into(),
+            quorum: 2,
+            max_rate_error_ppm: 100,
+            sources: clocks
+                .iter()
+                .zip([7, 8])
+                .map(|(server, seed)| clock::Source {
+                    address: server.address.clone(),
+                    public_key: STANDARD.encode(clock_fixture::key(seed)),
+                    version: clock::RoughtimeVersion::Draft0x8000000c,
+                })
+                .collect(),
+        }));
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
+        let adapter = config::Adapter {
+            standing_grants: Some(grants.clone()),
+            credential_revision: None,
+            instance_id: "fixture".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "fixture-config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(runtime::PrivateProtocol::V2),
+            startup: Default::default(),
+            restart: Default::default(),
+            executable: config::Executable {
+                path,
+                sha256,
+                args: vec![
+                    "--exact".into(),
+                    "local::runtime::process::write_tests::fixture".into(),
+                    "--".into(),
+                    "write-mode=owned".into(),
+                    format!("write-root={}", events.display()),
+                ],
+            },
+            permissions: config::Permissions {
+                profiles: BTreeSet::from(["fixture".into()]),
+                operations: BTreeSet::from(["write".into(), "read".into()]),
+                custody: Default::default(),
+            },
+        };
+        config.adapters.insert("fixture".into(), adapter.clone());
+        std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
+
+        // The child and its description, cached as the owner caches it.
+        let child = runtime::Child::spawn_within(&adapter, WAIT).unwrap();
+        let bootstrap = child.bootstrap().clone();
+        runtime::state::State::new(&paths.state)
+            .remember(&adapter.selection(), &bootstrap)
+            .unwrap();
+        let schema = crate::local::owner::schema(&bootstrap, "write").unwrap();
+
+        // A saved connection whose validation is fresh on the system clock.
+        let now = connectors_sdk::now_ms();
+        let registry = registry::Registry::new(&paths.state);
+        let acquisition = registry
+            .begin(&bootstrap.binding("fixture").unwrap(), now)
+            .unwrap();
+        let claim = registry.consume(acquisition, now).unwrap();
+        let candidate = registry
+            .prepare(
+                &claim,
+                registry::ValidatedBaseline {
+                    binding: None,
+                    identity: registry::ExternalIdentity {
+                        kind: "fixture".into(),
+                        subject: "owner".into(),
+                    },
+                    granted_scopes: Some(BTreeSet::new()),
+                    credential_expires_at_ms: None,
+                    collected_at_ms: now,
+                    valid_until_ms: now + 60_000,
+                },
+                12,
+                now,
+            )
+            .unwrap();
+        let receipt = custody::WrittenVersion::fixture(candidate.version());
+        let stored = registry.acknowledge(candidate, receipt, now).unwrap();
+        let connection = registry.publish(stored, now).unwrap();
+
+        // The issuer and its active key, for a pair generated here: the rows
+        // `approval_keys::Store` writes, a candidate first and its
+        // publication second. The seed never enters a custody; the tests
+        // sign with it directly.
+        let mut seed = [0u8; 32];
+        SystemRandom::new().fill(&mut seed).unwrap();
+        let pair = Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        let (issuer, kid) = (Uuid::new_v4().to_string(), Uuid::new_v4().to_string());
+        let mut store = metadata::Metadata::update_approval_keys(&paths.state).unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO local_approval_issuers VALUES (?1,'fixture',?2,?3)",
+                rusqlite::params![
+                    issuer,
+                    Uuid::new_v4().to_string(),
+                    Uuid::new_v4().to_string()
+                ],
+            )
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO local_approval_keys VALUES (?1,?2,?3,?4,'candidate')",
+                rusqlite::params![
+                    kid,
+                    issuer,
+                    URL_SAFE_NO_PAD.encode(pair.public_key().as_ref()),
+                    Uuid::new_v4().to_string()
+                ],
+            )
+            .unwrap();
+        store.persist().unwrap();
+        drop(store);
+        let mut store = metadata::Metadata::update_approval_keys(&paths.state).unwrap();
+        store
+            .connection
+            .execute(
+                "UPDATE local_approval_keys SET state='active' WHERE key_id=?1 AND state='candidate'",
+                [&kid],
+            )
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "UPDATE local_approval_issuers SET revision=?1 WHERE issuer_id=?2",
+                rusqlite::params![Uuid::new_v4().to_string(), issuer],
+            )
+            .unwrap();
+        store.persist().unwrap();
+        drop(store);
+        // The lock file of the key lease, which the store's first exclusive
+        // operation leaves; a shared lease does not create it.
+        drop(
+            crate::local::approval_keys::Lease::acquire(&paths.state, "approval-issuer.lock", true)
+                .unwrap(),
+        );
+        issuance::policy_set(
+            &paths,
+            "fixture",
+            br#"{"operations":["write"]}"#,
+            None,
+            Instant::now() + WAIT,
+        )
+        .unwrap();
+
+        // The grant, signed as `approvals grant-standing` signs it; this is
+        // also what creates the use store.
+        let reading =
+            standing::reading(&config.approval_clock.as_ref().unwrap().acquire().unwrap()).unwrap();
+        let request = serde_json::to_vec(&serde_json::json!({
+            "operation": "write",
+            "target": [{"pointer": "/value", "value": true}],
+            "not_after_unix_ms": reading.upper_unix_ms + 3_600_000,
+            "max_per_hour": 1,
+        }))
+        .unwrap();
+        let grant_id = {
+            let lock = standing::lock(&paths.state).unwrap();
+            let keys = issuance::key_store(&paths, &config, &adapter)
+                .unwrap()
+                .acquire_key()
+                .unwrap();
+            standing::grant(
+                &lock,
+                &grants,
+                &approvals::Signer::from_seed(Secret(seed.to_vec()), kid.clone()).unwrap(),
+                keys.key().unwrap(),
+                "fixture",
+                reading,
+                &request,
+            )
+            .unwrap()
+        };
+        Site {
+            child,
+            _clocks: clocks,
+            paths,
+            events,
+            grants,
+            connection,
+            schema,
+            grant_id,
+            seed,
+            kid,
+            _root: root,
+        }
+    }
+
+    /// The keyed write `{"value":true}` through `execute`. The grant is
+    /// revoked when `execute` reaches the step `revoke_at`; the second value
+    /// says how often it was.
+    fn write(site: &mut Site, revoke_at: seam::Step) -> (Delivery, u32) {
+        let revoked = Rc::new(Cell::new(0));
+        let hook = {
+            let revoked = revoked.clone();
+            let paths = Paths {
+                config: site.paths.config.clone(),
+                state: site.paths.state.clone(),
+            };
+            let (grants, grant_id) = (site.grants.clone(), site.grant_id.clone());
+            let (seed, kid) = (site.seed, site.kid.clone());
+            move |step: seam::Step| {
+                if step != revoke_at {
+                    return;
+                }
+                let config = config::Config::load(&paths.config).unwrap();
+                let adapter = config.adapters["fixture"].clone();
+                let reading =
+                    standing::reading(&config.approval_clock.as_ref().unwrap().acquire().unwrap())
+                        .unwrap();
+                let lock = standing::lock(&paths.state).unwrap();
+                let keys = issuance::key_store(&paths, &config, &adapter)
+                    .unwrap()
+                    .acquire_key()
+                    .unwrap();
+                standing::revoke(
+                    &lock,
+                    &grants,
+                    &approvals::Signer::from_seed(Secret(seed.to_vec()), kid.clone()).unwrap(),
+                    keys.key().unwrap(),
+                    reading,
+                    &grant_id,
+                )
+                .unwrap();
+                revoked.set(revoked.get() + 1);
+            }
+        };
+        seam::set(Some(seam::Seam {
+            credential: b"fictional-only".to_vec(),
+            at: Box::new(hook),
+        }));
+        let owned = Mutex::new(lifecycle::Control::default());
+        let (stopped, pool) = (AtomicBool::new(false), std::sync::Weak::new());
+        let delivery = execute(
+            &site.paths,
+            "fixture",
+            Invocation {
+                request: issuance::Request {
+                    connection: &site.connection,
+                    operation: "write",
+                    schema: &site.schema,
+                    revision: "fixture-private-descriptor",
+                    input: r#"{"value":true}"#,
+                },
+                key: Some("key-1"),
+                proof: None,
+                until: Instant::now() + WAIT,
+            },
+            &mut site.child,
+            Control {
+                lifecycle: &owned,
+                epoch: 0,
+                stopped: &stopped,
+                pool: &pool,
+            },
+        );
+        seam::set(None);
+        let delivery = delivery.unwrap();
+        delivery.validate().unwrap();
+        (delivery, revoked.get())
+    }
+
+    /// How often the child recorded `event`.
+    fn count(site: &Site, event: &str) -> usize {
+        std::fs::read_to_string(site.events.join(event))
+            .unwrap_or_default()
+            .lines()
+            .count()
+    }
+
+    /// The rows of the use store: grant, state and attempt of each use.
+    fn uses(site: &Site) -> Vec<(String, String, Option<String>)> {
+        let connection = rusqlite::Connection::open_with_flags(
+            site.paths.state.join("standing-grants.sqlite3"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let mut statement = connection
+            .prepare("SELECT grant_id, state, attempt_id FROM grant_uses")
+            .unwrap();
+        statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    fn refused_as_approval_required(delivery: &Delivery) {
+        let error = delivery.error.as_ref().expect("the write was not refused");
+        assert_eq!(
+            error.code,
+            FailureCode::Approval(ApprovalCode::ApprovalRequired)
+        );
+        assert_eq!(error.retry_after_seconds, None);
+        assert!(delivery.result.is_none());
+        assert_eq!(
+            delivery.mutation.classification,
+            Classification::NotAttempted
+        );
+    }
+
+    /// The first recheck: the grant is revoked after the write was admitted
+    /// and before its attempt is recorded. The write is refused as a write no
+    /// grant covers, nothing is sent, no attempt exists and the use is given
+    /// back. The hook runs only once the grant admitted the write, and the
+    /// use it took is the row of the last assertion.
+    #[test]
+    fn a_grant_revoked_after_admission_refuses_the_write_and_gives_the_use_back() {
+        let mut site = site();
+        let (delivery, revoked) = write(&mut site, seam::Step::Admitted);
+        assert_eq!(revoked, 1);
+        refused_as_approval_required(&delivery);
+        assert!(delivery.mutation.attempt.is_none());
+        assert!(delivery.mutation.standing.is_none());
+        // The preflight ran; the provider request did not.
+        assert_eq!((count(&site, "prepare"), count(&site, "send")), (1, 0));
+        assert_eq!(
+            uses(&site),
+            [(site.grant_id.clone(), "released".to_owned(), None)]
+        );
+    }
+
+    /// The second recheck: the grant is revoked after its use was bound to
+    /// the attempt and before the gate. The write is refused the same way and
+    /// nothing is sent; the attempt stays, names the grant, and its use stays
+    /// counted.
+    #[test]
+    fn a_grant_revoked_after_the_bind_refuses_the_write_and_keeps_the_use_counted() {
+        let mut site = site();
+        let (delivery, revoked) = write(&mut site, seam::Step::Bound);
+        assert_eq!(revoked, 1);
+        refused_as_approval_required(&delivery);
+        let attempt = delivery.mutation.attempt.as_ref().unwrap().id;
+        assert_eq!(
+            delivery
+                .mutation
+                .standing
+                .as_ref()
+                .map(|s| s.grant_id.as_str()),
+            Some(site.grant_id.as_str())
+        );
+        assert_eq!((count(&site, "prepare"), count(&site, "send")), (1, 0));
+        assert_eq!(
+            uses(&site),
+            [(
+                site.grant_id.clone(),
+                "bound".to_owned(),
+                Some(attempt.to_string())
+            )]
         );
     }
 }

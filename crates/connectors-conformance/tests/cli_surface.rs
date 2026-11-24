@@ -131,6 +131,10 @@ fn the_selected_inventory_has_thirty_four_commands_and_explicit_runtime_obligati
         "approvals policy-set",
         "approvals prepare",
         "approvals issue",
+        // story:local-invoke-admits-a-keyed-write-under-a-standing-grant
+        "approvals grant-standing",
+        "approvals list-standing",
+        "approvals revoke-standing",
         // story:connectors-do-short-invocation
         "invoke",
         // story:definitions-install
@@ -1244,7 +1248,9 @@ fn every_adapter_command_also_selects_by_connector_and_instance() {
         }
     }
     // `operations invoke` is removed (story:connectors-do-short-invocation).
-    assert_eq!(selecting.len(), 25, "{selecting:?}");
+    // The three standing commands
+    // (story:local-invoke-admits-a-keyed-write-under-a-standing-grant) select too.
+    assert_eq!(selecting.len(), 28, "{selecting:?}");
     for (name, callable) in &plan.callables {
         assert!(names_selection(&callable.result.shape), "{name}");
     }
@@ -1447,8 +1453,11 @@ fn no_alias_or_path_replaces_another_command() {
     // story:connectors-do-short-invocation: `invoke` is one of the paths and
     // `operations invoke` is removed; `definitions install` (story:definitions-install)
     // 34 commands and 5 aliases, and `setup custody-orphans`
-    // (story:custody-keeps-out-of-the-session-keyring) the newest.
-    assert_eq!(reached, 40);
+    // (story:custody-keeps-out-of-the-session-keyring) came next. The three
+    // standing commands
+    // (story:local-invoke-admits-a-keyed-write-under-a-standing-grant) are the
+    // newest: 38 commands and 5 aliases.
+    assert_eq!(reached, 43);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

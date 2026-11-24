@@ -351,6 +351,13 @@ pub struct Adapter {
     /// revision rule. It is not part of the executable selection digest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_revision: Option<String>,
+    /// The absolute path of the instance's signed standing-grant file
+    /// (`super::standing`; story:local-invoke-admits-a-keyed-write-under-a-
+    /// standing-grant). The file is read and verified on every use, so the
+    /// member is not part of the executable selection digest: a changed path
+    /// needs no new policy or key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub standing_grants: Option<PathBuf>,
     pub protocol: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "private_selection")]
@@ -469,6 +476,10 @@ pub struct Instance {
     /// are several and the instance names none: it has no entry in
     /// `Config::adapters` until it does ([`Config::awaiting_profile`]).
     pub awaiting_profile: Option<BTreeSet<String>>,
+    /// `standing_grants` of a derived instance's table, which states no entry:
+    /// its derived entry carries the same path ([`Adapter::standing_grants`]).
+    /// `None` for a pinned instance, whose entry holds the member.
+    pub standing_grants: Option<PathBuf>,
 }
 
 /// `[connectors.<connector>]` as written.
@@ -504,6 +515,8 @@ struct InstanceTable {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     credential_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    standing_grants: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     protocol: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "private_selection")]
@@ -529,6 +542,7 @@ impl InstanceTable {
             return None;
         }
         let adapter = Adapter {
+            standing_grants: self.standing_grants,
             credential_revision: self.credential_revision,
             instance_id: self.instance_id?,
             adapter_id: self.adapter_id?,
@@ -549,6 +563,7 @@ impl InstanceTable {
             profile: None,
             allowed_domains: Vec::new(),
             awaiting_profile: None,
+            standing_grants: None,
         };
         Some((instance, adapter))
     }
@@ -567,6 +582,7 @@ impl InstanceTable {
             adapter_id: Some(adapter.adapter_id),
             configuration_revision: Some(adapter.configuration_revision),
             credential_revision: adapter.credential_revision,
+            standing_grants: adapter.standing_grants,
             protocol: Some(adapter.protocol),
             private_protocol: adapter.private_protocol,
             startup: Some(adapter.startup),
@@ -612,7 +628,10 @@ impl InstanceTable {
     ) -> Result<(Instance, Option<Adapter>)> {
         let (mut instance, args, id) = self.underived(connector, name)?;
         match installation.derive(&id, args, instance.profile.is_some())? {
-            Derived::Entry(adapter) => Ok((instance, Some(*adapter))),
+            Derived::Entry(mut adapter) => {
+                adapter.standing_grants = instance.standing_grants.clone();
+                Ok((instance, Some(*adapter)))
+            }
             Derived::Awaiting(profiles) => {
                 instance.awaiting_profile = Some(profiles);
                 Ok((instance, None))
@@ -674,6 +693,7 @@ impl InstanceTable {
             profile: self.profile,
             allowed_domains: self.allowed_domains.unwrap_or_default(),
             awaiting_profile: None,
+            standing_grants: self.standing_grants,
         };
         Ok((instance, args, id))
     }
@@ -694,6 +714,7 @@ impl InstanceTable {
             adapter_id: None,
             configuration_revision: None,
             credential_revision: None,
+            standing_grants: instance.standing_grants,
             protocol: None,
             private_protocol: None,
             startup: None,
@@ -863,6 +884,10 @@ impl Config {
                 if !selector(name)
                     || !text(&instance.description, true, 1024, true)
                     || !text(&instance.endpoint, false, 2048, false)
+                    || instance
+                        .standing_grants
+                        .as_deref()
+                        .is_some_and(|path| fs::validate_path(path).is_err())
                     || !aliases.insert(&instance.alias)
                     // A listed instance without an entry keeps its alias.
                     || (instance.awaiting_profile.is_some()
@@ -1142,6 +1167,11 @@ impl Config {
                         profile: form.and_then(|form| form.profile.clone()),
                         allowed_domains: Vec::new(),
                         awaiting_profile: None,
+                        // A derived instance's table keeps the legacy
+                        // entry's member; a pinned one's entry holds it.
+                        standing_grants: form
+                            .and(self.adapters.get(alias))
+                            .and_then(|entry| entry.standing_grants.clone()),
                     },
                 );
         }
@@ -1421,6 +1451,7 @@ fn printed_adapter(instance: &str, executable: Executable, printed: &[u8]) -> Re
         return Err(Failure::InvalidConfiguration);
     }
     Ok(Adapter {
+        standing_grants: None,
         credential_revision: printed.credential_revision,
         instance_id: printed.instance,
         adapter_id: printed.adapter,
@@ -1996,6 +2027,10 @@ impl Config {
                 || !selector(&entry.configuration_revision)
                 || !instances.insert(&entry.instance_id)
                 || entry.protocol != "v1alpha1"
+                || entry
+                    .standing_grants
+                    .as_deref()
+                    .is_some_and(|path| fs::validate_path(path).is_err())
                 || entry.permissions.profiles.len() > 64
                 || entry.permissions.operations.len() > 256
                 || entry
@@ -4085,6 +4120,108 @@ mod custody_target_tests {
                 invalid,
                 "{writer}{target}"
             );
+        }
+    }
+}
+
+// The fixtures configure Unix absolute executable paths.
+#[cfg(all(test, unix))]
+mod standing_tests {
+    //! story:local-invoke-admits-a-keyed-write-under-a-standing-grant: the
+    //! optional `standing_grants` of a legacy entry and of an instance's table.
+    use super::*;
+
+    const SCALARS: &str = "instance_id='slack-bot'\nadapter_id='slack-credentials'\nconfiguration_revision='cfg-7'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n";
+    const EXECUTABLE: &str = "path='/opt/connectors/bin/slack-credentials'\nsha256='2222222222222222222222222222222222222222222222222222222222222222'\nargs=[]\n";
+    const GRANTS: &str = "/etc/connectors/slack-bot.grants";
+
+    fn head() -> String {
+        format!("format='connectors-local/5'\nowner_uid={}\n", fs::uid())
+    }
+
+    /// The legacy entry `[adapters.slack-bot]` with `member` among its scalars.
+    fn legacy(member: &str) -> String {
+        format!(
+            "{}[adapters.slack-bot]\n{SCALARS}{member}[adapters.slack-bot.executable]\n{EXECUTABLE}",
+            head()
+        )
+    }
+
+    /// The same pins as the instance `slack/bot`.
+    fn pinned(member: &str) -> String {
+        format!(
+            "{}[connectors.slack]\nenabled=true\n[connectors.slack.instances.bot]\nalias='slack-bot'\n{SCALARS}{member}[connectors.slack.instances.bot.executable]\n{EXECUTABLE}",
+            head()
+        )
+    }
+
+    /// An instance that states no pin: its entry is derived.
+    fn short(member: &str) -> String {
+        format!(
+            "{}[connectors.slack]\nenabled=true\n[connectors.slack.instances.bot]\n{member}",
+            head()
+        )
+    }
+
+    fn member(path: &str) -> String {
+        format!("standing_grants='{path}'\n")
+    }
+
+    #[test]
+    fn standing_grants_round_trips_and_leaves_the_selection() {
+        let written = format!("standing_grants = \"{GRANTS}\"");
+        for form in [legacy, pinned] {
+            let absent = Config::parse(&form("")).unwrap();
+            let present = Config::parse(&form(&member(GRANTS))).unwrap();
+            assert_eq!(absent.adapters["slack-bot"].standing_grants, None);
+            assert_eq!(
+                present.adapters["slack-bot"].standing_grants.as_deref(),
+                Some(Path::new(GRANTS))
+            );
+            // The member is outside the executable selection digest.
+            assert_eq!(
+                present.adapters["slack-bot"].selection(),
+                absent.adapters["slack-bot"].selection()
+            );
+            // Written and read back, the member is kept; absent, none appears.
+            let text = present.to_text().unwrap();
+            assert_eq!(text.matches(&written).count(), 1, "{text}");
+            let again = Config::parse(&text).unwrap();
+            assert_eq!(
+                again.adapters["slack-bot"].standing_grants.as_deref(),
+                Some(Path::new(GRANTS)),
+                "{text}"
+            );
+            assert!(!absent.to_text().unwrap().contains("standing_grants"));
+        }
+        // An instance whose entry is derived keeps the member in its table.
+        let derived = Config::parse_with(&short(&member(GRANTS)), Derivation::Deferred).unwrap();
+        let instance = &derived.connectors.as_ref().unwrap()["slack"].instances["bot"];
+        assert!(instance.derived);
+        assert_eq!(instance.standing_grants.as_deref(), Some(Path::new(GRANTS)));
+        let text = derived.to_text().unwrap();
+        assert_eq!(text.matches(&written).count(), 1, "{text}");
+        // A relative path is refused, as the other paths are.
+        for refused in [
+            "slack-bot.grants",
+            "./slack-bot.grants",
+            "/home/../grants",
+            "",
+        ] {
+            for form in [legacy, pinned] {
+                assert!(
+                    Config::parse(&form(&member(refused))).is_err(),
+                    "{refused:?}"
+                );
+            }
+            assert!(
+                Config::parse_with(&short(&member(refused)), Derivation::Deferred).is_err(),
+                "{refused:?}"
+            );
+        }
+        // The member is a path, not a table or a number.
+        for form in [legacy, pinned] {
+            assert!(Config::parse(&form("standing_grants=1\n")).is_err());
         }
     }
 }

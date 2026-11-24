@@ -253,6 +253,7 @@ fn process() -> Process {
         .canonicalize()
         .unwrap();
     let adapter = Adapter {
+        standing_grants: None,
         credential_revision: None,
         private_protocol: None,
         permissions: Default::default(),

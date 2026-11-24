@@ -103,6 +103,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
             .collect(),
     }));
     let adapter = Adapter {
+        standing_grants: None,
         credential_revision: None,
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),

@@ -219,7 +219,7 @@ impl Store {
         if self.read_only {
             return Err(Failure::CustodyReadOnly);
         }
-        let _lease = Lease::acquire(&self.path, true)?;
+        let _lease = Lease::acquire(&self.path, LOCK, true)?;
         let mut seed = Secret(vec![0; 32]);
         SystemRandom::new()
             .fill(&mut seed.0)
@@ -302,7 +302,7 @@ impl Store {
         if self.read_only {
             return Err(Failure::CustodyReadOnly);
         }
-        let _lease = Lease::acquire(&self.path, true)?;
+        let _lease = Lease::acquire(&self.path, LOCK, true)?;
         let record = self.current()?;
         record.expect(revision)?;
         if record.view.key(candidate)?.state != State::Candidate {
@@ -375,7 +375,7 @@ impl Store {
             .view)
     }
     pub fn revoke(&self, revision: Uuid, key: Uuid) -> Result<View> {
-        let _lease = Lease::acquire(&self.path, true)?;
+        let _lease = Lease::acquire(&self.path, LOCK, true)?;
         let mut metadata = Metadata::update_approval_keys(&self.path)?;
         let record = self.load(&metadata)?.ok_or(Failure::NotFound)?;
         record.expect(revision)?;
@@ -398,7 +398,7 @@ impl Store {
         if self.read_only {
             return Err(Failure::CustodyReadOnly);
         }
-        let _lease = Lease::acquire(&self.path, true)?;
+        let _lease = Lease::acquire(&self.path, LOCK, true)?;
         let record = self.prepare_retirement(revision, key)?;
         if record.view.key(key)?.state == State::Deleted {
             return Ok(record.view);
@@ -484,7 +484,7 @@ impl Store {
     /// Acquire BEFORE an approval preparation/spend transaction. Keep this guard
     /// borrowed by consumer policy until that transaction is acknowledged.
     pub fn acquire_key(&self) -> Result<KeyUse> {
-        let lease = Lease::acquire(&self.path, false)?;
+        let lease = Lease::acquire(&self.path, LOCK, false)?;
         let record = self.current()?;
         let active = record.view.active().ok_or(Failure::NotFound)?;
         let version = record.version(active.key_id)?;
@@ -661,20 +661,20 @@ impl KeyUse {
         Ok(result)
     }
 }
-struct Lease {
+pub(crate) struct Lease {
     _file: File,
     pid: u32,
 }
 impl Lease {
-    fn acquire(path: &Path, exclusive: bool) -> Result<Self> {
+    pub(crate) fn acquire(path: &Path, name: &str, exclusive: bool) -> Result<Self> {
         let directory = fs::directory(path, false, true)?;
         if exclusive {
-            match fs::publish_new(&directory, OsStr::new(LOCK), &[]) {
+            match fs::publish_new(&directory, OsStr::new(name), &[]) {
                 Ok(()) | Err(super::Failure::ConfigurationExists) => {}
                 Err(error) => return Err(error.into()),
             }
         }
-        let file = fs::private_file_at(&directory, OsStr::new(LOCK))?;
+        let file = fs::private_file_at(&directory, OsStr::new(name))?;
         let until = Instant::now() + super::metadata::lifecycle_lock_wait();
         #[cfg(unix)]
         loop {
@@ -715,7 +715,7 @@ impl Lease {
                 Err(_) => return Err(Failure::Conflict),
             }
         }
-        let current = fs::private_file_at(&directory, OsStr::new(LOCK))?;
+        let current = fs::private_file_at(&directory, OsStr::new(name))?;
         #[cfg(windows)]
         if fs::windows::identity(&file).map_err(|_| Failure::MetadataUnavailable)?
             != fs::windows::identity(&current).map_err(|_| Failure::MetadataUnavailable)?

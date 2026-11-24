@@ -21,6 +21,7 @@ fn entry(paths: &Paths, connector: &str, digest: char) -> Entry {
     Entry {
         digest,
         adapter: Adapter {
+            standing_grants: None,
             credential_revision: Some("credential-1".into()),
             instance_id: alias(connector),
             adapter_id: "catalog".into(),

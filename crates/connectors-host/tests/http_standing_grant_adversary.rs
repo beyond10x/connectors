@@ -724,7 +724,7 @@ fn adversary_the_last_slot_is_taken_once_and_the_window_is_one_hour() {
         serde_json::from_value(with(json!([{"pointer": "/o", "value": 1}]))[0].clone()).unwrap();
     let grant = Arc::new(grant);
     let directory = Arc::new(root.path().to_path_buf());
-    Uses::open(&directory).unwrap();
+    Uses::create(&directory).unwrap();
     let threads: Vec<_> = (0..16)
         .map(|_| {
             let grant = grant.clone();

@@ -32,6 +32,7 @@ Every command accepts these, anywhere on the command line.
 | [`connectors adapters status`](#connectors-adapters-status) | Deprecated name of `connectors instances status` |
 | [`connectors adapters stop`](#connectors-adapters-stop) | Deprecated name of `connectors instances stop` |
 | [`connectors approvals clock-check`](#connectors-approvals-clock-check) | Check the configured authenticated clock without starting services |
+| [`connectors approvals grant-standing`](#connectors-approvals-grant-standing) | Add one standing grant to the instance's signed grant file |
 | [`connectors approvals issue`](#connectors-approvals-issue) | Approve the exact reconstructed subject and publish a new protected proof file |
 | [`connectors approvals key-init`](#connectors-approvals-key-init) | Create a new approval-signing key in protected local custody |
 | [`connectors approvals key-recover`](#connectors-approvals-key-recover) | Confirm and publish an exact staged approval-signing key |
@@ -39,9 +40,11 @@ Every command accepts these, anywhere on the command line.
 | [`connectors approvals key-revoke`](#connectors-approvals-key-revoke) | Revoke the current key and cancel its pending replacement |
 | [`connectors approvals key-rotate`](#connectors-approvals-key-rotate) | Publish a replacement for the exact current approval-signing key |
 | [`connectors approvals key-status`](#connectors-approvals-key-status) | Observe public key metadata without starting services or reading secrets |
+| [`connectors approvals list-standing`](#connectors-approvals-list-standing) | List the standing grants of the instance's signed grant file |
 | [`connectors approvals policy-set`](#connectors-approvals-policy-set) | Publish the exact permitted write-operation set under revision control |
 | [`connectors approvals policy-status`](#connectors-approvals-policy-status) | Inspect retained local write policy without starting services |
 | [`connectors approvals prepare`](#connectors-approvals-prepare) | Resolve the exact approval subject without provider or credential access |
+| [`connectors approvals revoke-standing`](#connectors-approvals-revoke-standing) | Remove one standing grant from the instance's signed grant file |
 | [`connectors connections connect`](#connectors-connections-connect) | Begin admitted local protected credential acquisition on <connector>/<instance>; --endpoint first writes that instance's endpoint into the configuration |
 | [`connectors connections describe`](#connectors-connections-describe) | Inspect safe metadata for one connection |
 | [`connectors connections launch`](#connectors-connections-launch) | Run a pinned consumer with one connection's credential on descriptor 3 |
@@ -140,6 +143,21 @@ connectors approvals clock-check [OPTIONS]
 | `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
 | `--connector <field:connector>` | no | none | any |  |
 | `--instance <field:instance>` | no | none | any |  |
+
+## `connectors approvals grant-standing`
+
+Add one standing grant to the instance's signed grant file
+
+```text
+connectors approvals grant-standing [OPTIONS] --input-file <field:input_file>
+```
+
+| Argument | Required | Default | Values | Meaning |
+|---|---|---|---|---|
+| `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
+| `--connector <field:connector>` | no | none | any |  |
+| `--instance <field:instance>` | no | none | any |  |
+| `--input-file <field:input_file>` | yes | none | any |  |
 
 ## `connectors approvals issue`
 
@@ -257,6 +275,20 @@ connectors approvals key-status [OPTIONS]
 | `--connector <field:connector>` | no | none | any |  |
 | `--instance <field:instance>` | no | none | any |  |
 
+## `connectors approvals list-standing`
+
+List the standing grants of the instance's signed grant file
+
+```text
+connectors approvals list-standing [OPTIONS]
+```
+
+| Argument | Required | Default | Values | Meaning |
+|---|---|---|---|---|
+| `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
+| `--connector <field:connector>` | no | none | any |  |
+| `--instance <field:instance>` | no | none | any |  |
+
 ## `connectors approvals policy-set`
 
 Publish the exact permitted write-operation set under revision control
@@ -307,6 +339,21 @@ connectors approvals prepare [OPTIONS] --connection <field:connection> --operati
 | `--input-json <source:input:inline>` | no | none | any |  |
 | `--input-file <source:input:file>` | no | none | any |  |
 | `--input-stdin` | no | `false` | any |  |
+
+## `connectors approvals revoke-standing`
+
+Remove one standing grant from the instance's signed grant file
+
+```text
+connectors approvals revoke-standing [OPTIONS] <field:grant_id>
+```
+
+| Argument | Required | Default | Values | Meaning |
+|---|---|---|---|---|
+| `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
+| `--connector <field:connector>` | no | none | any |  |
+| `--instance <field:instance>` | no | none | any |  |
+| `<field:grant_id>` | yes | none | any |  |
 
 ## `connectors connections connect`
 

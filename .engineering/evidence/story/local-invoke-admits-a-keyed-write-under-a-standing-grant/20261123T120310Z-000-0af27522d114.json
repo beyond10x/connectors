@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-23T12:03:10Z",
+  "actor": "human:timo",
+  "artifact": "story:local-invoke-admits-a-keyed-write-under-a-standing-grant",
+  "kind": "story",
+  "revision": 60,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:standing-grant-local-design-round-1",
+    "review": "review-result:standing-grant-local-design-round-1",
+    "outcome": "fixed"
+  }
+}

@@ -65,6 +65,7 @@ impl Target {
         Config::initialize(&paths).unwrap();
         let mut config = Config::load(&paths.config).unwrap();
         let adapter = Adapter {
+            standing_grants: None,
             instance_id: "read-instance".into(),
             adapter_id: "read-adapter".into(),
             configuration_revision: "cfg-1".into(),

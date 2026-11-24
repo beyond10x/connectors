@@ -25,6 +25,21 @@ callables:
     input: connectors.cli.ApprovalIssueInput
     result: connectors.cli.ApprovalIssueResult
     errors: {failure: connectors.cli.Failure}
+  approval-grant-standing:
+    target: {kind: local, owner: connectors.cli, action: approval-grant-standing}
+    input: connectors.cli.StandingGrantInput
+    result: connectors.cli.StandingGrantResult
+    errors: {failure: connectors.cli.Failure}
+  approval-revoke-standing:
+    target: {kind: local, owner: connectors.cli, action: approval-revoke-standing}
+    input: connectors.cli.StandingRevokeInput
+    result: connectors.cli.StandingRevokeResult
+    errors: {failure: connectors.cli.Failure}
+  approval-list-standing:
+    target: {kind: local, owner: connectors.cli, action: approval-list-standing}
+    input: connectors.cli.StandingListInput
+    result: connectors.cli.StandingListResult
+    errors: {failure: connectors.cli.Failure}
   approval-clock-check:
     target: {kind: local, owner: connectors.cli, action: approval-clock-check}
     input: connectors.cli.ApprovalClockCheckInput
@@ -255,6 +270,45 @@ commands:
         source: {kind: option, long: approve-subject}
       - field: proof_output
         source: {kind: option, long: proof-output}
+  - path: [approvals, grant-standing]
+    aliases: []
+    callable: approval-grant-standing
+    about: Add one standing grant to the instance's signed grant file
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
+      # The production handler reads this file-only input through its bounded
+      # document reader, as `approvals policy-set` reads its file.
+      - field: input_file
+        source: {kind: option, long: input-file}
+  - path: [approvals, revoke-standing]
+    aliases: []
+    callable: approval-revoke-standing
+    about: Remove one standing grant from the instance's signed grant file
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
+      - field: grant_id
+        source: {kind: positional, index: 1}
+  - path: [approvals, list-standing]
+    aliases: []
+    callable: approval-list-standing
+    about: List the standing grants of the instance's signed grant file
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
   - path: [approvals, clock-check]
     aliases: []
     callable: approval-clock-check

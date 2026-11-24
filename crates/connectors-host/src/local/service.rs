@@ -356,7 +356,7 @@ impl ServiceState {
         .map_err(|_| Failure::InvalidConfiguration)?;
         self.standing = Some(Standing {
             grants,
-            uses: standing::Uses::open(&self.path).map_err(|_| Failure::MetadataUnavailable)?,
+            uses: standing::Uses::create(&self.path).map_err(|_| Failure::MetadataUnavailable)?,
         });
         Ok(self)
     }
