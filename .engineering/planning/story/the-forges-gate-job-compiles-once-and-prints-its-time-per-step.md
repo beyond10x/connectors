@@ -7,7 +7,7 @@ title: The forge's gate job compiles its test binaries once and prints its time 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
@@ -174,6 +174,48 @@ Also seen in that run: 4,483 tests across 241 binaries, `Summary [ 854.839s] 448
 4483 passed (9 slow), 223 skipped`; the three slowest are the same as on 292 (47.8 s, 36.5 s,
 34.9 s).
 
+### Measured 2026-11-24: what each build of the job compiles again, and why
+
+Read from the same log (pull request 294) and from cargo's unit graph of that tree (`cargo build
+… --unit-graph -Z unstable-options`, which prints the units a call would compile and compiles
+nothing). A unit is a package with one feature set.
+
+| call of the job | `Compiling` lines | of them compiled before in another form | time |
+|---|---|---|---|
+| shell: `cargo run -p connectors-build -- gate` | 314 | first build | 449 s |
+| gate: `cargo build --workspace` | 100 | 40 | 250 s |
+| gate: the test binaries (`cargo nextest run --workspace`) | 43 | 39 | 758 s |
+| gate: `cargo run -p connectors-tool-contracts` | 51 | not counted | 65 s |
+| gate: `cargo run -q -p connectors-docs` | no line, `-q` | not known | 167 s for the step |
+
+The cause is one rule of cargo: features are resolved for the packages a call selects.
+
+- `-p connectors-build` selects one package. Against `--workspace`, 10 packages get another
+  feature set: `clap` and `clap_builder` (`string`), `crossbeam-utils` and `crc32fast`
+  (`std`), `getrandom` 0.4 (`std`, `sys_rng`), `futures-channel` (`sink`), `tokio-util`
+  (`codec`), `tokio-rustls` (`ring`), `toml_writer` (`default`) and
+  `connectors-catalog-provider` (`service`). Everything above them is compiled again by the
+  workspace build: the 40, with `hyper`, `reqwest`, `zbus`, `connectors-sdk`,
+  `connectors-host`, `connectors-catalog`, `connectors-spec` and `connectors-build` itself.
+- `-p connectors-tool-contracts` has 19 units the workspace build lacks (14 packages with
+  another feature set, among them `libc`, `memchr`, `serde_json`, `syn`, `uuid`), and `-p
+  connectors-docs` has 11 (7 packages). Each is one more feature set of the same crates.
+- The test build adds what only tests ask for: `tokio` with `test-util`, `connectors-host` and
+  `connectors-custody` with `test-support`, and four crates only tests use (`rcgen`, `pem`,
+  `yasna`, `openapiv3`). Everything above `tokio` is compiled again, which is every crate of
+  the workspace. This one is not removed by a selection: a build without `test-util` is the
+  program a user gets.
+
+The same unit graph for `cargo build --bin connectors-build`, `--bin connectors-tool-contracts`
+and `--bin connectors-docs`: 404, 156 and 342 units, each with 0 units that the workspace build
+lacks. The workspace has no root package, so a call without `-p` selects every member and
+resolves the features of the workspace, and `--bin` then builds the one program.
+
+Also read: the test build makes 241 test binaries: 106 of `apps/connectors`, 34 of
+`crates/connectors-host`, 19 of `adapters/kubernetes`, 17 of `adapters/sql`, 65 of the 19
+other packages. The folder rule names one integration-test binary per crate. That is the
+test-step story's, not this one's.
+
 ## Change
 
 1. The gate and the ignored step print one line per step with its wall time, and a closing table
@@ -193,6 +235,15 @@ Also seen in that run: 4,483 tests across 241 binaries, `Summary [ 854.839s] 448
 3. Measure why the gate builds three times before its tests (449 s, 261 s, 750 s) and what each
    build makes that the one before did not. One build of the workspace and one of the test
    binaries is the target.
+   Measured 2026-11-24 (the section on what each build compiles again): each `cargo run -p`
+   of the job is a feature set of its own. Made the same day: the forge's three calls of the
+   build program and the gate's calls of `connectors-docs` and `connectors-tool-contracts`
+   name the program with `--bin`, which selects the workspace; two tests of
+   `crates/connectors-build` fail when one of them selects a package. Expected from the unit
+   graph, not read from a forge run yet: the gate's build of the workspace compiles the 60
+   crates the first build did not need and none a second time, and the tool contracts and the
+   documentation check compile nothing. Not changed: the test build compiles the crates above
+   `tokio` again, because tests ask for `test-util`.
 4. The three `cargo clippy` runs and the nine boundary checks: time each, and name which of them
    compile again what a step before compiled.
 
