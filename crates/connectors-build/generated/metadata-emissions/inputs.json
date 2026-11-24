@@ -1,5 +1,5 @@
 {
-  "digest": "1aac0f3d2b1ba9e4392692087b4b1fc00017948381dfe69f72aebd15d4a12f5f",
+  "digest": "77d32e02c9ee01a1f86536733988f932368ca91116aa39a18433355177ccb45c",
   "ess_crates": [
     "entity-core 0.28.0",
     "entity-core 0.33.1",
@@ -38,7 +38,7 @@
     },
     {
       "path": "ess/domains/approval_issuers.yaml",
-      "sha256": "7b76a822159e527e5f7b0993e4c2e91e697cc2e6087f236e51a377a6865b8e61"
+      "sha256": "e8484008e9eb8d07d3ad21c7d083de9e666a019c47c9b5751f90d0eacd2dc677"
     },
     {
       "path": "ess/domains/artifact_provenance.yaml",
@@ -54,7 +54,7 @@
     },
     {
       "path": "ess/domains/cli.yaml",
-      "sha256": "e3046b42e933d7266f00bf413e1a5ad845ee93fc43b1ff63e76a42712395926b"
+      "sha256": "d922ade1d6f85dcb944874509f6e3c68a69581d7dfbe4164f318d4936b876e7c"
     },
     {
       "path": "ess/domains/clock.yaml",
@@ -106,11 +106,11 @@
     },
     {
       "path": "ess/domains/local_approval_policy.yaml",
-      "sha256": "281678dda56cb7e69a6522fba7083077424a7f235256bd46d739d55ab126f10b"
+      "sha256": "edf4d53ca82efcc795eb96659e6281182533f048507fc76297bcd42064064304"
     },
     {
       "path": "ess/domains/mutations.yaml",
-      "sha256": "65acd5cd0dca806bdeedc5c6d78e18a5d5fabfe57de09502b00caaf057cc508c"
+      "sha256": "17f03601f1ff8b1e2917e4919ce1ad857a03bec6385a1daffdebd446b5fc42aa"
     },
     {
       "path": "ess/domains/oauth2.yaml",
@@ -130,7 +130,7 @@
     },
     {
       "path": "ess/domains/standing_approvals.yaml",
-      "sha256": "477726479f4a82f28b35f8dca209e41163493efa5f3445f11f1843a7078edce9"
+      "sha256": "4fdb13f19633fba51e26a76ef66024495241139a01f2fdca850e7709eb2195c0"
     },
     {
       "path": "ess/domains/tool_contracts.yaml",
