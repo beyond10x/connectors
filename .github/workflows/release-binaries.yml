@@ -261,6 +261,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
+          # The archives only, one artifact per target triple. Without a pattern the step
+          # also takes the build records the job `image` uploads when that job ends first.
+          pattern: "*-*-*"
           path: dist
           merge-multiple: true
       - name: Create the checksum manifest

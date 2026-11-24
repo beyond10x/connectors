@@ -6,7 +6,8 @@ status: draft
 title: The gate's test step ends within 120 s on the forge, and fails when it does not
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- informed_by: test-plan:where-the-gates-test-step-spends-its-time
+revision: 2
 ---
 ## Defect
 
@@ -44,19 +45,49 @@ All test time by binary: `connectors-host` 781 tests 616 s, `connectors-catalog-
 Six of the ten slowest tests ran 30.2 s to 31.9 s. Inferred, not read from their code: they wait
 out a production wait of 30 s.
 
+Second measurement, pull request 292, job 138329455972, 2026-11-24 10:30 to 10:44 CET:
+
+- `Starting 4379 tests across 240 binaries (223 tests skipped)`
+- `Summary [ 840.388s] 4379 tests run: 4379 passed (9 slow), 223 skipped`
+- `gate: test step ran 842.2 s (budget 120 s)`
+
+The two runs differ by 62 tests and 220 s. Why the second run was slower is not known: the
+durations of its tests were not compared with the first run's.
+
 ## Change
 
-Not decomposed yet. The order the numbers give:
+Decomposed on 2026-11-24 in test-plan:where-the-gates-test-step-spends-its-time, from the
+durations of the first run and the sources. It names, for each of the 81 tests of 5 s and
+more, the line the time is spent at, and groups them by cause. Twelve stories follow from it.
+They are not drafted as artifacts yet. "Before" and "after" are seconds summed over the tests a
+story covers; every "after" is an estimate and none was timed.
 
-1. The 81 tests of 5 s and more. A test that waits out a production constant gets a seam for that
-   wait, the way `set_test_query_timeout` (`crates/connectors-host/src/local/clock.rs`) shortens
-   the clock query in tests, and one test per constant keeps the production value in lane `slow`.
-2. The 1 s to 5 s band, binary by binary, starting with `connectors-host` and
-   `connectors-catalog-provider::main`: find what each test pays for (a child process, a store
-   opened from nothing, a fixture built per test) and build it once per run, in one of the two
-   forms the folder rule accepts.
-3. The gate fails when the test step runs over `TEST_STEP_BUDGET`. This is the last step: before
-   steps 1 and 2 it makes every pull request red.
+| story | tests | before | after | seam |
+|---|---|---|---|---|
+| S1 host lock waits | 4 | 122.0 | 5.5 | `child_lock_wait` and `set_lifecycle_lock_wait` exist; one test moves into the library tests |
+| S2 owner connect wait | 7 | 120.8 | 36.0 | new debug-only override of the 10 s connect wait |
+| S3 lease clock and admission bound | 11 | 222.9 | 48.0 | new debug-only clock offset and admission bound |
+| S4 idle exit and sweep | 4 | 67.4 | 9.5 | new debug-only sweep interval |
+| S5 MCP budgets and sleeps | 7 | 101.8 | 34.0 | the tests' own values |
+| S6 client timeouts | 5 | 56.2 | 5.4 | new test seam for the HTTP and SQL timeouts |
+| S7a released definition once, provider side | 66 | 175.4 | 13.4 | a committed lowered file with a digest of its sources |
+| S7b memoised ingest, catalog crate | 11 | 31.6 | 5.0 | ingest made once per process |
+| S8a waits that prove nothing, adapters and catalog | 8 | 80.0 | 18.6 | the tests' own values; one test to lane `slow` |
+| S8b waits in the host unit tests | 5 | 48.6 | 18.2 | the tests' own values |
+| S8c waits in the CLI tests | 7 | 64.2 | 34.7 | two new debug-only overrides |
+| S9 fixture templates | 18 | 190.6 | 107.7 | a template store and a template jail built once per run |
+
+S1, S6, S7a, S7b, S8a and S8b touch no file of another story. The overlaps of the other six
+are listed in the test plan.
+
+The stories do not reach the budget. They cover 1,281.6 s of the 2,474.8 s summed and leave
+336.0 s of it; the sum after all of them is 1,529.2 s, 382 s of wall time at four tests at a
+time, against 120 s. The rest is in tests the stories do not cover: 650 s in the band of 1 s
+to under 5 s and 543 s under 1 s. What closes that gap is not known. One candidate, not
+measured: the store and the jail of S9 for every test that builds one, not only for its 18.
+
+The gate fails when the test step runs over `TEST_STEP_BUDGET` only after the step is under
+the budget: before that it makes every pull request red.
 
 ## Acceptance
 

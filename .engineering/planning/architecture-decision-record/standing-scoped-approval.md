@@ -11,7 +11,8 @@ relations:
 - informed_by: decision-blocker:standing-write-approval-mode
 - serves: vision:independent-contract-adapters
 - decides: story:local-invoke-admits-a-keyed-write-under-a-standing-grant
-revision: 2
+- decides: story:standing-grant-binds-a-pattern-or-a-value-set
+revision: 3
 transitions:
 - {from: "proposed", to: "accepted", at: "2026-10-30T03:19:13Z", actor: "human:operator", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
 ---
@@ -40,8 +41,14 @@ credential never enters the caller's pod.
    once) do not apply to a write admitted under a grant; in their place the host checks, before
    any attempt is recorded and before any provider request:
    - the grant names this instance and this operation;
-   - every target member the grant names (a JSON pointer into the operation's input and its exact
-     value, such as `/owner` and `/repo`) is present in the input with that value;
+   - every target member the grant names (a JSON pointer into the operation's input, such as
+     `/owner` and `/repo`) is present in the input and holds what the member allows. A member
+     has one of three forms: `value`, the exact value the input must hold; `pattern`, a
+     regular expression the whole string at the pointer must match; `one_of`, a list of
+     distinct values of which the input holds one. `pattern` and `one_of` were added by
+     `story:standing-grant-binds-a-pattern-or-a-value-set`, so that one grant covers the
+     targets of a recurring run (every ticket of one project, a fixed list of statuses) and
+     nothing outside them;
    - now is before `not_after`;
    - the grant is not revoked;
    - fewer than `max_per_hour` writes were admitted under the grant in the current hour.

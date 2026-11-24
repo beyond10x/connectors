@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-local-gate-lints-the-windows-target
 kind: story
-status: active
+status: implemented
 title: The local gate lints the host and the CLI for a Windows target
 relations:
 - serves: vision:independent-contract-adapters
@@ -16,10 +16,11 @@ scope:
   path: crates/connectors-build/src/gate.rs
 - confidence: cited
   path: docs/development.md
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T05:19:08Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-24T07:27:52Z", actor: "human:timo", revision: 10}
+- {from: "active", to: "implemented", at: "2026-11-24T10:25:06Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Defect
 

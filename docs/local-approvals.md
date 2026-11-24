@@ -88,7 +88,8 @@ it nor issues a replacement automatically.
 
 A proof admits one write of one input. A standing grant admits every keyed write it
 covers, with no proof per write, until it expires. The operator signs it once. A grant
-names one instance, one operation, the exact value of each target member, the input
+names one instance, one operation, what each target member must hold (an exact value, a
+pattern or one of a set of values), the input
 members a caller may set beside them, an expiry and a cap of writes per hour. The rules
 are in the [CLI contract](../contracts/cli/v1alpha1/semantics.md#standing-grants).
 
@@ -122,7 +123,10 @@ connectors approvals revoke-standing --connector slack --instance bot "$grant_id
 ```
 
 - `target` holds 1 to 16 members; a write is covered only when its input has each pointer
-  with exactly that value. A number in a target value is an integer from
+  with a value the member admits. A member holds exactly one of three keys: `value`, the
+  exact value (it may be `null`); `pattern`, a regular expression the whole string must
+  match; `one_of`, 1 to 64 distinct values of which the input holds one ("A grant for many
+  targets", below). A number in a `value` or a `one_of` is an integer from
   -9223372036854775808 to 18446744073709551615: `grant-standing` refuses any other number
   (a fraction, an exponent, `-0`) as `invalid_input`, a grant file that holds one does not
   verify, and a write whose input holds one at a target pointer is covered by no grant.
@@ -136,6 +140,94 @@ connectors approvals revoke-standing --connector slack --instance bot "$grant_id
 - `grant-standing` and `revoke-standing` answer `outcome_unknown` when the host could not
   confirm that the new file is durably in place: the path holds the new file or the old
   one, and `list-standing` shows which.
+
+### A grant for many targets
+
+A caller whose target changes on every call, such as a step that moves each ticket of a
+release, needs no grant per ticket. A `pattern` member admits every string that matches it
+whole, and a `one_of` member admits each value it lists. One grant then covers all those
+writes under one `max_per_hour`. These two grants cover the Jira writes of such a step, the
+transitions and the comments of the tickets of project `DEV`:
+
+```json
+{
+  "operation": "issue.transition.run",
+  "target": [
+    {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"},
+    {"pointer": "/target_status", "one_of": ["10000", "10235", "3", "10234", "10223", "10001"]}
+  ],
+  "input_keys": ["/current_status", "/body/transition/id"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 500
+}
+```
+
+```json
+{
+  "operation": "issue.comment.add",
+  "target": [
+    {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"},
+    {"pointer": "/body/body/content/0/content/0/text", "pattern": "^Release review of (?s:.*)$"}
+  ],
+  "input_keys": ["/body/body/content", "/body/body/type", "/body/body/version"],
+  "not_after_unix_ms": 1798761600000,
+  "max_per_hour": 100
+}
+```
+
+- A pattern is written in the syntax of the Rust `regex` crate, starts with `^` and ends
+  with `$`, and must match the whole value: `^DEV-[0-9]+$` admits `DEV-12` and refuses
+  `DEV-12x`, `OPS-12` and a number. Only a string can match. Matching is case-sensitive, and
+  `\d`, `\w`, `\s` and `\b` are Unicode-aware, so write `[0-9]` for ASCII digits. `.`
+  matches every character but U+000A, so it also matches a carriage return and the other
+  line breaks of Unicode; `(?s:.*)` matches U+000A too.
+- A pattern folds case only with Unicode matching off. Write the fold as a group around
+  the letters only: `^(?i-u:sk)-[0-9]+$` folds `s` and `k` over the ASCII letters. Behind a
+  bare `(?i-u)`, and inside the group, the pattern is in byte mode: `\d`, `\w` and `\s` are
+  ASCII only, and `.`, a negated class such as `[^/]` and `\W` are refused, as the `regex`
+  crate refuses them. Every class that can match a byte outside ASCII is refused there,
+  also one written inside another class: `\D`, `\S`, a negated POSIX class such as
+  `[[:^alpha:]]` and `[^\W]` are refused as `.`, a negated class and `\W` are, and a
+  difference from an ASCII class such as `[\x00-\x7f--a]` is taken. So `^(?i-u)dev$` is
+  taken, and `^(?i-u)Release review of (?s:.*)$` is refused: write
+  `^(?i-u:release review of )(?s:.*)$`. A pattern that folds while
+  Unicode matching is on, such as `^(?i)dev$`, `^(?i:dev)$` or `^(?i-u)de(?u)v$`, is
+  refused: the Unicode case fold also admits look-alikes (U+017F for `s`, U+212A for `k`).
+- A pattern is matched against a value of at most its `max_value_bytes`; a longer string
+  is outside the grant, whatever the pattern would answer. The figure falls as the
+  pattern's compiled program grows: `^DEV-[0-9]+$` is matched against 22,055 bytes,
+  `^Release review of (?s:.*)$` against 8,192 and `^(?i-u:sk)-[0-9]+$` against 23,405.
+  `list-standing` shows it for each pattern member. A pattern that needs more bytes than
+  it is matched against, such as `^[a-z]{906}$`, covers nothing, and `grant-standing`
+  refuses a pattern that is matched against under 64 bytes.
+- The transition grant is closed: a transition that also sets `/body/fields` or
+  `/body/update` is outside it. A ticket of another project and a status outside the list
+  are outside it too.
+- The comment grant bounds the first text node only: the first paragraph of the comment
+  must start with `Release review of `. What follows that node (more text, more
+  paragraphs, links, mentions, media) is free, because `/body/body/content` is listed
+  whole. A comment whose first node is not that text, or that has no content, is outside
+  the grant.
+- A target pointer may point into an array (`/content/0/...`) on a closed grant only when
+  `input_keys` lists the array: an `input_keys` pointer may lie above a `target` pointer
+  when the next part of the target pointer is an array index. No other two pointers of a
+  closed grant may lie one above the other.
+- Bounds: a pattern is at most 256 bytes and its compiled program at most 65,536 bytes; a
+  grant file holds at most 64 pattern members, counted after `grant-standing` dropped the
+  expired grants. `grant-standing` refuses a document outside these bounds as
+  `invalid_input`. A counted repetition of a Unicode class passes the compiled-size limit
+  quickly: `^\w{2}$` and `^\pL{2}$` are refused, and `\d` is taken up to 12 repetitions.
+  Write the ASCII class where ASCII is meant: `[A-Za-z0-9_]` is taken up to 680
+  repetitions.
+- The hourly cap counts every write under the grant, whichever ticket it matched; a replay
+  of a key counts none. The grant ends at `not_after_unix_ms` and at `revoke-standing`, as
+  any grant does.
+- `list-standing` shows each member with the key it was written with, and a pattern
+  member also with `max_value_bytes`.
+- A binary older than 0.78.0 does not read a file with a `pattern` or `one_of` member, or
+  with an `input_keys` pointer above a `target` pointer: its `invoke` answers
+  `approval_required` and its three commands `invalid_configuration`. A file with `value`
+  members only reads on both.
 
 A keyed write with no `--approval-file` then runs under the grant:
 

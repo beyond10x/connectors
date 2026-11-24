@@ -31,6 +31,12 @@
 //! ([`Grants::covering`]). A grant without the member admits any other input
 //! member, as before the member existed.
 //!
+//! A target member binds the value at its pointer to one of three things
+//! ([`Bound`]; story:standing-grant-binds-a-pattern-or-a-value-set): an exact
+//! value, a pattern all of a string must match ([`Pattern`]), or a set of
+//! values. One grant with a pattern covers a caller whose target changes on
+//! every call, under one hourly cap.
+//!
 //! Nothing here grants caller authority: the host checks admission, the key and
 //! the grant, in that order, before any attempt or provider request.
 use super::approval_keys::Lease;
@@ -38,6 +44,14 @@ use super::approvals::{self, ConfiguredApprovalKey, Signer};
 use super::filesystem as fs;
 use super::mutations::{Clock, ClockInterval, MAX_CLOCK_WIDTH_MS};
 use super::runtime::channel::DEPTH;
+use regex_automata::{
+    nfa::thompson::{self, NFA, State, WhichCaptures, pikevm::PikeVM},
+    util::look::Look,
+};
+use regex_syntax::{
+    ast::{self, Ast},
+    hir::translate::Translator,
+};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -55,6 +69,34 @@ const GRANTS_LIMIT: usize = 256;
 const TARGET_LIMIT: usize = 16;
 const INPUT_KEYS_LIMIT: usize = 16;
 const POINTER_LIMIT: usize = 256;
+/// The longest pattern of a target member, in bytes.
+const PATTERN_LIMIT: usize = 256;
+/// The most a pattern's program may compile to, in bytes: the size limit of
+/// each of its two Thompson NFAs, the forward one the value is matched with
+/// and the reverse one ([`Pattern::new`]; it is what `size_limit` of the
+/// `regex` crate sets). `^\w+$` is within it and `^\w{2}$` is not, so a
+/// pattern holds `\w` at most once. The limit is per program and no ceiling
+/// on what a compiled pattern holds: the measured figures are in
+/// contracts/service/compatibility.md § 2.1.
+const PATTERN_SIZE_LIMIT: usize = 64 * 1024;
+/// The work one pattern member may ask for in one check, in eighths of a
+/// byte-range state times bytes of the value ([`weight`]): a member's longest
+/// value is this over the weight of its program ([`longest_value`]). The
+/// PikeVM visits each state of the program at most once per byte of the
+/// value, so the product bounds the check. It is 280 times 8,192:
+/// `^Release review of (?s:.*)$` weighs 280 and keeps a value of 8,192
+/// bytes. The measured cost of a file of [`PATTERN_MEMBERS_LIMIT`] members,
+/// each checked on a value of its own longest size, is in
+/// contracts/service/compatibility.md § 2.1.
+const PATTERN_WORK: usize = 280 * 8_192;
+/// The shortest longest value a pattern `approvals grant-standing` signs may
+/// have, in bytes ([`signable`]).
+const SHORTEST_LONGEST_VALUE: usize = 64;
+/// The most pattern members one document holds, over all its grants. One
+/// [`parse`] compiles no more.
+const PATTERN_MEMBERS_LIMIT: usize = 64;
+/// The most values of one `one_of`.
+const ONE_OF_LIMIT: usize = 64;
 const MAX_PER_HOUR: u32 = 10_000;
 const TIME_LIMIT: i64 = 9_007_199_254_740_991;
 /// The use store's file in the state directory.
@@ -85,8 +127,14 @@ pub enum Uncovered {
     OtherOperation,
     /// A grant's target member is missing from the input.
     MissingMember,
-    /// A grant's target member holds another value.
+    /// A grant's target member holds a value the member does not admit:
+    /// another value, a string its pattern does not match, a value outside
+    /// its set.
     OtherTarget,
+    /// A grant's pattern member holds a string longer than the member's
+    /// longest value ([`Pattern::max_value_bytes`]). The string is not
+    /// matched.
+    TooLong,
     /// The grant lists `input_keys` and the input holds a leaf outside the
     /// target and that list, or nests deeper than the walk goes.
     OutsideInput,
@@ -100,14 +148,16 @@ pub enum Uncovered {
 #[serde(deny_unknown_fields)]
 struct Document {
     format: String,
-    grants: Vec<Grant>,
+    grants: Vec<WrittenGrant>,
     #[serde(default)]
     revoked: Vec<String>,
 }
 
-/// One `connectors.standing_approvals.StandingGrant`.
+/// One `connectors.standing_approvals.StandingGrant`. It is read through
+/// [`WrittenGrant`], so a grant read from JSON holds only members
+/// [`TargetMember::try_from`] admits.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "WrittenGrant")]
 pub struct Grant {
     pub id: String,
     pub instance: String,
@@ -116,14 +166,52 @@ pub struct Grant {
     /// Closed input. Absent: any other member of the input is admitted.
     /// Present (it may be empty, and is never `null`): the input holds nothing
     /// outside the `target` and `input_keys` pointers.
-    #[serde(
-        default,
-        deserialize_with = "listed",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input_keys: Option<Vec<String>>,
     pub not_after_unix_ms: i64,
     pub max_per_hour: u32,
+}
+
+/// A grant as a document holds it: its members are text, and no pattern is
+/// compiled yet. [`parse`] counts the pattern members of a whole document in
+/// this form, before [`Grant::try_from`] compiles any.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WrittenGrant {
+    id: String,
+    instance: String,
+    operation: String,
+    target: Vec<WrittenMember>,
+    #[serde(default, deserialize_with = "listed")]
+    input_keys: Option<Vec<String>>,
+    not_after_unix_ms: i64,
+    max_per_hour: u32,
+}
+
+impl TryFrom<WrittenGrant> for Grant {
+    type Error = &'static str;
+
+    /// Refused: more than [`TARGET_LIMIT`] members, decided before any
+    /// pattern is compiled, or a member [`TargetMember::try_from`] refuses.
+    fn try_from(written: WrittenGrant) -> Result<Self, Self::Error> {
+        if written.target.len() > TARGET_LIMIT {
+            return Err("a grant holds at most 16 target members");
+        }
+        let target = written
+            .target
+            .into_iter()
+            .map(TargetMember::try_from)
+            .collect::<Result<_, _>>()?;
+        Ok(Self {
+            id: written.id,
+            instance: written.instance,
+            operation: written.operation,
+            target,
+            input_keys: written.input_keys,
+            not_after_unix_ms: written.not_after_unix_ms,
+            max_per_hour: written.max_per_hour,
+        })
+    }
 }
 
 /// `input_keys` where the member is present: a list of strings. `null` is not
@@ -134,13 +222,392 @@ fn listed<'de, D: serde::Deserializer<'de>>(
     Vec::<String>::deserialize(deserializer).map(Some)
 }
 
-/// One target member: an RFC 6901 pointer into the input and its exact value.
-/// Every number in the value is an integer in the range of `i64` or `u64`.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
+/// A key of a target member where it is present: read as its type, never as
+/// an absent key. `"value": null` is the value `null`; `"pattern": null` and
+/// `"one_of": null` are neither a string nor a list and are refused.
+fn present<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
+}
+
+/// One target member: an RFC 6901 pointer into the input and what the value
+/// there is bound to.
+#[derive(Clone, Debug, PartialEq)]
 pub struct TargetMember {
     pub pointer: String,
-    pub value: Value,
+    pub bound: Bound,
+}
+
+/// What a target member binds the input's value to. A document names
+/// exactly one of the three, by its key.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Bound {
+    /// `value`: the exact JSON value, `null` included. Every number in it is
+    /// an integer in the range of `i64` or `u64`.
+    Value(Value),
+    /// `pattern`: a string, all of which matches the pattern. No other JSON
+    /// type matches.
+    Pattern(Pattern),
+    /// `one_of`: one of 1 to 64 distinct values, each compared as `value` is.
+    OneOf(Vec<Value>),
+}
+
+impl Bound {
+    /// Why `value`, the input's value at the member's pointer, is outside
+    /// the member; `None` when it is inside. A number the reader holds as an
+    /// `f64` is no exact value ([`exact`]): it equals nothing, whatever the
+    /// grant holds. A string longer than a pattern's longest value is
+    /// [`Uncovered::TooLong`] and is not matched.
+    fn refuses(&self, value: &Value) -> Option<Uncovered> {
+        let admitted = match self {
+            Self::Value(bound) => exact(value) && value == bound,
+            Self::Pattern(pattern) => match value.as_str() {
+                Some(text) if text.len() > pattern.max_value_bytes() => {
+                    return Some(Uncovered::TooLong);
+                }
+                Some(text) => pattern.matches(text),
+                None => false,
+            },
+            Self::OneOf(bounds) => exact(value) && bounds.contains(value),
+        };
+        (!admitted).then_some(Uncovered::OtherTarget)
+    }
+}
+
+/// A member is written with `pointer` and the one key of its bound, so an
+/// exact member has the bytes it had before the other two forms existed.
+impl Serialize for TargetMember {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut member = serializer.serialize_struct("TargetMember", 2)?;
+        member.serialize_field("pointer", &self.pointer)?;
+        match &self.bound {
+            Bound::Value(value) => member.serialize_field("value", value)?,
+            Bound::Pattern(pattern) => member.serialize_field("pattern", pattern.as_str())?,
+            Bound::OneOf(values) => member.serialize_field("one_of", values)?,
+        }
+        member.end()
+    }
+}
+
+impl TargetMember {
+    /// The member as `approvals list-standing` shows it: as it is written,
+    /// and a pattern member with `max_value_bytes` beside it, the longest
+    /// value the pattern is matched against. A signed file never holds that
+    /// key: the reader computes it from the pattern at every read.
+    pub fn listed(&self) -> Value {
+        match &self.bound {
+            Bound::Value(value) => {
+                serde_json::json!({"pointer": self.pointer, "value": value})
+            }
+            Bound::Pattern(pattern) => serde_json::json!({
+                "pointer": self.pointer,
+                "pattern": pattern.as_str(),
+                "max_value_bytes": pattern.max_value_bytes(),
+            }),
+            Bound::OneOf(values) => {
+                serde_json::json!({"pointer": self.pointer, "one_of": values})
+            }
+        }
+    }
+}
+
+/// A target member as a document holds it: `pointer` and the keys of the
+/// three bounds, each read only where it is present ([`present`]).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WrittenMember {
+    pointer: String,
+    #[serde(default, deserialize_with = "present")]
+    value: Option<Value>,
+    #[serde(default, deserialize_with = "present")]
+    pattern: Option<String>,
+    #[serde(default, deserialize_with = "present")]
+    one_of: Option<Vec<Value>>,
+}
+
+impl TryFrom<WrittenMember> for TargetMember {
+    type Error = &'static str;
+
+    /// Refused: a member with none or more than one of `value`, `pattern`
+    /// and `one_of`; a number in a `value` or a `one_of` that is no exact
+    /// one ([`exact`]); a pattern [`Pattern::new`] refuses; a `one_of` that
+    /// is empty, holds more than [`ONE_OF_LIMIT`] values or holds one twice.
+    /// The pointer is checked by [`parse`].
+    fn try_from(written: WrittenMember) -> Result<Self, Self::Error> {
+        let bound = match (written.value, written.pattern, written.one_of) {
+            (Some(value), None, None) if exact(&value) => Bound::Value(value),
+            (None, Some(pattern), None) => {
+                Bound::Pattern(Pattern::new(pattern).ok_or("not a whole-value pattern")?)
+            }
+            (None, None, Some(values))
+                if (1..=ONE_OF_LIMIT).contains(&values.len())
+                    && values.iter().all(exact)
+                    && values
+                        .iter()
+                        .enumerate()
+                        .all(|(at, value)| !values[..at].contains(value)) =>
+            {
+                Bound::OneOf(values)
+            }
+            _ => return Err("a target member holds exactly one of value, pattern and one_of"),
+        };
+        Ok(Self {
+            pointer: written.pointer,
+            bound,
+        })
+    }
+}
+
+/// The pattern of a target member: its text and its compiled whole-value
+/// form, with the longest value that form is run on. Two patterns are equal
+/// when their texts are, so a grant compares as its document does.
+#[derive(Clone, Debug)]
+pub struct Pattern {
+    text: String,
+    whole: PikeVM,
+    max_value_bytes: usize,
+}
+
+/// What one byte of a value can cost in `program`, in eighths of what a
+/// byte-range state costs. The PikeVM visits a state at most once per byte,
+/// and what a visit costs depends on the state:
+/// - 8 for a state, whatever it is;
+/// - 1 more for every transition of a class state beyond its first (the
+///   transitions are searched one after another);
+/// - 3 more for every alternate of a union beyond its second;
+/// - 32 in all for a Unicode word boundary (`\b`, `\B` and the
+///   `\b{start}` family with Unicode on), which decodes the characters on
+///   both sides.
+///
+/// The weights are measured, not derived: with them no pattern tried costs
+/// more per unit than a run of byte ranges that are all live (`^x*x{150}$`).
+fn weight(program: &NFA) -> usize {
+    program
+        .states()
+        .iter()
+        .map(|state| match state {
+            State::Sparse(class) => 8 + class.transitions.len().saturating_sub(1),
+            State::Dense(_) => 8 + 255,
+            State::Union { alternates } => 8 + 3 * alternates.len().saturating_sub(2),
+            State::Look {
+                look:
+                    Look::WordUnicode
+                    | Look::WordUnicodeNegate
+                    | Look::WordStartUnicode
+                    | Look::WordEndUnicode
+                    | Look::WordStartHalfUnicode
+                    | Look::WordEndHalfUnicode,
+                ..
+            } => 32,
+            _ => 8,
+        })
+        .sum()
+}
+
+/// The longest value, in bytes, a program of `weight` is run on:
+/// [`PATTERN_WORK`] over the weight.
+fn longest_value(weight: usize) -> usize {
+    PATTERN_WORK / weight.max(1)
+}
+
+/// Whether `approvals grant-standing` signs `grant`: every pattern of it is
+/// run on a value of at least [`SHORTEST_LONGEST_VALUE`] bytes. The reader
+/// takes a shorter one; it covers no value longer than its own.
+fn signable(grant: &Grant) -> bool {
+    grant.target.iter().all(|member| match &member.bound {
+        Bound::Pattern(pattern) => pattern.max_value_bytes() >= SHORTEST_LONGEST_VALUE,
+        Bound::Value(_) | Bound::OneOf(_) => true,
+    })
+}
+
+/// Stops at the first place of a pattern where case-insensitive matching is
+/// on while Unicode matching is on. It follows the flags as the translator of
+/// `regex-syntax` does: `(?flags)` holds to the end of the group it stands
+/// in, over a `|` too, and `(?flags:...)` holds inside that group.
+struct UnicodeCaseFold {
+    insensitive: bool,
+    unicode: bool,
+    /// The flags outside each group that is open.
+    outer: Vec<(bool, bool)>,
+}
+
+impl UnicodeCaseFold {
+    /// Whether `pattern` holds such a place.
+    fn found_in(pattern: &Ast) -> bool {
+        let fold = Self {
+            insensitive: false,
+            unicode: true,
+            outer: Vec::new(),
+        };
+        ast::visit(pattern, fold).is_err()
+    }
+
+    fn set(&mut self, flags: &ast::Flags) -> Result<(), ()> {
+        if let Some(insensitive) = flags.flag_state(ast::Flag::CaseInsensitive) {
+            self.insensitive = insensitive;
+        }
+        if let Some(unicode) = flags.flag_state(ast::Flag::Unicode) {
+            self.unicode = unicode;
+        }
+        if self.insensitive && self.unicode {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl ast::Visitor for UnicodeCaseFold {
+    type Output = ();
+    type Err = ();
+
+    fn finish(self) -> Result<(), ()> {
+        Ok(())
+    }
+
+    fn visit_pre(&mut self, node: &Ast) -> Result<(), ()> {
+        match node {
+            Ast::Flags(set) => self.set(&set.flags),
+            Ast::Group(group) => {
+                self.outer.push((self.insensitive, self.unicode));
+                group.flags().map_or(Ok(()), |flags| self.set(flags))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn visit_post(&mut self, node: &Ast) -> Result<(), ()> {
+        if matches!(node, Ast::Group(_))
+            && let Some(outer) = self.outer.pop()
+        {
+            (self.insensitive, self.unicode) = outer;
+        }
+        Ok(())
+    }
+}
+
+impl PartialEq for Pattern {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text
+    }
+}
+
+impl Pattern {
+    /// `text` as a pattern a grant may hold, in the syntax of the `regex`
+    /// crate: at most [`PATTERN_LIMIT`] bytes, starting with `^` and ending
+    /// with an unescaped `$`, a regular expression on its own (it parses and
+    /// translates) that compiles wrapped as `\A(?:text)\z`, the form every
+    /// value is matched in. The wrap is what holds the whole value: a leading
+    /// `^` and a trailing `$` alone do not, since a top-level `|` leaves each
+    /// branch one anchor, `(?m)` lets `$` match at a line end and `(?x)` makes
+    /// a final `#$` a comment. Reading `text` on its own first means its
+    /// groups balance, so the wrap's `(?:` and `)` enclose all of it.
+    ///
+    /// This is a copy of the rule of
+    /// `connectors_catalog::inventory::pattern_matches`, which this crate
+    /// does not depend on; the vectors of
+    /// `tests/fixtures/whole_value_patterns.json` are read by a test in each
+    /// crate. Matching is case-sensitive and `\d`, `\w`, `\s` and `\b` are
+    /// Unicode-aware, as the crate's defaults are.
+    ///
+    /// Three things differ from the catalog's rule, since a grant file is
+    /// read on every write and a pattern is what a signer wrote to bound a
+    /// target:
+    /// - Nothing is kept between two reads, and the program is built under
+    ///   [`PATTERN_SIZE_LIMIT`]: the forward Thompson NFA the value is
+    ///   matched with, with no capture group but the whole match, and the
+    ///   reverse one, which is compiled under the same limit and dropped.
+    ///   The reverse one is what the `regex` crate builds too; checking it
+    ///   keeps the patterns taken here those the crate compiles under that
+    ///   limit (`^\pL*\pL*$` is refused by its reverse program alone).
+    /// - The matcher is the PikeVM of `regex-automata` alone, with a cache
+    ///   made for each check ([`Pattern::matches`]). It visits each state of
+    ///   the program at most once per byte of the value, so one check costs
+    ///   at most the program's [`weight`] times the value's length, and a
+    ///   value longer than [`Pattern::max_value_bytes`] is not matched. No
+    ///   lazy DFA, one-pass DFA, bounded backtracker or full DFA is built:
+    ///   nothing is held per pattern but the program, and nothing per CPU.
+    ///   No answer changes: every engine decides the same match.
+    /// - A pattern that turns case-insensitive matching on while Unicode
+    ///   matching is on (`(?i)`, `(?i:...)`) is refused
+    ///   ([`UnicodeCaseFold`]): Unicode case folding admits look-alikes (`s`
+    ///   also U+017F, `k` also U+212A) and is the costliest thing a pattern
+    ///   can ask for. `(?i-u)` and `(?i-u:...)` fold ASCII letters only and
+    ///   are taken.
+    pub fn new(text: String) -> Option<Self> {
+        if text.len() > PATTERN_LIMIT
+            || !text.starts_with('^')
+            || !text.ends_with('$')
+            || text.ends_with("\\$")
+        {
+            return None;
+        }
+        // The parser's and the translator's defaults are those of the `regex`
+        // crate. Both texts are parsed and the flags read before either is
+        // translated: translating is where a case fold costs.
+        let wrapped = format!(r"\A(?:{text})\z");
+        let parse = |pattern: &str| ast::parse::Parser::new().parse(pattern).ok();
+        let (alone, whole) = (parse(&text)?, parse(&wrapped)?);
+        if UnicodeCaseFold::found_in(&whole) {
+            return None;
+        }
+        Translator::new().translate(&text, &alone).ok()?;
+        let translated = Translator::new().translate(&wrapped, &whole).ok()?;
+        // No program is built for `text` on its own: the wrapped one holds
+        // all of it and the two anchors, so it is the larger of the two.
+        let program = |reverse: bool| {
+            let captures = if reverse {
+                WhichCaptures::None
+            } else {
+                WhichCaptures::Implicit
+            };
+            thompson::Compiler::new()
+                .configure(
+                    thompson::Config::new()
+                        .nfa_size_limit(Some(PATTERN_SIZE_LIMIT))
+                        .which_captures(captures)
+                        .reverse(reverse),
+                )
+                .build_from_hir(&translated)
+                .ok()
+        };
+        let forward = program(false)?;
+        // Compiled for its size limit only; nothing matches with it.
+        drop(program(true)?);
+        let max_value_bytes = longest_value(weight(&forward));
+        let whole = PikeVM::builder().build_from_nfa(forward).ok()?;
+        Some(Self {
+            text,
+            whole,
+            max_value_bytes,
+        })
+    }
+
+    /// The pattern as it was written.
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+
+    /// The longest value this pattern is matched against, in bytes
+    /// ([`longest_value`] of its program's [`weight`]). A longer value is
+    /// covered by no grant through this pattern ([`Uncovered::TooLong`]).
+    pub fn max_value_bytes(&self) -> usize {
+        self.max_value_bytes
+    }
+
+    /// Whether all of `value` matches. A value longer than
+    /// [`Pattern::max_value_bytes`] does not: the program is not run on it.
+    /// The PikeVM's cache is made here and dropped, so a pattern holds
+    /// nothing between two checks.
+    pub fn matches(&self, value: &str) -> bool {
+        if value.len() > self.max_value_bytes {
+            return false;
+        }
+        let mut cache = self.whole.create_cache();
+        self.whole.is_match(&mut cache, value)
+    }
 }
 
 /// A read grant file.
@@ -158,18 +625,52 @@ pub fn read(path: &Path) -> Result<Option<Grants>, Unreadable> {
     parse(&bytes).map(Some)
 }
 
-/// Refusal: anything but one strict document within the bounds.
+/// The pattern members of `grants`, over all of them.
+fn pattern_members<'a>(grants: impl IntoIterator<Item = &'a Grant>) -> usize {
+    grants
+        .into_iter()
+        .flat_map(|grant| &grant.target)
+        .filter(|member| matches!(member.bound, Bound::Pattern(_)))
+        .count()
+}
+
+/// Whether `token` is an array index as RFC 6901 writes one: `0`, or digits
+/// that do not start with `0`.
+fn index(token: &str) -> bool {
+    token == "0"
+        || (!token.starts_with('0')
+            && !token.is_empty()
+            && token.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+/// Refusal: anything but one strict document within the bounds. The pattern
+/// members of the whole document are counted before any is compiled, so a
+/// document compiles at most [`PATTERN_MEMBERS_LIMIT`] patterns, each under
+/// [`PATTERN_SIZE_LIMIT`].
 pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
     let document: Document =
         connectors_core::read_json(bytes).map_err(|_| Unreadable::Malformed)?;
     if document.format != FORMAT
         || document.grants.len() > GRANTS_LIMIT
         || document.revoked.len() > GRANTS_LIMIT
+        || document
+            .grants
+            .iter()
+            .flat_map(|grant| &grant.target)
+            .filter(|member| member.pattern.is_some())
+            .count()
+            > PATTERN_MEMBERS_LIMIT
     {
         return Err(Unreadable::Malformed);
     }
+    let grants = document
+        .grants
+        .into_iter()
+        .map(Grant::try_from)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| Unreadable::Malformed)?;
     let mut ids = BTreeSet::new();
-    for grant in &document.grants {
+    for grant in &grants {
         if !connectors_core::valid_id(&grant.id)
             || !ids.insert(grant.id.clone())
             || !connectors_core::valid_id(&grant.instance)
@@ -183,24 +684,31 @@ pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
         }
         let mut pointers = BTreeSet::new();
         for member in &grant.target {
-            if !valid_pointer(&member.pointer)
-                || !pointers.insert(member.pointer.as_str())
-                || !exact(&member.value)
-            {
+            if !valid_pointer(&member.pointer) || !pointers.insert(member.pointer.as_str()) {
                 return Err(Unreadable::Malformed);
             }
         }
         // A closed grant: its pointers are distinct and none lies below
-        // another, so each names its own part of the input.
+        // another, so each names its own part of the input. One form is
+        // admitted: a `target` pointer below an `input_keys` pointer when its
+        // next token is an array index. The walk of `closes` does not descend
+        // an array, so a member below an element can be bound only beside a
+        // key that lists the array; the key admits the array as it did, and
+        // the member only refuses more.
         if let Some(keys) = &grant.input_keys {
             if keys.len() > INPUT_KEYS_LIMIT || !keys.iter().all(|key| valid_pointer(key)) {
                 return Err(Unreadable::Malformed);
             }
             let all = grant.pointers();
+            let targets = grant.target.len();
             let overlaps = all.iter().enumerate().any(|(i, one)| {
-                all.iter()
-                    .enumerate()
-                    .any(|(j, other)| i != j && other.starts_with(one))
+                all.iter().enumerate().any(|(j, other)| {
+                    i != j
+                        && other.starts_with(one)
+                        && !(i >= targets
+                            && j < targets
+                            && other.get(one.len()).is_some_and(|next| index(next)))
+                })
             });
             if overlaps {
                 return Err(Unreadable::Malformed);
@@ -215,7 +723,7 @@ pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
         return Err(Unreadable::Malformed);
     }
     Ok(Grants {
-        grants: document.grants,
+        grants,
         revoked: document.revoked.into_iter().collect(),
     })
 }
@@ -224,9 +732,9 @@ pub fn parse(bytes: &[u8]) -> Result<Grants, Unreadable> {
 /// an integer in the range of `i64` or `u64`. `connectors_core::read_json`
 /// holds every other number (a fraction, an exponent, `-0`, an integer
 /// outside that range) as the nearest `f64`, so two numbers written with
-/// different digits can be one value. A grant's target value holds no such
-/// number ([`parse`]), and an input that holds one at a target pointer
-/// matches no grant ([`Grants::covering`]).
+/// different digits can be one value. A grant's `value` or `one_of` holds no
+/// such number ([`TargetMember::try_from`]), and an input that holds one at a
+/// target pointer matches no grant ([`Bound::admits`]).
 fn exact(value: &Value) -> bool {
     match value {
         Value::Number(number) => number.is_i64() || number.is_u64(),
@@ -326,8 +834,10 @@ fn within(value: &Value, depth: usize) -> bool {
 impl Grants {
     /// The grants that cover a write of `operation` on `instance` with `input`
     /// at `now_ms`, in file order: same instance and operation, every target
-    /// member present with its exact value (a number only as an integer in
-    /// the range of `i64` or `u64`), nothing in `input` outside the
+    /// member present with a value its bound admits ([`Bound`]: the exact
+    /// value, a string all of which matches the pattern, one value of the
+    /// set; a number only as an integer in the range of `i64` or `u64`),
+    /// nothing in `input` outside the
     /// grant's `target` and `input_keys` when it lists them
     /// ([`Uncovered::OutsideInput`]), `now_ms < not_after_unix_ms`, and
     /// not revoked. Empty means no grant covers it; the reason is the most
@@ -354,14 +864,13 @@ impl Grants {
                         matched = false;
                         break;
                     }
-                    // A number the reader holds as an `f64` is no exact
-                    // value: it matches nothing, whatever the grant holds.
-                    Some(value) if !exact(value) || *value != member.value => {
-                        reason = reason.max_specific(Uncovered::OtherTarget);
-                        matched = false;
-                        break;
+                    Some(value) => {
+                        if let Some(outside) = member.bound.refuses(value) {
+                            reason = reason.max_specific(outside);
+                            matched = false;
+                            break;
+                        }
                     }
-                    Some(_) => {}
                 }
             }
             if !matched {
@@ -396,9 +905,10 @@ impl Uncovered {
             Self::OtherOperation => 1,
             Self::MissingMember => 2,
             Self::OtherTarget => 3,
-            Self::OutsideInput => 4,
-            Self::Revoked => 5,
-            Self::Expired => 6,
+            Self::TooLong => 4,
+            Self::OutsideInput => 5,
+            Self::Revoked => 6,
+            Self::Expired => 7,
         }
     }
     fn max_specific(self, other: Self) -> Self {
@@ -1037,7 +1547,7 @@ fn publish(path: &Path, signed: &[u8]) -> Result<(), Refused> {
 #[serde(deny_unknown_fields)]
 struct GrantRequest {
     operation: String,
-    target: Vec<TargetMember>,
+    target: Vec<WrittenMember>,
     #[serde(default, deserialize_with = "listed")]
     input_keys: Option<Vec<String>>,
     not_after_unix_ms: i64,
@@ -1062,7 +1572,8 @@ fn requested(request: &[u8], id: String, instance: &str) -> Result<Grant, Refuse
     if request.not_after_unix_ms < 1 || !(1..=MAX_PER_HOUR).contains(&request.max_per_hour) {
         return Err(Refused::InvalidInput);
     }
-    let grant = Grant {
+    // The members are counted before a pattern of theirs is compiled.
+    let grant = Grant::try_from(WrittenGrant {
         id,
         instance: instance.to_owned(),
         operation: request.operation,
@@ -1070,7 +1581,11 @@ fn requested(request: &[u8], id: String, instance: &str) -> Result<Grant, Refuse
         input_keys: request.input_keys,
         not_after_unix_ms: request.not_after_unix_ms,
         max_per_hour: request.max_per_hour,
-    };
+    })
+    .map_err(|_| Refused::InvalidInput)?;
+    if !signable(&grant) {
+        return Err(Refused::InvalidInput);
+    }
     let alone = SignedDocument {
         format: FORMAT,
         grants: std::slice::from_ref(&grant),
@@ -1124,7 +1639,9 @@ pub fn grant(
         .map(Grants::kept)
         .unwrap_or_default();
     grants.retain(|grant| grant.not_after_unix_ms > now.lower_unix_ms);
-    if grants.len() >= GRANTS_LIMIT {
+    if grants.len() >= GRANTS_LIMIT
+        || pattern_members(&grants) + pattern_members([&new]) > PATTERN_MEMBERS_LIMIT
+    {
         return Err(Refused::InvalidInput);
     }
     let id = new.id.clone();
@@ -1236,6 +1753,9 @@ impl NotAdmitted {
             Self::Uncovered(Uncovered::OtherOperation) => "standing grant: another operation",
             Self::Uncovered(Uncovered::MissingMember) => "standing grant: target member missing",
             Self::Uncovered(Uncovered::OtherTarget) => "standing grant: another target value",
+            Self::Uncovered(Uncovered::TooLong) => {
+                "standing grant: target value longer than its pattern is matched against"
+            }
             Self::Uncovered(Uncovered::OutsideInput) => "standing grant: input outside input_keys",
             Self::Uncovered(Uncovered::Expired) => "standing grant: expired",
             Self::Uncovered(Uncovered::Revoked) => "standing grant: revoked",
@@ -2014,6 +2534,728 @@ mod tests {
             "one target pointer below another, with input_keys"
         );
     }
+
+    // story:standing-grant-binds-a-pattern-or-a-value-set: a target member
+    // holds exactly one of `value`, `pattern` and `one_of`.
+
+    /// A pattern of at most 256 bytes that compiles to just under
+    /// [`PATTERN_SIZE_LIMIT`], and the next one of its family, which compiles
+    /// to more. Both were found by compiling the family `^[a-z]{N}$` under
+    /// the host's rule at falling limits, with `regex` 1.13.1: N 906 needs a
+    /// limit of 65,488 bytes of the 65,536, and N 907 is refused. (A
+    /// Unicode-aware class costs far more: `^\w+$` needs 50,132 bytes, and
+    /// `^\w{2}$` is refused.)
+    pub(super) const UNDER_THE_SIZE_LIMIT: &str = "^[a-z]{906}$";
+    // Read only by `signed_tests`, which is compiled on unix.
+    #[cfg(unix)]
+    pub(super) const OVER_THE_SIZE_LIMIT: &str = "^[a-z]{907}$";
+
+    /// The transition grant of the story's consumer, as `approvals
+    /// grant-standing` reads it.
+    pub(super) fn transition_request(not_after_unix_ms: i64) -> Value {
+        json!({
+            "operation": "issue.transition.run",
+            "target": [
+                {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"},
+                {"pointer": "/target_status",
+                 "one_of": ["10000", "10235", "3", "10234", "10223", "10001"]}
+            ],
+            "input_keys": ["/current_status", "/body/transition/id"],
+            "not_after_unix_ms": not_after_unix_ms,
+            "max_per_hour": 500
+        })
+    }
+
+    /// The comment grant of the story's consumer.
+    fn comment_request(not_after_unix_ms: i64) -> Value {
+        json!({
+            "operation": "issue.comment.add",
+            "target": [
+                {"pointer": "/issueIdOrKey", "pattern": "^DEV-[0-9]+$"},
+                {"pointer": "/body/body/content/0/content/0/text",
+                 "pattern": "^Release review of (?s:.*)$"}
+            ],
+            "input_keys": ["/body/body/content", "/body/body/type", "/body/body/version"],
+            "not_after_unix_ms": not_after_unix_ms,
+            "max_per_hour": 100
+        })
+    }
+
+    /// One hop of `ticket` to the status `target_status`, as the consumer
+    /// sends it.
+    pub(super) fn transition(ticket: &str, target_status: &str) -> Value {
+        json!({
+            "issueIdOrKey": ticket,
+            "current_status": "3",
+            "target_status": target_status,
+            "body": {"transition": {"id": "31"}}
+        })
+    }
+
+    /// `request` as the grant `id` of `leaf` in a grant file.
+    fn of_leaf(id: &str, mut request: Value) -> Value {
+        request["id"] = json!(id);
+        request["instance"] = json!("leaf");
+        request
+    }
+
+    /// The ids of the grants covering `input` in a file of one open grant,
+    /// `g1`, whose only target member is `member`.
+    fn member_covers(member: &Value, input: &Value) -> Result<Vec<String>, Uncovered> {
+        let grants = file(json!([closed("g1", json!([member]), None)]))
+            .expect("a grant file holds the member");
+        covers(&grants, input)
+    }
+
+    /// Acceptance 1 to 3.
+    #[test]
+    fn a_pattern_member_matches_the_whole_string() {
+        let admitted = Ok(vec!["g1".to_owned()]);
+        let other = Err(Uncovered::OtherTarget);
+        let dev = json!({"pointer": "/k", "pattern": "^DEV-[0-9]+$"});
+        assert_eq!(member_covers(&dev, &json!({"k": "DEV-12"})), admitted);
+        for refused in ["DEV-12x", "xDEV-12", "dev-12", "DEV-12\n", "DEV-", ""] {
+            assert_eq!(
+                member_covers(&dev, &json!({"k": refused})),
+                other,
+                "{refused:?}"
+            );
+        }
+        // Only a string matches.
+        for refused in [
+            json!(12),
+            Value::Null,
+            json!(true),
+            json!(["DEV-12"]),
+            json!({"key": "DEV-12"}),
+        ] {
+            assert_eq!(
+                member_covers(&dev, &json!({"k": refused.clone()})),
+                other,
+                "{refused}"
+            );
+        }
+        assert_eq!(
+            member_covers(&dev, &json!({"other": "DEV-12"})),
+            Err(Uncovered::MissingMember)
+        );
+        // Each branch of a top-level `|` holds the whole value too.
+        let either = json!({"pointer": "/k", "pattern": "^a$|^b$"});
+        for value in ["a", "b"] {
+            assert_eq!(
+                member_covers(&either, &json!({"k": value})),
+                admitted,
+                "{value:?}"
+            );
+        }
+        for refused in ["ab", "a\nb", "ba", ""] {
+            assert_eq!(
+                member_covers(&either, &json!({"k": refused})),
+                other,
+                "{refused:?}"
+            );
+        }
+    }
+
+    /// Acceptance 4.
+    #[test]
+    fn a_value_set_member_admits_listed_values_only() {
+        let admitted = Ok(vec!["g1".to_owned()]);
+        let other = Err(Uncovered::OtherTarget);
+        let statuses = json!({"pointer": "/k", "one_of": ["10000", "10235"]});
+        for value in ["10000", "10235"] {
+            assert_eq!(
+                member_covers(&statuses, &json!({"k": value})),
+                admitted,
+                "{value:?}"
+            );
+        }
+        for refused in [json!("10001"), json!(10000), json!(["10000"]), Value::Null] {
+            assert_eq!(
+                member_covers(&statuses, &json!({"k": refused.clone()})),
+                other,
+                "{refused}"
+            );
+        }
+        assert_eq!(
+            member_covers(&statuses, &json!({})),
+            Err(Uncovered::MissingMember)
+        );
+        // A value of the set is compared as `value` is: any JSON value, a
+        // number digit for digit.
+        let mixed = json!({"pointer": "/k", "one_of": [1, null, {"a": [true]}]});
+        for value in [json!(1), Value::Null, json!({"a": [true]})] {
+            assert_eq!(
+                member_covers(&mixed, &json!({"k": value.clone()})),
+                admitted,
+                "{value}"
+            );
+        }
+        for refused in [json!("1"), json!(1.0), json!(2), json!({"a": [false]})] {
+            assert_eq!(
+                member_covers(&mixed, &json!({"k": refused.clone()})),
+                other,
+                "{refused}"
+            );
+        }
+    }
+
+    /// Acceptance 5: `"value": null` is a value, not an absent member.
+    #[test]
+    fn a_null_value_member_matches_null_only() {
+        let null = json!({"pointer": "/k", "value": null});
+        assert_eq!(
+            member_covers(&null, &json!({"k": null})),
+            Ok(vec!["g1".to_owned()])
+        );
+        assert_eq!(
+            member_covers(&null, &json!({})),
+            Err(Uncovered::MissingMember)
+        );
+        for refused in [json!(0), json!(""), json!(false), json!("null")] {
+            assert_eq!(
+                member_covers(&null, &json!({"k": refused.clone()})),
+                Err(Uncovered::OtherTarget),
+                "{refused}"
+            );
+        }
+    }
+
+    /// Acceptance 18 and 19: the consumer's two grants, on its inputs.
+    #[test]
+    fn the_jira_grants_cover_the_consumers_inputs() {
+        let grants = file(json!([
+            of_leaf("transition", transition_request(2_000_000_000_000)),
+            of_leaf("comment", comment_request(2_000_000_000_000)),
+        ]))
+        .expect("the two grants are one grant file");
+        let covers = |operation: &str, input: &Value| {
+            grants
+                .covering("leaf", operation, input, 1_000)
+                .map(|covering| {
+                    covering
+                        .iter()
+                        .map(|grant| grant.id.clone())
+                        .collect::<Vec<_>>()
+                })
+        };
+        let other = Err(Uncovered::OtherTarget);
+        let outside = Err(Uncovered::OutsideInput);
+
+        let run = "issue.transition.run";
+        assert_eq!(
+            covers(run, &transition("DEV-12", "10234")),
+            Ok(vec!["transition".to_owned()])
+        );
+        assert_eq!(covers(run, &transition("OPS-12", "10234")), other);
+        assert_eq!(covers(run, &transition("DEV-12", "10002")), other);
+        for member in ["fields", "update"] {
+            let mut input = transition("DEV-12", "10234");
+            input["body"][member] = json!({"labels": ["x"]});
+            assert_eq!(covers(run, &input), outside, "/body/{member}");
+        }
+
+        let add = "issue.comment.add";
+        let paragraph =
+            |text: &str| json!({"type": "paragraph", "content": [{"type": "text", "text": text}]});
+        let comment = |ticket: &str, content: Value| {
+            json!({
+                "issueIdOrKey": ticket,
+                "body": {"body": {"type": "doc", "version": 1, "content": content}}
+            })
+        };
+        let admitted = Ok(vec!["comment".to_owned()]);
+        let review = paragraph("Release review of 2.46.8");
+        assert_eq!(
+            covers(add, &comment("DEV-12", json!([review.clone()]))),
+            admitted
+        );
+        // The grant bounds the first text node only: what follows is free.
+        assert_eq!(
+            covers(
+                add,
+                &comment("DEV-12", json!([review.clone(), paragraph("anything")]))
+            ),
+            admitted
+        );
+        assert_eq!(
+            covers(
+                add,
+                &comment(
+                    "DEV-12",
+                    json!([paragraph("Release review of 2.46.8\nsecond line")])
+                )
+            ),
+            admitted
+        );
+        assert_eq!(
+            covers(
+                add,
+                &comment(
+                    "DEV-12",
+                    json!([paragraph("Note: Release review of 2.46.8")])
+                )
+            ),
+            other
+        );
+        assert_eq!(
+            covers(add, &comment("OPS-12", json!([review.clone()]))),
+            other
+        );
+        let mut visible = comment("DEV-12", json!([review]));
+        visible["body"]["visibility"] = json!({"type": "role", "value": "Administrators"});
+        assert_eq!(covers(add, &visible), outside);
+        assert_eq!(
+            covers(add, &comment("DEV-12", json!([]))),
+            Err(Uncovered::MissingMember)
+        );
+    }
+
+    /// Acceptance 25: 64 patterns, each just under the size limit, are one
+    /// parse of under a second.
+    #[test]
+    fn a_file_of_64_patterns_parses_within_a_second() {
+        let grants: Vec<Value> = (0..16)
+            .map(|grant| {
+                let target: Vec<Value> = (0..4)
+                    .map(|member| {
+                        json!({"pointer": format!("/k{member}"), "pattern": UNDER_THE_SIZE_LIMIT})
+                    })
+                    .collect();
+                closed(&format!("g{grant}"), json!(target), None)
+            })
+            .collect();
+        let bytes = document(json!(grants), json!([]));
+        let started = std::time::Instant::now();
+        let parsed = parse(&bytes);
+        let elapsed = started.elapsed();
+        assert_eq!(parsed.map(|file| file.grants().len()), Ok(16));
+        assert!(
+            elapsed < std::time::Duration::from_secs(1),
+            "64 patterns parsed in {elapsed:?}"
+        );
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Vectors {
+        #[serde(rename = "about")]
+        _about: String,
+        vectors: Vec<Vector>,
+    }
+
+    /// One shared vector: what the rule answers for `value` under `pattern`.
+    /// `matches` is `null` where the rule refuses the pattern itself.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Vector {
+        pattern: String,
+        value: String,
+        matches: Option<bool>,
+    }
+
+    /// Acceptance 26, the host's half: the rule here is a copy of
+    /// `connectors_catalog::inventory::pattern_matches`, and
+    /// `crates/connectors-catalog/tests/whole_value_patterns.rs` reads the
+    /// same vectors, so the two cannot differ on them unseen.
+    #[test]
+    fn the_shared_pattern_vectors_hold() {
+        let shared: Vectors = serde_json::from_str(include_str!(
+            "../../tests/fixtures/whole_value_patterns.json"
+        ))
+        .unwrap();
+        assert!(shared.vectors.len() >= 30, "{}", shared.vectors.len());
+        for vector in shared.vectors {
+            let member = json!({"pointer": "/k", "pattern": vector.pattern});
+            let answer = match file(json!([closed("g1", json!([member]), None)])) {
+                Err(refusal) => {
+                    assert_eq!(refusal, Unreadable::Malformed);
+                    None
+                }
+                Ok(grants) => Some(covers(&grants, &json!({"k": vector.value})).is_ok()),
+            };
+            assert_eq!(
+                answer, vector.matches,
+                "{:?} on {:?}",
+                vector.pattern, vector.value
+            );
+        }
+    }
+
+    /// The one pattern the host refuses and the catalog's rule takes: one
+    /// that turns case-insensitive matching on while Unicode matching is on.
+    /// The standing reader refuses the file that holds it and `approvals
+    /// grant-standing`'s check the request, wherever the flag stands; a
+    /// fold with Unicode off is taken and folds ASCII letters only.
+    #[test]
+    fn a_standing_pattern_folds_case_only_with_unicode_off() {
+        let read = |pattern: &str| {
+            file(json!([closed(
+                "g1",
+                json!([{"pointer": "/k", "pattern": pattern}]),
+                None
+            )]))
+        };
+        let request = |pattern: &str| {
+            serde_json::to_vec(&json!({
+                "operation": "chat.postMessage",
+                "target": [{"pointer": "/k", "pattern": pattern}],
+                "not_after_unix_ms": 2_000_000_000_000_i64, "max_per_hour": 1
+            }))
+            .unwrap()
+        };
+        // The catalog's rule: both texts compile as the `regex` crate reads
+        // them. Every pattern below is one it takes.
+        let elsewhere = |pattern: &str| {
+            regex::Regex::new(pattern).is_ok()
+                && regex::Regex::new(&format!(r"\A(?:{pattern})\z")).is_ok()
+        };
+        for pattern in [
+            "^(?i)dev$",
+            "^(?i:dev)$",
+            "^(?i)$",
+            "^(?si)dev$",
+            "^(?i-s)dev$",
+            "^(?u)(?i)dev$",
+            "^D(?i)ev$",
+            "^(d)(?i)ev$",
+            "^(?:d|(?i)e)v$",
+            "^d|(?i)ev$",
+            "^(d(?i:e))v$",
+            "^(?P<i>d)(?i:e)v$",
+            // Unicode off inside a group only, then a fold outside it.
+            "^(?-u:d)(?i)ev$",
+            "^(?-u:(?i)d)(?i)ev$",
+            // Unicode back on while the fold holds.
+            "^(?i-u)de(?u)v$",
+            "^(?i-u)de(?u:v)$",
+            "^(?i-u:d(?u:e))v$",
+            "^(?-u)(?i)d(?u)ev$",
+            // A flag holds over a `|`: the second branch would fold `k`
+            // with Unicode on. A flag set in a branch ends with its group.
+            "^(?i-u)s|(?u)k$",
+            "^(?:s|(?-u))(?i)k$",
+        ] {
+            assert!(elsewhere(pattern), "{pattern}");
+            assert_eq!(
+                read(pattern).err(),
+                Some(Unreadable::Malformed),
+                "{pattern}"
+            );
+            assert_eq!(
+                check_request(&request(pattern), "leaf"),
+                Err(Refused::InvalidInput),
+                "{pattern}"
+            );
+        }
+        for (pattern, admitted, refused) in [
+            ("^(?i-u)dev$", vec!["dev", "DEV", "dEv"], vec!["de", "devs"]),
+            ("^(?i-u:dev)$", vec!["dev", "DEV"], vec!["DEVS"]),
+            ("^(?-u)(?i)dev$", vec!["dev", "DEV"], vec![]),
+            ("^(?-u:(?i)dev)$", vec!["dev", "DEV"], vec![]),
+            // The fold ends with its group: `v` is matched as written.
+            ("^(?-u:(?i)de)v$", vec!["dev", "DEv"], vec!["DEV"]),
+            ("^(?i-u:de)(?-i)v$", vec!["dev", "DEv"], vec!["DEV"]),
+            ("^(?i-u:s)(?s:k)$", vec!["sk", "Sk"], vec!["SK"]),
+            (
+                "^(?-u:(?i)s)(?u)k$",
+                vec!["sk", "Sk"],
+                vec!["SK", "s\u{212a}"],
+            ),
+            // A flag holds over a `|`: Unicode stays off in the second
+            // branch, so its fold is ASCII only.
+            ("^(?-u)s|(?i)k$", vec!["s", "k", "K"], vec!["S", "\u{212a}"]),
+            // ASCII only: no long s for `s`, no Kelvin sign for `k`.
+            (
+                "^(?i-u)sk-[0-9]+$",
+                vec!["sk-12", "SK-12", "Sk-12"],
+                vec!["\u{17f}k-12", "s\u{212a}-12", "sk-\u{661}"],
+            ),
+            // Turning the fold off, and texts that only look like the flag.
+            ("^(?-i)dev$", vec!["dev"], vec!["DEV"]),
+            ("^(?-i:dev)$", vec!["dev"], vec!["DEV"]),
+            ("^(?s-i:d.v)$", vec!["dev", "d\nv"], vec!["DEV"]),
+            ("^[(?i)]$", vec!["i", "?", "("], vec!["I"]),
+            (r"^\(\?i\)dev$", vec!["(?i)dev"], vec!["DEV", "dev"]),
+            ("^(?P<i>dev)$", vec!["dev"], vec!["DEV"]),
+        ] {
+            assert_eq!(
+                check_request(&request(pattern), "leaf"),
+                Ok(()),
+                "{pattern}"
+            );
+            let grants = read(pattern).unwrap_or_else(|refusal| panic!("{pattern}: {refusal:?}"));
+            for value in admitted {
+                assert_eq!(
+                    covers(&grants, &json!({"k": value})),
+                    Ok(vec!["g1".to_owned()]),
+                    "{pattern} on {value:?}"
+                );
+            }
+            for value in refused {
+                assert_eq!(
+                    covers(&grants, &json!({"k": value})),
+                    Err(Uncovered::OtherTarget),
+                    "{pattern} on {value:?}"
+                );
+            }
+        }
+    }
+
+    /// The longest value of the first target member of the first grant, a
+    /// pattern.
+    fn longest(grants: &Grants) -> usize {
+        match &grants.grants()[0].target[0].bound {
+            Bound::Pattern(pattern) => pattern.max_value_bytes(),
+            other => panic!("not a pattern: {other:?}"),
+        }
+    }
+
+    /// Fix round 2, the work bound: a pattern member covers no value longer
+    /// than [`Pattern::max_value_bytes`]. The three patterns of the guide
+    /// keep at least 8,192 bytes; a value of exactly the bound is matched,
+    /// one byte more is [`Uncovered::TooLong`] though the pattern would
+    /// match it, and the owner's log names that reason.
+    #[test]
+    fn a_pattern_member_covers_no_value_longer_than_its_bound() {
+        for (pattern, bound, head, letter) in [
+            ("^DEV-[0-9]+$", 22_055, "DEV-", "1"),
+            (
+                "^Release review of (?s:.*)$",
+                8_192,
+                "Release review of ",
+                "\n",
+            ),
+            ("^(?i-u:sk)-[0-9]+$", 23_405, "SK-", "7"),
+        ] {
+            let member = json!({"pointer": "/k", "pattern": pattern});
+            let grants = file(json!([closed("g1", json!([member]), None)])).unwrap();
+            assert_eq!(longest(&grants), bound, "{pattern}");
+            assert!(bound >= 8_192, "{pattern}");
+            let at = format!("{head}{}", letter.repeat(bound - head.len()));
+            let over = format!("{at}{letter}");
+            let other = format!("x{}", &at[1..]);
+            assert_eq!(
+                (at.len(), over.len(), other.len()),
+                (bound, bound + 1, bound)
+            );
+            assert_eq!(
+                covers(&grants, &json!({"k": at})),
+                Ok(vec!["g1".to_owned()]),
+                "{pattern} at its bound"
+            );
+            assert_eq!(
+                covers(&grants, &json!({"k": over})),
+                Err(Uncovered::TooLong),
+                "{pattern} one byte over its bound"
+            );
+            assert_eq!(
+                covers(&grants, &json!({"k": other})),
+                Err(Uncovered::OtherTarget),
+                "{pattern} on another value of its bound's length"
+            );
+        }
+        assert_eq!(
+            NotAdmitted::Uncovered(Uncovered::TooLong).event(),
+            "standing grant: target value longer than its pattern is matched against"
+        );
+        // What the weight counts, each against one mutant of [`weight`] or of
+        // the program: no capture group but the whole match is compiled, so
+        // a group adds nothing; a Unicode word boundary weighs 32, not 8
+        // (12 states, two of them `\b`: 144); a union of four alternates
+        // weighs 14, not 8 (16 states: 134).
+        for (pattern, bound) in [
+            ("^(DEV)-([0-9]+)$", 22_055),
+            (r"^\bDEV\b$", 15_928),
+            ("^(?:a*|b*|c*|d*)$", 17_117),
+        ] {
+            let member = json!({"pointer": "/k", "pattern": pattern});
+            let grants = file(json!([closed("g1", json!([member]), None)])).unwrap();
+            assert_eq!(longest(&grants), bound, "{pattern}");
+        }
+        // A pattern that needs more bytes than it is run on covers nothing.
+        let member = json!({"pointer": "/k", "pattern": UNDER_THE_SIZE_LIMIT});
+        let grants = file(json!([closed("g1", json!([member]), None)])).unwrap();
+        assert!(longest(&grants) < 906, "{}", longest(&grants));
+        assert_eq!(
+            covers(&grants, &json!({"k": "a".repeat(906)})),
+            Err(Uncovered::TooLong)
+        );
+    }
+
+    /// Fix round 2, the work bound: one check of a file of 64 pattern
+    /// members, each on a value of exactly its own longest size, for the
+    /// costliest shapes found: runs of byte ranges that are all live at
+    /// once. The time is this thread's CPU time of one check of each file;
+    /// it is printed for the record, and the bound asserted is the second a
+    /// checked write may take.
+    #[cfg(unix)]
+    #[test]
+    fn one_check_of_64_patterns_at_their_bounds_takes_under_a_second() {
+        let cpu = || {
+            let mut time = libc::timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            };
+            // SAFETY: `time` is a valid timespec this call writes.
+            let status = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut time) };
+            assert_eq!(status, 0);
+            std::time::Duration::new(time.tv_sec as u64, time.tv_nsec as u32)
+        };
+        for (pattern, letter) in [
+            ("^x*x{150}$", "x"),
+            ("^(?i-u:x*x{150})$", "x"),
+            ("^(?s:.*)a?x{150}$", "x"),
+        ] {
+            let grants: Vec<Value> = (0..16)
+                .map(|grant| {
+                    let target: Vec<Value> = (0..4)
+                        .map(|member| json!({"pointer": format!("/k{member}"), "pattern": pattern}))
+                        .collect();
+                    closed(&format!("g{grant}"), json!(target), None)
+                })
+                .collect();
+            let read = file(json!(grants)).unwrap();
+            let bound = longest(&read);
+            let value = letter.repeat(bound);
+            let input = json!({"k0": value, "k1": value, "k2": value, "k3": value});
+            let started = cpu();
+            let covering = covers(&read, &input);
+            let took = cpu() - started;
+            assert_eq!(covering.map(|ids| ids.len()), Ok(16), "{pattern}");
+            println!("64 checks of {pattern} on {bound} bytes each: {took:?} of CPU time");
+            assert!(
+                took < std::time::Duration::from_secs(1),
+                "64 checks of {pattern} on {bound} bytes each took {took:?} of CPU time"
+            );
+        }
+    }
+
+    /// Fix round 2, the matcher's configuration: the reverse program counts.
+    /// Each pattern here has a forward program within
+    /// [`PATTERN_SIZE_LIMIT`] and a reverse one over it (measured with
+    /// `regex-automata` 0.4.18), and is refused as the `regex` crate refuses
+    /// it under the same limit. A reader that compiles the forward program
+    /// only takes all four.
+    #[test]
+    fn a_pattern_is_refused_by_its_reverse_program_alone() {
+        for pattern in [
+            r"^\pL*\pL*$",
+            "^(?:.?){131}$",
+            "^(?s:.*).{152}$",
+            "^(?s:.*)a?x{2022}$",
+        ] {
+            let wrapped = format!(r"\A(?:{pattern})\z");
+            let forward = Translator::new()
+                .translate(
+                    &wrapped,
+                    &ast::parse::Parser::new().parse(&wrapped).unwrap(),
+                )
+                .ok()
+                .and_then(|translated| {
+                    thompson::Compiler::new()
+                        .configure(
+                            thompson::Config::new()
+                                .nfa_size_limit(Some(PATTERN_SIZE_LIMIT))
+                                .which_captures(WhichCaptures::Implicit),
+                        )
+                        .build_from_hir(&translated)
+                        .ok()
+                });
+            assert!(forward.is_some(), "{pattern}: the forward program");
+            let elsewhere = regex::RegexBuilder::new(&wrapped)
+                .size_limit(PATTERN_SIZE_LIMIT)
+                .dfa_size_limit(PATTERN_SIZE_LIMIT)
+                .build();
+            assert!(elsewhere.is_err(), "{pattern}: the regex crate");
+            assert!(Pattern::new(pattern.to_owned()).is_none(), "{pattern}");
+        }
+    }
+
+    /// Fix round 2: `approvals list-standing` shows a pattern member with
+    /// `max_value_bytes`. The other two forms are shown as written, and what
+    /// is signed holds no such key.
+    #[test]
+    fn a_listed_pattern_member_shows_its_longest_value() {
+        let target = json!([
+            {"pointer": "/k", "pattern": "^DEV-[0-9]+$"},
+            {"pointer": "/c", "value": "C1"},
+            {"pointer": "/s", "one_of": ["a", "b"]}
+        ]);
+        let grants = file(json!([closed("g1", target.clone(), None)])).unwrap();
+        let members = &grants.grants()[0].target;
+        let listed: Vec<Value> = members.iter().map(TargetMember::listed).collect();
+        assert_eq!(
+            json!(listed),
+            json!([
+                {"pointer": "/k", "pattern": "^DEV-[0-9]+$", "max_value_bytes": 22_055},
+                {"pointer": "/c", "value": "C1"},
+                {"pointer": "/s", "one_of": ["a", "b"]}
+            ])
+        );
+        assert_eq!(serde_json::to_value(members).unwrap(), target);
+    }
+
+    /// Fix round 2: `approvals grant-standing` signs no pattern that is run
+    /// on under 64 bytes. The bound is [`longest_value`] of the program's
+    /// weight wherever a pattern is read, and [`signable`] is the check of
+    /// the command. A pattern of many Unicode word boundaries is one the
+    /// reader takes and the command refuses; the edge of the rule is shown
+    /// on a grant whose bound is set here.
+    #[test]
+    fn a_pattern_run_on_under_64_bytes_is_not_signed() {
+        let heavy = r"^(?:\B\B\B\B\B\B\B\B-){200}$";
+        let member = json!({"pointer": "/k", "pattern": heavy});
+        let grants = file(json!([closed("g1", json!([member]), None)])).unwrap();
+        assert_eq!(longest(&grants), 43, "{heavy}");
+        assert_eq!(
+            covers(&grants, &json!({"k": "-".repeat(200)})),
+            Err(Uncovered::TooLong)
+        );
+        let request = |pattern: &str| {
+            serde_json::to_vec(&json!({
+                "operation": "chat.postMessage",
+                "target": [{"pointer": "/k", "pattern": pattern}],
+                "not_after_unix_ms": 2_000_000_000_000_i64, "max_per_hour": 1
+            }))
+            .unwrap()
+        };
+        assert_eq!(
+            check_request(&request(heavy), "leaf"),
+            Err(Refused::InvalidInput)
+        );
+        assert_eq!(check_request(&request(r"^(?:\B-){200}$"), "leaf"), Ok(()));
+        assert_eq!(longest_value(280), 8_192);
+        assert_eq!(PATTERN_WORK, 2_293_760);
+        assert_eq!(longest_value(PATTERN_WORK / 64), 64);
+        assert_eq!(longest_value(PATTERN_WORK / 64 + 1), 63);
+        assert_eq!(longest_value(0), PATTERN_WORK);
+        let with_bound = |max_value_bytes: usize| {
+            let mut pattern = Pattern::new("^DEV-[0-9]+$".to_owned()).unwrap();
+            pattern.max_value_bytes = max_value_bytes;
+            Grant {
+                id: "g1".into(),
+                instance: "leaf".into(),
+                operation: "chat.postMessage".into(),
+                target: vec![
+                    TargetMember {
+                        pointer: "/c".into(),
+                        bound: Bound::Value(json!("C1")),
+                    },
+                    TargetMember {
+                        pointer: "/k".into(),
+                        bound: Bound::Pattern(pattern),
+                    },
+                ],
+                input_keys: None,
+                not_after_unix_ms: 2_000_000_000_000,
+                max_per_hour: 1,
+            }
+        };
+        assert!(signable(&with_bound(64)));
+        assert!(!signable(&with_bound(63)));
+        assert!(!signable(&with_bound(0)));
+    }
 }
 
 /// The local signed grant file
@@ -2123,7 +3365,7 @@ mod signed_tests {
             operation: "chat.postMessage".into(),
             target: vec![TargetMember {
                 pointer: "/body/channel".into(),
-                value: json!("C1"),
+                bound: Bound::Value(json!("C1")),
             }],
             input_keys: Some(vec!["/body/text".into()]),
             not_after_unix_ms,
@@ -2630,7 +3872,7 @@ mod signed_tests {
         let small = |id: String, not_after_unix_ms: i64| Grant {
             target: vec![TargetMember {
                 pointer: "/c".into(),
-                value: json!(1),
+                bound: Bound::Value(json!(1)),
             }],
             input_keys: None,
             ..channel_grant(&id, not_after_unix_ms)
@@ -2660,7 +3902,7 @@ mod signed_tests {
         let wide = |id: String| Grant {
             target: vec![TargetMember {
                 pointer: "/c".into(),
-                value: json!("v".repeat(3_000)),
+                bound: Bound::Value(json!("v".repeat(3_000))),
             }],
             input_keys: None,
             ..channel_grant(&id, NOW + 600_000)
@@ -4525,7 +5767,7 @@ mod signed_tests {
             let grant = Grant {
                 target: vec![TargetMember {
                     pointer: pointer.into(),
-                    value,
+                    bound: Bound::Value(value),
                 }],
                 input_keys: None,
                 ..channel_grant("g1", NOW + 600_000)
@@ -4805,5 +6047,729 @@ mod signed_tests {
                 "{document:?}"
             );
         }
+    }
+
+    // story:standing-grant-binds-a-pattern-or-a-value-set, through the
+    // signed file: `grant`, `list`, `revoke` and `admit`.
+
+    /// `approvals grant-standing` of `request` for `leaf` in `site`, at `now()`.
+    fn add(site: &Site, request: &Value) -> Result<String, Refused> {
+        let lock = lock(&site.state).unwrap();
+        grant(
+            &lock,
+            &site.path,
+            &signer(),
+            &key(),
+            "leaf",
+            now(),
+            &bytes(request),
+        )
+    }
+
+    /// `request()` with the target `target` and, when given, `input_keys`;
+    /// open without them.
+    fn bound(target: Value, input_keys: Option<Value>) -> Value {
+        let mut request = request();
+        request["target"] = target;
+        match input_keys {
+            Some(input_keys) => request["input_keys"] = input_keys,
+            None => drop(request.as_object_mut().unwrap().remove("input_keys")),
+        }
+        request
+    }
+
+    /// The site's grant file holding the document's `grants` as written,
+    /// signed by the test key: a file no command of this binary wrote.
+    fn put_grants(site: &Site, grants: Value) {
+        let claims = json!({
+            "iss": key().issuer, "aud": key().audience,
+            "document": {"format": FORMAT, "grants": grants, "revoked": []}
+        });
+        let header = json!({"alg": "Ed25519", "kid": "key-1", "typ": SIGNED_TYPE});
+        put(
+            &site.path,
+            &compact(&header, &connectors_core::canonical(&claims)),
+            0o600,
+        );
+    }
+
+    /// `count` pattern members, each on a pointer of its own.
+    fn patterns(count: usize) -> Value {
+        (0..count)
+            .map(|n| json!({"pointer": format!("/k{n}"), "pattern": "^a$"}))
+            .collect()
+    }
+
+    /// A grant of `leaf` with `count` pattern members, as a file holds it.
+    fn patterned(id: &str, count: usize, not_after_unix_ms: i64) -> Value {
+        json!({
+            "id": id, "instance": "leaf", "operation": "chat.postMessage",
+            "target": patterns(count),
+            "not_after_unix_ms": not_after_unix_ms, "max_per_hour": 1
+        })
+    }
+
+    /// A write of `leaf`'s `issue.transition.run` with `input`.
+    fn transition_call(input: &Value) -> Call<'_> {
+        Call {
+            instance: "leaf",
+            operation: "issue.transition.run",
+            input,
+        }
+    }
+
+    /// Acceptance 6 to 8: each refusal is `grant`'s `InvalidInput`, which
+    /// the CLI answers `invalid_input` naming `input_file`, and leaves the
+    /// file's bytes; beside each stands the nearest member that is taken.
+    #[test]
+    fn a_grant_document_with_a_bad_member_is_refused() {
+        use super::tests::{OVER_THE_SIZE_LIMIT, UNDER_THE_SIZE_LIMIT};
+        let site = site();
+        let long = |bytes: usize| format!("^{}$", "a".repeat(bytes - 2));
+        let values =
+            |count: usize| -> Value { (0..count).map(|n| json!(format!("v{n}"))).collect() };
+        assert!(UNDER_THE_SIZE_LIMIT.len() <= 256 && OVER_THE_SIZE_LIMIT.len() <= 256);
+        let taken = [
+            (
+                "a pattern",
+                json!({"pointer": "/k", "pattern": "^DEV-[0-9]+$"}),
+            ),
+            (
+                "a group that closes",
+                json!({"pointer": "/k", "pattern": "^(a)$"}),
+            ),
+            (
+                "a pattern of 256 bytes",
+                json!({"pointer": "/k", "pattern": long(256)}),
+            ),
+            ("one value", json!({"pointer": "/k", "one_of": ["a"]})),
+            ("64 values", json!({"pointer": "/k", "one_of": values(64)})),
+            (
+                "two different values",
+                json!({"pointer": "/k", "one_of": ["a", "b"]}),
+            ),
+            (
+                "a number beside its text",
+                json!({"pointer": "/k", "one_of": [1, "1"]}),
+            ),
+            ("null in a set", json!({"pointer": "/k", "one_of": [null]})),
+            ("a null value", json!({"pointer": "/k", "value": null})),
+            (
+                "a pattern under the size limit",
+                json!({"pointer": "/k", "pattern": UNDER_THE_SIZE_LIMIT}),
+            ),
+        ];
+        for (case, member) in &taken {
+            let request = bound(json!([member]), None);
+            assert_eq!(check_request(&bytes(&request), "leaf"), Ok(()), "{case}");
+            add(&site, &request).unwrap_or_else(|refusal| panic!("{case}: {refusal:?}"));
+        }
+        let before = std::fs::read(&site.path).unwrap();
+        let dev = "^DEV-[0-9]+$";
+        for (case, member) in [
+            (
+                "a pattern that does not compile",
+                json!({"pointer": "/k", "pattern": "^(a$"}),
+            ),
+            (
+                "no leading ^",
+                json!({"pointer": "/k", "pattern": "DEV-[0-9]+$"}),
+            ),
+            (
+                "no trailing $",
+                json!({"pointer": "/k", "pattern": "^DEV-[0-9]+"}),
+            ),
+            (
+                "an escaped trailing $",
+                json!({"pointer": "/k", "pattern": r"^DEV-[0-9]+\$"}),
+            ),
+            (
+                "a pattern of 257 bytes",
+                json!({"pointer": "/k", "pattern": long(257)}),
+            ),
+            (
+                "a pattern over the size limit",
+                json!({"pointer": "/k", "pattern": OVER_THE_SIZE_LIMIT}),
+            ),
+            ("an empty pattern", json!({"pointer": "/k", "pattern": ""})),
+            (
+                "a pattern that is not a string",
+                json!({"pointer": "/k", "pattern": 5}),
+            ),
+            ("an empty set", json!({"pointer": "/k", "one_of": []})),
+            ("65 values", json!({"pointer": "/k", "one_of": values(65)})),
+            (
+                "one value twice",
+                json!({"pointer": "/k", "one_of": ["a", "b", "a"]}),
+            ),
+            (
+                "one number twice",
+                json!({"pointer": "/k", "one_of": [1, 1]}),
+            ),
+            (
+                "one object twice, its members in another order",
+                json!({"pointer": "/k", "one_of": [{"a": 1, "b": 2}, {"b": 2, "a": 1}]}),
+            ),
+            (
+                "a fraction in a set",
+                json!({"pointer": "/k", "one_of": [1.5]}),
+            ),
+            (
+                "a set that is not a list",
+                json!({"pointer": "/k", "one_of": "a"}),
+            ),
+            (
+                "value and pattern",
+                json!({"pointer": "/k", "value": "DEV-1", "pattern": dev}),
+            ),
+            (
+                "a null value and a pattern",
+                json!({"pointer": "/k", "value": null, "pattern": dev}),
+            ),
+            (
+                "value and one_of",
+                json!({"pointer": "/k", "value": "a", "one_of": ["a"]}),
+            ),
+            (
+                "a null value and one_of",
+                json!({"pointer": "/k", "value": null, "one_of": ["a"]}),
+            ),
+            (
+                "pattern and one_of",
+                json!({"pointer": "/k", "pattern": dev, "one_of": ["DEV-1"]}),
+            ),
+            (
+                "all three",
+                json!({"pointer": "/k", "value": "DEV-1", "pattern": dev, "one_of": ["DEV-1"]}),
+            ),
+            ("none of the three", json!({"pointer": "/k"})),
+            ("pattern null", json!({"pointer": "/k", "pattern": null})),
+            ("one_of null", json!({"pointer": "/k", "one_of": null})),
+            (
+                "pattern null beside a value",
+                json!({"pointer": "/k", "value": "a", "pattern": null}),
+            ),
+            (
+                "one_of null beside a value",
+                json!({"pointer": "/k", "value": "a", "one_of": null}),
+            ),
+            (
+                "a fourth key",
+                json!({"pointer": "/k", "value": "a", "matches": "a"}),
+            ),
+        ] {
+            let request = bound(json!([member]), None);
+            assert_eq!(
+                check_request(&bytes(&request), "leaf"),
+                Err(Refused::InvalidInput),
+                "{case}"
+            );
+            assert_eq!(
+                add(&site, &request).err(),
+                Some(Refused::InvalidInput),
+                "{case}"
+            );
+            assert_eq!(std::fs::read(&site.path).unwrap(), before, "{case}");
+        }
+        assert_eq!(
+            list(&site.path, &key(), now()).map(|grants| grants.len()),
+            Ok(taken.len())
+        );
+    }
+
+    /// Acceptance 9: at most 64 pattern members in a file, counted where
+    /// `grant` signs, after the expired grants are dropped, and at every
+    /// parse.
+    #[test]
+    fn a_file_holds_at_most_64_pattern_members() {
+        let site = site();
+        let later = NOW + 600_000;
+        let ids = |site: &Site| -> Vec<String> {
+            list(&site.path, &key(), now())
+                .unwrap()
+                .into_iter()
+                .map(|grant| grant.id)
+                .collect()
+        };
+        // 63 pattern members in unexpired grants.
+        put_grants(
+            &site,
+            json!([
+                patterned("a", 16, later),
+                patterned("b", 16, later),
+                patterned("c", 16, later),
+                patterned("d", 15, later)
+            ]),
+        );
+        assert_eq!(ids(&site), ["a", "b", "c", "d"]);
+        let before = std::fs::read(&site.path).unwrap();
+        assert_eq!(
+            add(&site, &bound(patterns(2), None)).err(),
+            Some(Refused::InvalidInput),
+            "two more than 63"
+        );
+        assert_eq!(std::fs::read(&site.path).unwrap(), before);
+        let one = add(&site, &bound(patterns(1), None)).expect("one more than 63");
+        // 64: no further pattern member, and any other member still.
+        let before = std::fs::read(&site.path).unwrap();
+        assert_eq!(
+            add(&site, &bound(patterns(1), None)).err(),
+            Some(Refused::InvalidInput),
+            "one more than 64"
+        );
+        assert_eq!(std::fs::read(&site.path).unwrap(), before);
+        let exact = add(&site, &request()).expect("an exact member beside 64 patterns");
+        assert_eq!(
+            ids(&site),
+            ["a", "b", "c", "d", one.as_str(), exact.as_str()]
+        );
+
+        // 64 pattern members of which 4 are in an expired grant: the
+        // expired grant is dropped first, so 4 more are taken.
+        put_grants(
+            &site,
+            json!([
+                patterned("a", 16, later),
+                patterned("expired", 4, NOW),
+                patterned("b", 16, later),
+                patterned("c", 16, later),
+                patterned("d", 12, later)
+            ]),
+        );
+        assert_eq!(ids(&site).len(), 5);
+        let four = add(&site, &bound(patterns(4), None)).expect("4 in place of the expired 4");
+        assert_eq!(ids(&site), ["a", "b", "c", "d", four.as_str()]);
+
+        // A file with 65 is not one a parse admits, expired grant or not:
+        // it does not verify, and a command leaves it.
+        put_grants(
+            &site,
+            json!([
+                patterned("a", 16, later),
+                patterned("expired", 1, NOW),
+                patterned("b", 16, later),
+                patterned("c", 16, later),
+                patterned("d", 16, later)
+            ]),
+        );
+        let before = std::fs::read(&site.path).unwrap();
+        assert_eq!(
+            verify(&site.path, &key(), now()).err(),
+            Some(FileRefusal::Unverified)
+        );
+        assert_eq!(
+            add(&site, &request()).err(),
+            Some(Refused::InvalidConfiguration)
+        );
+        assert_eq!(std::fs::read(&site.path).unwrap(), before);
+    }
+
+    /// Acceptance 10: an `input_keys` pointer may lie above a `target`
+    /// pointer when the next token of the `target` pointer is a canonical
+    /// decimal array index, in every member form; every other overlap is
+    /// refused as before.
+    #[test]
+    fn input_keys_may_lie_above_a_target_through_an_array_index_only() {
+        let site = site();
+        let exact = |pointer: &str| json!({"pointer": pointer, "value": "x"});
+        for (case, target) in [
+            (
+                "a pattern below an element",
+                json!([{"pointer": "/a/list/0/text", "pattern": "^x$"}]),
+            ),
+            ("a value below an element", json!([exact("/a/list/0/text")])),
+            (
+                "a set below an element",
+                json!([{"pointer": "/a/list/0/text", "one_of": ["x"]}]),
+            ),
+            ("the element itself", json!([exact("/a/list/0")])),
+            ("element 10", json!([exact("/a/list/10/text")])),
+            (
+                "two elements",
+                json!([exact("/a/list/0/text"), exact("/a/list/1/text")]),
+            ),
+        ] {
+            add(&site, &bound(target, Some(json!(["/a/list"]))))
+                .unwrap_or_else(|refusal| panic!("{case}: {refusal:?}"));
+        }
+        let before = std::fs::read(&site.path).unwrap();
+        for (case, target, input_keys) in [
+            (
+                "an object member below an input key",
+                json!([exact("/a/b")]),
+                json!(["/a"]),
+            ),
+            (
+                "an index with a leading zero",
+                json!([exact("/a/01")]),
+                json!(["/a"]),
+            ),
+            ("the token -", json!([exact("/a/-")]), json!(["/a"])),
+            ("a signed index", json!([exact("/a/+1")]), json!(["/a"])),
+            ("an empty token", json!([exact("/a/")]), json!(["/a"])),
+            (
+                "an input key equal to a target",
+                json!([exact("/a/list")]),
+                json!(["/a/list"]),
+            ),
+            (
+                "a target above an input key",
+                json!([exact("/a/list")]),
+                json!(["/a/list/0"]),
+            ),
+            (
+                "two input keys, one above the other through an index",
+                json!([exact("/b")]),
+                json!(["/a", "/a/0"]),
+            ),
+            (
+                "two targets, one above the other",
+                json!([exact("/a/list/0"), exact("/a/list/0/text")]),
+                json!([]),
+            ),
+            (
+                "two targets, one above the other through an index",
+                json!([exact("/a/list"), exact("/a/list/0")]),
+                json!([]),
+            ),
+            (
+                "two targets, one above the other, below a listed array",
+                json!([exact("/a/list/0"), exact("/a/list/0/text")]),
+                json!(["/a/list"]),
+            ),
+        ] {
+            assert_eq!(
+                add(&site, &bound(target, Some(input_keys))).err(),
+                Some(Refused::InvalidInput),
+                "{case}"
+            );
+            assert_eq!(std::fs::read(&site.path).unwrap(), before, "{case}");
+        }
+
+        // It opens no input: the grant admits what it admits without the
+        // member below the listed array, less what the member refuses.
+        let site = self::site();
+        add(
+            &site,
+            &bound(
+                json!([
+                    {"pointer": "/body/channel", "value": "C1"},
+                    {"pointer": "/a/list/0/text", "pattern": "^x$"}
+                ]),
+                Some(json!(["/a/list"])),
+            ),
+        )
+        .unwrap();
+        let grants = verify(&site.path, &key(), now()).unwrap().unwrap();
+        let covers = |list: Value| {
+            grants
+                .covering(
+                    "leaf",
+                    "chat.postMessage",
+                    &json!({"body": {"channel": "C1"}, "a": {"list": list}}),
+                    NOW,
+                )
+                .map(|covering| covering.len())
+        };
+        assert_eq!(covers(json!([{"text": "x"}])), Ok(1));
+        assert_eq!(
+            covers(json!([{"text": "x", "more": 1}, {"other": true}])),
+            Ok(1),
+            "the listed array admits what else it holds"
+        );
+        assert_eq!(covers(json!([{"text": "y"}])), Err(Uncovered::OtherTarget));
+        assert_eq!(covers(json!([])), Err(Uncovered::MissingMember));
+        assert_eq!(
+            covers(json!({"0": {"text": "x"}})),
+            Ok(1),
+            "an object member named 0 is under the listed pointer too"
+        );
+        assert_eq!(
+            grants
+                .covering(
+                    "leaf",
+                    "chat.postMessage",
+                    &json!({"body": {"channel": "C1"}, "a": {"list": [{"text": "x"}], "else": 1}}),
+                    NOW,
+                )
+                .map(|covering| covering.len()),
+            Err(Uncovered::OutsideInput)
+        );
+    }
+
+    /// Acceptance 10a: `list` returns each member with the key it was
+    /// written with, and the signed document holds it so.
+    #[test]
+    fn list_shows_the_three_member_forms() {
+        let site = site();
+        let target = json!([
+            {"pointer": "/a", "value": {"n": 1, "m": null}},
+            {"pointer": "/b", "pattern": "^DEV-[0-9]+$"},
+            {"pointer": "/c", "one_of": ["10000", 3, null]},
+            {"pointer": "/d", "value": null}
+        ]);
+        let id = add(&site, &bound(target.clone(), None)).unwrap();
+        let listed = list(&site.path, &key(), now()).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, id);
+        assert_eq!(serde_json::to_value(&listed[0].target).unwrap(), target);
+        let claims: Value =
+            serde_json::from_slice(&claims_of(&std::fs::read(&site.path).unwrap())).unwrap();
+        assert_eq!(claims["document"]["grants"][0]["target"], target);
+    }
+
+    /// Acceptance 5a, the local half: a write the transition grant's pattern
+    /// or value set refuses is `NotAdmitted::Uncovered`, which the owner
+    /// answers `approval_required`, and the use store holds no row.
+    #[test]
+    fn a_write_outside_a_pattern_grant_counts_no_use() {
+        use super::tests::{transition, transition_request};
+        let site = site();
+        let id = add(&site, &transition_request(NOW + 600_000)).unwrap();
+        let uses = Uses::open(&site.state).unwrap();
+        let admit = |input: &Value| {
+            super::admit(
+                &site.path,
+                &key(),
+                transition_call(input),
+                Some(now()),
+                &uses,
+            )
+            .map(|admitted| {
+                admitted.bind(Uuid::new_v4()).unwrap();
+                admitted.grant_id().to_owned()
+            })
+        };
+        let mut no_ticket = transition("DEV-12", "10234");
+        no_ticket.as_object_mut().unwrap().remove("issueIdOrKey");
+        for (case, input, reason) in [
+            (
+                "another project",
+                transition("OPS-12", "10234"),
+                Uncovered::OtherTarget,
+            ),
+            (
+                "a status outside the set",
+                transition("DEV-12", "10002"),
+                Uncovered::OtherTarget,
+            ),
+            ("no ticket", no_ticket, Uncovered::MissingMember),
+        ] {
+            assert_eq!(admit(&input), Err(NotAdmitted::Uncovered(reason)), "{case}");
+            assert_eq!(uses.rows().unwrap(), 0, "{case}");
+        }
+        // The control: the write the grant covers is admitted and counted.
+        assert_eq!(admit(&transition("DEV-12", "10234")), Ok(id));
+        assert_eq!(uses.rows().unwrap(), 1);
+    }
+
+    /// Acceptance 12 and 13: one pattern grant counts every ticket it
+    /// matches against one cap, and answers at the cap what an exact-value
+    /// grant answers for the same use times.
+    #[test]
+    fn one_cap_counts_every_ticket_a_pattern_matches() {
+        use super::tests::{transition, transition_request};
+        use crate::local::owner::mutation::{Classification, MutationObservation};
+        let site = site();
+        let not_after = NOW + 900_000;
+        let pattern = add(&site, &transition_request(not_after)).unwrap();
+        // The control: an exact-value grant with the same cap.
+        let mut exact = request();
+        exact["max_per_hour"] = json!(500);
+        exact["not_after_unix_ms"] = json!(not_after);
+        let control = add(&site, &exact).unwrap();
+        let uses = Uses::open(&site.state).unwrap();
+        // This test's connection does not wait for the disk: the 1,000 writes
+        // below are 2,000 commits of four `fsync` each, 24 ms apiece on a
+        // loaded host. What is counted and answered is the same.
+        uses.connection()
+            .execute_batch("PRAGMA synchronous=OFF")
+            .unwrap();
+        let message = write();
+        // A write admitted at a reading that ends at `upper`, its use bound
+        // to a new attempt.
+        let admit = |call: Call<'_>, upper: i64| {
+            super::admit(&site.path, &key(), call, Some(ending(upper)), &uses).map(|admitted| {
+                let attempt = Uuid::new_v4();
+                admitted.bind(attempt).unwrap();
+                (admitted.grant_id().to_owned(), attempt)
+            })
+        };
+        let first = NOW + 2_000;
+        let mut last = None;
+        for n in 0..500_i64 {
+            let upper = first + n * 1_000;
+            let ticket = transition(&format!("DEV-{n}"), "10234");
+            let (grant_id, attempt) = admit(transition_call(&ticket), upper)
+                .unwrap_or_else(|refusal| panic!("ticket {n}: {refusal:?}"));
+            assert_eq!(grant_id, pattern, "ticket {n}");
+            last = Some(attempt);
+            let (grant_id, _) = admit(call(&message), upper)
+                .unwrap_or_else(|refusal| panic!("control {n}: {refusal:?}"));
+            assert_eq!(grant_id, control, "control {n}");
+        }
+        assert_eq!(uses.rows().unwrap(), 1_000);
+        // The next write, to any ticket: the first use, admitted 500 s
+        // before, leaves the hour in 3,100 s, under either grant.
+        let at_the_cap = first + 500_000;
+        let limited = Some(NotAdmitted::AtCap {
+            retry_after_seconds: 3_100,
+        });
+        for ticket in ["DEV-0", "DEV-499", "DEV-500", "DEV-99999"] {
+            assert_eq!(
+                admit(transition_call(&transition(ticket, "10001")), at_the_cap).err(),
+                limited,
+                "{ticket}"
+            );
+        }
+        assert_eq!(admit(call(&message), at_the_cap).err(), limited);
+        assert_eq!(uses.rows().unwrap(), 1_000);
+        // A replay is answered from the ledger before any grant is read
+        // (`owner::mutation`): it calls no `admit`. What it does with the
+        // use store is `named`, which names the grant of the attempt and
+        // takes no use, also at the cap.
+        let mut observation = MutationObservation {
+            classification: Classification::Applied,
+            attempt: None,
+            original_request_id: None,
+            replayed: true,
+            cause: None,
+            standing: None,
+        };
+        named(&mut observation, last.unwrap(), &site.state);
+        assert_eq!(
+            observation.standing.map(|standing| standing.grant_id),
+            Some(pattern)
+        );
+        assert_eq!(uses.rows().unwrap(), 1_000);
+    }
+
+    /// Acceptance 14: a pattern grant ends as an exact-value grant does, at
+    /// `not_after` by the upper bound of the clock's reading and at
+    /// `revoke-standing`.
+    #[test]
+    fn a_pattern_grant_ends_at_not_after_and_at_revocation() {
+        use super::tests::{transition, transition_request};
+        let site = site();
+        let not_after = NOW + 600_000;
+        let id = add(&site, &transition_request(not_after)).unwrap();
+        let uses = Uses::open(&site.state).unwrap();
+        let input = transition("DEV-12", "10234");
+        let at = |reading: ClockInterval| {
+            super::admit(
+                &site.path,
+                &key(),
+                transition_call(&input),
+                Some(reading),
+                &uses,
+            )
+            .map(|admitted| admitted.grant_id().to_owned())
+        };
+        assert_eq!(at(ending(not_after - 1)), Ok(id.clone()));
+        let expired = Err(NotAdmitted::Uncovered(Uncovered::Expired));
+        assert_eq!(at(ending(not_after)), expired);
+        assert_eq!(
+            at(ending(not_after + 1_000)),
+            expired,
+            "a straddling reading"
+        );
+        // Revoked: the grant is gone from the file, from the next read on.
+        assert_eq!(at(now()), Ok(id.clone()));
+        let lock = lock(&site.state).unwrap();
+        revoke(&lock, &site.path, &signer(), &key(), now(), &id).unwrap();
+        assert_eq!(at(now()), Err(NotAdmitted::Uncovered(Uncovered::NoGrant)));
+        // Each admitted write gave its use back; no refusal took one.
+        assert_eq!(uses.rows().unwrap(), 2);
+    }
+
+    /// Acceptance 15 and 16: a file signed by the 0.77.0 code of this
+    /// repository with exact members only
+    /// (`tests/fixtures/standing_grants_0_77_0.json`, with the public key it
+    /// verifies under and the reading it was signed at) verifies here, covers
+    /// the write the 0.77.0 tests cover, and is signed again to the bytes the
+    /// fixture holds.
+    #[test]
+    fn a_0_77_file_verifies_and_is_reproduced() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/standing_grants_0_77_0.json"
+        ))
+        .unwrap();
+        let text = |name: &str| fixture[name].as_str().unwrap().to_owned();
+        let key = ConfiguredApprovalKey {
+            issuer: text("issuer"),
+            audience: text("audience"),
+            kid: text("kid"),
+            public_key: text("public_key"),
+            not_before_unix_ms: 0,
+            not_after_unix_ms: fixture["key_not_after_unix_ms"].as_i64().unwrap(),
+            revoked: false,
+        };
+        let at = ClockInterval {
+            lower_unix_ms: fixture["verified_at_unix_ms"]["lower"].as_i64().unwrap(),
+            upper_unix_ms: fixture["verified_at_unix_ms"]["upper"].as_i64().unwrap(),
+        };
+        let signed = text("signed").into_bytes();
+        let site = site();
+        put(&site.path, &signed, 0o600);
+
+        // 15: it verifies, every member is an exact one, and it covers.
+        let grants = verify(&site.path, &key, at).unwrap().unwrap();
+        let ids = |covering: Result<Vec<&Grant>, Uncovered>| {
+            covering.map(|grants| {
+                grants
+                    .iter()
+                    .map(|grant| grant.id.clone())
+                    .collect::<Vec<_>>()
+            })
+        };
+        assert_eq!(
+            grants
+                .grants()
+                .iter()
+                .map(|grant| (grant.id.as_str(), grant.target.len()))
+                .collect::<Vec<_>>(),
+            [("g1", 1), ("g2", 3)]
+        );
+        assert!(
+            grants
+                .grants()
+                .iter()
+                .flat_map(|grant| &grant.target)
+                .all(|member| matches!(member.bound, Bound::Value(_)))
+        );
+        assert_eq!(
+            ids(grants.covering("leaf", "chat.postMessage", &write(), at.upper_unix_ms)),
+            Ok(vec!["g1".to_owned()])
+        );
+        // The open grant binds a number, `null` and a nested value.
+        let open = json!({"body": {
+            "n": 1,
+            "thread": null,
+            "meta": {"labels": ["a", 2, true, null], "empty": {}},
+            "text": "hello"
+        }});
+        assert_eq!(
+            ids(grants.covering("leaf", "chat.postMessage", &open, at.upper_unix_ms)),
+            Ok(vec!["g2".to_owned()])
+        );
+        let mut other = open.clone();
+        other["body"]["meta"]["labels"][1] = json!(3);
+        assert_eq!(
+            ids(grants.covering("leaf", "chat.postMessage", &other, at.upper_unix_ms)),
+            Err(Uncovered::OtherTarget)
+        );
+        assert_eq!(admit(&site, &key, &write()), Outcome::Admitted("g1".into()));
+
+        // 16: the same grants, signed by the same key at the same reading,
+        // are the fixture's payload bytes; Ed25519 is deterministic, so the
+        // whole file is the fixture's.
+        let again = sign(&signer(), &key, at, grants.grants()).unwrap();
+        assert_eq!(claims_of(&again), claims_of(&signed));
+        assert_eq!(again, signed);
+        let claims: Value = serde_json::from_slice(&claims_of(&signed)).unwrap();
+        assert_eq!(
+            serde_json::to_value(grants.grants()).unwrap(),
+            claims["document"]["grants"]
+        );
     }
 }

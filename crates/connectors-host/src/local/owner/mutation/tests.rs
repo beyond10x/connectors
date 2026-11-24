@@ -574,7 +574,7 @@ fn standing_is_named_for_an_attempt_and_absent_without_a_store() {
         operation: "chat.postMessage".into(),
         target: vec![standing::TargetMember {
             pointer: "/body/channel".into(),
-            value: json!("C1"),
+            bound: standing::Bound::Value(json!("C1")),
         }],
         input_keys: None,
         not_after_unix_ms: 1_789_056_600_000,

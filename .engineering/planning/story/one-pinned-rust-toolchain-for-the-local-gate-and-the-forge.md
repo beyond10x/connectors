@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: story:one-pinned-rust-toolchain-for-the-local-gate-and-the-forge
 kind: story
-status: active
+status: implemented
 title: One pinned Rust toolchain for the local gate, the build server and the forge
 relations:
 - serves: vision:independent-contract-adapters
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T05:19:07Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-11-24T06:30:10Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-11-24T10:25:06Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 

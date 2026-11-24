@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:an-approved-write-survives-one-refused-clock-acquisition
 kind: story
-status: active
+status: implemented
 title: An approved write survives one refused clock acquisition
 summary: A below-quorum clock acquisition gets one second attempt when one query deadline and the caller's reserve remain, in the four paths that sign or settle a write
 relations:
@@ -38,10 +38,11 @@ scope:
   path: docs/local-clock.md
 - confidence: cited
   path: website/docs/reference/contracts/clock.md
-revision: 25
+revision: 26
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T07:14:41Z", actor: "human:timo", revision: 23, decided_on: {"recorded":{"review_outcome":11}}}
 - {from: "proposed", to: "active", at: "2026-11-24T07:40:09Z", actor: "human:timo", revision: 24, decided_on: {"recorded":{"review_outcome":11}}}
+- {from: "active", to: "implemented", at: "2026-11-24T10:25:05Z", actor: "human:timo", revision: 26, decided_on: {"recorded":{"test_result":1,"review_outcome":13}}}
 ---
 ## What happened
 

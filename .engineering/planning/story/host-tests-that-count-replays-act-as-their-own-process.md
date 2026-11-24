@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:host-tests-that-count-replays-act-as-their-own-process
 kind: story
-status: active
+status: implemented
 title: Host tests that count store replays act as their own process
 relations:
 - serves: vision:independent-contract-adapters
@@ -19,10 +19,11 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/security_replay_tests.rs
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T01:50:55Z", actor: "human:timo", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-24T01:50:56Z", actor: "human:timo", revision: 9}
+- {from: "active", to: "implemented", at: "2026-11-24T10:25:06Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## What happened
 
