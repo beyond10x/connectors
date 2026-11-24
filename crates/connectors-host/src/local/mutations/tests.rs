@@ -218,6 +218,44 @@ fn pending_scan_pages_existing_instances_and_keyed_or_unkeyed_attempts() {
     ));
 }
 
+/// The owner's background keeps one scan between its passes (`owner::maintenance`). An
+/// attempt prepared after a pass, whose random identifier sorts before the one that pass ended
+/// on, is not in the next pass: that pass finds nothing after its cursor and starts over, and
+/// the pass after it returns the attempt. A test that waits for the background to see a new
+/// attempt therefore waits two passes, not one.
+#[test]
+fn a_pending_attempt_before_the_scans_cursor_is_returned_by_the_second_pass() {
+    let (_root, store, original) = fixture();
+    let prepare = |request: usize| {
+        let mut candidate = original.clone();
+        candidate.caller_key = None;
+        candidate.request_id = format!("request-{request}");
+        prepared(&store, &candidate).reference().attempt_id
+    };
+    let mut scan = PendingScan::default();
+    let mut cursor = prepare(0);
+    assert_eq!(store.pending(&mut scan, 64).unwrap().len(), 1);
+    // Identifiers are random. One that sorts after the cursor is the whole next pass and moves
+    // the cursor up; prepare until one sorts before it.
+    let mut pending = 1;
+    let early = loop {
+        assert!(pending < 64, "no identifier sorted before the cursor");
+        let id = prepare(pending);
+        pending += 1;
+        if id.to_string() < cursor.to_string() {
+            break id;
+        }
+        let page = store.pending(&mut scan, 64).unwrap();
+        assert_eq!(page.len(), 1);
+        assert_eq!(page[0].reference.attempt_id, id);
+        cursor = id;
+    };
+    assert!(store.pending(&mut scan, 64).unwrap().is_empty());
+    let page = store.pending(&mut scan, 64).unwrap();
+    assert_eq!(page.len(), pending);
+    assert!(page.iter().any(|entry| entry.reference.attempt_id == early));
+}
+
 #[test]
 fn instance_recovery_preserves_fault_uncertainty_and_ignores_revoked_business_grants() {
     let (root, store, candidate) = fixture();
