@@ -33,7 +33,7 @@ MySQL 8.0 or later, and a user that logs in with a password, granted `SELECT` on
 Take the executable from the release archive: `connectors-<version>-<target>.tar.gz` holds
 `connectors-sql` beside `connectors`
 ([install a release binary](../getting-started.md#or-install-a-release-binary)); archives of
-0.76.2 and earlier do not hold it. Use its path in the extracted directory wherever this page
+0.77.0 and earlier do not hold it. Use its path in the extracted directory wherever this page
 writes `target/release/connectors-sql`. Or build it from source:
 
 ```sh

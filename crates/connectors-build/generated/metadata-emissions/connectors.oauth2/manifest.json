@@ -4,8 +4,8 @@
     "refusals": 0,
     "refused": [],
     "scenarios": 7,
-    "spec_digest": "f11958387146f84717d047c95e72ef2b767ea0f98352e2b0d7dd21a363ba5038",
-    "suite_digest": "sha256:15b127b9db6583f143236976665f7e969593bd94befd914f6e19f8dd3f0107be"
+    "spec_digest": "6a97f870e7867d565ca46dcb0c8df91269f9eab632e5da04070946fe4d6d8e72",
+    "suite_digest": "sha256:f5269fa92f0d0b21c63a11f3664a0b76c57c064744f44c240731da77e2cb3a28"
   },
   "component": "local-metadata-authority",
   "format": "ess-mutation-manifest/7",
@@ -1508,8 +1508,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/not-ready",
-      "spec_digest": "ecac7a61316d47ec9346460d2279f8034817e5f2132c3146db673a27c499f800",
-      "suite_digest": "sha256:aa81c900f2d300dbd7d89a1a59ceddb6782ba158f351f0bdcc75a0ea2ff9e426"
+      "spec_digest": "63ab6fd4328c1a561bc207babaf0461ab5612df21f44e2c1cd3479c47fc561f0",
+      "suite_digest": "sha256:5ed06e70980e651b779e2ec37c2f2a48c54b5ffb1efde234313e61b0967f502f"
     },
     {
       "change": "`error: connectors.oauth2.RateLimited` becomes `error: connectors.oauth2.ConnectionNotReady`",
@@ -1520,8 +1520,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/rate-limited",
-      "spec_digest": "3b8c4a9902e45e606819c5ca5728bba9771d26a230949764efa428c64cd296c5",
-      "suite_digest": "sha256:f90f17779e14f8b04b7cf987916d804ccbcba1c90c547d06aa3b49668510433e"
+      "spec_digest": "2e6f3fd35703d32e8ed3549c3de829131560b7d3615f0097b499e4269bd4044d",
+      "suite_digest": "sha256:4228b83e6f9317ba9ea0f031f479c6c1fcd5bc886129bc89320eb0bd15e44b96"
     },
     {
       "change": "`error: connectors.oauth2.ReauthorizationRequired` becomes `error: connectors.oauth2.ConnectionNotReady`",
@@ -1532,8 +1532,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/reauthorization-required",
-      "spec_digest": "5724fae0d393e420071f5a1d5b2607aa63cdd92c20b5d4550680fd797592a860",
-      "suite_digest": "sha256:6c1d78de507fba88656245a4aa026705348ab6404bb82764b168ff7717b4f767"
+      "spec_digest": "d03c3da3def68e370c667514b573b316161245d761ebe6f48754931ea4fee81c",
+      "suite_digest": "sha256:7e14bbadb02c5f0f9c956b100931a70c056fa9aa337cce4bef9c51d30c69390e"
     },
     {
       "change": "`error: connectors.oauth2.RefreshUncertain` becomes `error: connectors.oauth2.ConnectionNotReady`",
@@ -1544,8 +1544,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/refresh-uncertain",
-      "spec_digest": "cacfcbde8942af9a48f0f31fab5cba73cf4aee7346e3e3d38174b61881aebcdd",
-      "suite_digest": "sha256:de2ba1a97aab1388abff1471aa7522e475feb58cdf0e1947b3ab2f335f6db29b"
+      "spec_digest": "45a925b366f7120dd72db789262b8ebe1ad5877b36c527917b5eaff456e162db",
+      "suite_digest": "sha256:61d12f1359c79a45c516d60298fe5e60e32216216a25e353121f11e3423a8f4a"
     },
     {
       "change": "`error: connectors.oauth2.Unavailable` becomes `error: connectors.oauth2.ConnectionNotReady`",
@@ -1556,8 +1556,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/unavailable",
-      "spec_digest": "6e7ee4e4d8d03d96673414c01c00beed4bb7acc5a37d2f68e4b630fc6dfcc61a",
-      "suite_digest": "sha256:9b3bb2c54fd38826d0813ffb65c3d62202416306bf13cd8f7a83f8e2f3c08935"
+      "spec_digest": "51f9920c9e48bcb973c257f94e8d52f78746ccc8d32d531032a28469cf1545b4",
+      "suite_digest": "sha256:0b04e3956cccf301f3078690ab5357e1cd8d93ab178aa19a9b55cee8e65aec6f"
     },
     {
       "change": "`error: connectors.refresh.OwnershipConflict` becomes `error: connectors.refresh.PublicationRefused`, and its `payload:` entry is dropped",
@@ -2184,8 +2184,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/issued-current/equality-0",
-      "spec_digest": "819335a5ce03fb19d54a4671aae32c4a669ea17121464314a7bab7f8b6472a27",
-      "suite_digest": "sha256:30c2f29dabee757d50849d9d7c77fef7fa53448f103b8b675617f512fff74776"
+      "spec_digest": "a945913c054741ee5c40cbee24a2b67cfdec48bd7ed97112e625b31280522e1a",
+      "suite_digest": "sha256:b4ec78d0bcea959f1b0101095e0c1d84ce6c1f5df918a9b504f9c94b043e6433"
     },
     {
       "change": "`decision == refreshed` becomes `decision != refreshed`",
@@ -2196,8 +2196,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/issued-refreshed/equality-0",
-      "spec_digest": "43a54b993b4021f330b925f1f5612c44996eed808cc88cad62102bef3ced8842",
-      "suite_digest": "sha256:0b8da613e22c46575ae02d9d85f94016df1e04f35ff9d949d795ba17a3d7d520"
+      "spec_digest": "0c6fa6510277d8ffead6297c3d3b7f2a05412d11498414ea2424f9b4072257ff",
+      "suite_digest": "sha256:ecc9da81bbac1fb06de3d96c593894d713c746390f1972fc10e27539dc48d042"
     },
     {
       "change": "`(decision == allow and not (defined(held_connection_ref)))` becomes `(decision == allow or not (defined(held_connection_ref)))`",
@@ -2271,8 +2271,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/issued-current/0",
-      "spec_digest": "7b7d0472d3c55b63e0ebebc9e523e0221e6c0f8e1646860716e2bc947d096425",
-      "suite_digest": "sha256:a2a3ef38f40ba7d406f75ebadbb7fbfaff5c3c90a9f19014baed782864d139b4"
+      "spec_digest": "9d96c6eac940274a277b34a0b8c28f375e1a7c3a08893e350217eee253dc379c",
+      "suite_digest": "sha256:7475655af5316175784423b22142bdbdcc3c99b1283e484fe6236ca4b8a5a387"
     },
     {
       "change": "`(decision == refreshed and defined(refresh_attempt_id))` becomes `(decision == refreshed or defined(refresh_attempt_id))`",
@@ -2283,8 +2283,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/issued-refreshed/0",
-      "spec_digest": "56315875de5be5371cdfd2473aa063c60d71d76228f0ee519c3a8b52da8ff019",
-      "suite_digest": "sha256:21282dbd4686500c66a6560a941d57a6962be3eef9b87333090b2bd89477b816"
+      "spec_digest": "f77cfe6de4e6628c06985904eaa5bfecc86ed1587b0d0b3a45976f9cea760c7c",
+      "suite_digest": "sha256:87e74e88c7e2b4d46db9e202354c6b2511137f28bdcb43d3623bd8d75a043f33"
     },
     {
       "change": "`when_subject: revision != input.expected_revision` becomes `when_subject: not (revision != input.expected_revision)`",
@@ -2721,8 +2721,8 @@
       ],
       "scenarios": 6,
       "site": "connectors.oauth2.IssueAccessToken/issued-current",
-      "spec_digest": "bef71b9b7984c554a8302ce40fdb8303bb2323290db33eb03f31fba184183e6e",
-      "suite_digest": "sha256:5f9bb39716b818f59588dfaf8ba03e99cfc5c3ed34d344b48dec1fdc2fd2a4c1"
+      "spec_digest": "4caa016303e668c76afb630c66af2435de87d2cf19e5d5d559dc1aed6a57715b",
+      "suite_digest": "sha256:011e8542b2cb066ea2e9d5f98a22bf71a422d2b06804e8137f9ac2b7aa6d1492"
     },
     {
       "change": "`when: (decision == refreshed and defined(refresh_attempt_id))` becomes `when: not ((decision == refreshed and defined(refresh_attempt_id)))`",
@@ -2733,8 +2733,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/issued-refreshed",
-      "spec_digest": "b5c9ee9b25436b50b1fc05f4d6bef3647e29361ba28a0576cfe386b58cdda301",
-      "suite_digest": "sha256:897f1e1bdea3ed905280509ae8472b0e61e53300f0820f7a0d119640773e7708"
+      "spec_digest": "6e46dfb4a08d74abb715eb65bbe09ba4f8c8790d77611c30320c2468e8f27fb7",
+      "suite_digest": "sha256:21c0c609ecf3f9cf1cf2e29febf9f6662cabde3f5ffda409af457dfefaaf3c24"
     },
     {
       "change": "`when: decision == not_ready` becomes `when: not (decision == not_ready)`",
@@ -2767,8 +2767,8 @@
       ],
       "scenarios": 5,
       "site": "connectors.oauth2.IssueAccessToken/rate-limited",
-      "spec_digest": "5e902d1ce2782f880f1a0a46cc74d316957555463524f8ad96f357c47fa8a4d3",
-      "suite_digest": "sha256:892c798326c13c0906b228ad3b24d36b2d8f035255200e82c6114bd01fff567a"
+      "spec_digest": "8bec31291c0ad0cc162d22f3a9202b1da13d3c7da6d4ea9ead15991b97386f92",
+      "suite_digest": "sha256:28bb13235141a55a7b4d34ac86308e97b5ff80adee1356cec7db088a599d8f8b"
     },
     {
       "change": "`when: decision == reauthorization_required` becomes `when: not (decision == reauthorization_required)`",
@@ -3018,8 +3018,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/issued-current/issued-refreshed",
-      "spec_digest": "4ced53fa19aadfba25d922ee82bf0c4771d5695218309385fe8df20f251b79a4",
-      "suite_digest": "sha256:d6139a21b7459619bafc941687399b86eeb5164eb3f3349db1db6083b9f5f5d6",
+      "spec_digest": "0b4ac2e64bd9d2574abf93256a7b210baf090d9d0d4786d74d53d0b7592c3118",
+      "suite_digest": "sha256:ae4911f7372946624c972ee24f497d34ef0d5c983697fd1b947db4636175c2ed",
       "unsatisfiable_guard": "((decision == current and not (defined(refresh_attempt_id))) and (decision == refreshed and defined(refresh_attempt_id)))"
     },
     {
@@ -3031,8 +3031,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/not-ready/reauthorization-required",
-      "spec_digest": "fdda669b24704ef9a2ad3403590637fc652fc352866883d61867e24385951b25",
-      "suite_digest": "sha256:92d1f9dca7247c4a10adb3207bd42463921516694b08857c00ac263bcbf7cde7",
+      "spec_digest": "266f61fcdebb3180b87fee174bb1b1ff7784219b41a69d53e80c3b11f331aba0",
+      "suite_digest": "sha256:d148589a15d01ef3ce1fe6050cd8974281795ea80c9ea01a47528abd56b877b2",
       "unsatisfiable_guard": "(decision == not_ready and decision == reauthorization_required)"
     },
     {
@@ -3044,8 +3044,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/reauthorization-required/refresh-uncertain",
-      "spec_digest": "404225d1403148e8b9340bac2de7965f5be38b79e211ab5731a50e3362778f9c",
-      "suite_digest": "sha256:b35997c579a47ef62314c19d6f4a4cb68771efc492103ce489eb2db00a7d24e7",
+      "spec_digest": "993f6f2707db4942bc4710f4293b7c0353d97a2451f871c60a7f985d89fdd052",
+      "suite_digest": "sha256:1546e3cc6288fe91905f099adde75ab375d784cd148fce0d2dda790d55fbd395",
       "unsatisfiable_guard": "(decision == reauthorization_required and decision == refresh_uncertain)"
     },
     {
@@ -3057,8 +3057,8 @@
       "refused": [],
       "scenarios": 7,
       "site": "connectors.oauth2.IssueAccessToken/refresh-uncertain/rate-limited",
-      "spec_digest": "ce75bb2430eda1d692631800ed5800814d19e5cfeeaa4bf2d299fc3b7848668e",
-      "suite_digest": "sha256:ca40eb934d242923cd1f28dbb21ee31917efb306216d8797ca48c2293a33335b",
+      "spec_digest": "898f500737f91786daf0b65f4259f690479db27ba1011177778c276fe9d627df",
+      "suite_digest": "sha256:c12fd9f6eeeb77340aae91c8f431d4a3c3ca9345d67934f03a258a4366b24960",
       "unsatisfiable_guard": "(decision == refresh_uncertain and decision == rate_limited)"
     },
     {
@@ -3903,8 +3903,8 @@
       "refused": [],
       "scenarios": 8,
       "site": "connectors.oauth2.DeclareAuthorizationServer/declared/profile_record_ref",
-      "spec_digest": "cc9cd0ad85b775fefe148a58ae05669b01aa85f65b909da9bd21aea909a95759",
-      "suite_digest": "sha256:b539a0fe4c9f1d2148718c9c1119c5d00909732756914a2575207d12d391b5c7"
+      "spec_digest": "335fa1b89772742c481779628b1fe0ecf74a13f1145aa6414d2664fa021d8fcb",
+      "suite_digest": "sha256:4efbe86a5e9249041146c7a29302ea72fa97ef53a7ef0a5e9bdb8c7dc2170491"
     },
     {
       "change": "`connection_ref: input.connection_ref` becomes `connection_ref: mutant-literal`",
@@ -3915,8 +3915,8 @@
       "refused": [],
       "scenarios": 6,
       "site": "connectors.oauth2.IssueAccessToken/issued-current/connection_ref",
-      "spec_digest": "d5b3e93203f7ff0d9f2270030261a80ab1da8ed845feac66e1183794ea7f87a2",
-      "suite_digest": "sha256:6f5ad4a97f1ce18d01c1fd9b9be929f4ee134e95dd5086b4b8f8888990af9662"
+      "spec_digest": "2e88edde6adf4f3435095f057db082f17b4bea9a12b726f652d5dc91a86f03bb",
+      "suite_digest": "sha256:f36a3c6ebb77e744bc87d6a03f5b0be6270cf58df0c125d51f02ae1b22d47930"
     },
     {
       "change": "`connection_ref: input.connection_ref` becomes `connection_ref: mutant-literal`",
@@ -3927,8 +3927,8 @@
       "refused": [],
       "scenarios": 6,
       "site": "connectors.oauth2.IssueAccessToken/issued-refreshed/connection_ref",
-      "spec_digest": "17f07cb5dee07954056cdb747f033b8055448865d95e5200e18674b2c4b7b86f",
-      "suite_digest": "sha256:2bdef54fa9f04cc47ed674aa9d7a91f8ab12237dd73fe04836d7a068231c8598"
+      "spec_digest": "e8e7d15c141ad3bf27ce80dbe0e3d1be25fb0faffcfa09365c4e4e79a288b118",
+      "suite_digest": "sha256:04952e2517a279e6cef203d17dd29a02815556e40775e6016ebf946509c083b5"
     },
     {
       "change": "`expected_binding_revision: input.expected_binding_revision` becomes `expected_binding_revision: input.owner`",
@@ -4113,7 +4113,7 @@
       "site": "connectors.sessions.Session.renew"
     }
   ],
-  "spec_digest": "f11958387146f84717d047c95e72ef2b767ea0f98352e2b0d7dd21a363ba5038",
+  "spec_digest": "6a97f870e7867d565ca46dcb0c8df91269f9eab632e5da04070946fe4d6d8e72",
   "specification": "connectors v1",
   "unavailable_sites": [
     {

@@ -11,7 +11,7 @@ the [PostgreSQL guide](local-postgres-cli.md).
 
 Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
-The release archives hold `connectors-sql` beside `connectors`; archives of 0.76.2 and
+The release archives hold `connectors-sql` beside `connectors`; archives of 0.77.0 and
 earlier do not, and this guide writes the path of a build from source:
 
 ```sh
