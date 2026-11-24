@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:standing-grant-closes-the-input-to-listed-members
 kind: story
-status: active
+status: implemented
 title: A standing grant closes a write's input to the members it lists
 summary: 'optional input_keys on a grant: a write with an input member outside the list is approval_required with no request, in both placements'
 relations:
@@ -31,10 +31,11 @@ scope:
   path: docs/running-services.md
 - confidence: cited
   path: ess/domains/standing_approvals.yaml
-revision: 18
+revision: 19
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:03:23Z", actor: "human:timo", revision: 16, decided_on: {"recorded":{"review_outcome":4}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:03:24Z", actor: "human:timo", revision: 17, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "active", to: "implemented", at: "2026-11-24T06:33:45Z", actor: "human:timo", revision: 19, decided_on: {"recorded":{"test_result":1,"review_outcome":4}}}
 ---
 ## Outcome
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:windows-mcp-tool-call-answers-timeout
 kind: story
-status: active
+status: implemented
 title: A tool call through the MCP stdio server answers on Windows
 summary: On windows-latest tools/call answers timeout after 2 s; step 10 of the Windows host job is red
 relations:
@@ -25,10 +25,11 @@ scope:
   path: crates/connectors-host/src/local/runtime/channel/windows.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/channel/windows/tests.rs
-revision: 41
+revision: 42
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T11:04:21Z", actor: "human:timo", revision: 40, decided_on: {"recorded":{"review_outcome":6}}}
 - {from: "proposed", to: "active", at: "2026-11-23T11:04:22Z", actor: "human:timo", revision: 41, decided_on: {"recorded":{"review_outcome":6}}}
+- {from: "active", to: "implemented", at: "2026-11-24T06:33:44Z", actor: "human:timo", revision: 42, decided_on: {"recorded":{"test_result":1,"review_outcome":6}}}
 ---
 ## Defect
 

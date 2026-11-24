@@ -2,15 +2,17 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0762-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: Scope of connectors 0.76.2
 summary: Scope, exclusions and evidence of the 0.76.2 cut
-revision: 2
+revision: 5
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-24T06:33:21Z", actor: "human:timo", revision: 4}
 ---
 ## Scope of connectors 0.76.2
 
-Released 2026-11-23 under Timo's release order of 03:59 CET (relayed by host-operator): finished
-green work is integrated and released when a user sees something.
+Released 2026-11-24 under Timo's release order of 2026-11-23 03:59 CET (relayed by
+host-operator): finished green work is integrated and released when a user sees something.
 
 - story:owner-and-providers-run-in-root-directory: on Linux and macOS the owner and every
   provider process it starts run in `/`. Before, they kept the working directory of the CLI
@@ -48,3 +50,16 @@ green work is integrated and released when a user sees something.
   that took over 50 s on the loaded workstation. It stays on branch
   `story/connections-through-owner` until they hold.
 - Standing grants (0.77.0) and the pattern grant (0.78.0).
+
+## Verified after the release
+
+- Pull request 289 merged 2026-11-24 03:31 CET as 83a201506d8; tag `v0.76.2` is on that commit.
+- Release page published 03:34 CET; the release-binaries run 45313383293 ended `success`; the
+  four archives match `SHA256SUMS`; the image `ghcr.io/beyond10x/connectors:0.76.2` (digest
+  sha256:99e687eea35b) is built for linux/amd64 and linux/arm64.
+- Checks of pull request 289: 17 of 17 passed, "host and CLI on windows-latest" among them for
+  the first time since 0.76.0.
+- A workstation install swapped from 0.76.1 to 0.76.2 at 04:30 CET (binary only, same store).
+  The first read through the Jira instance after the swap answered `timeout` at stage
+  `admission` after 9 s; the same read repeated one minute later answered status 200. One read
+  each through the two Slack instances answered status 200.

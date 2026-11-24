@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0770-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: Scope of connectors 0.77.0
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-24T06:33:21Z", actor: "human:timo", revision: 3}
 ---
 ## Scope of connectors 0.77.0
 
@@ -59,3 +61,23 @@ write, inside a grant a human signed.
   `story/connections-through-owner`).
 - `connectors-sql` as a released binary and the MySQL replica and Loki proxy tests
   (story:released-install-reads-mysql-and-loki-per-environment).
+
+## Verified after the release
+
+- Pull request 290 merged 2026-11-24 06:56 CET as 836767bccc2; tag `v0.77.0` is on that commit.
+- Release page published 06:57 CET; the release-binaries run 45336950938 ended `success`; the
+  four archives match `SHA256SUMS`; the image `ghcr.io/beyond10x/connectors:0.77.0` (digest
+  sha256:31bf468517dc) is built for linux/amd64 and linux/arm64.
+- Checks of pull request 290: 17 of 17 passed on its second head (f16613ca3). The first head
+  (507b602a2) failed three: the Windows lint (two test-only items whose callers are Unix-only)
+  and six tests that pin the CLI's commands and failure codes, in "repository gate" and "host
+  and CLI on macos-latest". Two commits fixed them with no change of product code; the
+  repository's `AGENTS.md` names those test binaries and a Windows-target lint as checks
+  before a push. The check "ignored CLI journeys" passed on both heads.
+- A workstation install swapped from 0.76.2 to 0.77.0 at 07:20 CET (binary only, same store):
+  one read each through the Jira instance and the two Slack instances answered status 200
+  within 2 s.
+- After the release no instance of that install has an approval key, a policy or a
+  `standing_grants` member: no grant exists. A process of the operator's user can create all
+  three; story:a-marked-instance-takes-only-approvals-a-human-signed (draft) holds the options
+  for an instance whose approvals only a human can sign.
