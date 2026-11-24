@@ -123,6 +123,7 @@ mod shipped;
 mod slack;
 mod slack_adversary;
 mod slack_send_adversary;
+mod upload_child_adversary;
 mod version;
 mod walk_adversary;
 mod walk_declarations;

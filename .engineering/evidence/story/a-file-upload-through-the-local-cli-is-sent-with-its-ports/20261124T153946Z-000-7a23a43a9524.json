@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-24T15:39:46Z",
+  "actor": "human:timo",
+  "artifact": "story:a-file-upload-through-the-local-cli-is-sent-with-its-ports",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:local-upload-adversary-round-1",
+    "review": "review-result:local-upload-adversary-round-1",
+    "outcome": "fixed"
+  }
+}

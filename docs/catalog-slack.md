@@ -281,9 +281,13 @@ One write uploads a file and shares it, under one approval or standing grant:
   `{"files":[{"id":<file_id>,"title":<title>}],"channel_id":…}` with
   `thread_ts` and `initial_comment` when given. Nothing is shared before it,
   so a refusal or failure of the first two requests is `refused`, never
-  `outcome_unknown`. `channel_not_found` and `not_in_channel` there are
-  refused as `not_found` and `forbidden`; any other `"ok": false`, and a
-  dispatch without a definite answer, is `outcome_unknown`.
+  `outcome_unknown`. One case differs through the local CLI: the three
+  requests share the invocation's deadline, and a deadline that ends while
+  the slot or the byte request is unanswered is `outcome_unknown` with
+  `timeout`, although nothing was shared. `channel_not_found` and
+  `not_in_channel` there are refused as `not_found` and `forbidden`; any
+  other `"ok": false`, and a dispatch without a definite answer, is
+  `outcome_unknown`.
 
 The input of one upload into a thread:
 

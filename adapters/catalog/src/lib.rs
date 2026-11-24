@@ -2730,7 +2730,10 @@ impl Prepared {
     /// byte request that fails, is not answered or answers a refusal, a slot
     /// answer that fails a check or names no URL or no value the completing
     /// body reads, and a URL the upload does not reach or the connection does
-    /// not admit, are each refused, the last two with no byte sent.
+    /// not admit, are each refused, the last two with no byte sent. A caller
+    /// that ends this call at a deadline of its own, as the provider child's
+    /// commit does, answers unknown for a deadline that ends in any of the
+    /// three requests.
     pub async fn execute_upload(
         mut self,
         slot: Box<dyn AuthenticatedWrite>,

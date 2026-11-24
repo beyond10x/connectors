@@ -3693,11 +3693,12 @@ fn an_approved_upload_through_the_child_sends_its_slot_its_bytes_and_the_share()
         .into_iter()
         .find(|(path, ..)| path.starts_with("/api/files.getUploadURLExternal"))
         .expect("the slot request");
-    assert!(slot.0.contains("filename=fixture-1.pdf"), "{}", slot.0);
-    assert!(
-        slot.0.contains(&format!("length={}", FILE_BYTES.len())),
-        "{}",
-        slot.0
+    assert_eq!(
+        slot.0,
+        format!(
+            "/api/files.getUploadURLExternal?filename=fixture-1.pdf&length={}",
+            FILE_BYTES.len()
+        )
     );
     assert!(
         posts[1]
