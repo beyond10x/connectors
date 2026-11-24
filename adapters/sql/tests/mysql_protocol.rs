@@ -641,6 +641,65 @@ async fn mysql_a_trailing_line_comment_cannot_swallow_the_wrapper() {
     );
 }
 
+// A caller that pages with its own `LIMIT … OFFSET …`, and counts with a `COUNT(*)` over
+// the statement. These show what is sent; the scripted fixture runs no SQL, so what a
+// server answers is shown by the ignored tests of `mysql_replica.rs`.
+
+const PAGED: &str = "SELECT id, name FROM item ORDER BY id";
+
+/// The last statement the fixture was asked to prepare.
+fn last_prepared(server: &Server) -> String {
+    server.log.lock().unwrap().prepares.last().unwrap().clone()
+}
+
+#[tokio::test]
+async fn a_statement_with_its_own_limit_and_offset_is_sent_inside_the_derived_table() {
+    let server = start(Script {
+        columns: vec![
+            col("id", LONG, 0, BINARY_CHARSET, 0),
+            col("name", VAR_STRING, 0, UTF8MB4, 0),
+        ],
+        rows: vec![vec![int4(101), text("one hundred and one")]],
+        ..Script::default()
+    })
+    .await;
+    let query = format!("{PAGED} LIMIT 100 OFFSET 100");
+    invoke(
+        &adapter(&server),
+        "query.read",
+        json!({"query": query, "limit": 100}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        last_prepared(&server),
+        "SELECT * FROM (SELECT id, name FROM item ORDER BY id LIMIT 100 OFFSET 100\n) AS result (c0,c1) LIMIT 101"
+    );
+}
+
+#[tokio::test]
+async fn a_count_over_a_statement_is_sent_as_a_derived_table() {
+    let server = start(Script {
+        columns: vec![col("n", LONGLONG, 0, BINARY_CHARSET, 0)],
+        rows: vec![vec![int8(250)]],
+        ..Script::default()
+    })
+    .await;
+    let query = format!("SELECT COUNT(*) AS n FROM ({PAGED}) AS matched");
+    let result = invoke(
+        &adapter(&server),
+        "query.read",
+        json!({"query": query, "limit": 1}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result["rows"], json!([["250"]]));
+    assert_eq!(
+        last_prepared(&server),
+        "SELECT * FROM (SELECT COUNT(*) AS n FROM (SELECT id, name FROM item ORDER BY id) AS matched\n) AS result (c0) LIMIT 2"
+    );
+}
+
 // The catalogue reads on MySQL: one fixed `information_schema` statement each,
 // the caller's names bound positionally, and the connected database the only
 // schema a table or index read can name.

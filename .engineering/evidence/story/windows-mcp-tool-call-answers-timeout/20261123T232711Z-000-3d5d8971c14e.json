@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-23T23:27:11Z",
+  "actor": "human:timo",
+  "artifact": "story:windows-mcp-tool-call-answers-timeout",
+  "kind": "story",
+  "revision": 41,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "check 'host and CLI on windows-latest' of pull request 288 passed all steps",
+    "reference": "https://github.com/beyond10x/connectors/pull/288"
+  }
+}

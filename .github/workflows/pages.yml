@@ -45,10 +45,11 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: website/package-lock.json
-      - name: Install Rust 1.98.1 with the browser target
+      - name: Install the Rust toolchain of rust-toolchain.toml with the browser target
         run: |
-          rustup toolchain install 1.98.1 --profile minimal --target wasm32-unknown-unknown
-          rustup default 1.98.1
+          rustup toolchain install
+          rustup target add wasm32-unknown-unknown
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
       - name: Install the pinned ess release
         working-directory: ${{ runner.temp }}

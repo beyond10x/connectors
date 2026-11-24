@@ -1,5 +1,5 @@
-# Attaches pre-built `connectors`, `connectors-catalog-provider` and the Grafana, Prometheus, Loki
-# and Kubernetes program binaries for Linux and macOS
+# Attaches pre-built `connectors`, `connectors-catalog-provider` and the Grafana, Prometheus, Loki,
+# Kubernetes and SQL (`connectors-sql`) program binaries for Linux and macOS
 # to the GitHub Release of every `v<version>` tag, with a SHA256SUMS file. No Windows binary is
 # built. The build job's `BINARIES` is the one list of packaged binaries; every step builds,
 # checks, signs and packages each of them, and the repository gate (`connectors-build
@@ -16,7 +16,8 @@
 #
 # A pull request that changes this file or the image runs provenance, the four builds and the
 # image build against the workspace version and publishes nothing. A manual dispatch backfills an
-# existing annotated tag.
+# existing annotated tag whose commit holds `rust-toolchain.toml`; the two steps that install Rust
+# refuse a tag from before that file; they do not fall back to a version.
 #
 # Every third-party action is pinned by commit; the publish and image jobs hold write authority.
 name: Release binaries
@@ -62,10 +63,16 @@ jobs:
           fetch-tags: true
           persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.sha }}
-      - name: Install Rust 1.98.1
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
-          rustup toolchain install 1.98.1 --profile minimal
-          rustup default 1.98.1
+          if [ ! -f rust-toolchain.toml ]; then
+            echo "::error::rust-toolchain.toml is missing from the checkout of $TAG. A release is built with the toolchain that file names and with no other; a tag from before the file is not built here."
+            exit 1
+          fi
+          rustup toolchain install
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
       - id: release
         name: Tag, workspace version, changelog and checkout agree
@@ -111,17 +118,24 @@ jobs:
       TARGET: ${{ matrix.target }}
       VERSION: ${{ needs.provenance.outputs.version }}
       # Each name is both a workspace package and the binary it builds.
-      BINARIES: connectors connectors-catalog-provider connectors-grafana connectors-prometheus connectors-loki connectors-kubernetes
+      BINARIES: connectors connectors-catalog-provider connectors-grafana connectors-prometheus connectors-loki connectors-kubernetes connectors-sql
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           ref: ${{ needs.provenance.outputs.commit }}
-      - name: Install Rust 1.98.1
+      - name: Install the Rust toolchain of rust-toolchain.toml
         shell: bash
+        env:
+          TAG: ${{ needs.provenance.outputs.tag || github.ref_name }}
         run: |
-          rustup toolchain install 1.98.1 --profile minimal --target "$TARGET"
-          rustup default 1.98.1
+          if [ ! -f rust-toolchain.toml ]; then
+            echo "::error::rust-toolchain.toml is missing from the checkout of $TAG. A release is built with the toolchain that file names and with no other; a tag from before the file is not built here."
+            exit 1
+          fi
+          rustup toolchain install
+          rustup target add "$TARGET"
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
       - name: Build the release binaries
         shell: bash

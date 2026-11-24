@@ -18,8 +18,11 @@ eight Roughtime sources and a `quorum`: the answer is formed only where at least
 `quorum` of them agree. This example uses the four public sources of the Roughtime
 ecosystem list, each run by a different operator; their addresses and keys were
 checked on 2026-10-14 (the addresses are the IPv4 answers of the names in the
-comments, since the client does no DNS). Recheck each source's current identity,
-address and version before use. The example's 10,000 ppm (1%) is an explicit
+comments, since the client does no DNS); the address of `time.txryan.com` was
+changed on 2026-11-24, when the name had moved from 148.113.255.71 to 149.56.214.17
+with the same key. Recheck each source's current identity, address and version
+before use, and resolve a source's name again when `clock-check` reports it
+`unreachable`. The example's 10,000 ppm (1%) is an explicit
 assumed maximum, including hardware error and Linux timer adjustments; it is not a
 calibration result or an automatic default for other machines.
 
@@ -45,7 +48,7 @@ public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
 version = "roughtime-0x8000000c"
 
 [[approval_clock.sources]]   # time.txryan.com
-address = "148.113.255.71:2002"
+address = "149.56.214.17:2002"
 public_key = "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
 version = "roughtime-0x8000000c"
 ```
@@ -62,7 +65,9 @@ unreachable source at once. A quorum equal to the number of sources tolerates no
 liar.
 
 On 2026-10-14 only int08h (signed radius 5 s) and time.txryan.com (3 s) answered;
-Cloudflare and roughtime.se were unreachable at `roughtime-0x8000000c`. With two
+Cloudflare and roughtime.se were unreachable at `roughtime-0x8000000c`. On
+2026-11-24 int08h, roughtime.se and time.txryan.com (at 149.56.214.17) answered and
+Cloudflare did not; each of the three dropped single checks. With two
 reachable sources this example is a quorum of two of two: it answers, but it
 tolerates no outage and no lying source until a third source answers. A verified
 source counts toward the quorum at any radius; only the combined answer is capped at

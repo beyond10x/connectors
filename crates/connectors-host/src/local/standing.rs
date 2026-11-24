@@ -2546,6 +2546,8 @@ mod tests {
     /// Unicode-aware class costs far more: `^\w+$` needs 50,132 bytes, and
     /// `^\w{2}$` is refused.)
     pub(super) const UNDER_THE_SIZE_LIMIT: &str = "^[a-z]{906}$";
+    // Read only by `signed_tests`, which is compiled on unix.
+    #[cfg(unix)]
     pub(super) const OVER_THE_SIZE_LIMIT: &str = "^[a-z]{907}$";
 
     /// The transition grant of the story's consumer, as `approvals

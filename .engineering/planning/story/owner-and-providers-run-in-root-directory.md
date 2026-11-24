@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-and-providers-run-in-root-directory
 kind: story
-status: active
+status: implemented
 title: The owner and its providers run in / instead of the caller's working directory
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
@@ -20,10 +20,11 @@ scope:
   path: crates/connectors-host/src/local/owner/transport.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process.rs
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T12:40:48Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-11-23T12:40:49Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-11-24T06:33:43Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Defect
 

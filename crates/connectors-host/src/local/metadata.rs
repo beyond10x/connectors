@@ -131,6 +131,11 @@ pub(super) fn exit_process() {
 }
 
 #[cfg(test)]
+pub(super) fn own_processes() -> er::OwnProcesses {
+    er::own_processes()
+}
+
+#[cfg(test)]
 pub(super) fn record_read_uses(on: bool) {
     er::record_read_uses(on);
 }
