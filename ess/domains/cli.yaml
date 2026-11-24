@@ -2042,7 +2042,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1750, docs/local-connection-registry.md:235-236;
+    # contracts/cli/v1alpha1/semantics.md:1793, docs/local-connection-registry.md:235-236;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
