@@ -115,8 +115,11 @@ fn help_says_adapter_only_on_a_deprecated_line() {
     // Root, 7 groups, 35 command paths and 5 aliases: `invoke` is one, and
     // `operations invoke` is removed (story:connectors-do-short-invocation).
     // `definitions install` is the newest (story:definitions-install).
-    // `setup custody-orphans` (story:custody-keeps-out-of-the-session-keyring) is the newest.
-    assert_eq!(paths.len(), 48, "{paths:?}");
+    // `setup custody-orphans` (story:custody-keeps-out-of-the-session-keyring) came next.
+    // `approvals grant-standing`, `list-standing` and `revoke-standing`
+    // (story:local-invoke-admits-a-keyed-write-under-a-standing-grant) are the
+    // newest: 38 command paths.
+    assert_eq!(paths.len(), 51, "{paths:?}");
 }
 
 /// The listing line `help` writes for `name`, the words after the name.
@@ -284,6 +287,8 @@ fn a_failure_rendered_for_a_person_never_says_adapter() {
     // `unsupported_private_protocol`
     // (story:adapter-private-protocol-refusal-named), then the
     // `metadata_missing` code and the `initialize_state` next action (#268),
-    // are the newest.
-    assert_eq!(rendered, 70);
+    // came next. The `rate_limited` code
+    // (story:local-invoke-admits-a-keyed-write-under-a-standing-grant) is the
+    // newest: 43 codes.
+    assert_eq!(rendered, 71);
 }

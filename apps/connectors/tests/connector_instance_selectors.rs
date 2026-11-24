@@ -190,10 +190,12 @@ fn selecting_commands(root: &Path, schema: &str) -> Vec<(String, Vec<String>)> {
                 "expected_key" | "candidate" | "key" => UUID.into(),
                 _ => "1".into(),
             };
-            let ArgumentSource::Option { long } = &argument.source else {
-                panic!("{field}: no option source");
-            };
-            args.extend([format!("--{long}"), value]);
+            match &argument.source {
+                ArgumentSource::Option { long } => args.extend([format!("--{long}"), value]),
+                // `approvals revoke-standing <grant id>`.
+                ArgumentSource::Positional { .. } => args.push(value),
+                _ => panic!("{field}: no option or positional source"),
+            }
         }
         commands.push((declaration.callable.clone(), args));
     }
@@ -280,8 +282,9 @@ fn both_selectors_reach_one_instance_and_only_the_alias_is_deprecated() {
     let (root, schema) = configured("");
     let count = selecting_commands(root.path(), &schema).len();
     // `operations invoke` is removed; `invoke` selects by its target
-    // (story:connectors-do-short-invocation).
-    assert_eq!(count, 25);
+    // (story:connectors-do-short-invocation). The three standing commands
+    // (story:local-invoke-admits-a-keyed-write-under-a-standing-grant) select too.
+    assert_eq!(count, 28);
     let (mut succeeded, mut wrong) = (Vec::new(), Vec::new());
     for index in 0..count {
         // Each run starts from the same configured state, so a command that
