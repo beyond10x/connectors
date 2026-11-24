@@ -816,6 +816,8 @@ pub(super) mod seam {
     thread_local! {
         static SEAM: RefCell<Option<Seam>> = const { RefCell::new(None) };
     }
+    // The tests that set a seam are Unix-only (`mutation::tests`).
+    #[cfg(unix)]
     pub fn set(seam: Option<Seam>) {
         SEAM.with(|slot| *slot.borrow_mut() = seam);
     }

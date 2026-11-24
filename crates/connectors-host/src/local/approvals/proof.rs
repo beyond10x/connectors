@@ -330,7 +330,9 @@ impl ConfiguredApprovalKey {
         Ok(claims)
     }
 }
-#[cfg(test)]
+// Its one caller is in the Unix-only tests of the signed grant file
+// (`standing::signed_tests`).
+#[cfg(all(test, unix))]
 impl Evidence {
     /// Whether the proof decoder takes these bytes as a proof.
     pub(in crate::local) fn decodes(&self) -> bool {

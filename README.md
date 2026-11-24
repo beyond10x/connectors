@@ -48,10 +48,9 @@ Two instances of one connector exist when you connect twice, for example with tw
 accounts or two hosts; the instance name addresses the right one. Every operation of
 an enabled connector is available on its instances. Configuration does not group
 operations or hide a subset; a library that wants a narrower surface projects one over
-it. A write that requires approval still needs a proof issued for its exact input, or, on
-an instance whose entry names a `standing_grants` file, a standing grant its operator signed
-once with `approvals grant-standing`
-([standing grants](docs/local-approvals.md#standing-grants)).
+it. A write that requires approval still needs a proof issued for its exact input, or a
+[standing grant](docs/local-approvals.md#standing-grants) its operator signed once with
+`approvals grant-standing`.
 
 "Adapter" is not one of these words. It is the internal name of an implementation (the
 catalog engine, a credential binary) and of the process that serves an instance.
@@ -311,12 +310,7 @@ for Linux and macOS, whose directory holds `connectors` and `connectors-catalog-
 ([Getting started](https://beyond10x.github.io/connectors/docs/getting-started#or-install-a-release-binary)).
 Keep the two binaries in one directory: an instance that pins nothing is derived by the provider
 beside `connectors`, which `setup check` lists as the `installed_provider` prerequisite. The macOS
-binaries are not signed. An archive downloaded through a browser carries Gatekeeper's quarantine
-attribute, and its binaries are refused until you remove it from the extracted directory:
-
-```sh
-xattr -dr com.apple.quarantine "connectors-$version-$target"
-```
+binaries are not signed: the linked page says how to remove Gatekeeper's quarantine attribute.
 
 Or run the container image: releases from 0.70.0 on publish `ghcr.io/beyond10x/connectors:<version>`
 for `linux/amd64` and `linux/arm64`, with the Linux archive's binaries, running as a non-root user
