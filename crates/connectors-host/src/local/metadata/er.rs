@@ -705,7 +705,7 @@ fn process() -> u64 {
 
 #[cfg(test)]
 fn process() -> u64 {
-    PROCESS.with(std::cell::Cell::get)
+    PROCESS.with(std::cell::Cell::get) ^ PROCESS_NAMESPACE.with(std::cell::Cell::get)
 }
 
 impl ErAuthority {
@@ -2942,6 +2942,9 @@ thread_local! {
     static FULL_REPLAYS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static FRESH_OPENS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static PROCESS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    /// The bits this thread's namespace sets in every process id the thread
+    /// acts as: none on a thread that is in no namespace.
+    static PROCESS_NAMESPACE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 /// Complete-store snapshots this thread has taken: each is a full replay.
@@ -2996,6 +2999,83 @@ fn note_fresh_open() {
 #[cfg(test)]
 pub(super) fn simulate_process(id: u64) {
     PROCESS.with(|process| process.set(id));
+}
+
+/// The process ids below this bit are a test's to simulate; a namespace sets
+/// its number in the bits from here up.
+#[cfg(test)]
+const NAMESPACE_SHIFT: u32 = 48;
+
+/// A namespace of process ids one test owns. `cargo test` runs the tests of
+/// this binary as threads of one process, and the idle handles of all of them
+/// are in one pool ([`IDLE`]) under the process id their thread acted as: a
+/// thread that pools a fifth handle as process 1, or ends process 1
+/// ([`exit_process`]), closes the idle handles every other test opened as
+/// process 1, and the next open of each is a fresh one. A thread in a namespace
+/// acts as process ids no thread outside that namespace acts as, whichever ids
+/// below `1 << NAMESPACE_SHIFT` either simulates, so only its own test evicts
+/// or closes its idle handles. A test that counts fresh opens or complete
+/// replays, or asserts on what a reused handle answers, takes one
+/// ([`own_processes`]).
+#[cfg(test)]
+#[derive(Clone, Copy)]
+pub(in crate::local) struct ProcessNamespace(u64);
+
+#[cfg(test)]
+impl ProcessNamespace {
+    /// Makes the calling thread act in this namespace until it ends: for a
+    /// thread the owning test starts as a thread of the same simulated
+    /// process. No thread inherits a namespace; one that never enters one acts
+    /// as exactly the process id set ([`simulate_process`]), 0 by default.
+    pub(in crate::local) fn enter(self) {
+        PROCESS_NAMESPACE.with(|namespace| namespace.set(self.0));
+    }
+}
+
+/// A test's own namespace of process ids, which the thread that took it acts
+/// in until this value is dropped.
+#[cfg(test)]
+#[must_use = "the thread leaves the namespace when this value is dropped"]
+pub(in crate::local) struct OwnProcesses {
+    namespace: ProcessNamespace,
+    outer: u64,
+    /// Not `Send`: it is dropped on the thread that took it.
+    _thread: std::marker::PhantomData<*const ()>,
+}
+
+#[cfg(test)]
+impl OwnProcesses {
+    /// The namespace, for a thread of this test to enter.
+    pub(in crate::local) fn namespace(&self) -> ProcessNamespace {
+        self.namespace
+    }
+}
+
+#[cfg(test)]
+impl Drop for OwnProcesses {
+    fn drop(&mut self) {
+        PROCESS_NAMESPACE.with(|namespace| namespace.set(self.outer));
+    }
+}
+
+/// Gives the calling test a namespace of process ids no other test has and
+/// makes this thread act in it.
+#[cfg(test)]
+pub(super) fn own_processes() -> OwnProcesses {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let number = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    assert!(
+        number < 1 << (u64::BITS - NAMESPACE_SHIFT),
+        "this test binary took every namespace of process ids"
+    );
+    let namespace = ProcessNamespace(number << NAMESPACE_SHIFT);
+    let outer = PROCESS_NAMESPACE.with(std::cell::Cell::get);
+    namespace.enter();
+    OwnProcesses {
+        namespace,
+        outer,
+        _thread: std::marker::PhantomData,
+    }
 }
 
 #[cfg(test)]
@@ -7537,6 +7617,7 @@ mod tests {
     /// processes in one pool; a simulated process is bounded as a real one is.
     #[test]
     fn handles_another_process_releases_never_evict_this_process_held_handle() {
+        let _processes = own_processes();
         let owner = 0x9001_0001_u64;
         let other = 0x9001_0002_u64;
         simulate_process(owner);
@@ -7558,7 +7639,7 @@ mod tests {
             .lock()
             .unwrap()
             .iter()
-            .filter(|idle| idle.process == other)
+            .filter(|idle| idle.process == process())
             .map(|idle| idle.durable_path.clone())
             .collect::<Vec<_>>();
         assert_eq!(others.len(), IDLE_LIMIT);

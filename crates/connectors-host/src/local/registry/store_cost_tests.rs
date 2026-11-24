@@ -581,7 +581,8 @@ fn read_invokes_inside_one_clock_interval_record_nothing() {
 /// whenever a full replay of the same bytes refuses them.
 #[test]
 fn a_reopen_after_its_own_write_refuses_every_blob_altered_since() {
-    use super::super::metadata::simulate_process;
+    use super::super::metadata::{own_processes, simulate_process};
+    let _processes = own_processes();
     let (root, registry) = fixture();
     let (_, candidate) = prepared(&registry, "one", NOW);
     let reference = publish_fixture(&registry, candidate, NOW);
