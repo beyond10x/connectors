@@ -14,6 +14,7 @@ relations:
 - depends_on: story:mcp-stdio-runtime-branch
 - depends_on: story:definition-reader-feed-extensions
 - depends_on: story:mounted-custody-kind-secret-volume
+- depends_on: story:released-install-reads-mysql-and-loki-per-environment
 scope:
 - confidence: cited
   path: .github/workflows/release-binaries.yml
