@@ -1029,7 +1029,7 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
         .collect::<Result<_>>()?;
     let custom = custom_harness_targets(&metadata)?;
     let output = crate::run(
-        Command::new("cargo")
+        crate::cargo_program()
             .current_dir(root)
             .env("CARGO_BUILD_JOBS", "2")
             .args([
@@ -1146,7 +1146,7 @@ fn inventoried(custom: &BTreeSet<(String, String)>, package: &str, target: &str)
 
 fn cargo_metadata(root: &Path) -> Result<Value> {
     Ok(serde_json::from_slice(
-        &crate::run(Command::new("cargo").current_dir(root).args([
+        &crate::run(crate::cargo_program().current_dir(root).args([
             "metadata",
             "--locked",
             "--offline",

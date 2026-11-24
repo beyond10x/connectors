@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:released-install-reads-mysql-and-loki-per-environment
 kind: story
-status: active
+status: implemented
 title: A released install reads mysql/<env> (a managed replica) and loki/<env>
 summary: The release archive ships connectors-sql; guides for a managed MySQL replica and for Loki without a Loki token; a consumer's two checks read through both
 relations:
@@ -45,10 +45,11 @@ scope:
   path: website/docs/connectors/mysql.md
 - confidence: cited
   path: website/docs/getting-started.md
-revision: 26
+revision: 27
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T01:43:23Z", actor: "human:timo", revision: 25, decided_on: {"recorded":{"review_outcome":7}}}
 - {from: "proposed", to: "active", at: "2026-11-24T01:43:24Z", actor: "human:timo", revision: 26, decided_on: {"recorded":{"review_outcome":7}}}
+- {from: "active", to: "implemented", at: "2026-11-24T13:27:55Z", actor: "human:timo", revision: 27, decided_on: {"recorded":{"test_result":2,"review_outcome":7}}}
 ---
 ## Request
 

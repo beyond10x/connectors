@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0772-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: Scope of connectors 0.77.2
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-24T12:41:08Z", actor: "human:timo", revision: 3}
 ---
 ## Scope of connectors 0.77.2
 
@@ -52,3 +54,24 @@ operator): finished green work is integrated and released when a user sees somet
 - An approval signer an agent process of the operator's user cannot use
   (story:a-marked-instance-takes-only-approvals-a-human-signed, `draft`; the pick is the
   operator's).
+
+## Verified after the release
+
+- Pull request 292 merged 2026-11-24 11:08 CET as 7626141119f; tag `v0.77.2` is on that
+  commit. Release page published 11:10 CET.
+- The release page held no archive from 11:10 to 12:38 CET. In the release-binaries run
+  45372260956 the build job for aarch64-apple-darwin started at 11:56 CET, 43 minutes after
+  the provenance job ended; the upload job waits for all four builds and ran 12:37:58 to
+  12:38:16 CET. While the page had no archive, the plugins repository's check of the newest
+  CLI release answered 404.
+- The run ended `success` in one attempt, all 7 jobs. The page holds four archives and
+  `SHA256SUMS`; `sha256sum -c` passes on the four downloaded archives.
+- The archive for x86_64-unknown-linux-gnu holds `connectors`, `connectors-catalog-provider`,
+  `connectors-sql`, `connectors-loki`, `connectors-kubernetes`, `connectors-prometheus` and
+  `connectors-grafana`; `connectors-sql --version` from it prints `connectors-sql 0.77.2`.
+  This is the first released archive read to hold `connectors-sql`; 0.77.1 has none.
+- The image `ghcr.io/beyond10x/connectors:0.77.2` (digest sha256:4e74c786c17d) is built for
+  linux/amd64 and linux/arm64.
+- From 0.78.0 on the release page is created as a pre-release and becomes the newest release
+  only after its four archives pass `sha256sum -c`, so the newest release always has archives.
+- No install was moved to 0.77.2; the workstation install goes from 0.77.0 to 0.78.0.

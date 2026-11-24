@@ -281,9 +281,13 @@ One write uploads a file and shares it, under one approval or standing grant:
   `{"files":[{"id":<file_id>,"title":<title>}],"channel_id":…}` with
   `thread_ts` and `initial_comment` when given. Nothing is shared before it,
   so a refusal or failure of the first two requests is `refused`, never
-  `outcome_unknown`. `channel_not_found` and `not_in_channel` there are
-  refused as `not_found` and `forbidden`; any other `"ok": false`, and a
-  dispatch without a definite answer, is `outcome_unknown`.
+  `outcome_unknown`. One case differs through the local CLI: the three
+  requests share the invocation's deadline, and a deadline that ends while
+  the slot or the byte request is unanswered is `outcome_unknown` with
+  `timeout`, although nothing was shared. `channel_not_found` and
+  `not_in_channel` there are refused as `not_found` and `forbidden`; any
+  other `"ok": false`, and a dispatch without a definite answer, is
+  `outcome_unknown`.
 
 The input of one upload into a thread:
 
@@ -295,14 +299,22 @@ The input of one upload into a thread:
 A connection without `hosts` admitting `files.slack.com`, as a bot instance
 derived from the shipped declaration is, describes `file.upload` but refuses
 every upload as `forbidden` after `files.getUploadURLExternal`, with no byte
-sent. The local CLI keeps its limits, an input of at most 1 MiB and an
-approval request of at most 272 KiB, both counting the base64 text, so an
-upload through it is bounded by them; the served host reads the whole 2 MiB.
+sent. The local CLI keeps its limits, an input of at most 1 MiB, an
+approval request of at most 272 KiB and an approval input of at most 256 KiB,
+each counting the base64 text, so an upload through it is bounded by them: with
+a short title and no comment, a file of 196,243 bytes is prepared and one of
+196,475 bytes is refused as `invalid_input`. The served host reads the whole
+2 MiB.
+
+Before 0.78.1 the local CLI refused every `file.upload` as `forbidden` at stage
+`dispatch`, with only `auth.test` sent; the served host was not affected.
 
 Verified against the local fixture in `adapters/catalog/tests/slack.rs`
 (`an_approved_file_delete_reads_the_file_then_sends_one_json_body` and the two
-cases after it), not against a live workspace. File upload is not selected: it
-is a binary request body, which the catalog does not send.
+cases after it; the upload through the provider child in
+`an_approved_upload_through_the_child_sends_its_slot_its_bytes_and_the_share`)
+and, for the upload on the served host, in `adapters/catalog/tests/served.rs`,
+not against a live workspace.
 
 ## Messages
 

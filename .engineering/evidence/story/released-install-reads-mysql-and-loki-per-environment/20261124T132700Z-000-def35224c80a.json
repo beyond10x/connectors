@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-24T13:27:00Z",
+  "actor": "human:timo",
+  "artifact": "story:released-install-reads-mysql-and-loki-per-environment",
+  "kind": "story",
+  "revision": 26,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "acceptance 3 on the released 0.78.0 archives: tar -tzf of the four archives lists connectors-sql; connectors-sql --version prints connectors-sql 0.78.0; setup check shows artifact:incidents ready for a mysql instance pinned by sha256",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.78.0"
+  }
+}

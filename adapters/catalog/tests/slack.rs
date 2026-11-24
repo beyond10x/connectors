@@ -948,6 +948,8 @@ fn deleted(body: &Value) -> Value {
 /// A file `files.info` finds whose delete is read and then left unanswered,
 /// the connection closed: the dispatch is ambiguous.
 const DROPPED_FILE: &str = "F0FIXTUREDROP";
+/// The file id the fixture issues with each upload slot.
+const UPLOADED_FILE: &str = "F0FIXTUREUP1";
 /// What `files.delete` answers: the pinned success schema, `ok` alone, for
 /// `F0FIXTURE01`; Slack's refusal, `200` with `ok: false`, for the others:
 /// `F0FIXTURE02` deleted in the meantime, `F0FIXTURE03` not the bot's to
@@ -1208,6 +1210,13 @@ impl Provider {
     fn files(credential: bool) -> Self {
         Self::start(false, false, Some(credential), None)
     }
+    /// [`Provider::files`] with the credential, on private protocol two, and
+    /// one more selection, `fixture.upload`: the shipped `file.upload`
+    /// reaching the fixture's origin, which issues slots, takes their bytes
+    /// under `/upload/v1/` and shares the file.
+    fn uploading() -> Self {
+        Self::start(false, false, Some(true), Some(PrivateProtocol::V2))
+    }
     fn start(
         refuse_identity: bool,
         user: bool,
@@ -1244,6 +1253,7 @@ impl Provider {
                 .unwrap();
             runtime.block_on(async {
                 let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let port = listener.local_addr().unwrap().port();
                 address_tx.send(listener.local_addr().unwrap()).unwrap();
                 let acceptor = TlsAcceptor::from(Arc::new(tls));
                 loop {
@@ -1290,12 +1300,16 @@ impl Provider {
                     if stream.read_exact(&mut sent).await.is_err() {
                         continue;
                     }
-                    let sent: Value = if sent.is_empty() {
+                    let route = path.split('?').next().unwrap_or_default().to_owned();
+                    // Uploaded bytes are recorded as their length and digest.
+                    let sent: Value = if route.starts_with("/upload/v1/") {
+                        json!({"length": sent.len(),
+                               "sha256": hex::encode(Sha256::digest(&sent))})
+                    } else if sent.is_empty() {
                         Value::Null
                     } else {
                         serde_json::from_slice(&sent).unwrap_or(Value::Null)
                     };
-                    let route = path.split('?').next().unwrap_or_default().to_owned();
                     exchanged.lock().unwrap().push((
                         method.clone(),
                         route.clone(),
@@ -1329,6 +1343,19 @@ impl Provider {
                                 continue;
                             }
                             "/api/files.delete" => Some((200, file_deleted(&sent))),
+                            "/api/files.getUploadURLExternal" => Some((
+                                200,
+                                json!({"ok": true, "file_id": UPLOADED_FILE,
+                                       "upload_url": format!(
+                                           "https://localhost:{port}/upload/v1/{UPLOADED_FILE}"
+                                       )}),
+                            )),
+                            "/api/files.completeUploadExternal" => Some((
+                                200,
+                                json!({"ok": true,
+                                       "files": [{"id": sent["files"][0]["id"],
+                                                  "title": sent["files"][0]["title"]}]}),
+                            )),
                             _ => None,
                         };
                         if let Some((status, answer)) = answer {
@@ -1342,6 +1369,22 @@ impl Provider {
                             let _ = stream.write_all(&answer).await;
                             continue;
                         }
+                    }
+                    // The upload host: a slot's bytes, answered as Slack answers
+                    // them, in text that is not JSON.
+                    if method == "POST" && route.starts_with("/upload/v1/") {
+                        observed
+                            .lock()
+                            .unwrap()
+                            .push((path, authorization, token_header));
+                        let bytes = format!("OK - {length}").into_bytes();
+                        let header = format!(
+                            "HTTP/1.1 200 fixture\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            bytes.len()
+                        );
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&bytes).await;
+                        continue;
                     }
                     // The file host: the content to the bot token alone, a
                     // `403` without it, as bytes that are not JSON.
@@ -1428,7 +1471,17 @@ impl Provider {
                 .expect("the shipped file download");
             download.id = "fixture.download".into();
             download.binary.as_mut().unwrap().hosts = vec![origin.clone()];
-            document["operations"] = json!([download]);
+            let mut selections = vec![download];
+            if matches!(protocol, Some(PrivateProtocol::V2)) {
+                let mut upload = shipped()
+                    .into_iter()
+                    .find(|s| s.id == "file.upload")
+                    .expect("the shipped file upload");
+                upload.id = "fixture.upload".into();
+                upload.binary.as_mut().unwrap().hosts = vec![origin.clone()];
+                selections.push(upload);
+            }
+            document["operations"] = json!(selections);
             document["hosts"] = json!([{"origin": origin, "credential": credential}]);
         }
         private(&config, &serde_json::to_vec(&document).unwrap());
@@ -3581,4 +3634,93 @@ fn a_file_delete_without_an_approval_a_file_or_a_token_sends_nothing() {
         outcome.map(|result| result.effect)
     );
     assert!(rejected.posts().is_empty(), "a delete was sent");
+}
+
+/// An upload as the local CLI sends it: the body the completing write is
+/// built from and the content with its SHA-256.
+fn upload_input() -> Value {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    json!({"body": {"channel_id": "C0FIXTURE01", "thread_ts": "1780000100.000100",
+                    "filename": "fixture-1.pdf", "title": "Fixture file",
+                    "initial_comment": "fixture file uploaded"},
+           "content": {"base64": STANDARD.encode(FILE_BYTES),
+                       "sha256": hex::encode(Sha256::digest(FILE_BYTES)),
+                       "media_type": "application/pdf"}})
+}
+
+/// An approved upload through the provider child, prepared and then
+/// committed as the local owner does it, is sent with its slot and byte
+/// ports: the slot is asked with the file's name and length, the bytes go to
+/// the issued URL as they are, and the completing write shares the issued
+/// file id with the title, the channel, the thread and the comment. Found on
+/// the first live use of 0.78.0: the commit dropped the two ports and every
+/// local upload was refused as `forbidden` with only `auth.test` sent.
+#[test]
+fn an_approved_upload_through_the_child_sends_its_slot_its_bytes_and_the_share() {
+    let provider = Provider::uploading();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let input = upload_input();
+    let result = write(&mut child, "fixture.upload", &input)
+        .unwrap_or_else(|failure| panic!("`fixture.upload` refused in prepare: {failure:?}"));
+    assert_eq!(
+        result.effect,
+        WriteEffect::Applied,
+        "{result:?}\n{:?}",
+        provider.exchanges()
+    );
+    let answer = result.result.unwrap();
+    assert_eq!(answer["status"], 200);
+    assert_eq!(answer["body"]["ok"], true);
+    assert_eq!(answer["body"]["files"][0]["id"], UPLOADED_FILE);
+    let exchanges = provider.exchanges();
+    let posts: Vec<_> = exchanges
+        .iter()
+        .filter(|(method, ..)| method == "POST")
+        .collect();
+    let routes: Vec<&str> = posts.iter().map(|(_, route, ..)| route.as_str()).collect();
+    let bytes = format!("/upload/v1/{UPLOADED_FILE}");
+    assert_eq!(
+        routes,
+        [
+            "/api/files.getUploadURLExternal",
+            bytes.as_str(),
+            "/api/files.completeUploadExternal"
+        ],
+        "{exchanges:?}"
+    );
+    let slot = provider
+        .requests()
+        .into_iter()
+        .find(|(path, ..)| path.starts_with("/api/files.getUploadURLExternal"))
+        .expect("the slot request");
+    assert_eq!(
+        slot.0,
+        format!(
+            "/api/files.getUploadURLExternal?filename=fixture-1.pdf&length={}",
+            FILE_BYTES.len()
+        )
+    );
+    assert!(
+        posts[1]
+            .2
+            .as_deref()
+            .is_some_and(|kind| kind.starts_with("application/pdf")),
+        "{:?}",
+        posts[1].2
+    );
+    assert_eq!(
+        posts[1].3,
+        json!({"length": FILE_BYTES.len(),
+               "sha256": hex::encode(Sha256::digest(FILE_BYTES))})
+    );
+    assert_eq!(
+        posts[2].3,
+        json!({"files": [{"id": UPLOADED_FILE, "title": "Fixture file"}],
+               "channel_id": "C0FIXTURE01", "thread_ts": "1780000100.000100",
+               "initial_comment": "fixture file uploaded"})
+    );
+    for (path, authorization, token_header) in provider.requests() {
+        assert_eq!(authorization.as_deref(), Some(HEADER), "{path}");
+        assert!(!token_header && !path.contains("token="), "{path}");
+    }
 }

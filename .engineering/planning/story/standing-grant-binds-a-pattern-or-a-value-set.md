@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:standing-grant-binds-a-pattern-or-a-value-set
 kind: story
-status: active
+status: implemented
 title: A standing grant binds a target member to a pattern or a value set
 relations:
 - depends_on: story:local-invoke-admits-a-keyed-write-under-a-standing-grant
@@ -42,10 +42,11 @@ scope:
   path: docs/running-services.md
 - confidence: cited
   path: ess/domains/standing_approvals.yaml
-revision: 33
+revision: 34
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-23T14:44:21Z", actor: "human:timo", revision: 31, decided_on: {"recorded":{"review_outcome":14}}}
 - {from: "proposed", to: "active", at: "2026-11-23T14:44:22Z", actor: "human:timo", revision: 32, decided_on: {"recorded":{"review_outcome":14}}}
+- {from: "active", to: "implemented", at: "2026-11-24T12:41:17Z", actor: "human:timo", revision: 34, decided_on: {"recorded":{"test_result":1,"review_outcome":20}}}
 ---
 ## Outcome
 

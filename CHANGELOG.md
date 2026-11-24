@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.78.1 — 2026-11-24
+
+### Changed
+
+- The repository's gate and its step of the ignored tests (`connectors-build gate`,
+  `connectors-build ignored`) start cargo without the `CARGO_MANIFEST_*` and `CARGO_PKG_*`
+  variables that `cargo run` hands them
+  (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step). With them set, cargo
+  ran the build script of `ring` again at each change between a cargo of the shell and a cargo
+  of the gate, and compiled `ring` and everything that depends on it again: in the gate job of
+  pull request 293, 209 s inside the gate and 48 s at the start of the ignored step were read
+  from the log, and the 567 s without a line in that step are inferred to be the same, of
+  3,175 s. Nothing changes for an installed binary.
+
+### Fixed
+
+- `file.upload` of the Slack catalog works through the local CLI
+  (story:a-file-upload-through-the-local-cli-is-sent-with-its-ports). Since 0.74.0, which
+  added the operation, every upload that was prepared, approved and sent with `connectors
+  invoke` was answered `forbidden` at stage `dispatch`, classification `refused`, with
+  nothing shared and only `auth.test` sent: the provider child committed the write without
+  the upload's slot and byte ports, and the engine refuses an upload sent without them. The
+  three requests of an upload (the slot, the bytes, the share) are now sent on that path
+  too. The served host was not affected. No command, configuration member or answer member
+  changes. An upload through the local CLI keeps its bounds: an approval input of at most
+  256 KiB counting the base64 text, a file of about 196,000 bytes
+  ([Slack catalog](docs/catalog-slack.md#files)). The three requests share the invocation's
+  deadline: one that ends while the slot or the byte request is unanswered is answered
+  `outcome_unknown` with `timeout`, with nothing shared.
+
 ## 0.78.0 — 2026-11-24
 
 ### Added

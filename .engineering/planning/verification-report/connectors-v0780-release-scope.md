@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0780-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: 'connectors 0.78.0: what the release holds'
-revision: 3
+revision: 5
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-24T13:27:54Z", actor: "human:timo", revision: 5}
 ---
 ## Scope of connectors 0.78.0
 
@@ -72,3 +74,41 @@ updates Jira tickets under one long-lived grant per operation (the operator's pi
 - An approval signer an agent process of the operator's user cannot use
   (story:a-marked-instance-takes-only-approvals-a-human-signed, `draft`; the pick is the
   operator's).
+
+## Verified after the release
+
+- Pull request 293 merged 2026-11-24 13:37 CET as 5e149ab0c57; tag `v0.78.0` is on that
+  commit. The release page was published 13:39 CET as a pre-release and made the newest
+  release at 14:15 CET, after the four archives passed `sha256sum -c`. Until then the newest
+  release was 0.77.2, which has archives.
+- Checks of pull request 293: "repository gate" passed in 52 min 55 s (run 45377042383; the
+  gate step 40 min 55 s, the step of the ignored tests 10 min 17 s). The job "Build
+  aarch64-apple-darwin" of the pull request's release-binaries run 45377042774 ended
+  cancelled after 52 minutes in the queue ("The job was not acquired by Runner of type
+  hosted even after multiple attempts"); its second attempt was taken by a runner at 13:25
+  CET and passed.
+- Release-binaries run 45395693456 of the tag: `success` in one attempt, all 7 jobs. The
+  upload job with the new `pattern` ran 14:09:47 to 14:09:59 CET, before the image job
+  (14:12:53 CET), and published four archives and `SHA256SUMS`.
+- Each of the four archives lists `connectors-sql`. From the archive for
+  x86_64-unknown-linux-gnu, `connectors-sql --version` prints `connectors-sql 0.78.0`, and a
+  `mysql` instance pinned to that file by its `sha256` in a scratch configuration shows the
+  check `artifact:incidents` as `ready` in `setup check`.
+- The image `ghcr.io/beyond10x/connectors:0.78.0` (digest sha256:507c8e52b137) is built for
+  linux/amd64 and linux/arm64.
+- The workstation's main install runs 0.78.0 since 14:16 CET; three reads passed (Jira,
+  Slack bot, Slack search). `setup check` names `installed_provider` as `failed`, as it did
+  on 0.77.0.
+- The workstation's four Slack side installs moved from 0.74.0 and 0.75.0 to 0.78.0 between
+  14:16 and 14:18 CET, each with a fresh store and one passing read. The two posting installs
+  hold the same policy operations as before; the bot install's policy gained `file.upload` on
+  the operator's order. One post through the bot install was applied.
+- The standing grants for the Jira write install were not created: the commands went to the
+  operator as text, and the grant is the owner's pick.
+- Found on the first live use, not by the gate: `file.upload` through the local CLI is
+  refused as `forbidden` at dispatch with nothing shared, for a file of 3,967 bytes, while
+  the upload slot and the byte upload answer when sent directly. The cause is not known at
+  the time of this record; the upload tests run on the served host and on a fixture.
+- Measured on the same install: `approvals prepare` takes a `file.upload` of a file of
+  196,243 bytes and refuses one of 196,475 bytes as `invalid_input`
+  (story:an-approved-binary-write-through-the-local-cli-holds-the-operations-2-mib).

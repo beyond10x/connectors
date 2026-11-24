@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-24T11:45:55Z",
+  "actor": "human:timo",
+  "artifact": "story:standing-grant-binds-a-pattern-or-a-value-set",
+  "kind": "story",
+  "revision": 33,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate, pull request 293, head 3eef22107",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45377042383/job/138385972600"
+  }
+}

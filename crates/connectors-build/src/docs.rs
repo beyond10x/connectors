@@ -210,7 +210,7 @@ pub fn examples(root: &Path, ess: &Path) -> Result<()> {
     }
     // One project-owned cache root, no shared target directory across worktrees.
     let output = super::run(
-        Command::new("cargo")
+        super::cargo_program()
             .current_dir(root)
             .env("CARGO_BUILD_JOBS", "2")
             .env("CARGO_ENCODED_RUSTFLAGS", rust_flags)

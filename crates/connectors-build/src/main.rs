@@ -237,6 +237,27 @@ enum MetadataConformanceAction {
 fn save_json(path: &Path, value: &Value) -> Result<()> {
     Ok(write(path, &json_bytes(value)?)?)
 }
+/// The `cargo` every build of this program starts: one that sees the environment of the
+/// shell, not of the `cargo run` that started this program. `cargo run` hands its program the
+/// package's `CARGO_MANIFEST_*` and `CARGO_PKG_*` variables. A cargo started with them set
+/// compares them with what a build script asked it to watch, and `ring` asks for
+/// `CARGO_MANIFEST_DIR`, `CARGO_PKG_NAME` and the four parts of the version
+/// (`cargo:rerun-if-env-changed`). So each change between a cargo of the shell and a cargo of
+/// this program compiled `ring` and everything that depends on it again (measured
+/// 2026-11-24 with cargo 1.98.1: "Dirty ring v0.17.14: the env variable CARGO_MANIFEST_DIR
+/// changed", in both directions; 824 s of a gate job of 3,175 s). No table of cargo's
+/// configuration starts with either prefix, so nothing that configures cargo is removed.
+fn cargo_program() -> Command {
+    let mut command = Command::new("cargo");
+    for (name, _) in std::env::vars_os() {
+        if name.to_str().is_some_and(|name| {
+            name.starts_with("CARGO_MANIFEST_") || name.starts_with("CARGO_PKG_")
+        }) {
+            command.env_remove(name);
+        }
+    }
+    command
+}
 fn run(command: &mut Command) -> Result<Output> {
     let output = command.output()?;
     if !output.status.success() {
@@ -489,6 +510,82 @@ mod tests {
     use super::*;
     use connectors_catalog::{bundle, discovery};
     use serde_json::json;
+
+    /// `cargo run` hands this program its package's `CARGO_MANIFEST_*` and `CARGO_PKG_*`
+    /// variables, and a test process gets the same ones. A cargo started with them set
+    /// compares them with what a build script asked it to watch, and `ring` asks for
+    /// `CARGO_MANIFEST_DIR`, `CARGO_PKG_NAME` and the four parts of the version. So the cargo
+    /// this program starts must not inherit them, and nothing else of cargo's environment
+    /// may be removed with them.
+    #[test]
+    fn a_cargo_this_program_starts_does_not_inherit_the_package_variables_of_cargo_run() {
+        let watched = [
+            "CARGO_MANIFEST_DIR",
+            "CARGO_PKG_NAME",
+            "CARGO_PKG_VERSION_MAJOR",
+            "CARGO_PKG_VERSION_MINOR",
+            "CARGO_PKG_VERSION_PATCH",
+            "CARGO_PKG_VERSION_PRE",
+        ];
+        assert!(
+            std::env::var_os("CARGO_MANIFEST_DIR").is_some()
+                && std::env::var_os("CARGO_PKG_NAME").is_some(),
+            "the test process has no package variables to inherit"
+        );
+        let command = cargo_program();
+        assert_eq!(command.get_program(), "cargo");
+        let removed: Vec<String> = command
+            .get_envs()
+            .map(|(name, value)| {
+                assert!(value.is_none(), "{name:?} is set");
+                name.to_str().expect("a UTF-8 variable name").to_owned()
+            })
+            .collect();
+        for name in watched {
+            if std::env::var_os(name).is_some() {
+                assert!(
+                    removed.iter().any(|removed| removed == name),
+                    "a cargo this program starts inherits {name}"
+                );
+            }
+        }
+        for name in &removed {
+            assert!(
+                name.starts_with("CARGO_MANIFEST_") || name.starts_with("CARGO_PKG_"),
+                "{name} is removed"
+            );
+        }
+    }
+
+    /// No build of this program starts a `cargo` beside [`cargo_program`]: the one other
+    /// call is a test's `cargo generate-lockfile` on a fixture of its own.
+    #[test]
+    fn every_build_of_this_program_starts_cargo_through_one_function() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let direct = ["Command::new(", "\"cargo\")"].concat();
+        let mut found = Vec::new();
+        let mut pending = vec![source];
+        while let Some(directory) = pending.pop() {
+            for entry in std::fs::read_dir(&directory).expect("a source directory") {
+                let path = entry.expect("a source entry").path();
+                if path.is_dir() {
+                    pending.push(path);
+                } else if path.extension().is_some_and(|extension| extension == "rs") {
+                    let text = std::fs::read_to_string(&path).expect("a source file");
+                    let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+                    for (number, line) in text.lines().enumerate() {
+                        if line.contains(&direct) {
+                            found.push((name.clone(), number + 1, line.trim().to_owned()));
+                        }
+                    }
+                }
+            }
+        }
+        found.sort();
+        let files: Vec<&str> = found.iter().map(|(name, ..)| name.as_str()).collect();
+        assert_eq!(files, ["gate.rs", "main.rs"], "{found:?}");
+        assert!(found[0].2.starts_with("let status ="), "{:?}", found[0]);
+    }
 
     /// The pinned Drive Discovery document, read in place.
     fn pinned_drive() -> Vec<u8> {
