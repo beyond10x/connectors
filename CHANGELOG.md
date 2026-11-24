@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.78.2 — 2026-11-24
+
+### Changed
+
+- The repository's gate and its step of the ignored tests print how long each of their steps
+  ran (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step).
+  `connectors-build gate` prints `gate: step ran <seconds> s: <name>` when a step ends and a
+  table `gate: time per step` with one row per step and their sum when the program ends, also
+  when an error ended a step; without `--msrv` the gate has 27 steps. `connectors-build
+  ignored` prints the same lines on standard error for its four steps, so its report on
+  standard output stays one JSON document. No step is added, removed or reordered, and no
+  command of a step changes ([development guide](docs/development.md)). Read from the gate job
+  of pull request 295, the first run with the lines: 1,948.1 s in the 27 steps, of them 638.6 s
+  the tests, 599.3 s the build of the test binaries and 203.2 s the build of the workspace,
+  after 344 s for the build of `connectors-build` itself. Nothing changes for an installed
+  binary.
+
 ## 0.78.1 — 2026-11-24
 
 ### Changed
