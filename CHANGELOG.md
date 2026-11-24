@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.77.2 — 2026-11-24
+
+### Changed
+
+- The local gate (`connectors-build gate`) lints the host and the CLI (`connectors-host`,
+  `connectors`) for `x86_64-pc-windows-gnu` after the Linux lint, so code that is dead or
+  does not compile on Windows fails on the workstation, before a push. The gate needs the Rust
+  target `x86_64-pc-windows-gnu` on the pinned toolchain and the C compiler
+  `x86_64-w64-mingw32-gcc`; without one of them it ends non-zero at its start and names what
+  is missing
+  ([development](docs/development.md#the-windows-lint)).
+
+### Fixed
+
+- An approved write no longer fails because one clock check got no answer. `approvals issue`,
+  `approvals grant-standing`, `revoke-standing` and `list-standing`, a write through `invoke`
+  and the recovery of a prepared write ask the clock sources a second time when the first
+  attempt refused `below_quorum` with no `unverified` source and their deadline still holds
+  one two-second query deadline plus a reserve (one second; three seconds before the first
+  of a write's two readings). The second attempt uses new sockets and new nonces, and no
+  third follows: one acquisition waits at most four seconds on the network (before: two),
+  and a write at most eight (before: four). Before, one attempt below its quorum in any of
+  the three acquisitions of an approved write (one in `issue`, two in `invoke`) answered
+  `unavailable` (`stage` `readiness` from `issue`, `not_attempted` at `stage` `admission`
+  from `invoke`) before any provider request. `approvals clock-check` still asks every
+  source once and shows the dropout
+  ([clock contract](contracts/service/clock.md#second-attempt),
+  [local clock](docs/local-clock.md)).
+
 ## 0.77.1 — 2026-11-24
 
 ### Added

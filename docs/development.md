@@ -14,7 +14,8 @@ it does not identify an installed executable.
 `--msrv` additionally checks the pure workspace surface on installed Rust 1.88.0
 and the Eventlog-backed runtime roots on installed Rust 1.91.0; `connectors-tool-contracts` is left
 out there, because its `b10x-tool-contract` dependency needs Rust 1.98. The Rust gate runs
-formatting, descriptor drift, offline builds/tests/Clippy, library dependency
+formatting, descriptor drift, offline builds/tests/Clippy, the lint of the host and the CLI
+for a Windows target ([below](#the-windows-lint)), library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
 independent compilation of each internal adapter's model, the release-binaries check of the guides
 (`connectors-build release-binaries`, below), the website examples model synthesis
@@ -82,7 +83,9 @@ the same way: its crates change the digest, and the files are regenerated with i
 
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
 gate without `--msrv` on every pull request and every push to `main`. It installs
-the toolchain [`rust-toolchain.toml`](../rust-toolchain.toml) pins, installs the pinned ESS and AEP releases after
+the toolchain [`rust-toolchain.toml`](../rust-toolchain.toml) pins with the target `x86_64-pc-windows-gnu`,
+installs the package `gcc-mingw-w64-x86-64` for the [Windows lint](#the-windows-lint),
+installs the pinned ESS and AEP releases after
 checking each archive against its release's `SHA256SUMS`, installs cargo-nextest 0.9.143 after
 checking its archive against the SHA-256 the workflow pins, fetches the locked
 dependencies and runs `cargo run --locked -p connectors-build -- gate`. It reads the
@@ -97,6 +100,40 @@ unoptimized dev/test binaries exhaust the synchronous bridge's 30-second
 operation deadline. Both dev (including the actual CLI) and test profiles use
 `opt-level = 1`; debug assertions and overflow checks remain enabled. The
 release profile and the bridge deadline are unchanged.
+
+## The Windows lint
+
+After the Linux lint the gate lints `connectors-host` and `connectors` for a Windows target:
+
+```sh
+cargo clippy --locked --offline -p connectors-host -p connectors --all-targets --target x86_64-pc-windows-gnu -- -D warnings
+```
+
+It is the lint step of
+[`.github/workflows/windows-host.yml`](../.github/workflows/windows-host.yml) with `--offline`
+and the target added; `the_windows_lint_is_the_forges_lint_for_the_gnu_target` fails when the
+two differ in a package or a flag. Code under `#[cfg(windows)]`, and code that is dead on
+Windows only, fails in the local gate and no longer first on the forge.
+
+The machine that runs the gate needs two things for it:
+
+- the Rust target `x86_64-pc-windows-gnu` on the toolchain `rust-toolchain.toml` pins
+  (`rustup target add x86_64-pc-windows-gnu`, run in the checkout);
+- the C compiler `x86_64-w64-mingw32-gcc` on `PATH`, because the build scripts of `ring` and
+  `libsqlite3-sys` compile C for the target (package `gcc-mingw-w64-x86-64` on Debian and
+  Ubuntu, `mingw-w64-gcc` on Arch Linux).
+
+The gate looks for both when it starts. When one is missing it ends non-zero and names it
+(`gate: the windows lint needs …`); it does not skip the step.
+`the_host_probe_finds_what_the_windows_lint_needs` is the same check as a test, on Linux.
+The check runs `x86_64-w64-mingw32-gcc` by that name. The build scripts read
+`CC_x86_64_pc_windows_gnu`, `TARGET_CC` and `CC` first, so on a machine that sets one of them
+the check and the lint can use different compilers.
+
+Clippy does not link, and `x86_64-pc-windows-gnu` is not the forge's
+`x86_64-pc-windows-msvc`: a link error, an error of the MSVC C runtime and every test result
+still show only in the forge's job "host and CLI on windows-latest". The gate has no such
+step for macOS.
 
 ## Pinned tools
 

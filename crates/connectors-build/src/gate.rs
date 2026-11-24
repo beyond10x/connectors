@@ -45,6 +45,93 @@ fn cargo(root: &Path, temp: &Path, ess: &Path, toolchain: Option<&str>) -> Resul
     Ok(cmd)
 }
 
+/// The Windows target the gate lints the host and the CLI for.
+const WINDOWS_TARGET: &str = "x86_64-pc-windows-gnu";
+
+/// The C compiler for [`WINDOWS_TARGET`]: the build scripts of `ring` and `libsqlite3-sys`
+/// compile C for the target, also under Clippy.
+const WINDOWS_CC: &str = "x86_64-w64-mingw32-gcc";
+
+/// The gate step that lints the host and the CLI for [`WINDOWS_TARGET`]: the lint of the
+/// forge's Windows job (`.github/workflows/windows-host.yml`) with `--offline` and the target
+/// added. Code under `cfg(windows)`, and code that is dead on Windows only, fails here and
+/// not first on the forge. Clippy does not link; the forge's job stays the check of the
+/// build and the tests.
+fn windows_lint(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
+    let mut cmd = cargo(root, temp, ess, None)?;
+    cmd.args([
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "connectors-host",
+        "-p",
+        "connectors",
+        "--all-targets",
+        "--target",
+        WINDOWS_TARGET,
+        "--",
+        "-D",
+        "warnings",
+    ]);
+    Ok(cmd)
+}
+
+/// The names of what [`windows_lint`] needs and `probe` does not find: the Rust target
+/// [`WINDOWS_TARGET`] of the active toolchain and the C compiler [`WINDOWS_CC`]. `probe`
+/// answers whether the host has the thing it is given the name of.
+fn windows_lint_prerequisites(probe: &dyn Fn(&str) -> bool) -> Vec<&'static str> {
+    [WINDOWS_TARGET, WINDOWS_CC]
+        .into_iter()
+        .filter(|name| !probe(name))
+        .collect()
+}
+
+/// Fails the gate, naming each missing prerequisite of [`windows_lint`]. The step is never
+/// skipped: a gate that passed without it would say nothing about Windows.
+fn windows_lint_ready(probe: &dyn Fn(&str) -> bool) -> Result<()> {
+    let missing = windows_lint_prerequisites(probe);
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "gate: the windows lint needs {}, missing on this host (docs/development.md, \"The Windows lint\")",
+        missing.join(" and ")
+    )
+    .into())
+}
+
+/// The gate's probe of this host. The Rust target is present when the toolchain that is
+/// active in `root` holds the target's `core`; the C compiler when it runs.
+fn host_probe(root: &Path) -> impl Fn(&str) -> bool + '_ {
+    move |name| {
+        if name != WINDOWS_TARGET {
+            return Command::new(name)
+                .arg("--version")
+                .output()
+                .is_ok_and(|output| output.status.success());
+        }
+        // rustc prints the directory for a target it has no libraries of as well.
+        let Ok(output) = Command::new("rustc")
+            .current_dir(root)
+            .args(["--print", "target-libdir", "--target", name])
+            .output()
+        else {
+            return false;
+        };
+        output.status.success()
+            && std::fs::read_dir(String::from_utf8_lossy(&output.stdout).trim()).is_ok_and(
+                |mut entries| {
+                    entries.any(|entry| {
+                        entry.is_ok_and(|entry| {
+                            entry.file_name().to_string_lossy().starts_with("libcore-")
+                        })
+                    })
+                },
+            )
+    }
+}
+
 /// The gate step that fails when a page the documentation site generates (CLI, crates, contract
 /// and model reference, status) differs from what its sources generate now.
 fn docs_check(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
@@ -108,6 +195,9 @@ fn oauth2_boundary(root: &Path, temp: &Path, ess: &Path) -> Result<()> {
 }
 
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
+    // Asked first: the Windows lint runs late, and a host that cannot run it should not
+    // learn so after the build and the tests.
+    windows_lint_ready(&host_probe(root))?;
     // The CI's path list for pull requests that change only planning or prose files, both
     // sides of it, and its guard against a planning file a test reads (`~/beyond10x/AGENTS.md`,
     // "Planning-only pull requests skip the tests").
@@ -227,6 +317,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
+    execute(&mut windows_lint(root, temp.path(), ess)?)?;
+    println!("gate: windows lint holds; exit=0");
     execute(&mut docs_check(root, temp.path(), ess)?)?;
     for adapter in [
         "grafana",
@@ -823,7 +915,10 @@ mod authored_execution_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::{Result, cargo, docs_check, test_step};
+    use super::{
+        Result, cargo, docs_check, test_step, windows_lint, windows_lint_prerequisites,
+        windows_lint_ready,
+    };
     use std::{ffi::OsStr, path::Path};
 
     const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
@@ -1072,6 +1167,114 @@ mod tests {
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args.first(), Some(&OsStr::new("+1.88.0")));
         assert_eq!(args.get(1), Some(&OsStr::new("--config")));
+    }
+
+    /// The Windows lint's arguments from `clippy` on, after the `--config` pair of `cargo(...)`.
+    fn windows_lint_arguments() -> Vec<String> {
+        let command = windows_lint(Path::new("/checkout"), Path::new(ROOT), Path::new("/ess"))
+            .expect("windows lint command");
+        assert_eq!(command.get_current_dir(), Some(Path::new("/checkout")));
+        command
+            .get_args()
+            .skip(2)
+            .map(|argument| argument.to_str().expect("utf-8 argument").to_owned())
+            .collect()
+    }
+
+    /// The gate lints what the forge's Windows job lints: the `cargo clippy` line of
+    /// `.github/workflows/windows-host.yml`, with only `--offline` and the target added. A
+    /// package or a flag the workflow's line gains or loses fails here.
+    #[test]
+    fn the_windows_lint_is_the_forges_lint_for_the_gnu_target() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let workflow =
+            std::fs::read_to_string(root.join(".github/workflows/windows-host.yml")).unwrap();
+        let lines: Vec<&str> = workflow
+            .lines()
+            .filter(|line| line.contains("cargo clippy"))
+            .collect();
+        assert_eq!(lines.len(), 1, "one lint step expected: {lines:?}");
+        let (_, forge) = lines[0].split_once("run: cargo ").expect("a run line");
+        let forge: Vec<&str> = forge.split_whitespace().collect();
+        let local: Vec<String> = windows_lint_arguments()
+            .into_iter()
+            .filter(|argument| {
+                !["--offline", "--target", "x86_64-pc-windows-gnu"].contains(&argument.as_str())
+            })
+            .collect();
+        assert_eq!(local, forge);
+    }
+
+    /// The whole command: offline like the gate's other cargo steps, and the target before
+    /// the `--` that starts Clippy's own arguments.
+    #[test]
+    fn the_windows_lint_runs_offline_for_the_gnu_target() {
+        assert_eq!(
+            windows_lint_arguments(),
+            [
+                "clippy",
+                "--locked",
+                "--offline",
+                "-p",
+                "connectors-host",
+                "-p",
+                "connectors",
+                "--all-targets",
+                "--target",
+                "x86_64-pc-windows-gnu",
+                "--",
+                "-D",
+                "warnings"
+            ]
+        );
+    }
+
+    #[test]
+    fn windows_lint_prerequisites_name_a_missing_rust_target() {
+        assert_eq!(
+            windows_lint_prerequisites(&|name| name != "x86_64-pc-windows-gnu"),
+            ["x86_64-pc-windows-gnu"]
+        );
+    }
+
+    #[test]
+    fn windows_lint_prerequisites_name_a_missing_c_compiler() {
+        assert_eq!(
+            windows_lint_prerequisites(&|name| name != "x86_64-w64-mingw32-gcc"),
+            ["x86_64-w64-mingw32-gcc"]
+        );
+    }
+
+    /// A host that lacks a prerequisite fails the gate by name; the step is never skipped.
+    #[test]
+    fn the_gate_names_each_missing_prerequisite_of_the_windows_lint() {
+        let error = windows_lint_ready(&|_| false)
+            .expect_err("a host with neither prerequisite")
+            .to_string();
+        for name in ["x86_64-pc-windows-gnu", "x86_64-w64-mingw32-gcc"] {
+            assert!(
+                error.contains(name),
+                "the error does not name {name}: {error}"
+            );
+        }
+        let error = windows_lint_ready(&|name| name != "x86_64-w64-mingw32-gcc")
+            .expect_err("a host without the C compiler")
+            .to_string();
+        assert!(error.contains("x86_64-w64-mingw32-gcc"), "{error}");
+        assert!(!error.contains("x86_64-pc-windows-gnu"), "{error}");
+        windows_lint_ready(&|_| true).expect("a host with both prerequisites");
+    }
+
+    /// The build server and the forge's gate job have both prerequisites, read with the
+    /// probe the gate itself uses.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_host_probe_finds_what_the_windows_lint_needs() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let probe = super::host_probe(&root);
+        assert_eq!(windows_lint_prerequisites(&probe), Vec::<&str>::new());
+        // The probe can answer no: a compiler no host has is not found.
+        assert!(!probe("x86_64-w64-mingw32-gcc-of-no-host"));
     }
 }
 
@@ -1415,5 +1618,252 @@ mod adversary_pass2_tests {
                 output.status
             );
         }
+    }
+}
+
+/// Adversary pass on the Windows lint step: what the six tests beside `windows_lint` leave
+/// open. They test the command builder and the prerequisite list; none of them fails when
+/// `run` stops calling either, or when the probe of the Rust target answers yes for a target
+/// rustc has no libraries of.
+#[cfg(all(test, unix))]
+mod windows_lint_adversary_tests {
+    use super::{WINDOWS_TARGET, host_probe, windows_lint_ready};
+    use std::{os::unix::fs::PermissionsExt, path::Path, process::Command};
+
+    const READY: &str = "    windows_lint_ready(&host_probe(root))?;";
+    const LINT: &str = "    execute(&mut windows_lint(root, temp.path(), ess)?)?;";
+    const HOLDS: &str = "    println!(\"gate: windows lint holds; exit=0\");";
+
+    /// The body of `run`, read from this file: `run` builds and tests the whole workspace,
+    /// so no test can call it.
+    fn run_body() -> &'static str {
+        let source = include_str!("gate.rs");
+        let signature =
+            "pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {\n";
+        let start = source.find(signature).expect("the signature of `run`") + signature.len();
+        let end = source[start..].find("\n}\n").expect("the end of `run`");
+        &source[start..start + end]
+    }
+
+    /// What is wrong with the Windows lint in a body of `run`, if anything: the prerequisite
+    /// check is its first statement and returns its error; the lint is executed once, at the
+    /// top level of `run` (under no `if`), after the Linux lint, and returns its error; the
+    /// line that says it holds follows it directly.
+    fn windows_lint_defect(run: &str) -> Option<&'static str> {
+        let lines: Vec<&str> = run.lines().collect();
+        let first = lines.iter().find(|line| {
+            let line = line.trim_start();
+            !line.is_empty() && !line.starts_with("//")
+        });
+        if first != Some(&READY) {
+            return Some(
+                "the prerequisite check is not the first statement that returns its error",
+            );
+        }
+        let places: Vec<usize> = (0..lines.len()).filter(|at| lines[*at] == LINT).collect();
+        let [lint] = places[..] else {
+            return Some("the lint is not executed once at the top level, returning its error");
+        };
+        if lines.get(lint + 1) != Some(&HOLDS) {
+            return Some("the line that says the lint holds does not follow the lint");
+        }
+        match lines.iter().position(|line| line.trim() == "\"clippy\",") {
+            Some(linux) if linux < lint => None,
+            _ => Some("the Windows lint does not follow the Linux lint"),
+        }
+    }
+
+    /// `run` asks for the prerequisites first and executes the Windows lint after the Linux
+    /// lint, each with `?`: a red lint or a missing prerequisite ends the gate non-zero.
+    #[test]
+    fn run_checks_the_prerequisites_first_and_executes_the_windows_lint() {
+        assert_eq!(windows_lint_defect(run_body()), None);
+    }
+
+    /// The mutants of `run` the six tests beside `windows_lint` leave green, each made from
+    /// the body above and refused by the check of the test before this one.
+    #[test]
+    fn each_mutant_of_run_that_loses_the_windows_lint_is_refused() {
+        let run = run_body();
+        let mutants = [
+            (
+                "the lint is dropped",
+                run.replacen(&format!("{LINT}\n"), "", 1),
+            ),
+            (
+                "the lint's result is discarded",
+                run.replacen(
+                    LINT,
+                    "    let _ = execute(&mut windows_lint(root, temp.path(), ess)?);",
+                    1,
+                ),
+            ),
+            (
+                "the lint runs without --msrv only",
+                run.replacen(LINT, &format!("    if !msrv {{\n    {LINT}\n    }}"), 1),
+            ),
+            (
+                "the prerequisite check is dropped",
+                run.replacen(&format!("{READY}\n"), "", 1),
+            ),
+            (
+                "the prerequisite check's result is discarded",
+                run.replacen(
+                    READY,
+                    "    let _ = windows_lint_ready(&host_probe(root));",
+                    1,
+                ),
+            ),
+            (
+                "the prerequisite check moves behind the build and the tests",
+                run.replacen(&format!("{READY}\n"), "", 1).replacen(
+                    LINT,
+                    &format!("{READY}\n{LINT}"),
+                    1,
+                ),
+            ),
+        ];
+        for (name, mutant) in mutants {
+            assert_ne!(mutant, run, "{name}: the mutant equals `run`");
+            assert!(
+                windows_lint_defect(&mutant).is_some(),
+                "{name}: the check finds nothing wrong"
+            );
+        }
+    }
+
+    /// The error of a host with neither prerequisite is the line the guide quotes, and the
+    /// section it sends the reader to exists.
+    #[test]
+    fn the_error_for_missing_prerequisites_is_the_line_the_guide_quotes() {
+        let error = windows_lint_ready(&|_| false)
+            .expect_err("a host with neither prerequisite")
+            .to_string();
+        assert_eq!(
+            error,
+            "gate: the windows lint needs x86_64-pc-windows-gnu and x86_64-w64-mingw32-gcc, \
+             missing on this host (docs/development.md, \"The Windows lint\")"
+        );
+        let guide = std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/development.md"),
+        )
+        .unwrap();
+        assert!(guide.lines().any(|line| line == "## The Windows lint"));
+        assert!(guide.contains("(`gate: the windows lint needs …`)"));
+    }
+
+    /// Set in the child process of the tests below to the probe that answers there.
+    const PLANTED: &str = "CONNECTORS_GATE_ADVERSARY_PLANTED_RUSTC";
+    /// The directory the planted `rustc` prints.
+    const LIBDIR: &str = "CONNECTORS_GATE_ADVERSARY_LIBDIR";
+    const ANSWER: &str = "planted-rustc-answer=";
+
+    /// The mutant of `host_probe`'s target branch: rustc's exit status alone, without the
+    /// look into the directory it prints.
+    fn target_probe_without_the_library_check(root: &Path) -> bool {
+        Command::new("rustc")
+            .current_dir(root)
+            .args(["--print", "target-libdir", "--target", WINDOWS_TARGET])
+            .output()
+            .is_ok_and(|output| output.status.success())
+    }
+
+    /// In the child process: prints the answer of the probe `PLANTED` names for the Windows
+    /// target and returns true. `host_probe` starts `rustc` from the process's own `PATH`,
+    /// so a planted `rustc` needs a process of its own.
+    fn answered_as_the_child() -> bool {
+        let Some(probe) = std::env::var_os(PLANTED) else {
+            return false;
+        };
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let present = if probe == "mutant" {
+            target_probe_without_the_library_check(&root)
+        } else {
+            host_probe(&root)(WINDOWS_TARGET)
+        };
+        println!("\n{ANSWER}{present}");
+        true
+    }
+
+    /// The answer of `probe` (`gate` or `mutant`) for the Windows target in a process whose
+    /// first `rustc` on `PATH` prints `libdir` and exits 0, as rustc does for a target it
+    /// has no libraries of. The process is this test binary running `test` alone.
+    fn answer_under_a_planted_rustc(test: &str, probe: &str, libdir: &Path) -> bool {
+        let bin = tempfile::tempdir().unwrap();
+        let rustc = bin.path().join("rustc");
+        std::fs::write(&rustc, format!("#!/bin/sh\nprintf '%s\\n' \"${LIBDIR}\"\n")).unwrap();
+        std::fs::set_permissions(&rustc, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let mut path = vec![bin.path().to_owned()];
+        path.extend(std::env::split_paths(
+            &std::env::var_os("PATH").unwrap_or_default(),
+        ));
+        let output = Command::new(std::env::current_exe().unwrap())
+            .arg(format!("gate::windows_lint_adversary_tests::{test}"))
+            .args(["--exact", "--nocapture"])
+            .env("PATH", std::env::join_paths(path).unwrap())
+            .env(PLANTED, probe)
+            .env(LIBDIR, libdir)
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let answer = stdout.split(ANSWER).nth(1).unwrap_or_else(|| {
+            panic!(
+                "the child printed no answer: {stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+        });
+        assert!(output.status.success(), "the child failed: {stdout}");
+        answer.starts_with("true")
+    }
+
+    /// The states of the directory rustc names for the Windows target: `absent` (the target
+    /// is not installed; `rustc --print target-libdir` still names it and exits 0), `empty`,
+    /// `mingw` (only the linker's `self-contained` files, no `core`) and `installed`.
+    fn libdirs(scratch: &Path) -> [std::path::PathBuf; 4] {
+        let [absent, empty, mingw, installed] =
+            ["absent", "empty", "mingw", "installed"].map(|name| scratch.join(name).join("lib"));
+        std::fs::create_dir_all(&empty).unwrap();
+        std::fs::create_dir_all(mingw.join("self-contained")).unwrap();
+        std::fs::create_dir_all(&installed).unwrap();
+        std::fs::write(installed.join("libcore-0123456789abcdef.rlib"), b"").unwrap();
+        [absent, empty, mingw, installed]
+    }
+
+    /// The gate's probe answers no for a target rustc names a directory for and has no
+    /// `core` of, and yes when the directory holds one.
+    #[test]
+    fn the_host_probe_misses_a_target_rustc_has_no_core_of() {
+        if answered_as_the_child() {
+            return;
+        }
+        let test = "the_host_probe_misses_a_target_rustc_has_no_core_of";
+        let scratch = tempfile::tempdir().unwrap();
+        let [absent, empty, mingw, installed] = libdirs(scratch.path());
+        assert!(
+            answer_under_a_planted_rustc(test, "gate", &installed),
+            "a directory with libcore-*.rlib is an installed target"
+        );
+        for libdir in [absent, empty, mingw] {
+            assert!(
+                !answer_under_a_planted_rustc(test, "gate", &libdir),
+                "the probe finds a target in {}",
+                libdir.display()
+            );
+        }
+    }
+
+    /// The control of the test above: under the same planted `rustc` the mutant without the
+    /// library check answers yes for a target that is not installed, so the test above is
+    /// red on that mutant.
+    #[test]
+    fn a_probe_without_the_library_check_finds_a_target_that_is_not_installed() {
+        if answered_as_the_child() {
+            return;
+        }
+        let test = "a_probe_without_the_library_check_finds_a_target_that_is_not_installed";
+        let scratch = tempfile::tempdir().unwrap();
+        let [absent, ..] = libdirs(scratch.path());
+        assert!(answer_under_a_planted_rustc(test, "mutant", &absent));
+        assert!(!answer_under_a_planted_rustc(test, "gate", &absent));
     }
 }

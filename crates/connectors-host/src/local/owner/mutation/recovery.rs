@@ -47,10 +47,12 @@ pub(in crate::local::owner) fn recover_observation(
                 .approval_clock
                 .as_ref()
                 .ok_or(Code::Unavailable)?;
+            // A below-quorum attempt is made once more while one query
+            // deadline and the reserve for the settlement below are left.
             Some(
                 selected
-                    .acquire()
-                    .map_err(|failure| Error::clock(selected, failure))?,
+                    .acquire_within(until, clock::RESERVE_AFTER_CLOCK)
+                    .map_err(|refused| Error::clock(selected, refused.failure))?,
             )
         } else {
             None

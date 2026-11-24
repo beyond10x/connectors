@@ -3,7 +3,7 @@
 //! neither path starts an owner/adapter or authorizes a business dispatch.
 use super::{Argument, Code, Error, Result, selected};
 use crate::local::{
-    approval_keys, approval_policy, approvals,
+    approval_keys, approval_policy, approvals, clock,
     config::{Adapter, Config, Paths},
     filesystem,
     mutations::ClockInterval,
@@ -382,15 +382,17 @@ pub fn issue(
     let name = output.file_name().ok_or_else(output_refused)?;
     filesystem::require_absent(&parent, name).map_err(|_| output_refused())?;
     check(until)?;
-    // Network acquisition must precede every policy/key/custody lease.
+    // Network acquisition must precede every policy/key/custody lease. A
+    // below-quorum attempt is made once more while one query deadline and
+    // the reserve for the work below are left (`clock::acquire_within`).
     let selected = first
         .config
         .approval_clock
         .as_ref()
         .ok_or(Code::InvalidConfiguration)?;
     let clock = selected
-        .acquire()
-        .map_err(|failure| Error::clock(selected, failure))?;
+        .acquire_within(until, clock::RESERVE_AFTER_CLOCK)
+        .map_err(|refused| Error::clock(selected, refused.failure))?;
     let current = resolve(paths, alias, request, until)?;
     if current.preparation.subject != first.preparation.subject
         || current.policy.selection != first.policy.selection
@@ -629,8 +631,8 @@ fn standing_reading(
         .as_ref()
         .ok_or(Code::InvalidConfiguration)?;
     let clock = selected
-        .acquire()
-        .map_err(|failure| Error::clock(selected, failure))?;
+        .acquire_within(until, clock::RESERVE_AFTER_CLOCK)
+        .map_err(|refused| Error::clock(selected, refused.failure))?;
     let now = standing::reading(&clock).ok_or(Code::Unavailable)?;
     check(until)?;
     Ok((path, now))
