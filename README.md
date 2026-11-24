@@ -307,9 +307,11 @@ Ordinary builds use checked-in generated Rust. They do not require ESS or refres
 vendor specifications; Cargo may need to download dependencies on the first build.
 
 Or install a release binary: each release page carries `connectors-<version>-<target>.tar.gz`
-for Linux and macOS, whose directory holds `connectors` and `connectors-catalog-provider`
+for Linux and macOS, whose directory holds `connectors`, `connectors-catalog-provider`,
+`connectors-grafana`, `connectors-prometheus`, `connectors-loki`, `connectors-kubernetes` and
+`connectors-sql`
 ([Getting started](https://beyond10x.github.io/connectors/docs/getting-started#or-install-a-release-binary)).
-Keep the two binaries in one directory: an instance that pins nothing is derived by the provider
+Keep the first two in one directory: an instance that pins nothing is derived by the provider
 beside `connectors`, which `setup check` lists as the `installed_provider` prerequisite. The macOS
 binaries are not signed. An archive downloaded through a browser carries Gatekeeper's quarantine
 attribute, and its binaries are refused until you remove it from the extracted directory:

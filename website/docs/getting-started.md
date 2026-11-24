@@ -44,8 +44,9 @@ carry source archives only, and there is no Windows binary.
 
 Each archive holds a directory with `connectors`, the catalog provider
 `connectors-catalog-provider`, the provider programs `connectors-kubernetes`,
-`connectors-grafana`, `connectors-prometheus` and `connectors-loki`, and `README.md` and
-`CHANGELOG.md`. Archives of 0.64.0 and earlier hold `connectors` and
+`connectors-grafana`, `connectors-prometheus`, `connectors-loki` and `connectors-sql` (MySQL
+and PostgreSQL), and `README.md` and `CHANGELOG.md`. Archives of 0.76.2 and earlier hold no
+`connectors-sql`, those of 0.64.0 and earlier hold `connectors` and
 `connectors-catalog-provider` only, those of 0.50.0 and earlier `connectors` alone. The other
 connectors are built from source, as their guides show.
 

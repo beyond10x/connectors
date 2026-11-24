@@ -48,6 +48,15 @@
   18446744073709551615: `grant-standing` refuses any other number (`invalid_input`), and a
   served host now refuses a mounted grant file whose target holds one (a fraction, an
   exponent, `-0`) as malformed, answering every write `unavailable`.
+- The release archives hold `connectors-sql`, the program of the `mysql` and `postgres`
+  connectors, beside the six programs they held, and the container image holds it with them:
+  a released install reads `mysql/<instance>` and `postgres/<instance>` without a build from
+  source. `connectors-sql --version` prints `connectors-sql <version>`; before, the option was
+  refused. The MySQL guide has a section on a managed read replica and says what `query.read`
+  does with a statement's own `LIMIT … OFFSET …`
+  ([MySQL guide](docs/local-mysql-cli.md#a-managed-mysql-replica)); the Loki guide says that a
+  Loki without a credential is not served and names the route through Grafana
+  ([Loki guide](adapters/loki/README.md#through-grafana)).
 
 ## 0.76.2 — 2026-11-24
 

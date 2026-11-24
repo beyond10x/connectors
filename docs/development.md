@@ -204,8 +204,12 @@ configuration; it requires no provider switch in the shared client or host.
 ## Release binaries
 
 [`release-binaries.yml`](../.github/workflows/release-binaries.yml) packages the binaries its
-build job's `BINARIES` lists, `connectors` and `connectors-catalog-provider`; its `cargo build`
-and `Package` steps iterate that list. `connectors-build release-binaries`, which the gate runs,
+build job's `BINARIES` lists: `connectors`, `connectors-catalog-provider`, `connectors-grafana`,
+`connectors-prometheus`, `connectors-loki`, `connectors-kubernetes` and `connectors-sql`. Its
+`cargo build` and `Package` steps iterate that list. This paragraph, the README and the site's
+getting-started page each name every listed binary; the `release_binaries` tests of
+`connectors-build` fail when one of the three lacks a name.
+`connectors-build release-binaries`, which the gate runs,
 reads the list and refuses a guide that runs an installed binary outside it. The guides are
 `README.md`, the Markdown files directly under `docs/` and the authored pages under
 `website/docs/`. A guide runs an installed binary where, in a fenced `sh`, `shell`, `bash`, `zsh`

@@ -27,6 +27,8 @@ Loki deployment are shown without output.
 A bearer token the Loki deployment, or the gateway in front of it, accepts. No tenant header is
 sent, so a multi-tenant Loki must derive the tenant from the token. To read through Grafana
 instead, use a Grafana service-account token and the data source's proxy path as `base_url`.
+A Loki that accepts requests without a credential is not served: every connection needs a
+token, so a consumer who has no Loki token reads through Grafana.
 Build the executable:
 
 ```sh

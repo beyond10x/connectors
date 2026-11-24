@@ -415,7 +415,86 @@ mod tests {
                 "connectors-prometheus",
                 "connectors-loki",
                 "connectors-kubernetes",
+                "connectors-sql",
             ])
         );
+    }
+
+    /// The prose that lists the archive's programs: each names every packaged binary.
+    const LISTS: [&str; 3] = [
+        "README.md",
+        "docs/development.md",
+        "website/docs/getting-started.md",
+    ];
+
+    /// The names `text` does not hold, in the order given. A name is held where it stands
+    /// whole: not followed by `-` or an alphanumeric character, so `connectors-sql` is not
+    /// an occurrence of `connectors`.
+    fn missing_names(text: &str, names: &[String]) -> Vec<String> {
+        let held = |name: &str| {
+            text.match_indices(name).any(|(start, _)| {
+                !text[start + name.len()..]
+                    .starts_with(|next: char| next == '-' || next.is_alphanumeric())
+            })
+        };
+        names.iter().filter(|name| !held(name)).cloned().collect()
+    }
+
+    const SEVEN: [&str; 7] = [
+        "connectors",
+        "connectors-catalog-provider",
+        "connectors-grafana",
+        "connectors-prometheus",
+        "connectors-loki",
+        "connectors-kubernetes",
+        "connectors-sql",
+    ];
+
+    #[test]
+    fn a_list_that_lacks_one_name_reports_exactly_that_name() {
+        let names = strings(&SEVEN);
+        let list = |left_out: &str| {
+            SEVEN
+                .iter()
+                .filter(|name| **name != left_out)
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        assert_eq!(missing_names(&list(""), &names), Vec::<String>::new());
+        // Every other name starts with `connectors-`: none of them is `connectors`.
+        assert_eq!(missing_names(&list("connectors"), &names), ["connectors"]);
+        assert_eq!(
+            missing_names(&list("connectors-sql"), &names),
+            ["connectors-sql"]
+        );
+        // A longer name is not the shorter one, and a name ends a sentence or a line.
+        assert_eq!(
+            missing_names("connectors-sqlite, connectors2", &names[..1]),
+            ["connectors"]
+        );
+        assert_eq!(
+            missing_names("runs connectors.\nconnectors-sql", &strings(&SEVEN[6..])),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            missing_names("runs connectors.", &names[..1]),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn every_prose_list_of_the_archive_names_every_packaged_binary() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let workflow = std::fs::read_to_string(root.join(WORKFLOW)).unwrap();
+        let names = packaged(&workflow).unwrap();
+        for list in LISTS {
+            let text = std::fs::read_to_string(root.join(list)).unwrap();
+            assert_eq!(
+                missing_names(&text, &names),
+                Vec::<String>::new(),
+                "{list} does not name these programs of the release archive"
+            );
+        }
     }
 }

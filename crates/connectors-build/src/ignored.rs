@@ -125,6 +125,7 @@ const PG: &str = "CONNECTORS_PG_SANDBOX";
 const PG_CONTAINER: &str = "CONNECTORS_PG_CONTAINER";
 const PG_ADVERSARY: &str = "CONNECTORS_PG_ADVERSARY_PORT";
 const MYSQL_ADVERSARY: &str = "CONNECTORS_MYSQL_ADVERSARY_PORT";
+const MYSQL_REPLICA: &str = "CONNECTORS_MYSQL_REPLICA_PORT";
 const PG_SECURITY: &str = "CONNECTORS_PG_SECURITY_PORT";
 const DOCKER: &str = "docker";
 const K8S: &str = "CONNECTORS_K8S_SANDBOX";
@@ -439,6 +440,16 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "mysql_adversary_2",
             "live_mysql_distinct_timestamps_are_written_distinctly",
         ) => Some((Live, vec![MYSQL_ADVERSARY])),
+        // A server in `super_read_only`: not the adversary server, which a test writes to.
+        (
+            "connectors-sql",
+            "mysql_replica",
+            "a_read_only_server_accepts_the_session_and_answers_a_read"
+            | "a_write_through_a_function_is_refused_by_a_read_only_server"
+            | "the_first_page_holds_the_first_hundred_rows"
+            | "a_page_selected_by_limit_and_offset_holds_its_rows"
+            | "a_count_over_the_statement_answers_its_rows",
+        ) => Some((Live, vec![MYSQL_REPLICA])),
         (
             "connectors",
             "failed_connect",
@@ -941,7 +952,7 @@ fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static st
             "CONNECTORS_K8S_SANDBOX must name the prepared sandbox API base".into(),
         );
     }
-    for key in [PG_ADVERSARY, MYSQL_ADVERSARY, PG_SECURITY] {
+    for key in [PG_ADVERSARY, MYSQL_ADVERSARY, MYSQL_REPLICA, PG_SECURITY] {
         if !std::env::var(key).is_ok_and(|port| port.parse::<u16>().is_ok_and(|port| port > 0)) {
             missing.insert(
                 key,
@@ -1431,6 +1442,34 @@ mod tests {
         "connectors_host",
         "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted",
     );
+    /// The read-only MySQL server is its own prerequisite: the server behind
+    /// `CONNECTORS_MYSQL_ADVERSARY_PORT` is written to and cannot stand in for it.
+    #[test]
+    fn the_mysql_replica_tests_are_live_and_need_their_own_server() {
+        let tests = [
+            "a_read_only_server_accepts_the_session_and_answers_a_read",
+            "a_write_through_a_function_is_refused_by_a_read_only_server",
+            "the_first_page_holds_the_first_hundred_rows",
+            "a_page_selected_by_limit_and_offset_holds_its_rows",
+            "a_count_over_the_statement_answers_its_rows",
+        ];
+        let source = include_str!("../../../adapters/sql/tests/mysql_replica.rs");
+        assert_eq!(source.matches("#[ignore").count(), tests.len());
+        for name in tests {
+            assert!(source.contains(&format!("async fn {name}()")), "{name}");
+            let entry = &classified(&[("connectors-sql", "mysql_replica", name)])[0];
+            assert_eq!(entry.family, Some(Family::Live), "{name}");
+            assert_eq!(
+                entry.prerequisites,
+                ["CONNECTORS_MYSQL_REPLICA_PORT"],
+                "{name}"
+            );
+        }
+        assert!(
+            prerequisites(&BTreeMap::new()).contains_key("CONNECTORS_MYSQL_REPLICA_PORT")
+                || std::env::var_os("CONNECTORS_MYSQL_REPLICA_PORT").is_some()
+        );
+    }
     #[test]
     fn only_prerequisite_parses_and_defaults_to_no_narrowing() {
         let parse = |args: &[&str]| {
