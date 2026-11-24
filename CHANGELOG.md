@@ -36,6 +36,14 @@
   mount or sign such a file ([running services](docs/running-services.md#standing-write-grants),
   [local approvals](docs/local-approvals.md#a-grant-for-many-targets)).
 
+### Fixed
+
+- The release workflow publishes the archives of a tag also when the container image is
+  built first. The job that uploads the archives to the release page took every artifact of
+  the run; when the image job ended before it, the run also held the two build records of
+  the image build, and the job stopped at its count of four files. This left 0.77.1 without
+  archives. The job now takes the archive artifacts only.
+
 ## 0.77.2 — 2026-11-24
 
 ### Changed

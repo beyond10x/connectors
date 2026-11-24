@@ -35,3 +35,4 @@ mod metadata_conformance_fixture_adversary;
 mod oauth2_declaration_mirrors_ess;
 mod oauth2_refresh_metadata_authority_adversary;
 mod one_pinned_rust_toolchain;
+mod release_artifact_selection;
