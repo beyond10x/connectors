@@ -237,9 +237,26 @@ enum MetadataConformanceAction {
 fn save_json(path: &Path, value: &Value) -> Result<()> {
     Ok(write(path, &json_bytes(value)?)?)
 }
-/// The `cargo` every build of this program starts.
+/// The `cargo` every build of this program starts: one that sees the environment of the
+/// shell, not of the `cargo run` that started this program. `cargo run` hands its program the
+/// package's `CARGO_MANIFEST_*` and `CARGO_PKG_*` variables. A cargo started with them set
+/// compares them with what a build script asked it to watch, and `ring` asks for
+/// `CARGO_MANIFEST_DIR`, `CARGO_PKG_NAME` and the four parts of the version
+/// (`cargo:rerun-if-env-changed`). So each change between a cargo of the shell and a cargo of
+/// this program compiled `ring` and everything that depends on it again (measured
+/// 2026-11-24 with cargo 1.98.1: "Dirty ring v0.17.14: the env variable CARGO_MANIFEST_DIR
+/// changed", in both directions; 824 s of a gate job of 3,175 s). No table of cargo's
+/// configuration starts with either prefix, so nothing that configures cargo is removed.
 fn cargo_program() -> Command {
-    Command::new("cargo")
+    let mut command = Command::new("cargo");
+    for (name, _) in std::env::vars_os() {
+        if name.to_str().is_some_and(|name| {
+            name.starts_with("CARGO_MANIFEST_") || name.starts_with("CARGO_PKG_")
+        }) {
+            command.env_remove(name);
+        }
+    }
+    command
 }
 fn run(command: &mut Command) -> Result<Output> {
     let output = command.output()?;
