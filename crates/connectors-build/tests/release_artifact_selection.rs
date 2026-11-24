@@ -16,8 +16,8 @@ const BUILD_RECORDS: [&str; 2] = [
 ];
 
 fn workflow() -> Value {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.github/workflows/release-binaries.yml");
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.github/workflows/release-binaries.yml");
     serde_yaml_ng::from_str(&fs::read_to_string(path).unwrap()).unwrap()
 }
 
@@ -70,7 +70,8 @@ fn every_download_step_names_its_artifacts() {
     let workflow = workflow();
     let steps = download_patterns(&workflow);
     assert!(
-        steps.iter().any(|(job, _)| job == "publish") && steps.iter().any(|(job, _)| job == "image"),
+        steps.iter().any(|(job, _)| job == "publish")
+            && steps.iter().any(|(job, _)| job == "image"),
         "expected a download step in `publish` and in `image`: {steps:?}"
     );
     for (job, pattern) in &steps {
