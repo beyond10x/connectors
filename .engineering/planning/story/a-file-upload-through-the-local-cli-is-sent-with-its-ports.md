@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:a-file-upload-through-the-local-cli-is-sent-with-its-ports
 kind: story
-status: active
+status: implemented
 title: A file upload through the local CLI is sent with its slot and byte ports
 summary: The local commit dropped an upload's ports, so every local file.upload was refused as forbidden; found on the first live use of 0.78.0
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T13:41:18Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-24T13:41:18Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-11-24T17:35:50Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Gap
 
@@ -51,8 +52,28 @@ live workspace". No test sent an upload through the provider child.
    with only `auth.test` sent.
 3. A write that creates a credential is still held (`execute_created` keeps its custody path), and
    a prepared upload is still refused when it is sent without its ports.
-4. On the workstation's bot install, with the released binary, one `file.upload` of a test image
+4. On the workstation's bot install, with the released binary, one `file.upload` of a test file
    into the operator's test thread is `applied` and the file is read back in the thread.
+   (Written as "a test image" until 2026-11-24; the one live upload was a text file, see
+   "Verified".)
+
+## Verified
+
+- 1 and 2: `adapters/catalog/tests/slack.rs`,
+  `an_approved_upload_through_the_child_sends_its_slot_its_bytes_and_the_share`; red on the tree
+  of 0.78.0 in `0f0dd58ae`, green with `95fb4f974`.
+- 3: `adapters/catalog/tests/upload_child_adversary.rs`,
+  `a_prepared_upload_sent_without_its_ports_is_refused_with_nothing_sent`, and the
+  `created_credential` tests. The adversary review is
+  review-result:local-upload-adversary-round-1 (holds, five findings, no blocker).
+- 4: 2026-11-24 18:31 CET, with the binaries of release 0.78.1 from its checked archive
+  (`connectors 0.78.1`), through the workstation's bot install: one `file.upload` of a text
+  file of 82 bytes with a title and a comment into the operator's test thread, answered `ok`
+  with classification `applied` and a file id. Read back through the read install with
+  `conversations.replies`: the thread holds the message with that file id, the file's name,
+  title, size 82 and `text/plain`, and the comment as a `rich_text` block with bold, code and
+  italic, so `initial_comment` takes mrkdwn. Not verified live: an image or other bytes that
+  are not text; the fixture cases above compare the SHA-256 of such bytes.
 
 ## Scope
 
