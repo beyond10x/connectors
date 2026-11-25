@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:six-cli-tests-take-jail-binaries-built-once-per-run
 kind: story
-status: draft
+status: active
 title: 'Six CLI tests link their binaries into the jail instead of copying them: 50.7 s, no saving estimated'
 summary: Each mounted-container test copies about 133 MB of binaries into its jail; Jail::install hard-links them and copies only where it cannot link
 relations:
@@ -14,7 +14,10 @@ scope:
   path: crates/connectors-custody/src/mounted/fixture.rs
 - confidence: cited
   path: crates/connectors-custody/src/mounted/tests.rs
-revision: 7
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T03:09:52Z", actor: "human:operator", revision: 8}
+- {from: "proposed", to: "active", at: "2026-11-25T03:09:52Z", actor: "human:operator", revision: 9}
 ---
 ## Defect
 
@@ -161,3 +164,56 @@ The six test files are not edited. Other stories of this set edit other tests in
     "owner-only"; no check of it was found for an executable.
   - The cost of the copy, of the sha256, of `Container::new` and of one CLI run. None was
     measured, so no "after" figure is claimed.
+
+## As built (2026-11-25)
+
+Where the implementation differs from the Change and Acceptance sections. Durations and
+file-system facts are from the build host of the shared pool.
+
+1. The filter `mounted::tests::install_` of acceptance 1 finds eight tests, not four. Four were
+   added:
+   - `install_at_the_place_of_an_earlier_link_leaves_its_source_alone`. `Jail::install` removes an
+     existing destination before it links or copies. Without the removal, a second install at one
+     place copies onto the earlier link and empties that link's source.
+   - `install_copies_what_a_symbolic_link_names`. Without this rule the link call puts a second
+     name of the symbolic link into the jail, where its target does not exist.
+   - `install_copies_a_source_without_an_execute_bit` and
+     `install_copies_a_source_with_a_set_id_or_sticky_bit`, after the adversary read: see item 2.
+2. The link rule is narrower than "no group or other write bit". A source is linked only when it
+   has the owner execute bit, no group or other write bit, and none of the set-user-id,
+   set-group-id and sticky bits. Every other source is copied with mode 0700, as before this
+   story. The adversary read showed why: with the write bits alone, a source of mode 0644 was
+   linked and could not be run in the jail, and a source of mode 4755 kept its bit there. No
+   caller installs such a source today.
+3. `install_links_the_running_test_binary_on_one_device` of acceptance 1 is named
+   `install_links_the_running_test_binary_where_the_link_call_works`. Two mounts of one device
+   have equal device numbers and still refuse a link, so "on one device" was not the condition.
+   The test tries the link call into the jail's directory itself, removes that probe, and then
+   expects one inode when the call worked and the rule of item 2 allows a link, and a copy of
+   mode 0700 with equal bytes otherwise. Any other error of the probe fails the test.
+4. `install_copies_a_source_on_another_file_system` keeps `/proc/self/exe` as its source. The name
+   is on procfs; the link call does not follow it and fails with `EXDEV`. The test asserts that
+   error before it installs. On a host whose cargo binaries carry a group write bit the install
+   copies because of that bit; the assertion on the link call still runs.
+5. The default temporary directory of the build host is on another file system than `target/`,
+   so a plain `cargo nextest run` there takes the copy arm. With the temporary directory under
+   the checkout, as the gate sets it, the link is made. The eight `install_` tests pass in both
+   forms: 8 of 8, and 10 of 10 runs in a row in each form, each test under 0.06 s.
+6. Callers of `Jail::install`: none writes or changes the mode of an installed file, and no
+   program one starts does. They use it as a command, read it for a digest, or put its path into
+   configuration text. A write would now land in the source under `target/`: the jailed programs
+   run as the file's owner and `/bin-test` is not bound read-only, as before this story.
+7. Where the installed file is a link, another jail's install and removal of the same source
+   move the file's link count and change time. One reader of a change time exists:
+   `file_identity` in `crates/connectors-host/src/local/config.rs`, called for the catalog
+   provider of an installation, as part of a cache key. One jail holds such a file
+   (`apps/connectors/tests/setup_migrate_short.rs`), and its source gets a second name in that
+   jail only. If two jails did link it, the owner would derive a second time; it would refuse
+   nothing (read, not run).
+8. The six CLI tests, sums of one run each on the build host: 67.0 s with copies; 54.7 s and
+   73.1 s in two runs with links. The spread between runs is larger than the effect, as the
+   title says.
+
+Not established: that the link is made in the forge's gate job. From the workflow files (read,
+not run) the "repository gate" job has `target/` and its temporary directory under the checkout,
+and the journeys job has them apart and copies, as before.
