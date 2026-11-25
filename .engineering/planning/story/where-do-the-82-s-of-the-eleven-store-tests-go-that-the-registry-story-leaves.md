@@ -10,7 +10,7 @@ relations:
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
 - depends_on: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
-revision: 5
+revision: 6
 ---
 ## Defect
 
@@ -288,3 +288,29 @@ that change and story:four-host-tests-no-longer-wait-out-the-30-s-lock-wait move
   soak or stress run on the workstation, each test bound to 60 s by the runner, the test step
   bound to 120 s, a pool job to 10 minutes unless it names its time (30 minutes at most), a
   script that only measures starts without the `slot` prefix, no new Python.
+
+## Answer
+
+Entries are added as items are measured. An item without an entry is open.
+
+### Item 9: a story
+
+`ess generate` per test costs 2.18 s on the build host, summed over the 16 tests that call
+`schema`: more than the 1.0 s of statement 1.
+
+- Runs, 2026-11-25, build host, a head that holds
+  story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold, the binary alone:
+  `cargo nextest run --locked -p connectors-sql --test ess_model --status-level pass --final-status-level pass`.
+  The 17 durations nextest printed, summed per run, with the jobs running in the pool
+  (`slot status`) before each run.
+- As the code is: 3.295 s (5 jobs), 4.543 s (7 jobs), 3.424 s (6 jobs). Median 3.424 s.
+- With a probe of the change (`schema` reads one directory under the target directory, filled
+  by one test before the three runs): 0.909 s (5 jobs), 1.242 s (4 jobs), 1.349 s (5 jobs).
+  Median 1.242 s. The probe was taken back; no branch holds it.
+- The difference of the medians is 2.18 s (arithmetic). The three base runs were made first
+  and the three probe runs after them, not in turns.
+- The forge, read first as the item asks: in the test step of four "repository gate" jobs (pull
+  requests 302, 303, 304 and 307) five of the 16 tests ended in 0.061 to 0.088 s each, the call
+  included. A call there takes at most 0.088 s; 16 calls at most 1.41 s (arithmetic).
+- The draft that claims it:
+  story:the-sixteen-ess-model-tests-read-schemas-generated-once-per-run.
