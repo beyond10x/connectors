@@ -1060,7 +1060,7 @@ fn a_push_the_forge_applies_after_the_caller_hung_up_is_still_logged() {
         &[(ZERO, &tip, "refs/heads/agent/hangup")],
         &pack(&work, &objects(&work, &tip, "origin/main")),
     );
-    forge.hold_push_ms.store(3000, Ordering::SeqCst);
+    forge.hold_push_ms.store(500, Ordering::SeqCst);
     let mut stream = connect(&served);
     send(&mut stream, &receive_path(), None, &body);
     eventually("the forge reads the relayed push", || forge.pushes() == 1);
@@ -1069,11 +1069,19 @@ fn a_push_the_forge_applies_after_the_caller_hung_up_is_still_logged() {
     eventually("the forge applies the push", || {
         forge.head(PROJECT, "refs/heads/agent/hangup").as_deref() == Some(tip.as_str())
     });
-    std::thread::sleep(Duration::from_secs(3));
+    // The relay logs within some 50 ms of the forge's update. It has 3 s for it:
+    // a loaded machine makes this wait longer, not the test red.
+    let logged = |log: &str| {
+        log.lines()
+            .any(|line| line.contains("refs/heads/agent/hangup") && line.contains("outcome="))
+    };
+    let waited = std::time::Instant::now();
+    while !logged(&served.log()) && waited.elapsed() < Duration::from_secs(3) {
+        std::thread::sleep(Duration::from_millis(50));
+    }
     let log = served.log();
     assert!(
-        log.lines()
-            .any(|line| line.contains("refs/heads/agent/hangup") && line.contains("outcome=")),
+        logged(&log),
         "the forge applied refs/heads/agent/hangup and the relay logged no outcome for it:\n{log}"
     );
 }
