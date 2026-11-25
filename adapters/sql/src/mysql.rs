@@ -9,8 +9,8 @@
 //! binary result protocol and are written by the `mysql-native-text` rules
 //! (`Family::rendering`), which the adapter's ESS model fixes.
 use super::{
-    CLEANUP_TIMEOUT, CONNECT_TIMEOUT, Config, QUERY_TIMEOUT, Query, REQUEST_TIMEOUT, column_bounds,
-    database_certificates, query_timeout, sqlstate_error,
+    CLEANUP_TIMEOUT, CONNECT_TIMEOUT, Config, Query, REQUEST_TIMEOUT, column_bounds,
+    database_certificates, query_timeout, sqlstate_error, work_deadline,
 };
 use base64::Engine as _;
 use connectors_contracts::{Column, QueryResult};
@@ -22,6 +22,7 @@ use mysql_async::{
     prelude::Queryable,
 };
 use serde_json::Value;
+use std::time::Duration;
 use tokio::{sync::oneshot, time::Instant};
 
 /// Every later transaction of the session, including each autocommitted
@@ -407,12 +408,13 @@ pub(crate) async fn query(
     password: &dyn Credential,
     instance: &str,
     args: Query,
+    query_time: Duration,
 ) -> Result<Value> {
     let deadline = Instant::now() + REQUEST_TIMEOUT;
     let opts = options(config, password).await?;
     let mut conn = connect(opts.clone()).await?;
     // Reserve cleanup time inside the 15 s request bound, as on PostgreSQL.
-    let work_deadline = (Instant::now() + QUERY_TIMEOUT).min(deadline - CLEANUP_TIMEOUT);
+    let work_deadline = work_deadline(deadline, query_time);
     let instance = instance.to_owned();
     let database = config.database.clone();
     let (mut send, receive) = oneshot::channel();
