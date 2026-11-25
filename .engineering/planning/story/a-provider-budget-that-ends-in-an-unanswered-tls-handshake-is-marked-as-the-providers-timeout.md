@@ -18,7 +18,7 @@ scope:
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 9
+revision: 10
 ---
 ## Defect
 
@@ -139,7 +139,8 @@ wins over a connect that has started, that connect ends in a background task und
 deadline its future kept. Acceptance 1 decides it. If the layer does not see the value, the
 test stays red and this story is re-planned before any other form is built.
 
-A budget that ends before the TCP connection opens is cut by the same bound and is unmarked.
+A budget with at least 500 ms left at `send` that ends before the TCP connection opens is cut
+by the same bound and is unmarked. With less left the call is as today (item 3).
 No test builds that case: a TCP connect that hangs needs an address outside the host, and the
 test step makes no network request.
 
@@ -199,9 +200,11 @@ Other stories on these files:
 - story:test-binary-per-package-rest (draft, no scope) would move the test files of
   `crates/connectors-host` under one test binary and change the binary names of
   acceptance 5. It is not planned beside this story.
-- `contracts/auth/capability/v1alpha1/semantics.md` cites lines 11 to 35 of `http.rs` by
-  number; no test pins that citation. This story adds no line above line 36: its imports are
-  written with their full paths.
+- Three contract texts cite lines of `http.rs` by number, and no test pins a citation:
+  `contracts/auth/capability/v1alpha1/semantics.md` (lines 11 to 35),
+  `contracts/auth/connection/v1alpha1/semantics.md` (lines 30 to 36) and
+  `adapters/prometheus/contracts/series/v1alpha1/semantics.md` (lines 11 to 25). This story
+  adds no line above line 37: its imports are written with their full paths.
 
 ## Not in this story
 

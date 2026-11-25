@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 6
+revision: 7
 ---
 ## Defect
 
@@ -76,13 +76,20 @@ Test code only, one file, `adapters/sql/tests/ess_model.rs`.
 4. Two functions. `schemas_in(parent, sources)` does items 1 and 2 for a parent directory and
    a source directory and returns the directory of the key. `schema(name)` loses its `out`
    argument, calls `schemas_in` with the two defaults and reads one schema from the result.
-   The 16 tests call `schema(name)`. The two new tests and the child test call `schemas_in`
-   with directories of their own.
+   The 16 tests call `schema(name)`. The test of acceptance 3 and the child test call
+   `schemas_in` with directories of their own; the test of acceptance 1 starts the children
+   and calls neither.
+   `sources` is the directory `ess` reads, not only the one the key is made of: `schemas_in`
+   starts `ess generate` with the working directory set to the parent of `sources` and
+   `--path` set to its file name, a relative path as every `ess generate` call of the
+   workspace gives it today. The default of `schema` is `spec/ess` under the manifest
+   directory of the crate, as today.
 5. The per-test temporary directory goes where a test used it only for the schemas. The
    executable `ess` is started in one place of the file, inside `schemas_in` under the lock.
-6. The child test of acceptance 1 reads the parent directory from an environment variable and
-   returns at once when the variable is absent, as an ordinary run has it. It is not an
-   ignored test.
+6. The child test of acceptance 1 reads the parent directory from the environment variable
+   `CONNECTORS_TEST_ESS_MODEL_SCHEMAS_PARENT` and returns at once when the variable is
+   absent, as an ordinary run has it. It is not an ignored test. No other file of the
+   repository names that variable.
 7. The two new tests of acceptances 1 and 3 each make a parent directory of their own with
    `tempfile::tempdir_in(CARGO_TARGET_TMPDIR)`, and the children get that one. No new test
    writes the default parent directory, so its `generations.log` holds lines of the 16 tests
@@ -119,7 +126,10 @@ product that takes at most 0.3 s to make.
 6. The 16 tests use the shared directory: in `adapters/sql/tests/ess_model.rs` as the pull
    request leaves it, `Command::new` of the `ess` executable appears once, inside
    `schemas_in`; `schema` takes the name alone; and `schemas_in` is called from `schema`,
-   from the two new tests and from the child test, and from nowhere else.
+   from `a_changed_source_byte_makes_a_new_directory` and from the child test, and from
+   nowhere else. The body of `schemas_in` holds neither the text `CARGO_MANIFEST_DIR` nor
+   the text `spec/ess`: the working directory and the `--path` of the command come from its
+   `sources` argument.
 7. `git diff --stat` of the pull request names one file outside the planning store.
 8. The three new tests, the child test among them, end within 5 s each in the same job; none
    is a `slow_lane_` test.
