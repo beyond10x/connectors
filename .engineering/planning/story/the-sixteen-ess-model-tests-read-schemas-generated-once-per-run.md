@@ -12,7 +12,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 4
+revision: 5
 ---
 ## Defect
 
@@ -56,16 +56,34 @@ Test code only, one file, `adapters/sql/tests/ess_model.rs`.
    parent directory holds the crate and the binary, because `target/tmp` is shared by every
    package of the tree.
 2. Creation is single-flight across processes. A caller opens the file `<key>.lock` beside the
-   directory and takes an exclusive lock on it (`std::fs::File::lock`), which the operating
-   system releases when the process ends. Under the lock: when the directory is there, it is
+   directory and takes an exclusive lock on it (`std::fs::File::lock`). The helper drops the
+   file, and with it the lock, when it returns, so that the threads of one `cargo test`
+   process, each with an open file of its own, take it in turn; the operating system
+   releases it when a process is killed. Under the lock: when the directory is there, it is
    read; when not, the caller generates into `<key>.<process id>.tmp` beside it, renames that
    into place and appends one line to `generations.log` in the parent directory. A caller in
    another process therefore reads a whole directory or waits for one. cargo-nextest runs each
    test in its own process, so an in-process global is not used.
-3. The helper takes the parent directory and the source directory as arguments, so that a
+   Under the lock a directory `<key>.*.tmp` beside it is stale, left by a process that was
+   killed; the caller removes its own `<key>.<process id>.tmp` before it generates.
+3. The function that takes the lock carries `#[allow(clippy::incompatible_msrv)]` with the
+   reason in a comment: `File::lock` is stable since Rust 1.89, `connectors-sql` inherits the
+   workspace's `rust-version` of 1.88, and the gate's clippy runs with `-D warnings` over all
+   targets. The file is a test binary compiled with the pinned toolchain alone; the gate's
+   check at 1.88 compiles the library of `connectors-sql`, not its tests. The file carries
+   `#![cfg(unix)]`, so the lock is `flock` on Linux and macOS.
+4. The helper takes the parent directory and the source directory as arguments, so that a
    test can point it at directories of its own. The 16 tests pass the two defaults.
-4. The `out` argument and the per-test temporary directory go where a test used them only for
-   the schemas.
+5. The `out` argument and the per-test temporary directory go where a test used them only for
+   the schemas. The executable `ess` is started in one place of the file, the helper's
+   generation under the lock.
+6. The child test of acceptance 1 reads the parent directory from an environment variable and
+   returns at once when the variable is absent, as an ordinary run has it. It is not an
+   ignored test.
+7. The two new tests of acceptances 1 and 3 each make a parent directory of their own with
+   `tempfile::tempdir_in(CARGO_TARGET_TMPDIR)`, and the children get that one. No new test
+   writes the default parent directory, so its `generations.log` holds lines of the 16 tests
+   alone, and two runs in one tree do not empty each other's directory.
 
 Decided: the form is the fixture on disk keyed by the digest of its sources. The other
 accepted form, a committed generated file with a digest of its sources, is not taken: it adds
@@ -77,21 +95,26 @@ product that takes at most 0.3 s to make.
 1. Made once on a cold directory, across processes: a new test
    `four_processes_on_an_empty_directory_generate_once` starts 4 children of its own test
    binary at once (each runs the one child test, which calls the helper with the pinned `ess`
-   on a parent directory the test made empty) and then reads `generations.log`: 1 line. The 4
-   children exit 0 and each printed the same directory.
+   on the new, empty parent directory of the test) and then reads `generations.log`: 1 line.
+   The 4 children exit 0 and each printed the same directory.
 2. Acceptance 1 is red-capable: with the lock removed (not committed), one run of the test is
    recorded in "As built" with its line count. If that run still shows 1 line, "As built" says
    so and names what the test does not see.
 3. A changed source makes a new product: a new test
    `a_changed_source_byte_makes_a_new_directory` copies the 4 files to a temporary directory,
-   calls the helper, changes one byte of one copy and calls it again: the two directories
-   differ and `generations.log` holds 2 lines. No file under `adapters/sql/spec/ess` changes.
+   calls the helper on a parent directory of its own, changes one byte of one copy and calls
+   it again: the two directories differ and that parent's `generations.log` holds 2 lines. No file under `adapters/sql/spec/ess` changes.
 4. The 17 tests that exist today pass in the test step of the forge's "repository gate" job of
    the pull request.
 5. No assertion of an existing test changes: the pull request's diff of
    `adapters/sql/tests/ess_model.rs` removes no line that contains `assert`.
-6. `git diff --stat` of the pull request names one file outside the planning store.
-7. The two new tests end within 5 s each in the same job; neither is a `slow_lane_` test.
+6. The 16 tests use the helper: in `adapters/sql/tests/ess_model.rs` as the pull request
+   leaves it, `Command::new` of the `ess` executable appears once, inside the helper's
+   generation, and no call of `schema` passes a temporary directory.
+7. `git diff --stat` of the pull request names one file outside the planning store.
+8. The three new tests, the child test among them, end within 5 s each in the same job; none
+   is a `slow_lane_` test.
+9. The gate's clippy step passes in the same job.
 
 "As built" records the 17 durations of the binary in the pull request's gate job beside those
 of the newest gate job on main at or before its base commit. That is a record, not an
@@ -121,9 +144,12 @@ Other stories near this file:
 - The fixture's hold: story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold.
 - `the_model_admits_exactly_the_read_profiles_the_executable_admits`, 0.559 to 0.700 s as the
   code is and 0.557 to 0.800 s with the probe: its time is not in the call.
-- The other tests that call `ess generate`, one call each per test that uses it:
+- The other test files that start `ess generate` (found with a search for `"generate"` under
+  `adapters/*/tests` and `crates/connectors-build/tests`):
   `adapters/sql/tests/mysql_adversary.rs`, `adapters/sql/tests/mysql_adversary_2.rs`,
   `adapters/grafana/tests/ess_model.rs`, `adapters/loki/tests/ess_model.rs`,
-  `adapters/loki/tests/adversary_pass1.rs`, `adapters/prometheus/tests/ess_model.rs`. Not
-  counted and not measured here; they belong to
-  story:where-do-the-1298-s-of-the-tests-under-5-s-go.
+  `adapters/loki/tests/adversary_pass1.rs`, `adapters/prometheus/tests/ess_model.rs`,
+  `crates/connectors-build/tests/catalog_guard_model.rs`, `catalog_walk_model.rs`,
+  `catalog_binary_model.rs`, `catalog_amendment_model.rs`, `catalog_identity_model.rs` and
+  `fresh_checkout_regeneration.rs` of the same directory. Their calls are not counted and not
+  measured here; they belong to story:where-do-the-1298-s-of-the-tests-under-5-s-go.

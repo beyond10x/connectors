@@ -16,7 +16,7 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 7
+revision: 8
 ---
 ## Defect
 
@@ -75,11 +75,17 @@ a release build, shown by a test on a release build.
 4. The two test files start the server after `.env_clear()`. Each sets the variables on that
    command:
    - `security_mcp_deadline.rs`: the on-time case runs at a budget of 4,000 ms with
-     `…_LISTED_REQUEST_MS=4000`. The control keeps its `LATE_BUDGET` and gets no variable.
-   - `mcp_tool_call_shapes_adversary.rs`: `REQUEST_MS` becomes 4,000 with
-     `…_LISTED_REQUEST_MS=4000` and `…_WALK_RESERVE_MS=1000`; the walk test's page delay becomes
-     1,000 ms, so that the walk outlasts the budget after about three pages. Every test of the
-     file that uses `served()` runs under these values.
+     `…_LISTED_REQUEST_MS=4000`. Both it and the control start the server through `paused`,
+     which calls `spawn`, which builds the command with `Served::server`. `paused` takes the
+     variables as a parameter and hands them to `spawn`, which sets them on that command. The
+     on-time test passes the one variable. The control keeps its `LATE_BUDGET` and passes
+     none. `Served::server` does not change, so its other callers (`Peer::start` and the tests
+     that use it) get no variable.
+   - `mcp_tool_call_shapes_adversary.rs`: `REQUEST_MS` becomes 4,000; the walk test's page
+     delay becomes 1,000 ms, so that the walk outlasts the budget after two or three pages.
+     `served` takes the budget as an argument and `Peer::start` takes the variables. Every
+     test that exists in the file today passes `REQUEST_MS`, `…_LISTED_REQUEST_MS=4000` and
+     `…_WALK_RESERVE_MS=1000`. The new test of acceptance 5 passes 19,999 and no variable.
 5. The on-time test fails when its scenario is not built. Today it prints "scenario not built"
    and passes when `began_on_time` is false. If the forge shows it red for that reason, the
    budget of the case is raised; the assertion stays.
@@ -118,10 +124,11 @@ one release test of the helper covers every wait read through it, as the helper'
 
 - `apps/connectors/src/mcp/projection.rs`: the comparison in `Snapshot::limits`,
   `WALK_REPLY_RESERVE`, `walk_deadline`.
-- `apps/connectors/tests/security_mcp_deadline.rs`: `BUDGET`, the on-time test, the command
-  that starts the server.
-- `apps/connectors/tests/mcp_tool_call_shapes_adversary.rs`: `REQUEST_MS`, `Peer::start`, the
-  walk test's page delay, the new test.
+- `apps/connectors/tests/security_mcp_deadline.rs`: `BUDGET`, the on-time test, `paused` and
+  `spawn`, and the control's call of `paused`. `Served::server` is read and not changed.
+- `apps/connectors/tests/mcp_tool_call_shapes_adversary.rs`: `REQUEST_MS`, `served()`, which
+  writes the budget into the configuration and takes it as an argument for the new test,
+  `Peer::start`, the walk test's page delay, the new test.
 
 No other file changes: no unit test is added under `apps/connectors/src/mcp/`, and
 `crates/connectors-host/src/local/owner/transport.rs` is not touched, because both names carry
@@ -142,6 +149,11 @@ Other stories on these files:
   rebuilding the on-time scenario from replies that need no listed tool: not built, no story.
 - A release-build test of package `connectors`: see "Change"; no story.
 - The four tests that story:seven-mcp-tests-use-a-4-s-request-budget-and-shorter-holds
-  shortened.
+  changed. Its "As built" gives one run each: three got shorter
+  (`security_control_a_late_reply_to_a_paused_reader_keeps_the_session` 6.3 s,
+  `adversary_stdin_closed_while_the_store_is_held_exits_successfully` 1.8 s,
+  `adversary_a_lost_session_leaves_no_provider_read_open` 4.5 s) and
+  `adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready` stayed
+  at 6.7 s. The control and the long-read test stay over 5 s; no story.
 - `adversary_a_store_replaced_under_the_owner_ends_the_session` (16.5 s in the forge's gate job
   138270416028), which no story of the set changes.
