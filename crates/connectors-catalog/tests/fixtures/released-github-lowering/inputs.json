@@ -1,0 +1,79 @@
+{
+  "digest": "8ae7c7be887ba47085fd1328e37ac6962c86c14ea8ce89073d75c2e3bf18d9de",
+  "files": [
+    {
+      "path": "crates/connectors-catalog/src/amendment.rs",
+      "sha256": "5e0737908b1a792a1944fd470937083067bb6d15cb27e4fe0ce918d741a3ebb0"
+    },
+    {
+      "path": "crates/connectors-catalog/src/authored.rs",
+      "sha256": "30b74a2d0bb2caf004686363ac590ef855d3b047b014a71aa5372729c44c57e5"
+    },
+    {
+      "path": "crates/connectors-catalog/src/bundle.rs",
+      "sha256": "67b213041f80138a52bed73cb83f98313f465f407e6a77a60bc1d5c0c8dcb210"
+    },
+    {
+      "path": "crates/connectors-catalog/src/coverage.rs",
+      "sha256": "be63a460ff629b9d17d631ed9c5e8228f16f309fd55c8e5ef56ddab57b9c4ca6"
+    },
+    {
+      "path": "crates/connectors-catalog/src/definition.rs",
+      "sha256": "7e2bf826f307c0ca1bf86ce7b76c63b468efda01e1598651df454131507bc7a8"
+    },
+    {
+      "path": "crates/connectors-catalog/src/derived.rs",
+      "sha256": "2db5f7149a77f4232cc9c0ad485115d5db4399b787eed30aef2b46e235530bfc"
+    },
+    {
+      "path": "crates/connectors-catalog/src/discovery.rs",
+      "sha256": "d8f6c2bf6714ad3f2868d2899fb4a615282b60047e28fb853c3e788d148d641d"
+    },
+    {
+      "path": "crates/connectors-catalog/src/import.rs",
+      "sha256": "124e525edc2c8443f6e2c8d5a06ebefb23098937682a79a593378648faea6566"
+    },
+    {
+      "path": "crates/connectors-catalog/src/inventory.rs",
+      "sha256": "64ad24ad564dac2954201d36eb6c2d1d4f9b4069fc78d0e24a55edbe650dd022"
+    },
+    {
+      "path": "crates/connectors-catalog/src/lib.rs",
+      "sha256": "e521c0856a2248ffb093312e6c3493c2c1347ca7ee50a35f9e1ab956a83b90d6"
+    },
+    {
+      "path": "crates/connectors-catalog/src/pipeline.rs",
+      "sha256": "e102f84a035244eb95f192a9aa2b9be3ef896f1672ae6106028489f647ff0105"
+    },
+    {
+      "path": "crates/connectors-catalog/src/query_template.rs",
+      "sha256": "e49ed8f3239016c31022c21d6b57fbadc33741b40e5e0e790c32e77ee931ce1a"
+    },
+    {
+      "path": "crates/connectors-catalog/src/swagger.rs",
+      "sha256": "0309b900f1b04003e7907f7f8c0c50ac049fdad34dc0ff86dd3c7a613022218e"
+    },
+    {
+      "path": "crates/connectors-catalog/src/template.rs",
+      "sha256": "7469fb221346d49666f0c95b67b8119adf4a429a07faa8c2e19e54d90473f10f"
+    },
+    {
+      "path": "crates/connectors-catalog/tests/fixtures/definitions-0.5.2/connectors/github.yaml",
+      "sha256": "e5408d1307ae01f3a5fbfb32587ecb72288bf0ea873cfb47e3383d1e5ef91cc2"
+    },
+    {
+      "path": "crates/connectors-catalog/tests/fixtures/definitions-0.5.2/upstream/github/LICENSE.md",
+      "sha256": "3243761cbac07e6d169a5a2f4e7c25cc544da85248e735df74c3672e055cc87b"
+    },
+    {
+      "path": "crates/connectors-catalog/tests/fixtures/definitions-0.5.2/upstream/github/README.md",
+      "sha256": "e9829062ee025e32159a9d44bda6906e717853346a90be29caba41cb624f265b"
+    },
+    {
+      "path": "crates/connectors-catalog/tests/fixtures/definitions-0.5.2/upstream/github/api.github.com.yaml.gz",
+      "sha256": "a57e519530d45b455305d8aed6f15311708d2b9915f33c648b54dfeb62c5e851"
+    }
+  ],
+  "format": "connectors-released-lowering/1",
+  "regenerate": "CONNECTORS_WRITE_RELEASED_LOWERING=1 cargo test --locked -p connectors-catalog-provider --test main -- --ignored --exact released_lowering::slow_lane_the_committed_lowering_equals_a_fresh_lowering"
+}

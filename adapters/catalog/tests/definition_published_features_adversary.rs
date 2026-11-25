@@ -21,31 +21,9 @@ fn released() -> PathBuf {
         .join("../../crates/connectors-catalog/tests/fixtures/definitions-0.5.2")
 }
 
-/// The engine the released definition lowers to.
+/// The engine the released definition lowers to, from the committed lowering.
 fn engine() -> Engine {
-    let temp = tempfile::tempdir().unwrap();
-    let scratch = temp.path().join("scratch");
-    std::fs::create_dir_all(&scratch).unwrap();
-    let out = temp.path().join("out");
-    let lowered = definition::lower(&definition::Request {
-        definition: &released().join("connectors/github.yaml"),
-        root: &released(),
-        out: &out,
-        scratch: &scratch,
-    })
-    .expect("the released definition lowers");
-    let selections: Vec<Selection> =
-        serde_json::from_value(
-            serde_json::from_slice::<Value>(&std::fs::read(&lowered.operations).unwrap()).unwrap()
-                ["operations"]
-                .clone(),
-        )
-        .expect("the lowered selection reads as the engine's selections");
-    let bundle = bundle::load(&out, &lowered.provider).unwrap();
-    match Engine::new(&bundle, "", &selections) {
-        Ok(engine) => engine,
-        Err(error) => panic!("the lowered selection loads: {}", error.message),
-    }
+    crate::released_lowering::engine()
 }
 
 /// One GET as sent: its path segments and its query pairs.

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition
 kind: story
-status: draft
+status: active
 title: '40 catalog provider tests read a committed lowering of the released definition: about 94.9 s become an estimated 9.7 s'
 summary: engine() lowers the released definition per call, about 1.5 s each; a committed generated directory with a digest of its sources replaces it; 26 tests that lower a changed definition keep theirs
 relations:
@@ -23,7 +23,10 @@ scope:
   path: adapters/catalog/tests/released_lowering.rs
 - confidence: inferred
   path: crates/connectors-catalog/tests/fixtures/released-github-lowering
-revision: 10
+revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T07:57:05Z", actor: "human:operator", revision: 11}
+- {from: "proposed", to: "active", at: "2026-11-25T07:57:05Z", actor: "human:operator", revision: 12}
 ---
 ## Defect
 
