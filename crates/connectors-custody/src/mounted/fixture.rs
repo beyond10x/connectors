@@ -119,13 +119,17 @@ impl Jail {
     /// be made, an owner-only copy where not.
     ///
     /// A link is the source itself under a second name, mode included. So a
-    /// source is linked only when group and others cannot write it, and its
-    /// mode is left as it is. Everything else is copied with mode 0700: a
-    /// source on another file system, a link the host refuses, a source that
-    /// group or others can write, and a symbolic link.
+    /// source is linked only when its mode is one the jail may see as it is:
+    /// group and others cannot write it, its owner can execute it, and it has
+    /// no set-user-id, set-group-id or sticky bit. Its mode is left alone.
+    /// Everything else is copied with mode 0700: a source with another mode,
+    /// a source on another file system, a link the host refuses, and a
+    /// symbolic link.
     ///
     /// Nothing may write the installed file or change its mode: where it is
-    /// a link, that writes the source.
+    /// a link, that writes the source. Where the file is a link, its link
+    /// count and change time move when another jail installs or removes the
+    /// same source.
     pub fn install(&self, source: &Path, inside: &str) -> PathBuf {
         let destination = self.path(inside);
         if let Some(parent) = destination.parent() {
@@ -136,8 +140,9 @@ impl Jail {
         if destination.symlink_metadata().is_ok() {
             fs::remove_file(&destination).unwrap();
         }
-        let private = fs::metadata(source).unwrap().permissions().mode() & 0o022 == 0;
-        if private && fs::hard_link(source, &destination).is_ok() {
+        let mode = fs::metadata(source).unwrap().permissions().mode();
+        let as_it_is = mode & 0o7022 == 0 && mode & 0o100 != 0;
+        if as_it_is && fs::hard_link(source, &destination).is_ok() {
             if !destination.is_symlink() {
                 return destination;
             }

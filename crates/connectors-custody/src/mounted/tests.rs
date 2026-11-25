@@ -650,8 +650,9 @@ fn install_links_a_source_on_the_jails_file_system() {
 /// and a jail root in the temporary directory. The test asks the host first,
 /// with the link call itself: equal device numbers do not say it, because
 /// two mounts of one device refuse a link between them. Linked where that
-/// call works and cargo gave the binary no group or other write bit; a copy
-/// where the call crosses devices or the binary has such a bit.
+/// call works and cargo gave the binary a mode a link may carry (no group or
+/// other write bit, the owner's execute bit, no set-id or sticky bit); a copy
+/// where the call crosses devices or the mode is another.
 #[test]
 fn install_links_the_running_test_binary_where_the_link_call_works() {
     let source = std::env::current_exe().unwrap();
@@ -666,9 +667,9 @@ fn install_links_the_running_test_binary_where_the_link_call_works() {
         Err(error) => panic!("the probe link into the jail's directory: {error}"),
     };
     let installed = jail.install(&source, "/bin-test/custody");
-    let private = named(&source).mode() & 0o022 == 0;
-    eprintln!("the link call works: {links}; no group or other write bit: {private}");
-    if links && private {
+    let mode = named(&source).mode();
+    let as_it_is = mode & 0o7022 == 0 && mode & 0o100 != 0;
+    if links && as_it_is {
         assert_eq!(
             inode(&named(&installed)),
             inode(&named(&source)),
@@ -744,4 +745,41 @@ fn install_at_the_place_of_an_earlier_link_leaves_its_source_alone() {
     assert_eq!(fs::read(&first).unwrap(), b"first");
     assert_eq!(fs::read(&installed).unwrap(), b"second, a copy");
     copied(&named(&installed), &named(&second));
+}
+
+/// `install` puts an executable into the jail whatever mode its source has:
+/// a link would keep a source without the owner's execute bit as it is, and
+/// nothing could run it. It is copied, and the jail runs the copy.
+#[test]
+fn install_copies_a_source_without_an_execute_bit() {
+    let (_directory, source) = program(0o644, b"#!/bin/sh\nexit 0\n");
+    let jail = Jail::new();
+    let installed = jail.install(&source, "/bin-test/program");
+    copied(&named(&installed), &named(&source));
+    assert_eq!(named(&source).mode() & 0o7777, 0o644, "the source's mode");
+    let ran = Jail::output(
+        jail.command("/bin-test/program", Map::Own)
+            .env_clear()
+            .stdin(Stdio::null()),
+    );
+    assert!(ran.status.success(), "the copy runs in the jail: {ran:?}");
+}
+
+/// A link would carry a set-user-id, set-group-id or sticky bit of its source
+/// into the jail; the copy never had one. A host may drop a bit it does not
+/// grant this user (set-group-id, for a group the user is not in): the bits
+/// it kept decide, and it keeps the set-user-id bit of the user's own file.
+#[test]
+fn install_copies_a_source_with_a_set_id_or_sticky_bit() {
+    for mode in [0o4755, 0o2755, 0o1755] {
+        let (_directory, source) = program(mode, b"#!/bin/sh\n");
+        let kept = named(&source).mode() & 0o7000;
+        assert!(mode != 0o4755 || kept == 0o4000, "the set-user-id bit");
+        let jail = Jail::new();
+        let installed = named(&jail.install(&source, "/bin-test/program"));
+        assert_eq!(installed.mode() & 0o7000, 0, "of a source with {mode:o}");
+        if kept != 0 {
+            copied(&installed, &named(&source));
+        }
+    }
 }
