@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 7
+revision: 8
 ---
 ## Defect
 
@@ -86,7 +86,8 @@ Test code only, one file, `adapters/sql/tests/ess_model.rs`.
    directory of the crate, as today.
 5. The per-test temporary directory goes where a test used it only for the schemas. The
    executable `ess` is started in one place of the file, inside `schemas_in` under the lock.
-6. The child test of acceptance 1 reads the parent directory from the environment variable
+6. The child test of acceptance 1, `a_child_generates_into_the_parent_it_is_given`, reads
+   the parent directory from the environment variable
    `CONNECTORS_TEST_ESS_MODEL_SCHEMAS_PARENT` and returns at once when the variable is
    absent, as an ordinary run has it. It is not an ignored test. No other file of the
    repository names that variable.
@@ -113,10 +114,17 @@ product that takes at most 0.3 s to make.
    so and names what the test does not see.
 3. A changed source makes a new product: a new test
    `a_changed_source_byte_makes_a_new_directory` copies the 4 files to a temporary directory,
-   calls `schemas_in` on a parent directory of its own, changes one byte inside a comment
-   line of the copy of `domains/profiles.yaml` and calls it again: the two directories differ
-   and that parent's `generations.log` holds 2 lines. No file under `adapters/sql/spec/ess`
-   changes.
+   calls `schemas_in` on a parent directory of its own, changes one byte that the schema
+   carries in the copy of `domains/profiles.yaml` (the bound `lte: 64` of
+   `connectors_sql.profiles.ProfileId` becomes `lte: 65`) and calls it again: the two
+   directories differ, that parent's `generations.log` holds 2 lines, and the file
+   `schemas/schema/types/connectors_sql.profiles.ProfileId.schema.json` holds
+   `"maxLength": 64` in the first directory and `"maxLength": 65` in the second. That shows
+   that `ess` read the copy. No file under `adapters/sql/spec/ess` changes.
+   Read on 2026-11-25 with the pinned `ess` 0.97.4, outside the tree: started in the parent
+   of a copy of the 4 files with `--path` at the copy's name, `ess generate` exits 0, and
+   with that one byte changed the schema file differs in `maxLength` (64, 65), in the same
+   bound of its `x-ess-invariants` line and in its `contract_digest`.
 4. The 17 tests that exist today pass in the test step of the forge's "repository gate" job of
    the pull request.
 5. No assertion of an existing test changes: the pull request's diff of
@@ -171,8 +179,8 @@ Other stories near this file:
   `crates/connectors-build/tests/catalog_guard_model.rs`, `catalog_walk_model.rs`,
   `catalog_binary_model.rs`, `catalog_amendment_model.rs`, `catalog_identity_model.rs` and
   `fresh_checkout_regeneration.rs` of the same directory. Each file starts it in one place,
-  and the 12 files hold 42 test functions, so a run makes at most 42 such calls. Their calls
-  per run and their times are not measured. No story claims them:
-  story:where-do-the-1298-s-of-the-tests-under-5-s-go reads four other binaries. At the 0.088 s
-  that a call takes at most on the forge for this story's sources, 42 calls are at most 3.7 s
-  (arithmetic; their sources differ). No story.
+  and the 12 files hold 42 test functions. That is a count of test functions, not of calls:
+  the tests of `fresh_checkout_regeneration.rs` run the `connectors-build` binary, which
+  starts `ess generate` itself in several places, so one test makes several calls. Their
+  calls per run and their times are not measured. No story claims them:
+  story:where-do-the-1298-s-of-the-tests-under-5-s-go reads four other binaries. No story.

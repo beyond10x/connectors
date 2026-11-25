@@ -4,7 +4,7 @@ id: story:a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-a
 kind: story
 status: draft
 title: A provider budget that ends in an unanswered TLS handshake is marked as the provider's timeout
-summary: With a provider budget shorter than the connect timeout, a timeout during an unanswered TLS handshake carries upstream_answer = true although no request was sent; a connector layer bounds the connect by the budget so that the cut is reported as a connect error
+summary: With a provider budget shorter than the connect timeout, a timeout during an unanswered TLS handshake carries upstream_answer = true although no request was sent; with at least 500 ms of the budget left, a connector layer bounds the connect by the budget so that the cut is reported as a connect error
 relations:
 - informed_by: story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts
 - depends_on: story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts
@@ -18,7 +18,7 @@ scope:
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 10
+revision: 12
 ---
 ## Defect
 
@@ -44,6 +44,10 @@ with `Timeout` and `upstream_answer = true`; the peer had read 251 bytes. Withou
 budget the same peer is cut by the connect timeout and the timeout is not marked
 (`a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked` in
 `crates/connectors-host/tests/provider_timeout_adversary.rs`).
+
+That run's budget of 300 ms is under the 500 ms below which this story changes nothing (item 3
+of "Change"): the same run ends marked after this story too. The test of acceptance 1 runs with
+1,000 ms for that reason.
 
 Read in the source of reqwest 0.13.5: `PendingRequest::poll` polls the request's own timers
 before the request and, when one has passed, returns a timeout that carries no connect error
@@ -169,7 +173,7 @@ test step makes no network request.
 4. `a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked` and
    `a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout` pass unchanged.
 5. The upgrade path and the read POST are untouched: the pull request's diff changes no line
-   of the function `upgrade` and no line of the read POST, and the test binaries
+   of the function `upgrade` and no line of the read POST (the function `post_json`), and the test binaries
    `http_upgrade` and `upgrade_adversary` of `connectors-host` pass in the forge's
    "repository gate" job.
 6. A budget with less than 500 ms left is as today: the pull request's diff changes no line
