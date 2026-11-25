@@ -1595,6 +1595,55 @@ const START_DELAY: &str = "CONNECTORS_TEST_OWNER_START_DELAY_MS";
 /// (tests/owner_slow_start.rs).
 #[cfg(all(unix, debug_assertions))]
 const LAUNCH_DELAY: &str = "CONNECTORS_TEST_OWNER_LAUNCH_DELAY_MS";
+/// The prefix of a variable that replaces a production wait in a test build
+/// (`connectors_sdk::debug_override_ms`). A test build's CLI passes every
+/// variable that carries it to the owner it starts, so an override the owner
+/// reads needs no entry in [`owner_environment`].
+#[cfg(all(unix, debug_assertions))]
+const OVERRIDE_PREFIX: &str = "CONNECTORS_TEST_OVERRIDE_";
+/// What an owner receives of the `environment` of the CLI that starts it;
+/// `spawn` sets it on a cleared environment. It is the `installation`
+/// directory the CLI resolved and, in a test build, seven variables by name
+/// and every variable whose name starts with [`OVERRIDE_PREFIX`]. The seven
+/// tie the owner to the process a harness names (owner.md), hand it the
+/// follow hook's trust root (`oauth::follow`), so the owner's refresh trusts
+/// the fixture authorization server the CLI's grant trusted, the startup
+/// delay that stands in for a large store ([`START_DELAY`]), the file its
+/// verifications of the store are counted in (`metadata::VERIFICATION_LOG`),
+/// and the three hooks of an acquisition (`registry`). A release build
+/// compiles neither the names nor the prefix and passes the installation
+/// directory alone.
+#[cfg(unix)]
+#[cfg_attr(not(debug_assertions), allow(unused_variables))]
+fn owner_environment(
+    installation: Option<PathBuf>,
+    environment: impl Iterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
+) -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    let mut passed: Vec<(std::ffi::OsString, std::ffi::OsString)> = Vec::new();
+    if let Some(directory) = installation {
+        passed.push((
+            crate::local::config::INSTALLATION.into(),
+            directory.into_os_string(),
+        ));
+    }
+    #[cfg(debug_assertions)]
+    passed.extend(environment.filter(|(name, _)| {
+        name.to_str().is_some_and(|name| {
+            name.starts_with(OVERRIDE_PREFIX)
+                || [
+                    super::tether::PARENT,
+                    "CONNECTORS_TEST_OAUTH_FOLLOW",
+                    START_DELAY,
+                    crate::local::metadata::VERIFICATION_LOG,
+                    crate::local::registry::ACQUISITION_MS,
+                    crate::local::registry::PUBLICATION_FAILS_ONCE,
+                    crate::local::registry::PUBLICATION_REPLY_LOST_ONCE,
+                ]
+                .contains(&name)
+        })
+    }));
+    passed
+}
 /// What a started owner's caller holds until the owner has answered its
 /// greeting. On macOS that is the owner's launch copy: the owner measures its
 /// build from the file at its running executable's path
@@ -1668,34 +1717,10 @@ fn spawn(
         ])
         .current_dir("/")
         .env_clear()
+        .envs(owner_environment(installation, std::env::vars_os()))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    if let Some(directory) = &installation {
-        command.env(crate::local::config::INSTALLATION, directory);
-    }
-    // A test build ties the owner to the process a harness names (owner.md),
-    // and hands it the follow hook's trust root (`oauth::follow`), so the
-    // owner's refresh trusts the fixture authorization server the CLI's grant
-    // trusted, and the startup delay that stands in for a large store
-    // ([`START_DELAY`]), and the file its verifications of the store are counted
-    // in (`metadata::VERIFICATION_LOG`); with the installation directory above,
-    // they are all of the CLI's environment the owner receives. A release build
-    // compiles none.
-    #[cfg(debug_assertions)]
-    for name in [
-        super::tether::PARENT,
-        "CONNECTORS_TEST_OAUTH_FOLLOW",
-        START_DELAY,
-        crate::local::metadata::VERIFICATION_LOG,
-        crate::local::registry::ACQUISITION_MS,
-        crate::local::registry::PUBLICATION_FAILS_ONCE,
-        crate::local::registry::PUBLICATION_REPLY_LOST_ONCE,
-    ] {
-        if let Some(value) = std::env::var_os(name) {
-            command.env(name, value);
-        }
-    }
     // SAFETY: the hook uses only async-signal-safe syscalls and scalar fds. This
     // process intentionally outlives the CLI and starts a separate session.
     unsafe {
@@ -1964,19 +1989,14 @@ fn accept(
 /// contracts/cli/v1alpha1/owner.md: an owner with no client and no child work
 /// for this long exits.
 const IDLE_EXIT: Duration = Duration::from_secs(600);
-/// Test builds may shorten the bound through the environment; a release build
-/// has no override. The CLI starts owners with a cleared environment.
-#[cfg(debug_assertions)]
+/// Test builds may shorten the bound through the environment
+/// (`connectors_sdk::debug_override_ms`); a release build has no override.
+/// The CLI starts owners with a cleared environment.
 fn idle_bound() -> Duration {
-    std::env::var("CONNECTORS_TEST_OWNER_IDLE_MS")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .map(Duration::from_millis)
-        .unwrap_or(IDLE_EXIT)
-}
-#[cfg(not(debug_assertions))]
-fn idle_bound() -> Duration {
-    IDLE_EXIT
+    Duration::from_millis(connectors_sdk::debug_override_ms(
+        "CONNECTORS_TEST_OWNER_IDLE_MS",
+        IDLE_EXIT.as_millis() as u64,
+    ))
 }
 /// Binds the owner socket owner-only from the moment it is at `socket`. A
 /// CLI polls that path while an owner starts or listens again after
@@ -4558,6 +4578,51 @@ mod tests {
         drop(held);
         let host = owner.join().unwrap();
         assert_eq!(greeted, Ok(host.expect("the next owner was never greeted")));
+    }
+
+    /// story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build:
+    /// of the environment of a test build's CLI, the owner it starts gets the
+    /// installation directory, the seven variables named one by one and every
+    /// variable with the override prefix. It gets no other test variable and
+    /// nothing else of the CLI's environment.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn a_started_owner_gets_every_override_and_the_seven_named_variables_and_no_other() {
+        use std::ffi::OsString;
+        let pair = |name: &str, value: &str| (OsString::from(name), OsString::from(value));
+        let named = [
+            "CONNECTORS_TEST_OWNER_PARENT",
+            "CONNECTORS_TEST_OAUTH_FOLLOW",
+            "CONNECTORS_TEST_OWNER_START_DELAY_MS",
+            "CONNECTORS_TEST_VERIFICATION_LOG",
+            "CONNECTORS_TEST_ACQUISITION_MS",
+            "CONNECTORS_TEST_PUBLICATION_FAILS_ONCE",
+            "CONNECTORS_TEST_PUBLICATION_REPLY_LOST_ONCE",
+        ];
+        let mut environment = named.map(|name| pair(name, "named")).to_vec();
+        environment.extend([
+            pair("CONNECTORS_TEST_OVERRIDE_EXAMPLE_MS", "250"),
+            pair("CONNECTORS_TEST_EXAMPLE", "1"),
+            pair("CONNECTORS_TEST_OWNER_IDLE_MS", "1500"),
+            pair("CONNECTORS_TEST_OWNER_LAUNCH_DELAY_MS", "1"),
+            pair("EXAMPLE_CONNECTORS_TEST_OVERRIDE_MS", "1"),
+            pair("PATH", "/usr/bin"),
+        ]);
+        let mut passed = owner_environment(
+            Some(PathBuf::from("/opt/connectors")),
+            environment.into_iter(),
+        );
+        passed.sort();
+        let mut expected = named.map(|name| pair(name, "named")).to_vec();
+        expected.extend([
+            pair("CONNECTORS_TEST_OVERRIDE_EXAMPLE_MS", "250"),
+            pair(crate::local::config::INSTALLATION, "/opt/connectors"),
+        ]);
+        expected.sort();
+        assert_eq!(passed, expected);
+        // Without an installation directory and a test variable: nothing.
+        let passed = owner_environment(None, [pair("PATH", "/usr/bin")].into_iter());
+        assert!(passed.is_empty(), "{passed:?}");
     }
 }
 

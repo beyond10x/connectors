@@ -2832,6 +2832,14 @@ fn selected_fixture() {{
                 )),
                 "connectors-sdk holds no release-only test the filter {filter} matches"
             );
+            // The same filter runs the proof that a release build ignores a debug override. A
+            // rename out of the filter would leave the lane green on the test above alone.
+            assert!(
+                SDK.contains(&format!(
+                    "#[cfg(all(test, not(debug_assertions)))]\n#[test]\nfn {filter}ignores_a_debug_override() {{\n"
+                )),
+                "connectors-sdk holds no release-only test {filter}ignores_a_debug_override"
+            );
 
             for index in [timing, release] {
                 let command = text(&lane[index], "run").trim();

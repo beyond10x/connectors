@@ -678,8 +678,8 @@ fn allocate(
 /// The environment variable a test build's owner reads: milliseconds an
 /// acquisition stays in flight instead of [`ENTRY_MS`], a stand-in for the
 /// four-minute window of an acquisition whose outcome stayed unknown
-/// (tests/owner_recovers_after_failed_acquisition.rs).
-#[cfg(debug_assertions)]
+/// (tests/owner_recovers_after_failed_acquisition.rs). A release build reads
+/// no variable of this name (`connectors_sdk::debug_override_ms`).
 pub(crate) const ACQUISITION_MS: &str = "CONNECTORS_TEST_ACQUISITION_MS";
 /// The environment variable a test build's owner reads: the path of a file the
 /// first publication removes and, having removed it, answers `outcome_unknown`
@@ -693,14 +693,7 @@ pub(crate) const PUBLICATION_FAILS_ONCE: &str = "CONNECTORS_TEST_PUBLICATION_FAI
 pub(crate) const PUBLICATION_REPLY_LOST_ONCE: &str = "CONNECTORS_TEST_PUBLICATION_REPLY_LOST_ONCE";
 
 fn acquisition_ms() -> u64 {
-    #[cfg(debug_assertions)]
-    if let Some(ms) = std::env::var(ACQUISITION_MS)
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-    {
-        return ms;
-    }
-    ENTRY_MS
+    connectors_sdk::debug_override_ms(ACQUISITION_MS, ENTRY_MS)
 }
 
 fn create_acquisition(
