@@ -30,7 +30,7 @@ scope:
   path: crates/connectors-host/src/local/owner/transport.rs
 - confidence: cited
   path: crates/connectors-sdk/src/lib.rs
-revision: 7
+revision: 9
 ---
 ## Defect
 
@@ -84,6 +84,13 @@ Group C, probes under the 30 s admission bound:
   `unavailable_after_ms` 16 s under a 1 s lifetime.
 
 ## Change
+
+This story stays `draft`. It is revised when
+story:where-do-the-connection-lease-tests-clock-and-the-30-s-admission-bound-live has its
+`## Answer`: the revision then names the site of the 30,000 ms that the four tests of group C wait
+on and the route that brings group B under the bound of acceptance 1. The sentence on which
+property of the product the 30 s admission bound protects, and why a shorter test value is safe,
+is left to that revision: the site is not established until the answer names it.
 
 The design of this story is open until
 story:where-do-the-connection-lease-tests-clock-and-the-30-s-admission-bound-live answers. This
@@ -143,7 +150,7 @@ each. Sum 48.0 s.
    and
    `connectors::connection_lease::slow_lane_concurrent_revalidations_both_answer_ready_within_the_admission_bound`
    pass in the lane `slow`. The lane's command
-   `cargo run --locked -p connectors-build -- ignored --family timing --required --only-prerequisite provider`
+   `cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider`
    lists both as `passed`. Alone they run with
    `cargo test --locked -p connectors --test connection_lease_adversary -- --ignored --exact slow_lane_adversary_a_hanging_early_recollection_does_not_cost_a_read_its_current_evidence`
    and
@@ -159,8 +166,6 @@ story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-rele
 - `apps/connectors/tests/connection_lease_adversary.rs`: the six tests above and one lane test.
 - `apps/connectors/tests/adversary_d218_u1.rs`: the one test above.
 - `apps/connectors/tests/support/mounted.rs`: the knobs of the adapter fixture (lines 185 to 230).
-  story:six-cli-tests-take-jail-binaries-built-once-per-run touches another region of this file:
-  `Container::new` (lines 264 to 292).
 - `crates/connectors-host/src/local/owner/transport.rs`: the admission bound at line 2817 and the
   30,000 ms at lines 2884, 3000 and 3038. Four other stories of this set write this file. The
   `depends_on` edges put this story last: the helper story,

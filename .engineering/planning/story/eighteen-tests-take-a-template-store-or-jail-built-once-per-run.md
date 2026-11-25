@@ -13,9 +13,13 @@ scope:
 - confidence: cited
   path: .config/nextest.toml
 - confidence: cited
+  path: Cargo.lock
+- confidence: cited
   path: adapters/sql/tests/ess_model.rs
 - confidence: cited
   path: crates/connectors-build/Cargo.toml
+- confidence: cited
+  path: crates/connectors-build/src/gate.rs
 - confidence: cited
   path: crates/connectors-build/src/main.rs
 - confidence: inferred
@@ -40,11 +44,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/template_store.rs
-- confidence: cited
-  path: crates/connectors-host/tests/http_standing_grant.rs
-- confidence: cited
-  path: crates/connectors-host/tests/http_standing_grant_adversary.rs
-revision: 9
+revision: 13
 ---
 ## Defect
 
@@ -122,6 +122,18 @@ Read at 0.78.1, which of the eleven the template reaches:
   `Target::new` is in `owner/governed/tests.rs` line 59) and the two `http_standing_grant` files.
   Whether a template store reaches them is not established. Their "after" is the plan's 50 %.
 
+Read at 0.78.2, what `Metadata::initialize` (`crates/connectors-host/src/local/metadata.rs` lines
+372 to 471) creates the store through:
+
+- the module `filesystem` (`filesystem.rs` and the directory `filesystem/`): the file imports it
+  as `fs` (line 3) and `initialize` calls `fs::directory`, `fs::publish_new`, `fs::sync_directory`
+  and `fs::uid`, and through `lifecycle_lock` `fs::private_file_at`;
+- `metadata.rs` itself (`open_connection`, `validate`, `adopt_er`, `migrate`,
+  `enable_checkpoints_now`) and the files of `metadata/`: `er.rs`, `er/ledger.rs`, `deadline.rs`,
+  the `.sql` files it takes in with `include_str!`, and `entity-runtime-definitions.json`;
+- `metadata/er.rs` names types of the modules `runtime`, `approvals`, `audit` and `registry`.
+  Whether a call of `initialize` on an empty directory runs code of those four was not followed.
+
 ## Change
 
 The second accepted form of the folder rule: one fixture built once per test run by a setup step
@@ -129,33 +141,51 @@ before the tests, kept on disk under `target/` and keyed by the digest of its so
 in-process global is not this form: nextest runs each test in its own process.
 
 1. New: a setup step. `.config/nextest.toml` gets one setup script entry that runs
-   `cargo run --locked --offline -p connectors-build -- test-fixtures`. The command is a new
+   `cargo run --locked --offline --bin connectors-build -- test-fixtures` (`--bin` as the gate job
+   starts the tool, `.github/workflows/rust-gate.yml` line 108). The command is a new
    subcommand in a new file, `crates/connectors-build/src/test_fixtures.rs`, entered in
    `crates/connectors-build/src/main.rs`. It is Rust, not Python and not a shell script. It follows
    `baseline_suite` in `crates/connectors-build/src/metadata_emissions.rs` (lines 127 to 151): read
    the product from `<target>/<name>/<digest>/` when it is there, else build it beside its place
    and rename it in.
+   The entry carries a filter: `package(connectors-host) | package(connectors-sql)`. The script
+   runs only for a run that selects tests of these two packages. They are the packages whose tests
+   read the two products (points 6 and 7). The fourth step of the lane `slow`, a run of one
+   `connectors-sdk` test (story:the-lane-slow-runs-the-ignored-timing-family), and a run of
+   `-p connectors-build` then do not run the script.
 2. Product one, the template store: `Metadata::initialize` on an empty directory, kept in
-   `target/test-fixtures/template-store/<digest>/`. Digest inputs:
-   `crates/connectors-host/src/local/metadata.rs`, every file under
-   `crates/connectors-host/src/local/metadata/`, and `Cargo.lock` (inferred: the store's format
-   follows the pinned Entity Runtime crates). `connectors-build` gets `connectors-host` as a
-   direct dependency (`crates/connectors-build/Cargo.toml`); it is in its graph today through
-   `connectors-catalog-provider` (inferred from `adapters/catalog/Cargo.toml`).
+   `target/test-fixtures/template-store/<digest>/`. Digest inputs: every file under
+   `crates/connectors-host/src/local/`, and `Cargo.lock` (inferred: the store's format follows the
+   pinned Entity Runtime crates). The whole directory is the input because of the four modules
+   named above whose reach was not followed: a list of modules could miss one. The cost: nearly
+   every change of the host builds the template once more, which is one `Metadata::initialize`.
+   `connectors-build` gets `connectors-host` as a direct dependency
+   (`crates/connectors-build/Cargo.toml`). It has none today: its entry in `Cargo.lock` (lines 612
+   to 641) lists no `connectors-host`, it takes `connectors-catalog-provider` with
+   `default-features = false` (line 12 of its manifest), and that package depends on
+   `connectors-host` only under its feature `service` (`adapters/catalog/Cargo.toml` lines 11 and
+   12). Both manifests name `rust-version = "1.91"`. `Cargo.lock` changes by that one line.
 3. Product two, the generated schemas of `adapters/sql/spec/ess`: the pinned `ess generate`, kept
    in `target/test-fixtures/sql-ess-schemas/<digest>/`. Digest inputs: every file under
    `adapters/sql/spec/ess/` and `crates/connectors-spec/toolchain.json` (the pin of `ess`).
 4. The step prints one line per product: `test-fixtures: <product> built in <ms> ms, digest <hex>`
-   or `test-fixtures: <product> reused, digest <hex>`. It hands the two directories to the tests
+   or `test-fixtures: <product> reused, digest <hex>`. It appends the same line to the file
+   `target/test-fixtures/last-run.txt`. It hands the two directories to the tests
    through the file nextest names in `NEXTEST_ENV`, as `CONNECTORS_TEST_TEMPLATE_STORE` and
    `CONNECTORS_TEST_SQL_ESS_SCHEMAS`.
-5. New: `crates/connectors-host/src/local/template_store.rs` (`#[cfg(test)]`, entered in
+5. The gate prints what the step did. `test_step` in `crates/connectors-build/src/gate.rs` (lines
+   521 to 585) removes `target/test-fixtures/last-run.txt` before the tests, where it removes the
+   JUnit report today (lines 559 to 563). After the tests it prints each line of the file as
+   `gate: test-fixtures: <line>`, or `gate: no test-fixtures record at <path>` when the file is
+   absent, where it prints the ten slowest tests today (lines 568 to 576). The gate's own output
+   is in the job's log whether or not nextest shows the output of a setup script.
+6. New: `crates/connectors-host/src/local/template_store.rs` (`#[cfg(test)]`, entered in
    `crates/connectors-host/src/local/mod.rs`): one function that copies the template into a test's
    own directory when the variable is set and calls `Metadata::initialize` when it is not. The
    call sites named above use it. A test never writes into the template.
-6. `schema` in `ess_model.rs` reads from the directory of the variable when it is set and
+7. `schema` in `ess_model.rs` reads from the directory of the variable when it is set and
    generates as today when it is not.
-7. A run without the setup step (plain `cargo test`, `connectors-build ignored`) sets no variable
+8. A run without the setup step (plain `cargo test`, `connectors-build ignored`) sets no variable
    and behaves as today.
 
 `crates/connectors-host/src/local/approval_policy/tests.rs` has a `fixture()` (line 17) that calls
@@ -170,29 +200,31 @@ a whole second.
 
 ## Acceptance
 
-1. Built once: in the test step of the forge's "repository gate" job of this story's pull request,
-   each of the two lines `test-fixtures: template-store …` and `test-fixtures: sql-ess-schemas …`
-   appears once.
+1. Built once: in the log of the forge's "repository gate" job of this story's pull request, each
+   of the two lines `gate: test-fixtures: template-store …` and
+   `gate: test-fixtures: sql-ess-schemas …` appears once. The gate prints them (point 5). The line
+   of the template store names the time of one `Metadata::initialize` on the runner, which the
+   plan did not measure.
 2. Reused: a second run of the setup step with unchanged sources prints `reused` for both
-   products and writes no file. A unit test of `test_fixtures.rs` holds this, and holds that one
-   changed byte of a digest input gives a new digest and `built`.
-3. The measurement: the `built in <ms> ms` of the template store in that job is the cost of one
-   `Metadata::initialize`, which the plan did not measure. The pull request's description records
-   it, and for each of the twelve tests the duration before (above) and after (from that job).
-4. The twelve tests pass, and their durations in the test step of that job sum to at most 84 s.
+   products and writes no file under the two product directories. A unit test of
+   `test_fixtures.rs` holds this, and holds that one changed byte of a digest input gives a new
+   digest and `built`.
+3. The twelve tests pass, and their durations in the test step of that job sum to at most 84 s.
    Before: 115.0 s. Estimate: 55.9 s. Bound: 1.5 × 55.9 = 83.85, rounded up to 84 s.
-5. Kept runs: each of the twelve tests keeps its number of cases, rounds and trials (13 cases, 21
+4. Kept runs: each of the twelve tests keeps its number of cases, rounds and trials (13 cases, 21
    transactions, 35 fixtures, 40 read uses, 8 rounds, 150 events, 24 rounds, 6 rounds of 8
    invokes, 8 originals, 7 cap and limit cases). The pull request changes no loop count in them.
-6. With the variable unset, the tests of `registry::tests` pass under plain `cargo test`.
+5. With the variable unset, the tests of `registry::tests` pass under plain `cargo test`.
 
 ## Scope
 
 - `.config/nextest.toml`: the setup script entry. No other story of this set writes this file.
 - `crates/connectors-build/src/test_fixtures.rs` (new), `crates/connectors-build/src/main.rs`
-  (the subcommand), `crates/connectors-build/Cargo.toml` (the dependency).
-  story:six-cli-tests-take-jail-binaries-built-once-per-run adds a product to the same subcommand
-  and `depends_on` this story.
+  (the subcommand), `crates/connectors-build/Cargo.toml` (the dependency) and `Cargo.lock` (its
+  one line).
+- `crates/connectors-build/src/gate.rs`: `test_step` (point 5). No other story of this set has
+  this file in its scope. story:the-gates-test-step-ends-within-120-s-on-the-forge changes the
+  same function after the stories of this set, when it makes the step fail over 120 s.
 - `crates/connectors-host/src/local/template_store.rs` (new) and
   `crates/connectors-host/src/local/mod.rs` (one line).
 - Under `crates/connectors-host/src/local/`: `registry/tests.rs` (`fixture`),
@@ -202,18 +234,22 @@ a whole second.
 - `crates/connectors-host/src/local/owner/refresh/tests.rs`: `Connected::build` (lines 314 to
   323). story:five-host-unit-tests-shorten-the-waits-they-chose touches another region of this
   file: `LIFETIME_MS` and one test near line 995.
-- `crates/connectors-host/tests/http_standing_grant.rs`,
-  `crates/connectors-host/tests/http_standing_grant_adversary.rs`: listed by the plan; no change
-  is named for them above.
 - `adapters/sql/tests/ess_model.rs`: `schema`.
+
+The plan lists `crates/connectors-host/tests/http_standing_grant.rs` and
+`crates/connectors-host/tests/http_standing_grant_adversary.rs`. No change is named for them
+above, and they are not in this story's scope.
 
 story:store-tests-end-within-60s-under-load, a draft outside this set, names eight of these tests
 by function, two tests of the `http_standing_grant` binaries without a name, and the same form (a
-saved store under `target/` keyed by the digest of its sources). It was not edited.
+saved store under `target/` keyed by the digest of its sources). This story owns the change for
+the twelve tests it names. The older story keeps its acceptance (60 s at host load) and is measured
+after this story lands; it has a `depends_on` edge to this story.
 
 ## Not in this story
 
-- The jail binaries: story:six-cli-tests-take-jail-binaries-built-once-per-run.
+- The jail binaries: story:six-cli-tests-take-jail-binaries-built-once-per-run. That story no
+  longer adds a product to the setup step and reads nothing of this story.
 - The 100-run stress test: story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate.
 - The template store for every other test that builds a store: the 406 tests of 1 s to under 5 s
   (813.8 s) and the tests under 1 s. The plan names this as a candidate that was not measured.
@@ -223,8 +259,19 @@ saved store under `target/` keyed by the digest of its sources). It was not edit
   story:the-gates-test-step-ends-within-120-s-on-the-forge.
 - Not established: whether cargo-nextest 0.9.143 (the pin in `.github/workflows/rust-gate.yml`
   line 91) runs a setup script without an experimental switch, and whether it passes variables
-  from `NEXTEST_ENV` as described; whether a store copied from a template opens as its own store
-  in every test (`Metadata::initialize`, `metadata.rs` line 372, was read by its signature only);
-  whether the template reaches the three tests named above; every "after" figure on the forge.
+  from `NEXTEST_ENV` as described; whether that version supports a filter on a setup script
+  entry and leaves the script out of a run that selects no test of the two packages; whether a
+  store made by one build of the library is read the same by the other (the setup step makes the
+  template with the library built without `cfg(test)`, the tests read it in the `cfg(test)` build,
+  and `metadata.rs` and `metadata/er.rs` have `cfg(test)` and `cfg(not(test))` branches, the
+  latter at `metadata.rs` line 281 and `metadata/er.rs` lines 701, 3157 and 3186; acceptance 3
+  would show a difference as red tests); whether a store copied from a template opens as its own
+  store
+  in every test; whether a test needs two stores to differ where copies of one template are
+  equal (`initialize` writes one random authority id into the store, `metadata.rs` line 447, and
+  every copy carries it); what the dependency on `connectors-host` adds to a build of
+  `connectors-build` alone, as `slow.yml` (line 59) and `pages.yml` (lines 76 and 78) start it
+  with `-p`; whether the
+  template reaches the three tests named above; every "after" figure on the forge.
   The gate's test step has a setup step of its own already (`crates/connectors-build/src/gate.rs`
-  lines 525 to 531, `baseline_suite`); the revision placed this one in `.config/nextest.toml`.
+  lines 550 to 558, `baseline_suite`); the revision placed this one in `.config/nextest.toml`.

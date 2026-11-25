@@ -7,7 +7,19 @@ title: Five store tests end within 60 s at host load
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-revision: 5
+- depends_on: story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/governed/tests/bounded_realization_security.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/refresh/tests/issue.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/store_cost_tests.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/tests.rs
+- confidence: inferred
+  path: crates/connectors-host/tests/metadata_reopen_adversary.rs
+revision: 9
 ---
 ## Defect
 
@@ -104,7 +116,13 @@ story:grown-store-replay-test-flake.
 ## Acceptance
 
 - Each of the five store tests and the two owner tests is timed alone on an idle machine and
-  at host load of at least 60, on `main`; the two times are in the report.
+  at host load of at least 60, on `main`. The two times of a test are recorded with one
+  evidence record on this story, in the form
+  `aep plan artifact evidence story:store-tests-end-within-60s-under-load --kind test_result --source '<the command of the run, then the two times>' --ref <the log of the run>`.
+  The verb has no other field for free text, so the times stand in `--source` and in the log.
+  The run prints `uptime` before and after the test, so the host load stands beside each time in
+  the log the record names. Those `uptime` lines show whether the load of 60 was reached; a run
+  below it is recorded with its load and does not meet this statement.
 - Each ends within 60 s at that load: by a smaller store or fewer iterations that still shows
   what the test shows (stated per test), or by a shared fixture built once per run (a saved
   store under `target/` keyed by the digest of its sources; a `OnceLock` is not that under
@@ -118,3 +136,13 @@ story:grown-store-replay-test-flake.
 ## Out of scope
 
 What each test asserts.
+
+## Order with the test-step stories
+
+The stories that decompose story:the-gates-test-step-ends-within-120-s-on-the-forge own the change
+for the tests they name (story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run for
+eight tests named here and the two of the `http_standing_grant` binaries,
+story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate for the stress test,
+story:seven-cli-tests-of-a-slow-owner-start-no-longer-wait-out-the-10-s-connect-wait for one test);
+this story keeps its acceptance, 60 s at host load, and is measured after the eighteen-tests story
+lands, which its `depends_on` edge to that story records.

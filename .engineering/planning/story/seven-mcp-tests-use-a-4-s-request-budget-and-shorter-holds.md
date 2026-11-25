@@ -3,8 +3,8 @@ format: aep.planning-md/3
 id: story:seven-mcp-tests-use-a-4-s-request-budget-and-shorter-holds
 kind: story
 status: draft
-title: 'Seven MCP tests use a 4 s request budget and shorter holds: 101.8 s become an estimated 34.0 s'
-summary: Three tests chose a request budget of 20 s and four sleep or hold the store for 4 s to 9 s; all values are the tests' own
+title: 'Six MCP tests use a 4 s request budget and shorter holds: 85.3 s become an estimated 28.0 s'
+summary: Three tests chose a request budget of 20 s and three sleep or hold the store for 4 s to 9 s; all values are the tests' own; a seventh test of 16.5 s has no value to shorten and stays unclaimed
 relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
@@ -17,7 +17,7 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 5
+revision: 8
 ---
 ## Defect
 
@@ -25,10 +25,16 @@ Seven MCP tests wait on values the tests chose themselves. Three use a request b
 (group D, 60.5 s). Four sleep or hold the store for 4 s to 9 s (group E, 41.3 s). Together they
 take 101.8 s of the test step.
 
+This story changes six of the seven (85.3 s, computed: 101.8 − 16.5). The seventh,
+`adversary_a_store_replaced_under_the_owner_ends_the_session`, stays at 16.5 s: no value of its
+own to shorten was found, and no story of this set claims a change for it. The id of this story
+keeps "seven"; an id cannot be changed.
+
 Source of the durations: the ones nextest printed in the forge's gate job 138270416028 of pull
 request 291, 2026-11-24, as listed in test-plan:where-the-gates-test-step-spends-its-time (groups D
 and E). The plan read the sources at 0.77.2. The function names and lines below were read in the
-tree of 0.78.1. The sums are the plan's and equal the sums of its rows.
+tree of 0.78.1 and are the same at 0.78.2. The sums of the two groups are the plan's and equal the
+sums of its rows.
 
 Group D, a request budget of 20 s:
 
@@ -49,7 +55,7 @@ Group E, sleeps and holds, all in binary `connectors::adversary_local_mcp_server
 
 - 16.5 s, `adversary_a_store_replaced_under_the_owner_ends_the_session` (line 881): after the
   store is replaced it polls every 20 ms, up to 5 s, for the session to end. It has no sleep of
-  its own.
+  its own. Not changed by this story.
 - 10.6 s, `adversary_a_lost_session_leaves_no_provider_read_open` (line 1117): sleeps until
   9,000 ms after dispatch to see that the stalled provider read closed.
 - 8.2 s, `adversary_stdin_closed_while_the_store_is_held_exits_successfully` (line 1264): a release
@@ -91,23 +97,30 @@ Group E (`LEASE_MS` is 1,900 in `apps/connectors/src/mcp/session.rs` line 16):
    the read by 500 ms. Values are this story's choice.
 6. `adversary_a_lost_session_leaves_no_provider_read_open`: in place of the sleep until 9,000 ms
    after dispatch, the test waits for the session's end and then 500 ms more.
-7. `adversary_a_store_replaced_under_the_owner_ends_the_session`: no value of its own to shorten
-   was found. See "Not established".
+7. `adversary_a_store_replaced_under_the_owner_ends_the_session` is not changed. No value of its
+   own to shorten was found: the test has no sleep, and its poll ends as soon as the session
+   ends. It stays at 16.5 s and is counted in no sum of this story. See "Not in this story".
 
-Estimate after (the plan; not timed): group D 18.0 s, 6 s each (fixture 3 s + budget 4 s, less the
-overlap, rounded up). Group E 16.0 s: 6 + 3 + 4 + 3 in the order of the rows above (fixture 2.1 s,
-the band median of the binary, plus 1 to 3 s). Sum 34.0 s.
+Estimate after for the six tests (the plan's rows; not timed): group D 18.0 s, 6 s each (fixture
+3 s + budget 4 s, less the overlap, rounded up). The three changed tests of group E 10.0 s: 3 + 4
++ 3 in the order of the rows above (fixture 2.1 s, the band median of the binary, plus 1 to 3 s).
+Sum 28.0 s. The plan's sum for the seven is 34.0 s; its 6 s for the replaced-store test has no
+change behind it and is left out (34.0 − 6 = 28.0).
 
 ## Acceptance
 
-1. The seven tests pass, and their durations in the test step of the forge's "repository gate" job
-   of this story's pull request sum to at most 51 s. Before: 101.8 s. Estimate: 34.0 s. Bound: 1.5
-   × 34.0 = 51 s. The numbers are read from the durations nextest prints in that job.
+1. The six changed tests pass (the three of group D and, of group E,
+   `adversary_a_lost_session_leaves_no_provider_read_open`,
+   `adversary_stdin_closed_while_the_store_is_held_exits_successfully` and
+   `adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready`), and their
+   durations in the test step of the forge's "repository gate" job of this story's pull request
+   sum to at most 42 s. Before: 85.3 s. Estimate: 28.0 s. Bound: 1.5 × 28.0 = 42 s. The numbers
+   are read from the durations nextest prints in that job.
 2. The margins hold in the sources: the late reply is released 600 ms after the budget, the reader
    is paused until 500 ms after it, and the walk's page delay is one fifth of the budget.
 3. `connectors::security_mcp_deadline::slow_lane_security_an_on_time_reply_written_across_its_deadline_keeps_the_session`
    passes in the lane `slow` with a budget of 20,000 ms. The lane's command
-   `cargo run --locked -p connectors-build -- ignored --family timing --required --only-prerequisite provider`
+   `cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider`
    lists it as `passed`. Alone it runs with
    `cargo test --locked -p connectors --test security_mcp_deadline -- --ignored --exact slow_lane_security_an_on_time_reply_written_across_its_deadline_keeps_the_session`.
 4. The gate's ignored step still passes: the new ignored test is not unknown to it.
@@ -119,12 +132,16 @@ the band median of the binary, plus 1 to 3 s). Sum 34.0 s.
   file is counted in story:six-cli-tests-take-jail-binaries-built-once-per-run, which does not
   edit the file.
 - `apps/connectors/tests/mcp_tool_call_shapes_adversary.rs`: `REQUEST_MS` and the one test above.
-- `apps/connectors/tests/adversary_local_mcp_server.rs`: the four tests above.
+- `apps/connectors/tests/adversary_local_mcp_server.rs`: the three tests of points 4 to 6.
+  `adversary_a_store_replaced_under_the_owner_ends_the_session` of the same file is not edited.
 
 No other story of this set writes these three files.
 
 ## Not in this story
 
+- `adversary_a_store_replaced_under_the_owner_ends_the_session` (16.5 s, group E): not changed
+  and claimed by no change of this set. Where its 16.5 s go was not found in the test (it has no
+  sleep of its own), so the plan's estimate of 6 s has no value behind it.
 - The 14 tests of `connectors::adversary_local_mcp_server` and the 15 of
   `connectors::local_mcp_server` in the band of 1 s to under 5 s (section 3 of the plan), and the
   tests of every other group.
@@ -132,12 +149,10 @@ No other story of this set writes these three files.
 - The lane `slow` itself: story:the-lane-slow-runs-the-ignored-timing-family.
 - The gate failing when its test step runs over 120 s:
   story:the-gates-test-step-ends-within-120-s-on-the-forge.
-- Not established: every "after" figure on the forge. Three of the four estimates of group E are
-  the plan's and do not follow from the values above:
+- Not established: every "after" figure on the forge. Two of the three estimates of group E that
+  this story keeps are the plan's and do not follow from the values above:
   - the long read: fixture 2.1 s + hold 2.9 s is about 5 s, against the plan's 3 s;
   - the lost session: the test's comment says the session ends about 5 s after stdin closed, so
-    the plan's 3 s holds only if that end comes sooner;
-  - the replaced store: where its 16.5 s go was not found in the test (it has no sleep of its
-    own), so the plan's 6 s has no value behind it.
-  The bound of acceptance 1 is kept at the plan's sum. If the three tests take what the values
-  above give, the sum is about 40 s (inferred: 18 + 6 + 7 + 4 + 5), still under 51 s.
+    the plan's 3 s holds only if that end comes sooner.
+  The bound of acceptance 1 is kept at the plan's rows. If the two tests take what the values
+  above give, the sum is about 34 s (inferred: 18 + 7 + 4 + 5), still under 42 s.
