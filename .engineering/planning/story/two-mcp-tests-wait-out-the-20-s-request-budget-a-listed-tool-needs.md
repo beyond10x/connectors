@@ -7,7 +7,7 @@ title: Two MCP tests wait out the 20 s request budget a listed tool needs
 relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - depends_on: story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build
-revision: 1
+revision: 2
 ---
 ## Defect
 
@@ -39,8 +39,11 @@ A second bound holds the walk test: its reply reserve of 5 s is longer than a bu
 
 ## Change
 
-Open until the story is planned. Three ways were named when the defect was found; the operator
-picks one before planning:
+The operator's decision (2026-11-25): both tests stay in the gate at 20 s until this story is
+built, and the way is the first of the three below, the debug-only override. It gets its critics
+before implementation, and it is off in a release build, shown by a test on a release build. The
+points of the change are open until the story is planned. The three ways that were named when the
+defect was found:
 
 1. A debug-only override of the 20 s bound, read through `connectors_sdk::debug_override_ms`
    (story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build),
@@ -53,8 +56,12 @@ picks one before planning:
 
 ## Acceptance
 
-Open until the story is planned. One statement holds for every way: the two tests keep what they
-assert today, and a run shows each of them red for the defect it guards after the change.
+Open until the story is planned. Two statements are fixed:
+
+- The two tests keep what they assert today, and a run shows each of them red for the defect it
+  guards after the change.
+- A test on a release build shows that the override is off there: a release build lists no tool
+  at a request budget under 20 s.
 
 ## Scope
 
