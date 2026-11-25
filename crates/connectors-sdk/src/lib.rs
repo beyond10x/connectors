@@ -491,3 +491,92 @@ impl Cursors {
         Ok(cursor.continuation)
     }
 }
+
+/// A production wait, in milliseconds, that a test build may replace through the environment.
+/// A build with `debug_assertions` returns the number the variable `name` holds, and
+/// `production` when the variable is absent or holds no number. A build without
+/// `debug_assertions` returns `production` and reads no variable
+/// (`release_build_ignores_a_debug_override`). Every such wait is read here and nowhere else
+/// (`connectors-build`, `tests/debug_override_reads.rs`), so that one test covers them all.
+/// A variable whose name starts with `CONNECTORS_TEST_OVERRIDE_` also reaches the owner a test
+/// build's CLI starts.
+#[doc(hidden)]
+pub fn debug_override_ms(name: &str, production: u64) -> u64 {
+    #[cfg(debug_assertions)]
+    if let Some(milliseconds) = std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        return milliseconds;
+    }
+    #[cfg(not(debug_assertions))]
+    let _ = name;
+    production
+}
+
+#[cfg(test)]
+mod debug_override_tests {
+    use super::debug_override_ms;
+    use std::process::Command;
+
+    const NAME: &str = "CONNECTORS_TEST_OVERRIDE_EXAMPLE_MS";
+    pub(super) const PRODUCTION: u64 = 600_000;
+    const PRINTED: &str = "debug_override_ms=";
+    const CHILD: &str = "debug_override_tests::child_prints_what_the_helper_returns";
+
+    /// Run as the child of the tests of the helper: prints what the helper returns in this
+    /// process. An ordinary run has no such variable and prints the production value.
+    #[test]
+    fn child_prints_what_the_helper_returns() {
+        println!("{PRINTED}{}", debug_override_ms(NAME, PRODUCTION));
+    }
+
+    /// What the helper returns in a child process, this test binary running [`CHILD`] alone,
+    /// whose environment holds the variable with `value` or does not hold it.
+    pub(super) fn in_a_child(value: Option<&str>) -> u64 {
+        let mut child = Command::new(std::env::current_exe().unwrap());
+        child
+            .args(["--exact", CHILD, "--nocapture"])
+            .env_remove(NAME);
+        if let Some(value) = value {
+            child.env(NAME, value);
+        }
+        let output = child.output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        let printed = String::from_utf8(output.stdout).unwrap();
+        let (_, value) = printed
+            .split_once(PRINTED)
+            .unwrap_or_else(|| panic!("the child printed no value: {printed}"));
+        let digits: String = value.chars().take_while(char::is_ascii_digit).collect();
+        digits.parse().unwrap()
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn a_child_with_the_variable_gets_its_value_and_one_without_it_the_production_value() {
+        assert_eq!(in_a_child(Some("250")), 250);
+        assert_eq!(in_a_child(None), PRODUCTION);
+        // No number: the production value.
+        assert_eq!(in_a_child(Some("soon")), PRODUCTION);
+    }
+}
+
+/// Compiled only without `debug_assertions`: a child process whose environment holds an
+/// override gets the production value from the helper. The lane `slow` runs it, as the test
+/// below.
+#[cfg(all(test, not(debug_assertions)))]
+#[test]
+fn release_build_ignores_a_debug_override() {
+    assert_eq!(
+        debug_override_tests::in_a_child(Some("250")),
+        debug_override_tests::PRODUCTION
+    );
+}
+
+/// Compiled only without `debug_assertions`, and it asserts nothing but that it runs. The lane
+/// `slow` runs the tests of this crate whose name holds `release_build_` with
+/// `cargo nextest run --release ... --no-tests fail`: zero such tests means that `--release`
+/// resolved to a profile with `debug_assertions`, and the step fails.
+#[cfg(all(test, not(debug_assertions)))]
+#[test]
+fn release_build_has_no_debug_assertions() {}

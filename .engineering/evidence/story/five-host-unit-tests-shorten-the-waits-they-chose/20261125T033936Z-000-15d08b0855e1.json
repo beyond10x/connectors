@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T03:39:36Z",
+  "actor": "human:operator",
+  "artifact": "story:five-host-unit-tests-shorten-the-waits-they-chose",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate of pull request 300, head 95c8a1b46: the five tests passed in 7.266 s, 4.094 s, 2.056 s, 2.562 s and 3.158 s, sum 19.1 s, bound 28 s, before 48.6 s",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45536869426/job/138945630062"
+  }
+}

@@ -13,19 +13,13 @@ use std::time::Duration;
 
 /// How long the command waits for the owner to answer and to exit.
 const BOUND: Duration = Duration::from_secs(30);
-/// Test builds may shorten the bound through the environment; a release build
-/// has no override.
-#[cfg(debug_assertions)]
+/// Test builds may shorten the bound through the environment
+/// (`connectors_sdk::debug_override_ms`); a release build has no override.
 fn bound() -> Duration {
-    std::env::var("CONNECTORS_TEST_OWNER_STOP_MS")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .map(Duration::from_millis)
-        .unwrap_or(BOUND)
-}
-#[cfg(not(debug_assertions))]
-fn bound() -> Duration {
-    BOUND
+    Duration::from_millis(connectors_sdk::debug_override_ms(
+        "CONNECTORS_TEST_OWNER_STOP_MS",
+        BOUND.as_millis() as u64,
+    ))
 }
 
 pub(super) fn execute(paths: &Paths) -> Result<Value, HandlerReply> {

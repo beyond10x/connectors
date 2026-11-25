@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-clock-exchange-issuance-test-runs-out-its-120-s-bound-on-windows
 kind: story
-status: active
+status: implemented
 title: The clock-exchange issuance test ran 120 s on Windows for one silent source and did not name it
 summary: One test of approval issuance waited 120 s for a clock source and answered a bare Unavailable. It gets bounds of 10 s, 15 s and 41 s, survives one lost datagram and names its facts when red.
 relations:
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/owner/approval_issuance/tests.rs
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T06:48:02Z", actor: "human:operator", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-25T06:48:02Z", actor: "human:operator", revision: 6}
+- {from: "active", to: "implemented", at: "2026-11-25T07:46:15Z", actor: "human:operator", revision: 8, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Defect
 

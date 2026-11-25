@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T05:33:59Z",
+  "actor": "human:operator",
+  "artifact": "story:the-lane-slow-runs-the-ignored-timing-family",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job slow of pull request 304, head 97dea2ac1: 224 ignored tests, 1 selected, 1 executed, 0 failed, 0 missing, 0 unknown; the slow_lane_ test of the 100 rounds passed, the step of ignored tests ran 31.4 s (limit 60 s); the release command ran 1 test, release_build_has_no_debug_assertions, passed; time per step 633.9 s build, 2.2 s listing, 31.4 s tests",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45551511316/job/138993529389"
+  }
+}

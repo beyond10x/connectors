@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing
 kind: story
-status: active
+status: implemented
 title: 'Seven adapter and catalog tests drop waits that prove nothing: 73.0 s become an estimated 16.6 s'
 summary: Fixed deadlines, poll timeouts and a host walk per test; five get shorter, one stays and one is removed
 relations:
@@ -24,10 +24,11 @@ scope:
   path: adapters/kubernetes/tests/exec_credential_security.rs
 - confidence: cited
   path: crates/connectors-catalog/tests/bundle_adversary_2.rs
-revision: 16
+revision: 17
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T02:53:29Z", actor: "human:operator", revision: 13}
 - {from: "proposed", to: "active", at: "2026-11-25T02:53:30Z", actor: "human:operator", revision: 14}
+- {from: "active", to: "implemented", at: "2026-11-25T05:44:40Z", actor: "human:operator", revision: 17, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Defect
 
