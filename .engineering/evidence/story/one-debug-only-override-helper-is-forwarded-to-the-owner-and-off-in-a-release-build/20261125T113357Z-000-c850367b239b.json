@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T11:33:57Z",
+  "actor": "human:operator",
+  "artifact": "story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job slow of pull request 308, head f8527ed99: the release command ran 2 tests of connectors-sdk, release_build_has_no_debug_assertions and release_build_ignores_a_debug_override, 2 passed; the lane's ignored step: 2 selected, 2 executed, 0 failed, 0 missing, 0 unknown",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45600959289/job/139159429765"
+  }
+}

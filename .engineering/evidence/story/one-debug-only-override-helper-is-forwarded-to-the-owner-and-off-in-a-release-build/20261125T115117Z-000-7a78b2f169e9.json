@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T11:51:17Z",
+  "actor": "human:operator",
+  "artifact": "story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate of pull request 308, head f8527ed99: connectors-sdk debug_override_tests::a_child_with_the_variable_gets_its_value_and_one_without_it_the_production_value passed; connectors-host local::owner::transport::tests::a_started_owner_gets_every_override_and_the_seven_named_variables_and_no_other passed; the three tests of connectors-build debug_override_reads passed; test step 4522 tests run, 4522 passed; ignored step 225 in the inventory, 4 executed, 0 failed, 0 missing, 0 unknown",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45600959318/job/139159429993"
+  }
+}
