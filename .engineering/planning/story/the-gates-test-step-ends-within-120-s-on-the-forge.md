@@ -12,7 +12,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-build/src/gate.rs
-revision: 6
+revision: 8
 ---
 ## Defect
 
@@ -84,12 +84,12 @@ from the first run; every "after" is an estimate and none was timed.
 | S7b `story:the-catalog-crate-tests-ingest-the-released-definition-once-per-process` | 1 | 7.4 | none stated | none for this test (`embedded_text_where_the_engine_refuses_it_is_refused`); the story reads S7a's file in one test outside the 81 and states no time after |
 | S8a `story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing` | 7 | 73.0 | 16.6 | the tests' own values; one test is removed; one stays at 8.3 s |
 | S8b `story:five-host-unit-tests-shorten-the-waits-they-chose` | 5 | 48.6 | 18.2 | the tests' own values |
-| S8c `story:seven-cli-tests-shorten-their-waits-or-a-production-wait` | 6 | 54.0 | 24.5 | three debug-only overrides: print deadline, clock query timeout, client drain bound |
+| S8c `story:seven-cli-tests-shorten-their-waits-or-a-production-wait` | 6 | 54.0 | 32.2 | two debug-only overrides: print deadline, client drain bound; the clock test runs its three rows at once; one test keeps its 7.0 s |
 | S9a `story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run` | 12 | 115.0 | 55.9 | a template store and generated SQL schemas built once per run by a setup step |
 | S9b `story:six-cli-tests-take-jail-binaries-built-once-per-run` | 6 | 50.7 | 50.6 | `Jail::install` links the binaries into the jail and copies where it cannot link; no saving is estimated |
 | S9c `story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate` | 1 | 31.9 | 3.2 | 10 runs in the gate, 100 in the lane `slow` |
 | N4 `story:where-do-the-10-s-of-the-identification-retry-loop-test-go` | 1 | 10.2 | 10.2 | a question; no change claimed |
-| sum | 81 | 1,117.8 | 332.8 | the "after" sum leaves out S7b's test, which has no figure |
+| sum | 81 | 1,117.8 | 340.5 | the "after" sum leaves out S7b's test, which has no figure |
 
 The ids of S5, S7b, S8a, S8c, S9a and S9b keep the words of their first titles; the store does not
 change an id.
@@ -133,8 +133,13 @@ Decisions beyond the plan, each recorded in its story:
 - N1: the lane runs, for the first time in any job, the eight `Timing` entries without a
   prerequisite that the table of `ignored.rs` holds today, and may move one of them to `Deferred`.
 - S6: one lane test at the 5 s connect timeout; the plan names runs at 15 s and at 10 s.
-- S8c: 20 repeat runs of `clock_check_below_quorum_refusal`, run by the implementor in the story's
-  tree; they are a step of neither the gate nor the lane.
+- S8c: `clock_check_below_quorum_refusal` gets no override of the clock query timeout. Its three
+  rows run at once, each with a silent source of its own, at the production 2 s. The plan's
+  override left a prompt source 800 ms.
+- S8c: the functions `print_deadline()` and `drain_bound()`, each with a unit test of its
+  production value.
+- S8c: `a_queued_read_another_session_cancels_runs_unsent_and_the_running_read_succeeds` is not
+  changed. The plan cut two of its sleeps; what they outlast was not established.
 - S8a: the test `no_suite_sees_the_installation_another_suite_sets` is removed. The plan moved it
   to the lane, where it cannot fail either.
 - S9b: no product built once per run; `Jail::install` links the file cargo built.
@@ -147,11 +152,13 @@ Decisions beyond the plan, each recorded in its story:
 
 Not claimed by a change, among the 81. Each test below keeps its time in the sum after:
 
-- No change is named, 4 tests, 42.4 s (10.2 + 7.4 + 16.5 + 8.3): N4's test (10.2 s); S7b's
+- No change is named, 5 tests, 49.4 s (10.2 + 7.4 + 16.5 + 8.3 + 7.0): N4's test (10.2 s); S7b's
   `embedded_text_where_the_engine_refuses_it_is_refused` (7.4 s, which the plan had at 2.0 s
   after); `adversary_a_store_replaced_under_the_owner_ends_the_session` (16.5 s, the row "no
   story"); `a_rate_limited_read_waits_once_for_a_delay_that_fits_and_names_any_other` (8.3 s,
-  inside S8a's row: Retry-After is whole seconds).
+  inside S8a's row: Retry-After is whole seconds);
+  `a_queued_read_another_session_cancels_runs_unsent_and_the_running_read_succeeds` (7.0 s, inside
+  S8c's row).
 - A change with no estimated saving, 6 tests: the jail tests of S9b, 50.7 s before and 50.6 s
   after.
 - Reach unproven, 3 tests of S9a: the two `http_standing_grant` tests (7.1 s each, 3.5 s each
@@ -161,21 +168,21 @@ Not claimed by a change, among the 81. Each test below keeps its time in the sum
 
 The sum after for the 81, computed:
 
-- the table's column: 332.8 s for the fifteen rows with a figure;
-- with S7b's test at its time before: 332.8 + 7.4 = 340.2 s;
+- the table's column: 340.5 s for the fifteen rows with a figure;
+- with S7b's test at its time before: 340.5 + 7.4 = 347.9 s;
 - against the first revision's 329.7 s: 329.7 − 34.0 (S5 with seven tests) + 28.0 (S5 with six) +
-  16.5 (the test that left S5) = 340.2 s;
-- of the 340.2 s, 42.4 s are the four tests with no change and 50.6 s the six with no estimated
-  saving: 340.2 − 42.4 − 50.6 = 247.2 s rest on an estimated change;
+  16.5 (the test that left S5) − 24.5 (S8c before its revision 11) + 32.2 (S8c now) = 347.9 s;
+- of the 347.9 s, 49.4 s are the five tests with no change and 50.6 s the six with no estimated
+  saving: 347.9 − 49.4 − 50.6 = 247.9 s rest on an estimated change;
 - if the template store reaches none of the three tests above:
-  340.2 + (14.2 − 7.0) + (17.5 − 8.7) = 356.2 s.
+  347.9 + (14.2 − 7.0) + (17.5 − 8.7) = 363.9 s.
 
 Outside the 81 and also unclaimed: 26 provider tests that lower a changed definition, about
 80.5 s, and 9 catalog-crate tests of 1 s to under 5 s, about 22.6 s.
 
 The stories do not reach the budget. Of the 2,474.8 s summed they cover 1,176.8 s (the 81 tests
-and the 36 further tests of S7a, 59.0 s) and leave 345.2 s of it (340.2 s for the 81 and 5.0 s for
-the 36); the sum after all of them is 2,474.8 − 1,176.8 + 345.2 = 1,643.2 s, 410.8 s of wall time
+and the 36 further tests of S7a, 59.0 s) and leave 352.9 s of it (347.9 s for the 81 and 5.0 s for
+the 36); the sum after all of them is 2,474.8 − 1,176.8 + 352.9 = 1,650.9 s, 412.7 s of wall time
 at four tests at a time, against 120 s. The rest, 1,298.0 s, is in tests the stories do not cover:
 about 755 s in the band of 1 s to under 5 s and 543 s under 1 s.
 
