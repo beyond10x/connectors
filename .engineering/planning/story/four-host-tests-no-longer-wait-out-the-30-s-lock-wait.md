@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/tests/local_foundation.rs
-revision: 11
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 9}
@@ -118,8 +118,9 @@ timed).
   name.
 
 No other story of this set writes these four files.
-story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run reads `metadata.rs` as an
-input of a digest and does not write it.
+story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, which planned to read
+`metadata.rs` as an input of a digest, is archived and was not built. The stories that took its
+place name none of the four files in their scope.
 
 ## Not in this story
 

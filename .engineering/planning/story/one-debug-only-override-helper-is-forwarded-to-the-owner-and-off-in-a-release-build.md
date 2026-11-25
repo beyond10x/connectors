@@ -25,7 +25,7 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: cited
   path: crates/connectors-sdk/src/lib.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T05:07:24Z", actor: "human:operator", revision: 7}
 - {from: "proposed", to: "active", at: "2026-11-25T05:07:25Z", actor: "human:operator", revision: 8}
@@ -127,10 +127,9 @@ that test, and the proof of point 4 would not cover them.
    tree of this story. The same module holds both sides with two texts of its own: a text that
    calls `std::env::var("CONNECTORS_TEST_OVERRIDE_EXAMPLE_MS")` is reported with its line, and a
    text that passes the same name to `debug_override_ms` is not. The gate's test step runs the
-   module. The command selects tests of `connectors-build` only, so the setup script of
-   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, whose filter names
-   `connectors-host` and `connectors-sql`, does not run for it (that story lists the filter's
-   support in cargo-nextest 0.9.143 as not established).
+   module. The command selects tests of `connectors-build` only. No setup script runs for it:
+   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, which planned one for
+   `connectors-host` and `connectors-sql`, is archived and was not built.
 
 ## Scope
 
