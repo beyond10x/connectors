@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout
 kind: story
-status: draft
+status: proposed
 title: A provider budget that ends in an unanswered TLS handshake is marked as the provider's timeout
 summary: With a provider budget shorter than the connect timeout, a timeout during an unanswered TLS handshake carries upstream_answer = true although no request was sent; with at least 500 ms of the budget left, a connector layer bounds the connect by the budget so that the cut is reported as a connect error
 relations:
@@ -18,7 +18,9 @@ scope:
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 12
+revision: 13
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T14:38:58Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"review_outcome":19}}}
 ---
 ## Defect
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-sixteen-ess-model-tests-read-schemas-generated-once-per-run
 kind: story
-status: draft
+status: proposed
 title: 'Sixteen ess_model tests read schemas generated once per run: 2.18 s on the build host; on the forge at most 1.41 s, measured on 5 of the 16 tests'
 summary: 16 tests of adapters/sql/tests/ess_model.rs each run ess generate for the same 4 source files; one directory per test run under the target directory, keyed by a digest of its sources and filled under a file lock, replaces 15 of the 16 calls
 relations:
@@ -13,7 +13,9 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 9
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T14:38:57Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"review_outcome":19}}}
 ---
 ## Defect
 
