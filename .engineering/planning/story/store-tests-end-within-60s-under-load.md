@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/tests/metadata_reopen_adversary.rs
-revision: 11
+revision: 12
 ---
 ## Defect
 
@@ -124,9 +124,9 @@ story:grown-store-replay-test-flake.
   the log the record names. Those `uptime` lines show whether the load of 60 was reached; a run
   below it is recorded with its load and does not meet this statement.
 - Each ends within 60 s at that load: by a smaller store or fewer iterations that still shows
-  what the test shows (stated per test), or by a shared fixture built once per run (a saved
-  store under `target/` keyed by the digest of its sources; a `OnceLock` is not that under
-  cargo-nextest), not by a longer timeout.
+  what the test shows (stated per test), not by a longer timeout. The other route this
+  statement named, a saved store built once per run under `target/`, is measured and closed
+  for these tests (the last paragraph of this story).
 - The filterset of story:entity-runtime-0330-records-name-definition-by-digest, acceptance
   line 8, exits 0 within 120 s at that load.
 - `cargo nextest run -p connectors-host -E 'test(owner::)'` exits 0 within 120 s at that load,

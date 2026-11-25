@@ -14,7 +14,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-revision: 5
+revision: 6
 ---
 ## Defect
 
@@ -124,10 +124,11 @@ Product behaviour does not change: same records, same errors, same order. All po
    `timed("er.definitions_build", …)` is called inside the closure handed to the `OnceLock`,
    around the build: a call that finds the value counts nothing.
    `timed("er.bundle_parse", …)` is around the parse in `definition_bundle()`. Today
-   `definition_bundle()` is called at six places besides `registry()`: lines 1170
-   (`record_writer_for_tests`) and 4328 (`persist_batch`), which points 2 and 4 remove, and
-   four in the test module (lines 6119, 6460, 6539 and 6784), which stay and parse as before.
-   After points 1, 2 and 4 the build is its only caller outside the test module.
+   `definition_bundle()` is called at eleven places besides `registry()` (`grep -n`): lines
+   1170 (`record_writer_for_tests`) and 4328 (`persist_batch`), which points 2 and 4 remove,
+   and nine in the test module (lines 6119, 6460, 6539, 6784, 6877, 7078, 7534, 7591 and
+   8288), which stay and parse as before. After points 1, 2 and 4 the build is its only caller
+   outside the test module. The new test calls none of the nine.
 
 Established by reading:
 
@@ -167,17 +168,27 @@ Established by reading:
   `static OnceLock<T>` builds only when `T` is `Send` and `Sync`. The registry is already moved
   to another thread today.
 - (e) Tests that race, read for what makes their threads overlap. Five of the eleven run
-  several threads (tests 2, 6, 8, 10 and 11). Three do not depend on how long a persist takes:
-  tests 6 and 8 start their threads at a `Barrier` (`registry/tests.rs` line 805,
-  `mutations/tests.rs` line 497), and test 11 holds the provider's answer with a lock until it
-  has counted the waiters (`tests/http_standing_grant.rs` lines 957 to 984). Two do: test 2
-  spreads its 16 callers by a sleep of 3 ms times their index (`owner/refresh/tests/issue.rs`
-  line 319), and test 10 spawns its 8 tasks with no common start
-  (`tests/http_standing_grant_adversary.rs` lines 272 to 287). Both assert a result that also
-  holds when the callers run one after another, and neither shows that two overlapped. A
-  shorter persist can make fewer of them overlap. That is not established, and how many overlap
-  today is not either. This story changes neither test. Open question 13 counts the overlaps
-  before and after this change and names the story when they fall.
+  several threads (tests 2, 6, 8, 10 and 11).
+  - Test 11 shows its overlap: it holds the provider's answer with a lock until it has counted
+    the waiters (`tests/http_standing_grant.rs` lines 957 to 984). The duration of a persist
+    does not change that.
+  - Tests 6 and 8 start their threads together at a `Barrier` (`registry/tests.rs` line 805,
+    `mutations/tests.rs` line 497). A common start is not a shown overlap: both assert a result
+    that also holds when the threads run one after another (test 8:
+    `assert_ne!(gate.is_ok(), abort.is_ok())`, line 509; test 6: each outcome is `Ok`,
+    `Conflict` or `Revoked`, lines 838 to 854).
+  - Test 2 starts its 16 callers at a `Barrier` (`owner/refresh/tests/issue.rs` line 311) and
+    then spreads them by a sleep of 3 ms times their index (line 319). Test 10 spawns its 8
+    tasks with no common start (`tests/http_standing_grant_adversary.rs` lines 272 to 287).
+    Both assert a result that also holds one after another.
+  - So no overlap is shown in tests 2, 6, 8 and 10, today or after this change. A shorter
+    persist can make fewer callers overlap; tests 2 and 10, whose callers arrive apart, are the
+    ones most exposed by reading. How many overlap today is not measured.
+  - This story changes none of the four tests and no product behaviour; what can change is how
+    often a test reaches the race it was written for. Open question 13 counts the overlaps on
+    this story's base commit and on the head of its pull request, and names the story that is
+    due when they fall. That count can be made before this story's pull request merges, and
+    the merge does not wait for it.
 
 Not measured: the memory the shared value holds for the life of the process.
 
@@ -200,8 +211,10 @@ Not measured: the memory the shared value holds for the life of the process.
    - asserts that `fresh_opens()` rose by at least 3;
    - asserts that `take_costs()` holds 0 calls of `er.definitions_build` and 0 calls of
      `er.bundle_parse`;
-   - starts one more thread that makes one persist on the first store and one open of it as a
-     further new process, and returns its own `take_costs()`: 0 calls of both kinds there too.
+   - starts one more thread that first enters the test's namespace of process ids
+     (`own.namespace().enter()`, `ProcessNamespace::enter` at line 3030; a new thread does not
+     inherit it), then makes one persist on the first store and one open of it as a further new
+     process, and returns its own `take_costs()`: 0 calls of both kinds there too.
 
    What the counts exclude. A value kept per handle or per simulated process is built again in
    the 3 opens. A value kept per store is built again for the second store. A value kept per
@@ -217,8 +230,9 @@ Not measured: the memory the shared value holds for the life of the process.
    The test holds no time window. Run:
    `cargo nextest run -p connectors-host -E 'test(persists_and_fresh_opens_build_the_definitions_once_per_process)'`.
 2. The diff: `git diff --stat` of the pull request against its base names one file under
-   `crates/`, `er.rs`. Outside `mod tests` of that file the pull request changes no test code,
-   so no assertion and no loop, round or trial count of the eleven tests changes (43 cases in
+   `crates/`, `er.rs`. In that file `mod tests` gains the new test and changes nowhere else,
+   and the only test-support code changed outside it is `record_writer_for_tests` (point 4).
+   So no assertion and no loop, round or trial count of the eleven tests changes (43 cases in
    the first, counted in the source: 1 + 10 + 4 + 1 + 5 + 20 + 2).
 3. Behaviour: the tests of `connectors-host` pass. The run that shows it: the test step of the
    forge's "repository gate" job of the pull request, and before the push the eleven tests above,
@@ -228,7 +242,10 @@ Not measured: the memory the shared value holds for the life of the process.
 4. Time: the durations of the eleven tests in the test step of the forge's "repository gate" job
    of the pull request sum to at most "base" minus 16.0 s. "Base" is the sum of the same eleven
    durations in the newest "repository gate" job on main that ran the test step, at or before
-   the pull request's base commit. The pull request's body names that job and its commit. When
+   the pull request's base commit. The base commit is the commit of main that the job tested
+   the branch with: the gate runs on `pull_request`, so it checks out the merge of the branch
+   with main, and the first parent of that merge is the base (read from the job's checkout
+   step). The pull request's body names that commit, the base job and its commit. When
    main is merged into the branch again, "base" is read again for the new base commit, so a
    pull request that merged in between (the fixture story's, for one) is in "base" and not in
    the saving. For the base of the plan, 108.0 s (job 138270416028), the bound is 92.0 s.
@@ -273,8 +290,10 @@ No other file is written. That holds only behind
 story:the-specification-cites-er-rs-by-function-name-not-by-line. At head f9f263a2
 `ess/domains/cli.yaml` line 2218 cites `er.rs:5095-5097`, the test
 `the_er_rs_citation_lands_on_the_cursor_expiry_path` of `connectors-build` requires the text
-`ConnectionListCursor` in those lines, and every point of this change is above line 5095.
-Without that story this pull request is red in the gate, or it writes `cli.yaml` and the record
+`ConnectionListCursor` in those lines, and every point of this change is above line 5095. That
+test goes red when line 5095 moves down by 3 lines or more or up by 2 or more; by how many
+lines this change moves it is not known before it is written. Without that story this pull
+request is then red in the gate, or it writes `cli.yaml` and the record
 `crates/connectors-build/generated/metadata-emissions/inputs.json`, which holds a sha256 of
 `cli.yaml`. This story has a `depends_on` edge to that story and starts from a head that holds
 it. No committed record holds a digest of `er.rs` itself (`git grep` for the path under
@@ -295,8 +314,10 @@ Who else names `er.rs`, in two lists:
   this file, so it does not write it. `post-commit-metadata-failure-is-outcome-unknown` (draft)
   cites lines 4115 to 4207, the region of `persist` and `persist_batch`, and records no scope.
 - The lists differ because the tool reads only the `scope` of a draft's frontmatter.
-- Stories of the set that name the file: only the archived
-  `eighteen-tests-take-a-template-store-or-jail-built-once-per-run`.
+- Stories of the set that write the file: none but this one. The archived
+  `eighteen-tests-take-a-template-store-or-jail-built-once-per-run` would have. The parent,
+  the two question stories, the citation story and `store-tests-end-within-60s-under-load`
+  name it and do not write it.
   `four-host-tests-no-longer-wait-out-the-30-s-lock-wait` writes `metadata.rs`, not this file.
 
 Order with the three drafts: this story goes first, and no edge records that. An edge would
@@ -323,7 +344,7 @@ story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-lea
   questions 7 and 8.
 - The template store, the shared schemas and the setup step of the old story: not built, see
   its section "Measured (2026-11-25): not built as written".
-- A common start or a proof of overlap for tests 2 and 10: open question 13.
+- A common start or a proof of overlap for tests 2, 6, 8 and 10: open question 13.
 - The line citations of `er.rs` in the specification:
   story:the-specification-cites-er-rs-by-function-name-not-by-line, which this story depends on.
 - The tests under 5 s: whether they carry the same share is not measured.

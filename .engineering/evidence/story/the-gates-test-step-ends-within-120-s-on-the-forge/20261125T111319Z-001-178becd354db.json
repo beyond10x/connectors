@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-25T11:13:19Z",
+  "actor": "human:operator",
+  "artifact": "story:the-gates-test-step-ends-within-120-s-on-the-forge",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:replan-template-store-scope-round-2",
+    "review": "review-result:replan-template-store-scope-round-2",
+    "outcome": "fixed"
+  }
+}

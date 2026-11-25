@@ -4,13 +4,13 @@ id: story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story
 kind: story
 status: draft
 title: Where do the 81.7 s of the eleven store tests go that the registry story leaves?
-summary: 'A question, not a change: thirteen items the measurement of 2026-11-25 and its critics left open, each with whose code it is and what must be measured first; items 9 and 10 are about the SQL test, item 13 about two tests'' races'
+summary: 'A question, not a change: thirteen items the measurement of 2026-11-25 and its critics left open, each with whose code it is and what must be measured first; items 9 and 10 are about the SQL test, item 13 about four tests whose race is not shown to happen'
 relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
 - depends_on: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
-revision: 3
+revision: 5
 ---
 ## Defect
 
@@ -26,7 +26,8 @@ figure nobody read.
 
 Three items are not about the 81.7 s. Items 9 and 10 concern the SQL test
 `every_page_is_one_the_model_admits`, which is not one of the eleven. Item 13 is not a cost: it
-asks what the registry change takes from the races of two tests.
+asks whether four of the eleven tests still meet in their race, before and after the registry
+change.
 
 Source of the figures unless an item says otherwise: run 5 of that measurement on the build
 host, head d5cf22480: the eleven store tests one at a time, with timers around the calls,
@@ -112,6 +113,8 @@ story can be written:
    - Not established: why these opens find no pooled handle.
    - To measure first: per fresh open its reason, counted with a `cfg(test)` seam beside
      `note_fresh_open` (line 2990): no handle for the path, the pool full, another process id.
+   - This item owns the three timers of a fresh open for all eleven tests: its answer also
+     covers the 4.01 s of them in the other ten tests (item 12).
 9. `ess generate` per test. The helper `schema` (`adapters/sql/tests/ess_model.rs` line 24) runs
    it in 16 of the 17 tests of the file. One call: 0.10, 0.13, 0.54 and 0.69 s in four runs on
    the build host; 0.568 s in run 6.
@@ -139,40 +142,68 @@ story can be written:
       3,467.8 ms, `host.capture_sql` 1,694.2 ms, `m.open_connection` 1,463.9 ms,
       `m.floor_record` 909.9 ms, `er.write_checkpoint` plus `er.enable_checkpoints` 698.0 ms.
       Together 8.23 s (arithmetic).
-    - `er.start`, `resynchronize` and `complete_snapshot` sum to 12.33 s over the eleven tests.
-      Item 8 holds the 8.32 thread-seconds of one test; 4.01 s are in the other ten
-      (arithmetic).
+    - `er.start`, `resynchronize` and `complete_snapshot` sum to 12.33 s over the eleven tests:
+      8.32 thread-seconds in the one test of item 8 and 4.01 s in the other ten (arithmetic).
+      Item 8 answers for all of it; this item gets no entry for these three timers.
     - Not established: how the timers nest in each other and in the seven named costs. So the
       figures of this item are not added to each other, and 21.92 s is the most that has no
       owner.
     - Whose code: not established per timer.
     - To measure first: the timers of run 5 as a tree, each with its own time without the time
       of the timers inside it, on a head that holds the registry change; then whose code each
-      timer over 1.0 s of own time is.
-13. Two tests whose race depends on how long a persist takes. Read on 2026-11-25, not measured.
+      timer over 1.0 s of own time is. The answer has one entry per such timer and one entry
+      for what is left, with its sum.
+13. Four tests whose race is not shown to happen. Read on 2026-11-25, not measured. Each
+    starts several threads or tasks and asserts something that also holds when they run one
+    after another. A persist that is 13.67 ms shorter on the build host (10.63 + 3.04,
+    arithmetic) can make them meet less often.
     - `adversary_concurrent_issues_within_the_lead_send_one_exchange`
       (`owner/refresh/tests/issue.rs` lines 299 to 345): 16 callers in each of 8 trials start at
       a `Barrier` (line 311) and then sleep 3 ms times their index (line 319), so they arrive 0
       to 45 ms apart. The test asserts one request at the token endpoint per trial (lines 329 to
-      343). That also holds when the callers run one after another, and nothing in the test
-      shows that two of them overlapped.
+      343).
+    - `concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence`
+      (`registry/tests.rs` lines 786 to 856): three threads in each of 8 rounds start at a
+      `Barrier` (line 805), each with the contended wait of the lifecycle lock (line 809). The
+      test accepts success, `Conflict` or `Revoked` for the publication and for the dispatch
+      (lines 838 to 850) and asserts the state `Revoked` at the end.
+    - `abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt`
+      (`mutations/tests.rs` lines 490 to 522): two threads in each of 24 rounds start at a
+      `Barrier` (line 497). The test asserts that one of the two succeeds and the other does not
+      (line 509).
     - `adversary_a_concurrent_duplicate_under_a_cap_of_one_is_a_replay_not_rate_limited`
       (`crates/connectors-host/tests/http_standing_grant_adversary.rs` lines 258 to 324): 8
       tasks in each of 6 rounds are spawned in a loop (lines 272 to 287) with no common start.
       The test asserts one provider request per round and accepts an answer of 200 or a
       replayed 502 (lines 298 to 323). It never requires the 502.
-    - The other three tests with several threads among the eleven do not depend on it. Two
-      start their threads at a `Barrier` (`registry/tests.rs` line 805, `mutations/tests.rs`
-      line 497). One holds the provider's answer with a lock until it has counted the waiters
-      (`crates/connectors-host/tests/http_standing_grant.rs` lines 957 to 984).
+    - A `Barrier` gives a common start. It does not show that two threads were in the same
+      section at the same time.
+    - Not in this item: the fifth test with several threads among the eleven
+      (`replays_waiting_on_an_original_hold_no_slot_and_at_most_four_wait_per_key`,
+      `crates/connectors-host/tests/http_standing_grant.rs` lines 948 to 1030). It holds the
+      provider's answer with a lock until it has counted the waiters (lines 957 to 984), so its
+      overlap is shown.
     - Whose code: this repository's test code.
-    - Not established: how many callers overlap today, and whether fewer do when each persist
-      is 13.67 ms shorter on the build host (10.63 + 3.04, arithmetic).
-    - To measure first: per trial of the first test the number of callers that read the
-      expiring generation before the leader published, and per round of the second the number
-      of duplicates that arrived while the original held its key; counted with a temporary
-      counter on the registry story's base commit and on its merge commit, each test run 3
-      times at each.
+    - Not established: how often the threads meet today, and whether they meet less often
+      after the registry change. For the third test also where its two threads meet:
+      `open_dispatch` and `abort` were not read. That is read before its counter is placed.
+    - The count, one figure per test and run, taken with a temporary counter:
+      - first test: per trial the number of callers, the leader not counted, that read the
+        expiring generation before the leader published the new one (0 to 15); the figure is
+        the sum over the 8 trials (0 to 120). The leader is the caller whose request reaches
+        the token endpoint.
+      - second and third test: per round 1 when at least one acquisition of the lifecycle lock
+        (`lock_within`, `metadata.rs` line 1465) between the `Barrier` and the joins needed
+        more than one try, else 0; the figure is the sum over the rounds (0 to 8, 0 to 24). If
+        the reading shows that the two threads of the third test meet elsewhere, the entry
+        names that place and counts there.
+      - fourth test: per round the number of tasks, the original not counted, that arrived
+        while the original held its key (0 to 7); the figure is the sum over the 6 rounds (0 to
+        42). The original is the task whose request reaches the provider.
+    - To measure first: each test 3 times on the registry story's base commit and 3 times on
+      the head of its pull request, on the build host. Per test and commit the median of the
+      three figures is the result. The counts need the head of the pull request, not its
+      merge: the merge does not wait for this item.
 
 Closed by the measurement and not a question: the store built from nothing per test. It costs
 5.55 s in 101 calls of `Metadata::initialize` over the eleven tests; a template would save 33 to
@@ -186,37 +217,49 @@ the registry story's pull request.
 
 ## Acceptance
 
-1. Each of the thirteen items gets exactly one entry under a heading `## Answer` in this story.
-   Each figure in an entry names its source: the command of the run on the build host and its
-   output, or the job of the forge run. An entry is one of five kinds:
+1. Each of the thirteen items gets exactly one entry under a heading `## Answer` in this story,
+   with two exceptions: item 12 gets one entry per timer over 1.0 s of own time and one for
+   what is left, and item 13 gets one entry per test. Each figure in an entry names its
+   source: the command of the run on the build host and its output, or the job of the forge
+   run. An entry is one of five kinds:
    - a story: the cost is in this repository's code and a change that keeps behaviour removes
-     at least 1.0 s of it, summed over the eleven tests on the build host. The entry names the
-     draft story that claims it, created as a draft that decomposes
+     at least 1.0 s of it on the build host. The 1.0 s is summed over the eleven tests for
+     items 1 to 8 and 12, summed over the 16 tests of `adapters/sql/tests/ess_model.rs` that
+     call `schema` for item 9, and taken from the duration of the one test
+     `every_page_is_one_the_model_admits` for item 10. The entry names the draft story that
+     claims it, created as a draft that decomposes
      story:the-gates-test-step-ends-within-120-s-on-the-forge. For item 13 the 1.0 s does not
-     apply: a story is due when, in any of the 3 runs on the merge commit, a test has no trial
-     or round with an overlap, or when the count of overlaps fell to less than half of the base
-     commit's. That draft gives the test a common start or an assertion that the overlap
-     happened;
+     apply. A story is due for a test when its median on the head of the registry story's
+     pull request is 0, or is less than half of its median on the base commit. A median of 0
+     on the base commit means the test does not meet in its race today, whatever the registry
+     change does: a story is due for it too, and the entry says that the registry change did
+     not cause it. That draft gives the test an assertion that the overlap happened, or a
+     start that makes it happen;
    - the dependency's: the entry names the function and its share and no change in this
      repository. Whether a story is asked of the dependency's repository is the operator's
      decision; the entry lists it for that decision;
    - dropped: the cost is in this repository's code and the removable part is measured under
      1.0 s, or removing it changes what the product verifies. The entry states the figure or
-     the check that would be lost. For item 13: the counts of both commits, when no story is
-     due by the rule above;
+     the check that would be lost. For a test of item 13: the three figures and the median of
+     both commits, when no story is due by the rule above;
    - no code: the cost follows the load of the host or the disk (item 11) or is in neither the
      fixture, the adapter nor the client library (item 10). The entry names the run that shows
      it and what it means for how the time statements of the set are read;
    - not taken up: only item 10, when the fixture story is confirmed. The entry says so and
      names that story's pull request.
-2. The 1.0 s of statement 1 is 0.85 % of the 117.685 s of run 5 (arithmetic). It is read from a
-   run on a head that holds the registry change, by the same timers.
-3. Order. Items 1 to 8, 12 and 13 are measured after
+2. The 1.0 s of statement 1 is 0.85 % of the 117.685 s of run 5 (arithmetic). For items 1 to 8
+   and 12 it is read from a run on a head that holds the registry change, by the same timers.
+   For items 9 and 10 it is read from the durations nextest prints, before and with a probe of
+   the change.
+3. Order. Items 1 to 8 and 12 are measured after
    story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process has
-   merged, on a head that holds it: that change removes REG and PARSE2 from every figure above,
-   and item 13 compares its merge commit with its base commit. This story has a `depends_on`
-   edge to it. Item 10 waits for the outcome of the fixture story and records no edge, because
-   a confirmed fixture story ends the item. Items 9 and 11 wait for nothing.
+   merged, on a head that holds it: that change removes REG and PARSE2 from every figure above.
+   Item 13 is counted as soon as that story's pull request has a head, on that head and on its
+   base commit. It does not wait for the merge, and the merge does not wait for it; its
+   entries may be written first. This story has a `depends_on` edge to the registry story for
+   both. Item 10 waits for the outcome of the fixture story and records no edge, because a
+   confirmed fixture story ends the item. Items 9 and 11 wait for nothing; their runs on the
+   build host are not started while the six runs of the fixture story are made.
 
 ## Scope
 

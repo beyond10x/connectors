@@ -10,7 +10,7 @@ relations:
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
 - depends_on: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
-revision: 5
+revision: 6
 ---
 ## Defect
 
@@ -89,11 +89,18 @@ Questions:
 5. What does story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
    take from the tests under 5 s? That story changes product code that every test with a persist
    runs, and claims only eleven tests of 5 s and more. Read from two forge jobs: the "repository
-   gate" job of that story's pull request and the job the pull request names as its base. For
-   each of the four binaries of question 1 and for the whole test step: the sum of the durations
-   of the tests under 5 s in both jobs, and the difference. Each figure is one job. The spread
-   between two gate jobs of main with no code change between them is read the same way from two
-   such jobs, and a difference inside that spread is reported as not shown.
+   gate" job of that story's pull request and the job the pull request names as its base. The
+   set of tests is fixed by the base job: the tests that took under 5 s there and that also
+   ran in the pull request's job. A test that ran in only one of the two jobs is not in the
+   set; the answer lists those tests by name. For each of the four binaries of question 1 and
+   for the whole test step: the sum of the durations of the set in both jobs, and the
+   difference. Each figure is one job. The spread is read the same way from two gate jobs of
+   main that ran the test step with no change outside the planning store between their
+   commits, and a difference inside that spread is reported as not shown. No job is run again
+   to make such a pair. When no pair exists, the answer says so: the spread is not known and
+   the difference is reported without a verdict.
+   What the difference is: what that story took from the durations of these tests. It is not
+   the share of the two costs in them, which only timers in the tests could give.
    This is the one question that reads a run made after a story of the set landed. This story
    has a `depends_on` edge to that story for it. Questions 1 to 4 do not wait for it; the sum of
    question 3 is corrected by the figure of question 5 once it exists.

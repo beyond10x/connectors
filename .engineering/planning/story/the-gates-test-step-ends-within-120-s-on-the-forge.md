@@ -11,7 +11,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-build/src/gate.rs
-revision: 13
+revision: 14
 ---
 ## Defect
 
@@ -130,12 +130,14 @@ Without a row, because they cover no test of their own:
   stories of the set (below).
 - N6 `story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves`:
   thirteen items that the measurement of 2026-11-25 and the critics' reading left open in the
-  tests of S9d and S9e, none attributed far enough for a story. The largest is the write of the
-  Entity Runtime batch, 30.29 s of 117.685 s on the build host.
+  tests of S9d and S9e, none attributed far enough for a story. Twelve are costs. The largest
+  is the write of the Entity Runtime batch, 30.29 s of 117.685 s on the build host. Item 13 is
+  not a cost: it asks whether four of S9d's tests still meet in their race, which the title
+  does not say. A story from it claims no test time.
 - N7 `story:the-specification-cites-er-rs-by-function-name-not-by-line`: two comments under
   `ess/domains/` cite `er.rs` by line and a test of `connectors-build` holds one of them, so a
-  change above line 5095 of `er.rs` makes that test red. N7 makes the citations name a
-  function. It claims no test time. S9d has a `depends_on` edge to it.
+  change that moves line 5095 of `er.rs` down by 3 lines or more, or up by 2 or more, makes
+  that test red. N7 makes the citations name a function. It claims no test time. S9d has a `depends_on` edge to it.
 
 Edges (`depends_on`) order the stories that write one file.
 `aep plan artifact waves --kind story --status draft`, run after the notes of the third round,
@@ -219,8 +221,10 @@ Not claimed by a change, among the 81. Each test below keeps its time in the sum
 - A change with no estimated saving, 6 tests: the jail tests of S9b, 50.7 s before and 50.6 s
   after.
 
-Claimed by a change whose estimate is not confirmed, 12 tests. Their "after" in the sum is the
-estimate, not their time before:
+Claimed by a change whose estimate rests on more than a reading of the change, 12 tests: 11
+on shares carried over from another machine and 1 on a cause that is not confirmed. No
+"after" of the set was timed; these two kinds carry one more assumption. Their "after" in the
+sum is the estimate, not their time before:
 
 - An estimate carried over from another machine, 11 tests of S9d: the 76.0 s after are each
   test's duration on the forge times the share of the two costs in that test on the build host.
@@ -258,8 +262,8 @@ stories that follow, or the answers the operator chooses from. N5 also owns the 
 two forge runs. Acceptance 1 of this story is not met by the other stories of the set: beyond them
 it needs N5's answer and the stories drafted from it. The first plan's candidate, the store of S9a
 for every test that builds one, is measured and closed: 33 to 38 ms per store. One candidate that
-is not measured: the share of S9d's two costs in the tests under 5 s. N5's question 5 reads it
-and has a `depends_on` edge to S9d.
+is not measured: what S9d takes from the tests under 5 s. N5's question 5 reads it as a
+difference of two forge jobs and has a `depends_on` edge to S9d.
 
 This story's acceptance reads the forge's test step, which S9d and S9e change. It records no
 edge to them: its own change waits until acceptance 1 holds, and that needs every story of the

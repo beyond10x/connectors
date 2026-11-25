@@ -44,7 +44,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/template_store.rs
-revision: 16
+revision: 17
 transitions:
 - {from: "draft", to: "archived", at: "2026-11-25T10:33:35Z", actor: "human:operator", revision: 15}
 ---
@@ -352,8 +352,7 @@ by CPU: user and system time are 88 to 124 % of their wall time.
   rest as thirteen questions: BATCH, READBACK, CATCHUP, PROJ, VALID, the migrate with nothing to
   migrate, the lock poll, the fresh opens, `ess generate` per test, the SQL test when the
   fixture draft is refuted, the variance from run to run, the "Rest" row of the table above
-  without the 5.55 s of `initialize`, and two tests whose race depends on how long a persist
-  takes.
+  without the 5.55 s of `initialize`, and four tests whose race is not shown to happen.
 - story:the-specification-cites-er-rs-by-function-name-not-by-line goes ahead of the registry
   draft: a test holds a line citation of `er.rs` that the registry draft's change would move.
 - Two stories named this story in `depends_on`. Both edges are removed with this section.

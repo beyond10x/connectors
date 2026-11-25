@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/mysql/fixture.rs
-revision: 3
+revision: 4
 ---
 ## Defect
 
@@ -90,7 +90,9 @@ Not established by reading: whether one of the 84 relies on the hold. Statement 
    three runs at the base commit and three runs with point 1, in turns, durations as nextest
    prints them. The wrapper script only measures, so it starts without the `slot` prefix;
    `cargo` inside it takes its slot through the shim, and each such job ends within the pool's
-   10 minutes.
+   10 minutes. While the six runs are made, no other timing run of the set is started on the
+   build host (items 9 and 11 of the question story time there too), and the script writes the
+   number of jobs running in the pool (`slot status`) beside each duration.
    - The six runs count only when each run at the base commit takes at least 7.0 s (the two so
      far: 9.245 and 9.293 s). A base run under 7.0 s means the wait was not there to remove. The
      six runs are then made once more at another time of day. When a base run is under 7.0 s
@@ -102,8 +104,9 @@ Not established by reading: whether one of the 84 relies on the hold. Statement 
    - Refuted: one run with point 1 takes 3.0 s or more. A partial effect counts as refuted, and
      that is intended: the story claims a cause, and a change that takes a few seconds off for a
      reason nobody named is not merged under this title. Then the second probe replaces point 1:
-     `Wire::write` sends header and body with one `write_all`. The same six runs and the same
-     rule decide.
+     `Wire::write` sends header and body with one `write_all`. Six new runs decide by the same
+     rule: three at the base commit and three with the second probe, in turns. The base runs
+     of the first round are not used again.
    - Refuted twice: nothing is merged. The story goes back to draft with the durations of both
      rounds, and item 10 of the question story takes the test over.
    - A record, no part of the decision: one run of each kind under
