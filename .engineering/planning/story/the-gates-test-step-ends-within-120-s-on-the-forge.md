@@ -7,7 +7,7 @@ title: The gate's test step ends within 120 s on the forge, and fails when it do
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
-revision: 2
+revision: 3
 ---
 ## Defect
 
@@ -58,33 +58,69 @@ durations of its tests were not compared with the first run's.
 
 Decomposed on 2026-11-24 in test-plan:where-the-gates-test-step-spends-its-time, from the
 durations of the first run and the sources. It names, for each of the 81 tests of 5 s and
-more, the line the time is spent at, and groups them by cause. Twelve stories follow from it.
-They are not drafted as artifacts yet. "Before" and "after" are seconds summed over the tests a
-story covers; every "after" is an estimate and none was timed.
+more, the line the time is spent at, and groups them by cause. Eighteen draft stories follow
+from it: fourteen change tests, two (N1, N2) build what the others use, and two (N3, N4) are
+questions. The first draft of twelve was revised once after four critics read it (acceptance,
+design, scope, parallel safety; all four asked for a revision).
+
+"Before" and "after" are seconds summed over the tests of 5 s and more that a story covers,
+from the first run; every "after" is an estimate and none was timed.
 
 | story | tests | before | after | seam |
 |---|---|---|---|---|
-| S1 host lock waits | 4 | 122.0 | 5.5 | `child_lock_wait` and `set_lifecycle_lock_wait` exist; one test moves into the library tests |
-| S2 owner connect wait | 7 | 120.8 | 36.0 | new debug-only override of the 10 s connect wait |
-| S3 lease clock and admission bound | 11 | 222.9 | 48.0 | new debug-only clock offset and admission bound |
-| S4 idle exit and sweep | 4 | 67.4 | 9.5 | new debug-only sweep interval |
-| S5 MCP budgets and sleeps | 7 | 101.8 | 34.0 | the tests' own values |
-| S6 client timeouts | 5 | 56.2 | 5.4 | new test seam for the HTTP and SQL timeouts |
-| S7a released definition once, provider side | 66 | 175.4 | 13.4 | a committed lowered file with a digest of its sources |
-| S7b memoised ingest, catalog crate | 11 | 31.6 | 5.0 | ingest made once per process |
-| S8a waits that prove nothing, adapters and catalog | 8 | 80.0 | 18.6 | the tests' own values; one test to lane `slow` |
-| S8b waits in the host unit tests | 5 | 48.6 | 18.2 | the tests' own values |
-| S8c waits in the CLI tests | 7 | 64.2 | 34.7 | two new debug-only overrides |
-| S9 fixture templates | 18 | 190.6 | 107.7 | a template store and a template jail built once per run |
+| S1 `story:four-host-tests-no-longer-wait-out-the-30-s-lock-wait` | 4 | 122.0 | 5.5 | `child_lock_wait` and `set_lifecycle_lock_wait` exist; the 30 s test goes to the lane `slow`, a library test replaces it in the gate |
+| S2 `story:seven-cli-tests-of-a-slow-owner-start-no-longer-wait-out-the-10-s-connect-wait` | 7 | 120.8 | 36.0 | one debug-only override of the 10 s connect wait |
+| S3 `story:eleven-connection-lease-tests-advance-a-clock-instead-of-sleeping` | 11 | 222.9 | 48.0 | open until N3 answers; a clock offset in `connectors-sdk` needs the operator's word |
+| S4 `story:four-idle-exit-tests-no-longer-span-several-5-s-recovery-sweeps` | 4 | 67.4 | 9.5 | a debug-only sweep interval |
+| S5 `story:seven-mcp-tests-use-a-4-s-request-budget-and-shorter-holds` | 7 | 101.8 | 34.0 | the tests' own values |
+| S6 `story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts` | 5 | 56.2 | 5.4 | two debug-only HTTP overrides; the SQL timeout by a constructor parameter |
+| S7a `story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition` | 4 | 35.9 | 4.7 | a committed lowered file with a digest of its sources; it reaches 40 tests in all, about 94.9 s to 9.7 s |
+| S7b `story:the-catalog-crate-tests-ingest-the-released-definition-once-per-process` | 1 | 7.4 | 7.4 | reads S7a's file; it reaches one test, and that test's time does not change |
+| S8a `story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing` | 7 | 73.0 | 16.6 | the tests' own values; one test to the lane `slow` |
+| S8b `story:five-host-unit-tests-shorten-the-waits-they-chose` | 5 | 48.6 | 18.2 | the tests' own values |
+| S8c `story:seven-cli-tests-shorten-their-waits-or-a-production-wait` | 6 | 54.0 | 24.5 | three debug-only overrides: print deadline, clock query timeout, client drain bound |
+| S9a `story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run` | 12 | 115.0 | 55.9 | a template store and generated SQL schemas built once per run by a setup step |
+| S9b `story:six-cli-tests-take-jail-binaries-built-once-per-run` | 6 | 50.7 | 50.6 | jail binaries linked from a product built once per run; the plan estimates no saving |
+| S9c `story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate` | 1 | 31.9 | 3.2 | 10 runs in the gate, 100 in the lane `slow` |
+| N4 `story:where-do-the-10-s-of-the-identification-retry-loop-test-go` | 1 | 10.2 | 10.2 | a question; no change claimed |
+| sum | 81 | 1,117.8 | 329.7 | |
 
-S1, S6, S7a, S7b, S8a and S8b touch no file of another story. The overlaps of the other six
-are listed in the test plan.
+The ids of S7b, S8a, S8c and S9a keep the words of their first titles; the store does not change
+an id.
 
-The stories do not reach the budget. They cover 1,281.6 s of the 2,474.8 s summed and leave
-336.0 s of it; the sum after all of them is 1,529.2 s, 382 s of wall time at four tests at a
-time, against 120 s. The rest is in tests the stories do not cover: 650 s in the band of 1 s
-to under 5 s and 543 s under 1 s. What closes that gap is not known. One candidate, not
-measured: the store and the jail of S9 for every test that builds one, not only for its 18.
+Without a row, because they cover no test of their own:
+
+- N1 `story:the-lane-slow-runs-the-ignored-timing-family`: an ignored test whose function name
+  starts with `slow_lane_` runs in the lane `slow` and is ended at 60 s. It owns
+  `.github/workflows/slow.yml` and the table of `crates/connectors-build/src/ignored.rs`. With
+  its paths the lane starts for nearly every pull request that changes code; the lane has no
+  step budget yet.
+- N2 `story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build`:
+  one helper for every debug-only override, forwarded to the owner by one prefix. It carries the
+  one decision beyond the plan: a test on a release build that the override is ignored there.
+- N3 `story:where-do-the-connection-lease-tests-clock-and-the-30-s-admission-bound-live`: the
+  question S3 waits for.
+
+Edges (`depends_on`) order the stories that write one file; `aep plan artifact waves` puts the
+set into seven waves (N1 and S8b first, S3 last). `crates/connectors-host/src/local/owner/transport.rs`
+is written by N2, S4, S2, S8c and S3, in that order.
+
+Not claimed by a change, among the 81: 2 tests, 17.6 s (N4's test, and S7b's
+`embedded_text_where_the_engine_refuses_it_is_refused`, 7.4 s, which the plan had at 2.0 s
+after). Outside the 81 and also unclaimed: 26 provider tests that lower a changed definition,
+about 80.5 s, and 9 catalog-crate tests of 1 s to under 5 s, about 22.6 s.
+
+The stories do not reach the budget. Of the 2,474.8 s summed they cover 1,176.8 s (the 81 tests
+and the 36 further tests of S7a, 59.0 s) and leave 334.7 s of it; the sum after all of them is
+1,632.7 s, 408 s of wall time at four tests at a time, against 120 s. The rest is in tests the
+stories do not cover: about 755 s in the band of 1 s to under 5 s and 543 s under 1 s. What
+closes that gap is not known. One candidate, not measured: the store of S9a for every test that
+builds one, not only for its 12.
+
+Two older drafts overlap the set and are not changed by it:
+story:store-tests-end-within-60s-under-load (eight tests of S9a, the stress test of S9c, one
+test of S2) and story:test-binary-per-package-rest (it renames the test binaries the acceptance
+commands of the set name).
 
 The gate fails when the test step runs over `TEST_STEP_BUDGET` only after the step is under
 the budget: before that it makes every pull request red.
