@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate
 kind: story
-status: active
+status: implemented
 title: 'The 100-run capacity stress keeps 10 runs in the gate: 31.9 s become an estimated 3.2 s'
 summary: One CLI test runs the CLI 100 times in the test step; 10 runs stay in the gate and the 100 run in the lane slow
 relations:
@@ -13,10 +13,11 @@ relations:
 scope:
 - confidence: cited
   path: apps/connectors/tests/local_cli.rs
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T04:03:29Z", actor: "human:operator", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-25T04:03:29Z", actor: "human:operator", revision: 6}
+- {from: "active", to: "implemented", at: "2026-11-25T05:49:07Z", actor: "human:operator", revision: 8, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
