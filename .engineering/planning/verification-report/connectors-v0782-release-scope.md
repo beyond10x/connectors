@@ -7,7 +7,7 @@ title: Scope of connectors 0.78.2
 summary: What 0.78.2 holds, what a consumer reads and what is known open at the release
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "accepted", at: "2026-11-24T19:57:57Z", actor: "human:timo", revision: 2}
 ---
@@ -64,3 +64,24 @@ request 298, and the release is cut from `main` at `8310e9ed6`, two commits afte
   (story:a-refused-local-write-names-its-reason, `draft`), and an approved upload through the
   local CLI does not hold the operation's 2 MiB
   (story:an-approved-binary-write-through-the-local-cli-holds-the-operations-2-mib, `draft`).
+
+## Verified after the release (2026-11-25)
+
+- Pull request 298 merged 2026-11-24 23:07 CET as `8310e9ed6` with 16 of 16 checks green. Its
+  job "ignored CLI journeys" reports the journey
+  `catalog_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts` as
+  `passed`.
+- Pull request 297 merged 2026-11-25 00:01 CET (23:01 UTC on 2026-11-24, the date of the
+  changelog section) as `f471c405b` with 17 of 17 checks green on its second head `de3b42882`,
+  "ignored CLI journeys" among them. Two green runs after the change do not prove the cause read
+  from the code: by that reading the old wait of 8 s could fail in at most about one run of five.
+- Tag `v0.78.2` on `f471c405b`. The release page was a pre-release from 00:03 CET until its four
+  archives matched `SHA256SUMS` (`sha256sum -c`: 4 OK), then the newest release (00:48 CET).
+  The run of `release-binaries.yml` (45506630325) ended `success` on its first attempt.
+- The container image of the tag lists `linux/amd64` and `linux/arm64`; its revision label is
+  the tagged commit.
+- No install on the workstation moved to 0.78.2: the release changes nothing for an installed
+  binary.
+- The forge's gate job: 39 min 34 s on pull request 298, 50 min 29 s on the second head of pull
+  request 297. story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step stays
+  `active`; its change 3 is pull request 296, not in this release.
