@@ -509,43 +509,70 @@ struct ClockServer {
 #[test]
 fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
     let root = root();
-    // Every wait below is this one bound: `until()`, the lease
-    // and lifecycle waits (per thread), the clock query and the fake
-    // server's wait for the request. A loaded scheduler cannot spend it.
-    let wait = crate::local::metadata::CONTENDED_LOCK_WAIT;
-    crate::local::metadata::set_lifecycle_lock_wait(wait);
-    // The fake server takes an exclusive metadata update before it replies.
-    crate::local::clock::set_test_query_timeout(wait);
-    crate::local::clock::set_test_max_width_ms(wait.as_millis());
-    let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
-    socket.set_read_timeout(Some(wait)).unwrap();
+    // Three bounds, each longer than the one before it. A run in which every
+    // datagram arrives waits none of them out.
+    // `update`: the first source's policy update, and every wait for the
+    // lifecycle lock. Only this test's two threads take that lock, so a
+    // loaded scheduler has 10 s for milliseconds of work. A policy lease or
+    // the metadata lifecycle lock that `issue` kept during the exchange
+    // spends it: the update then fails before the query ends and is named in
+    // the assertion. A key lease is not seen: the update does not take it.
+    let update = std::time::Duration::from_secs(10);
+    // `query`: one attempt at the clock. It outlasts `update`, and it ends
+    // before the 30 s after which a source that did answer is refused
+    // (`bounds_ns`), so a source that stays silent leaves the attempt below
+    // quorum and `issue` asks again.
+    let query = std::time::Duration::from_secs(15);
+    // The deadline of `issue`: two attempts, the reserve after them and one
+    // more `update` for its local work. One lost datagram costs an attempt,
+    // not the test. `issue` reads its deadline between its steps; it cuts no
+    // wait that is running.
+    let within = 2 * query + clock::RESERVE_AFTER_CLOCK + update;
+    crate::local::metadata::set_lifecycle_lock_wait(update);
+    crate::local::clock::set_test_query_timeout(query);
+    // The width the test accepts when both sources answer late. The first
+    // source's wait for its update widens its own interval only.
+    crate::local::clock::set_test_max_width_ms(query.as_millis());
+    let paths = std::sync::Arc::new(std::sync::OnceLock::new());
+    // What the update answered and how long it took.
+    let updates = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let (stored, taken) = (paths.clone(), updates.clone());
+    let first = clock_fixture::Server::spawn(Box::new(move |_, request| {
+        let mut made = taken.lock().unwrap();
+        // The source makes the update before its first reply. It answers a
+        // second attempt's request without another.
+        if made.is_empty() {
+            crate::local::metadata::set_lifecycle_lock_wait(update);
+            let started = Instant::now();
+            // This exclusive update fails if the issuing command already holds
+            // a policy lease or the metadata lifecycle lock.
+            let ended = policy_set(
+                stored.get().unwrap(),
+                "fixture",
+                br#"{"operations":[]}"#,
+                Some(1),
+                started + update,
+            );
+            made.push((
+                ended.map(|_| ()).map_err(|error| error.code),
+                started.elapsed(),
+            ));
+        }
+        Some(clock_fixture::Fixture::default().reply(request))
+    }));
     let second = clock_fixture::Server::fixture(clock_fixture::Fixture {
         seed: 8,
         ..Default::default()
     });
-    let first = socket.local_addr().unwrap().to_string();
-    let t = setup(root.path(), None, [&first, &second.address]);
+    let t = setup(root.path(), None, [&first.address, &second.address]);
     t.fake_issuer();
     t.policy();
     let approved = prepare(&t.paths, "fixture", &t.request(), until()).unwrap();
-    let paths = Paths {
+    let set = paths.set(Paths {
         config: t.paths.config.clone(),
         state: t.paths.state.clone(),
-    };
-    let exchange = std::thread::spawn(move || {
-        crate::local::metadata::set_lifecycle_lock_wait(wait);
-        let mut packet = [0; 4096];
-        let (size, peer) = socket.recv_from(&mut packet).unwrap();
-        // This exclusive update would fail if the issuing command had already
-        // acquired a policy/key lease or retained a metadata lifecycle handle.
-        policy_set(&paths, "fixture", br#"{"operations":[]}"#, Some(1), until()).unwrap();
-        socket
-            .send_to(
-                &clock_fixture::Fixture::default().reply(&packet[..size]),
-                peer,
-            )
-            .unwrap();
     });
+    assert!(set.is_ok());
     let output = root.path().join("revoked-during-clock.json");
     let result = issue(
         &t.paths,
@@ -553,9 +580,18 @@ fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
         &t.request(),
         &approved.subject_sha256,
         &output,
-        until(),
+        Instant::now() + within,
     );
-    exchange.join().unwrap();
+    let asked =
+        [&first, &second].map(|source| source.requests.load(std::sync::atomic::Ordering::SeqCst));
+    let made = updates.lock().unwrap();
+    // A red run names what a bare `unavailable` does not: which source was
+    // asked how often, and whether the update went through and when.
+    let facts = format!(
+        "issue: {:?}; requests of the first and the second source: {asked:?}; the update and its time: {made:?}",
+        result.as_ref().err()
+    );
+    assert!(matches!(made.as_slice(), [(Ok(()), _)]), "{facts}");
     assert!(
         matches!(
             result,
@@ -564,8 +600,7 @@ fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
                 ..
             })
         ),
-        "{:?}",
-        result.as_ref().err()
+        "{facts}"
     );
     assert!(!output.exists());
 }
