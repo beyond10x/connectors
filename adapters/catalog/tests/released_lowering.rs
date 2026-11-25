@@ -8,12 +8,14 @@
 //! The directory holds what `definition::lower` wrote into its `out` (`index.json`,
 //! `github.bundle.json`, `github/operations.json`, `github/connector.json`), what it
 //! returned (`lowered.json`: the provider, and the paths from the directory) and
-//! `inputs.json`: one sha256 per input file and the digest over them.
+//! `inputs.json`: one sha256 per input file with the digest over them, and one sha256 per
+//! lowered file (every file of the directory but `inputs.json`).
 //!
 //! The rule for every later change: who changes an input of the digest regenerates the
 //! committed lowering in the same change. An input is any file under
 //! `crates/connectors-catalog/tests/fixtures/definitions-0.5.2/` and any `.rs` file under
-//! `crates/connectors-catalog/src/`. The change runs
+//! `crates/connectors-catalog/src/`; a file or directory whose name starts with `.` is not
+//! one. The change runs
 //!
 //! ```text
 //! CONNECTORS_WRITE_RELEASED_LOWERING=1 cargo test --locked -p connectors-catalog-provider --test main -- --ignored --exact released_lowering::slow_lane_the_committed_lowering_equals_a_fresh_lowering
@@ -21,8 +23,11 @@
 //!
 //! and commits the directory with the new `inputs.json`; when the lowering's bytes did not
 //! change, only `inputs.json` changes. `the_committed_lowering_is_current` enforces the
-//! rule: it is red in the gate until the change regenerates. `Cargo.lock` is not an input:
-//! a dependency that changes the bytes is caught by the lane test
+//! rule: it is red in the gate until the change regenerates. It also hashes the lowered
+//! files and is red when one of them is not the file the record names, so the directory is
+//! written by the command and never by hand. Only the value `1` writes; any other value of
+//! the variable is refused, and so is every value where `CI` is set. `Cargo.lock` is not an
+//! input: a dependency that changes the bytes is caught by the lane test
 //! `slow_lane_the_committed_lowering_equals_a_fresh_lowering`, which lowers again and
 //! compares every byte.
 #![cfg(unix)]
@@ -48,15 +53,18 @@ const ROOTS: [Root<'static>; 2] = [
     (DEFINITIONS, None),
     ("crates/connectors-catalog/src", Some("rs")),
 ];
-/// The record of the inputs: one sha256 per input file, and the digest over them.
+/// The record: one sha256 per input file with the digest over them, and one per lowered file.
 const INPUTS_FILE: &str = "inputs.json";
 /// What `definition::lower` returned: the provider, and each path from the directory.
 const LOWERED_FILE: &str = "lowered.json";
-const FORMAT: &str = "connectors-released-lowering/1";
-/// Set, the lane test writes the committed directory in place of comparing with it.
+const FORMAT: &str = "connectors-released-lowering/2";
+/// Set to `1`, the lane test writes the committed directory in place of comparing with it.
 const WRITE: &str = "CONNECTORS_WRITE_RELEASED_LOWERING";
 /// The command that regenerates the committed lowering.
 const REGENERATE: &str = "CONNECTORS_WRITE_RELEASED_LOWERING=1 cargo test --locked -p connectors-catalog-provider --test main -- --ignored --exact released_lowering::slow_lane_the_committed_lowering_equals_a_fresh_lowering";
+
+/// Paths and their sha256, by path.
+type Rows = BTreeMap<String, String>;
 
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -66,14 +74,20 @@ fn committed() -> PathBuf {
     repository().join(DIRECTORY)
 }
 
+/// The way out every failed check names.
+fn regenerate() -> String {
+    format!("Regenerate it and commit the directory in the same change:\n{REGENERATE}")
+}
+
+fn read(path: &Path) -> Vec<u8> {
+    fs::read(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+}
+
 fn read_json(path: &Path) -> Value {
-    let bytes = fs::read(path).unwrap_or_else(|error| {
-        panic!(
-            "{}: {error}; the committed lowering is made with `{REGENERATE}`",
-            path.display()
-        )
-    });
-    serde_json::from_slice(&bytes).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+    let bytes = fs::read(path)
+        .unwrap_or_else(|error| panic!("{}: {error}. {}", path.display(), regenerate()));
+    serde_json::from_slice(&bytes)
+        .unwrap_or_else(|error| panic!("{}: {error}. {}", path.display(), regenerate()))
 }
 
 fn write_json(path: &Path, value: &Value) {
@@ -105,14 +119,20 @@ pub(crate) fn engine() -> Engine {
 }
 
 /// Every file under `directory`, at any depth, sorted: the order is not the file system's.
-fn files_under(directory: &Path) -> Vec<PathBuf> {
+/// Without `hidden`, a file or directory whose name starts with `.` is left out, and so is
+/// all that is under such a directory.
+fn files_under(directory: &Path, hidden: bool) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let mut pending = vec![directory.to_path_buf()];
     while let Some(next) = pending.pop() {
         let entries =
             fs::read_dir(&next).unwrap_or_else(|error| panic!("{}: {error}", next.display()));
         for entry in entries {
-            let path = entry.unwrap().path();
+            let entry = entry.unwrap_or_else(|error| panic!("{}: {error}", next.display()));
+            if !hidden && entry.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            let path = entry.path();
             if path.is_dir() {
                 pending.push(path);
             } else {
@@ -124,12 +144,12 @@ fn files_under(directory: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// `path` from `base`, as text: no part of the record or of a message is an absolute path.
+/// `path` from `base`, as text: the record holds no absolute path.
 fn relative(base: &Path, path: &Path) -> String {
     path.strip_prefix(base)
         .unwrap_or_else(|_| panic!("{} is not under {}", path.display(), base.display()))
         .to_str()
-        .expect("a UTF-8 path")
+        .unwrap_or_else(|| panic!("{} is not UTF-8", path.display()))
         .to_owned()
 }
 
@@ -137,21 +157,40 @@ fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
+/// Rows as the record holds them: `[{"path": …, "sha256": …}]`, by path.
+fn rows_json(rows: &Rows) -> Value {
+    rows.iter()
+        .map(|(path, digest)| json!({"path": path, "sha256": digest}))
+        .collect()
+}
+
+/// The rows of a list of the record; a list that is none reads as no rows.
+fn rows(list: &Value) -> Rows {
+    list.as_array()
+        .into_iter()
+        .flatten()
+        .map(|file| {
+            let text = |key: &str| file[key].as_str().unwrap_or_default().to_owned();
+            (text("path"), text("sha256"))
+        })
+        .collect()
+}
+
 /// The record of the digest's inputs: every input file under `roots`, each a directory under
-/// `base`, with its sha256, sorted by path, and the digest over those lines. Paths are from
-/// `base`, so the record is the same wherever the tree is checked out.
+/// `base`, with its sha256, sorted by path, and the digest over those lines. A name that
+/// starts with `.` is not an input (an editor's lock, `.DS_Store`). Paths are from `base`, so
+/// the record is the same wherever the tree is checked out.
 fn inputs(base: &Path, roots: &[Root<'_>]) -> Value {
-    let mut files = Vec::new();
+    let mut files = Rows::new();
     for (root, extension) in roots {
-        for path in files_under(&base.join(root)) {
+        for path in files_under(&base.join(root), false) {
             let is_input = extension
                 .is_none_or(|extension| path.extension().is_some_and(|found| found == extension));
             if is_input {
-                files.push((relative(base, &path), sha256(&fs::read(&path).unwrap())));
+                files.insert(relative(base, &path), sha256(&read(&path)));
             }
         }
     }
-    files.sort();
     let summary: String = files
         .iter()
         .map(|(path, digest)| format!("file {digest} {path}\n"))
@@ -160,57 +199,131 @@ fn inputs(base: &Path, roots: &[Root<'_>]) -> Value {
     // bytes are the same whether or not serde_json keeps insertion order in this build.
     json!({
         "digest": sha256(summary.as_bytes()),
-        "files": files
-            .iter()
-            .map(|(path, digest)| json!({"path": path, "sha256": digest}))
-            .collect::<Vec<_>>(),
+        "files": rows_json(&files),
         "format": FORMAT,
         "regenerate": REGENERATE,
     })
 }
 
-/// The fast check: the recorded digest is the current one. Its failure says that the
-/// committed lowering is stale, names the command that regenerates it and lists the input
-/// files that changed.
-fn check(recorded: &Value, current: &Value) -> Result<(), String> {
-    if recorded["digest"].is_string() && recorded["digest"] == current["digest"] {
-        return Ok(());
-    }
-    let files = |record: &Value| -> BTreeMap<String, String> {
-        record["files"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|file| {
-                let text = |key: &str| file[key].as_str().unwrap_or_default().to_owned();
-                (text("path"), text("sha256"))
-            })
-            .collect()
-    };
-    let (recorded, current) = (files(recorded), files(current));
+/// The lowered files of `directory` with their sha256: every file but the record itself.
+fn lowered(directory: &Path) -> Rows {
+    files_under(directory, true)
+        .iter()
+        .map(|path| relative(directory, path))
+        .filter(|name| name != INPUTS_FILE)
+        .map(|name| {
+            let digest = sha256(&read(&directory.join(&name)));
+            (name, digest)
+        })
+        .collect()
+}
+
+/// What `inputs.json` holds: the record of the inputs, and the lowered files made from them.
+fn record(inputs: &Value, lowered: &Rows) -> Value {
+    json!({
+        "digest": inputs["digest"],
+        "files": inputs["files"],
+        "format": inputs["format"],
+        "lowered": rows_json(lowered),
+        "regenerate": inputs["regenerate"],
+    })
+}
+
+/// One line per path the two sets of rows do not hold with the same sha256, under the word
+/// for its case: in both, only in `current`, only in `recorded`.
+fn differences(recorded: &Rows, current: &Rows, words: [&str; 3]) -> String {
+    let [changed, only_current, only_recorded] = words;
     let paths: BTreeSet<&String> = recorded.keys().chain(current.keys()).collect();
-    let mut changed = String::new();
+    let mut lines = String::new();
     for path in paths {
-        let what = match (recorded.get(path), current.get(path)) {
+        let word = match (recorded.get(path), current.get(path)) {
             (Some(was), Some(is)) if was == is => continue,
-            (Some(_), Some(_)) => "changed",
-            (None, _) => "added",
-            (_, None) => "removed",
+            (Some(_), Some(_)) => changed,
+            (None, _) => only_current,
+            (_, None) => only_recorded,
         };
-        changed.push_str(&format!("\n  {what}: {path}"));
+        lines.push_str(&format!("\n  {word}: {path}"));
     }
-    Err(format!(
-        "the committed lowering of the released definition is stale: an input changed after \
-         {DIRECTORY} was made. Regenerate it and commit the directory in the same change:\n\
-         {REGENERATE}\ninput files that changed:{changed}"
-    ))
+    lines
+}
+
+/// The inputs half of the fast check: the record was made from the inputs as they are now.
+/// Its failure says that the committed lowering is stale, names the command that regenerates
+/// it and lists the input files that changed; a digest that is not the one of the record's
+/// own rows is said to be that.
+fn check(recorded: &Value, current: &Value) -> Result<(), String> {
+    if recorded["format"] != current["format"] {
+        return Err(format!(
+            "the record of the committed lowering ({DIRECTORY}/{INPUTS_FILE}) has the format {} \
+             and this check reads {}. {}",
+            recorded["format"],
+            current["format"],
+            regenerate()
+        ));
+    }
+    let changed = differences(
+        &rows(&recorded["files"]),
+        &rows(&current["files"]),
+        ["changed", "added", "removed"],
+    );
+    if !changed.is_empty() {
+        return Err(format!(
+            "the committed lowering of the released definition is stale: an input changed after \
+             {DIRECTORY} was made. {}\ninput files that changed:{changed}",
+            regenerate()
+        ));
+    }
+    if !recorded["digest"].is_string() || recorded["digest"] != current["digest"] {
+        return Err(format!(
+            "the digest in the record of the committed lowering ({DIRECTORY}/{INPUTS_FILE}) is \
+             not the digest of the input files it lists: every listed sha256 is the current one, \
+             the digest over them is {}, the record holds {}. The record was not written by the \
+             regeneration command. {}",
+            current["digest"],
+            recorded["digest"],
+            regenerate()
+        ));
+    }
+    Ok(())
+}
+
+/// The fast check on `directory`: its record reads, was made from the inputs `current`, and
+/// names every lowered file of the directory with the sha256 the file has. Each failure names
+/// what differs and the command that regenerates. Nothing is lowered.
+fn check_directory(directory: &Path, current: &Value) -> Result<(), String> {
+    let path = directory.join(INPUTS_FILE);
+    let text = fs::read(&path)
+        .map_err(|error| format!("{}: {error}. {}", path.display(), regenerate()))?;
+    let recorded: Value = serde_json::from_slice(&text).map_err(|error| {
+        format!(
+            "{} does not read as JSON: {error}. {}",
+            path.display(),
+            regenerate()
+        )
+    })?;
+    check(&recorded, current)?;
+    let differing = differences(
+        &rows(&recorded["lowered"]),
+        &lowered(directory),
+        ["changed", "not in the record", "missing"],
+    );
+    if !differing.is_empty() {
+        return Err(format!(
+            "the lowered files in {} are not the ones {INPUTS_FILE} records: a file of the \
+             committed lowering was edited, removed or added after the directory was made. {}\n\
+             lowered files that differ:{differing}",
+            directory.display(),
+            regenerate()
+        ));
+    }
+    Ok(())
 }
 
 /// Compare two directories byte for byte: the error names the first file, in path order, that
 /// one of them lacks or that holds other bytes.
 fn compare(committed: &Path, fresh: &Path) -> Result<(), String> {
     let names = |directory: &Path| -> BTreeSet<String> {
-        files_under(directory)
+        files_under(directory, true)
             .iter()
             .map(|path| relative(directory, path))
             .collect()
@@ -227,8 +340,8 @@ fn compare(committed: &Path, fresh: &Path) -> Result<(), String> {
                 "`{name}` is in the second directory and not in the first"
             ));
         }
-        let one = fs::read(committed.join(name)).unwrap();
-        let other = fs::read(fresh.join(name)).unwrap();
+        let one = read(&committed.join(name));
+        let other = read(&fresh.join(name));
         if one != other {
             let at = one
                 .iter()
@@ -246,19 +359,20 @@ fn compare(committed: &Path, fresh: &Path) -> Result<(), String> {
 }
 
 fn copy_directory(from: &Path, to: &Path) {
-    for file in files_under(from) {
+    for file in files_under(from, true) {
         let target = to.join(relative(from, &file));
-        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        let parent = target.parent().expect("a file has a directory");
+        fs::create_dir_all(parent).unwrap_or_else(|error| panic!("{}: {error}", parent.display()));
         fs::copy(&file, &target).unwrap_or_else(|error| panic!("{}: {error}", target.display()));
     }
 }
 
 /// Lower the released definition into `directory`, complete as the committed directory is:
-/// what `definition::lower` writes, what it returns, and the record of the inputs.
+/// what `definition::lower` writes, what it returns, and the record.
 fn lower_into(directory: &Path) {
     let scratch = tempfile::tempdir().unwrap();
     let released = repository().join(DEFINITIONS);
-    let lowered = definition::lower(&definition::Request {
+    let lowered_to = definition::lower(&definition::Request {
         definition: &released.join("connectors/github.yaml"),
         root: &released,
         out: directory,
@@ -268,22 +382,70 @@ fn lower_into(directory: &Path) {
     write_json(
         &directory.join(LOWERED_FILE),
         &json!({
-            "bundle": relative(directory, &lowered.bundle),
-            "connector": relative(directory, &lowered.connector),
-            "operations": relative(directory, &lowered.operations),
-            "provider": lowered.provider,
+            "bundle": relative(directory, &lowered_to.bundle),
+            "connector": relative(directory, &lowered_to.connector),
+            "operations": relative(directory, &lowered_to.operations),
+            "provider": lowered_to.provider,
         }),
     );
-    write_json(&directory.join(INPUTS_FILE), &inputs(&repository(), &ROOTS));
+    write_json(
+        &directory.join(INPUTS_FILE),
+        &record(&inputs(&repository(), &ROOTS), &lowered(directory)),
+    );
 }
 
-/// The committed lowering is made from the inputs as they are now: the digest recorded in
-/// `inputs.json` is the current one. Nothing is lowered here.
+/// What the lane test does with a fresh lowering.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    /// Compare it with the committed directory, byte for byte.
+    Compare,
+    /// Write it over the committed directory, and compare nothing.
+    Write,
+}
+
+/// The lane test's mode, from the value of `CONNECTORS_WRITE_RELEASED_LOWERING` and the value
+/// of `CI` (`None`: not set). Unset compares. Only `1` writes, and never where `CI` is set: a
+/// lane that writes compares nothing and would pass on any lowering. Every other set value is
+/// refused, so that an empty value or a `0` meant as "off" does not skip the comparison.
+fn mode(write: Option<&str>, ci: Option<&str>) -> Result<Mode, String> {
+    match (write, ci) {
+        (None, _) => Ok(Mode::Compare),
+        (Some(_), Some(_)) => Err(format!(
+            "`{WRITE}` is set and `CI` is set: a lane that writes compares nothing. Unset \
+             `{WRITE}`; the lowering is regenerated on a developer's machine and committed"
+        )),
+        (Some("1"), None) => Ok(Mode::Write),
+        (Some(other), None) => Err(format!(
+            "`{WRITE}` is set to `{other}`: only the value `1` writes the committed lowering. \
+             Unset it to compare"
+        )),
+    }
+}
+
+/// A copy of the committed directory in a temporary directory: a test edits the copy.
+fn copy_of_committed() -> (tempfile::TempDir, PathBuf) {
+    let temp = tempfile::tempdir().unwrap();
+    let copy = temp.path().join("copy");
+    copy_directory(&committed(), &copy);
+    (temp, copy)
+}
+
+/// Change one byte in the middle of the file; the byte's offset.
+fn change_the_middle_byte(path: &Path) -> usize {
+    let mut bytes = read(path);
+    let middle = bytes.len() / 2;
+    bytes[middle] ^= 1;
+    fs::write(path, bytes).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    middle
+}
+
+/// The committed lowering is made from the inputs as they are now, and its lowered files are
+/// the ones its record names: the digest and every sha256 in `inputs.json` are the current
+/// ones. Nothing is lowered here.
 #[test]
 fn the_committed_lowering_is_current() {
-    let recorded = read_json(&committed().join(INPUTS_FILE));
-    if let Err(stale) = check(&recorded, &inputs(&repository(), &ROOTS)) {
-        panic!("{stale}");
+    if let Err(failure) = check_directory(&committed(), &inputs(&repository(), &ROOTS)) {
+        panic!("{failure}");
     }
 }
 
@@ -324,6 +486,48 @@ fn a_changed_input_byte_changes_the_digest() {
     );
 }
 
+/// A file or directory whose name starts with `.` is not an input: a `.DS_Store`, a hidden
+/// directory and an editor's lock beside two inputs leave the record as it was.
+#[test]
+fn a_name_that_starts_with_a_dot_is_not_an_input() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("one.yaml"), "one\n").unwrap();
+    fs::write(temp.path().join("two.rs"), "two\n").unwrap();
+    let roots: [Root<'_>; 1] = [("", None)];
+    let first = inputs(temp.path(), &roots);
+
+    fs::write(temp.path().join(".DS_Store"), "finder\n").unwrap();
+    fs::create_dir(temp.path().join(".cache")).unwrap();
+    fs::write(temp.path().join(".cache/three.rs"), "three\n").unwrap();
+    std::os::unix::fs::symlink("nobody@nowhere.1:1", temp.path().join(".#two.rs")).unwrap();
+    let second = inputs(temp.path(), &roots);
+    assert_eq!(
+        first, second,
+        "the hidden names change neither the digest nor the rows"
+    );
+    assert_eq!(
+        rows(&second["files"]).keys().collect::<Vec<_>>(),
+        ["one.yaml", "two.rs"],
+        "the record names the two inputs and no hidden file"
+    );
+}
+
+/// An input that cannot be read fails with its path: here a link that points nowhere.
+#[test]
+fn an_input_that_cannot_be_read_fails_with_its_path() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("here.rs"), "here\n").unwrap();
+    std::os::unix::fs::symlink("nowhere", temp.path().join("gone.rs")).unwrap();
+    let base = temp.path().to_path_buf();
+    let panic = std::panic::catch_unwind(move || inputs(&base, &[("", Some("rs"))]))
+        .expect_err("a link that points nowhere cannot be read");
+    let message = panic.downcast_ref::<String>().cloned().unwrap_or_default();
+    assert!(
+        message.contains("gone.rs"),
+        "the failure names the file that could not be read: {message}"
+    );
+}
+
 /// A recorded digest that is not the current one fails the check, and the failure holds the
 /// regeneration command character for character and lists the input that changed.
 #[test]
@@ -347,21 +551,151 @@ fn a_stale_digest_prints_the_regeneration_command() {
     );
 }
 
+/// A recorded digest that is not the digest of the record's own rows, each of them current,
+/// is not reported as a stale lowering with an empty list: the failure says what is wrong.
+#[test]
+fn a_wrong_digest_over_current_rows_says_that_the_digest_is_not_theirs() {
+    let current = inputs(&repository(), &ROOTS);
+    let mut recorded = current.clone();
+    recorded["digest"] = json!("0".repeat(64));
+    let failure = check(&recorded, &current).expect_err("the recorded digest is not the current");
+    assert!(
+        failure.contains("is not the digest of the input files it lists")
+            && failure.contains(REGENERATE),
+        "the failure says that the digest is not the one of the listed files: {failure}"
+    );
+    assert!(
+        !failure.contains("input files that changed"),
+        "no empty list of changed files: {failure}"
+    );
+}
+
+/// A record that does not read as JSON (here: a merge's conflict marker) and a record that is
+/// missing both fail the fast check with the regeneration command.
+#[test]
+fn a_record_that_does_not_read_prints_the_regeneration_command() {
+    let (_temp, copy) = copy_of_committed();
+    let path = copy.join(INPUTS_FILE);
+    let current = read_json(&path);
+    check_directory(&copy, &current).expect("an unchanged copy passes the fast check");
+
+    let text = fs::read_to_string(&path).unwrap();
+    fs::write(&path, format!("<<<<<<< HEAD\n{text}")).unwrap();
+    let failure = check_directory(&copy, &current).expect_err("a conflict marker is not JSON");
+    assert!(
+        failure.contains(INPUTS_FILE) && failure.contains(REGENERATE),
+        "the failure names the record and the regeneration command: {failure}"
+    );
+
+    fs::remove_file(&path).unwrap();
+    let failure = check_directory(&copy, &current).expect_err("a missing record fails");
+    assert!(
+        failure.contains(INPUTS_FILE) && failure.contains(REGENERATE),
+        "the failure names the record and the regeneration command: {failure}"
+    );
+}
+
+/// The fast check binds the lowered files, not only the inputs: one changed byte in any file
+/// of a copy of the committed directory fails it, and the failure names the file and the
+/// regeneration command. Nothing is lowered here.
+#[test]
+fn a_changed_byte_in_a_lowered_file_of_a_copy_fails_the_fast_check() {
+    let (_temp, copy) = copy_of_committed();
+    let current = read_json(&copy.join(INPUTS_FILE));
+    check_directory(&copy, &current).expect("an unchanged copy passes the fast check");
+    let names: Vec<String> = lowered(&copy).into_keys().collect();
+    assert_eq!(
+        names,
+        [
+            "github.bundle.json",
+            "github/connector.json",
+            "github/operations.json",
+            "index.json",
+            "lowered.json"
+        ],
+        "the lowered files of the directory"
+    );
+    for name in &names {
+        let path = copy.join(name);
+        let bytes = read(&path);
+        change_the_middle_byte(&path);
+        match check_directory(&copy, &current) {
+            Ok(()) => panic!("one changed byte of {name} passes the fast check"),
+            Err(failure) => assert!(
+                failure.contains(&format!("changed: {name}")) && failure.contains(REGENERATE),
+                "the failure names {name} and the regeneration command: {failure}"
+            ),
+        }
+        fs::write(&path, bytes).unwrap();
+    }
+    check_directory(&copy, &current).expect("the restored copy passes again");
+}
+
+/// The bundle's own guard is the digest in `index.json`. A bundle edited together with that
+/// row loads, so the load does not notice it; the fast check does, and names both files.
+#[test]
+fn a_bundle_edited_together_with_its_index_row_fails_the_fast_check() {
+    let (_temp, copy) = copy_of_committed();
+    let current = read_json(&copy.join(INPUTS_FILE));
+    let replace = |name: &str, from: &str, to: &str| {
+        let text = fs::read_to_string(copy.join(name)).unwrap();
+        assert!(text.contains(from), "`{from}` is in {name}");
+        fs::write(copy.join(name), text.replacen(from, to, 1)).unwrap();
+    };
+    let before = sha256(&read(&copy.join("github.bundle.json")));
+    replace(
+        "github.bundle.json",
+        "\"license\":\"MIT\"",
+        "\"license\":\"MIX\"",
+    );
+    let after = sha256(&read(&copy.join("github.bundle.json")));
+    replace("index.json", &before, &after);
+    bundle::load(&copy, "github").expect("the edited bundle loads: its index row names its digest");
+
+    let failure = check_directory(&copy, &current).expect_err("the pair fails the fast check");
+    assert!(
+        failure.contains("changed: github.bundle.json")
+            && failure.contains("changed: index.json")
+            && failure.contains(REGENERATE),
+        "the failure names both files and the regeneration command: {failure}"
+    );
+}
+
+/// A lowered file that is missing and a file the record does not name both fail the fast
+/// check, each by its name.
+#[test]
+fn a_missing_and_an_extra_lowered_file_fail_the_fast_check() {
+    let (_temp, copy) = copy_of_committed();
+    let current = read_json(&copy.join(INPUTS_FILE));
+    let name = "github/connector.json";
+    let bytes = read(&copy.join(name));
+    fs::remove_file(copy.join(name)).unwrap();
+    let failure = check_directory(&copy, &current).expect_err("a missing file fails");
+    assert!(
+        failure.contains(&format!("missing: {name}")) && failure.contains(REGENERATE),
+        "the failure names the missing file and the regeneration command: {failure}"
+    );
+    fs::write(copy.join(name), bytes).unwrap();
+    check_directory(&copy, &current).expect("the restored copy passes again");
+
+    fs::write(copy.join("github/extra.json"), "{}\n").unwrap();
+    let failure = check_directory(&copy, &current).expect_err("an extra file fails");
+    assert!(
+        failure.contains("not in the record: github/extra.json") && failure.contains(REGENERATE),
+        "the failure names the extra file and the regeneration command: {failure}"
+    );
+}
+
 /// The comparison the lane test makes fails on one changed byte and names the file. Nothing is
 /// lowered here: the second directory is a copy of the committed one.
 #[test]
 fn a_changed_byte_in_a_copy_of_the_fixture_fails_the_comparison() {
     let committed = committed();
-    let temp = tempfile::tempdir().unwrap();
-    let copy = temp.path().join("copy");
-    copy_directory(&committed, &copy);
+    let (_temp, copy) = copy_of_committed();
     compare(&committed, &copy).expect("an unchanged copy compares equal");
 
     let name = "github/operations.json";
-    let mut bytes = fs::read(copy.join(name)).unwrap();
-    let middle = bytes.len() / 2;
-    bytes[middle] ^= 1;
-    fs::write(copy.join(name), bytes).unwrap();
+    let middle = change_the_middle_byte(&copy.join(name));
     let difference = compare(&committed, &copy).expect_err("one changed byte fails the comparison");
     assert!(
         difference.contains(name) && difference.contains(&format!("byte {middle}")),
@@ -369,27 +703,70 @@ fn a_changed_byte_in_a_copy_of_the_fixture_fails_the_comparison() {
     );
 }
 
+/// The lane test writes only for the value `1` and only where `CI` is not set. Unset, it
+/// compares, with or without `CI`. Every other set value is refused and nothing is skipped:
+/// an empty value and `0` do not write, and do not pass without comparing either.
+#[test]
+fn only_the_value_1_outside_ci_writes_and_every_other_set_value_is_refused() {
+    assert_eq!(mode(None, None), Ok(Mode::Compare));
+    assert_eq!(mode(None, Some("true")), Ok(Mode::Compare));
+    assert_eq!(mode(Some("1"), None), Ok(Mode::Write));
+    for other in ["", "0", "true", "yes", " 1", "1 ", "11"] {
+        let Err(refused) = mode(Some(other), None) else {
+            panic!("the value `{other}` writes or compares: it is neither `1` nor unset");
+        };
+        assert!(
+            refused.contains(WRITE) && refused.contains("only the value `1` writes"),
+            "the refusal of `{other}` names the variable and the one value: {refused}"
+        );
+    }
+    for ci in ["true", "1", ""] {
+        for value in ["1", "0", ""] {
+            let Err(refused) = mode(Some(value), Some(ci)) else {
+                panic!("the value `{value}` writes or compares where CI is `{ci}`");
+            };
+            assert!(
+                refused.contains(WRITE) && refused.contains("`CI` is set"),
+                "the refusal names the variable and CI: {refused}"
+            );
+        }
+    }
+}
+
 /// Regeneration from the sources, outside the gate (lane `slow`): the released definition
 /// lowers to the committed directory, byte for byte. With `CONNECTORS_WRITE_RELEASED_LOWERING`
-/// set it writes the directory in place of comparing: that is how the lowering is regenerated.
+/// set to `1` it writes the directory in place of comparing: that is how the lowering is
+/// regenerated. Any other value, and `1` where `CI` is set, is refused before anything is
+/// lowered (see `mode`).
 #[test]
 #[ignore = "lane slow"]
 fn slow_lane_the_committed_lowering_equals_a_fresh_lowering() {
+    let variable =
+        |name: &str| std::env::var_os(name).map(|value| value.to_string_lossy().into_owned());
+    let mode = match mode(variable(WRITE).as_deref(), variable("CI").as_deref()) {
+        Ok(mode) => mode,
+        Err(refused) => panic!("{refused}"),
+    };
     let temp = tempfile::tempdir().unwrap();
     let fresh = temp.path().join("fresh");
     lower_into(&fresh);
     let committed = committed();
-    if std::env::var_os(WRITE).is_some() {
-        if committed.exists() {
-            fs::remove_dir_all(&committed).unwrap();
+    match mode {
+        Mode::Write => {
+            if committed.exists() {
+                fs::remove_dir_all(&committed)
+                    .unwrap_or_else(|error| panic!("{}: {error}", committed.display()));
+            }
+            copy_directory(&fresh, &committed);
         }
-        copy_directory(&fresh, &committed);
-        return;
-    }
-    if let Err(difference) = compare(&committed, &fresh) {
-        panic!(
-            "{DIRECTORY} (the first directory) is not what the released definition lowers to \
-             now (the second): {difference}\nregenerate it and commit the directory:\n{REGENERATE}"
-        );
+        Mode::Compare => {
+            if let Err(difference) = compare(&committed, &fresh) {
+                panic!(
+                    "{DIRECTORY} (the first directory) is not what the released definition \
+                     lowers to now (the second): {difference}\n{}",
+                    regenerate()
+                );
+            }
+        }
     }
 }

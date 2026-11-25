@@ -74,6 +74,28 @@
       "sha256": "a57e519530d45b455305d8aed6f15311708d2b9915f33c648b54dfeb62c5e851"
     }
   ],
-  "format": "connectors-released-lowering/1",
+  "format": "connectors-released-lowering/2",
+  "lowered": [
+    {
+      "path": "github.bundle.json",
+      "sha256": "fc0ce38a1de73ae14a245dbdd0a2376f71bec60ca9e1b43c161b7b54d7fe2f1e"
+    },
+    {
+      "path": "github/connector.json",
+      "sha256": "4604b12a823c87302611e9a0cfc74a3fad15163f2511e5308fc8a5e795b926b7"
+    },
+    {
+      "path": "github/operations.json",
+      "sha256": "ab47418007c25816ec370e3ee2c5ad56fcc87b62dacf318c8a56e7e6b9af2593"
+    },
+    {
+      "path": "index.json",
+      "sha256": "7a51e4a6a9fd7e0caca0feab6f848a1035b1329dafe396602272d7b970abd5fd"
+    },
+    {
+      "path": "lowered.json",
+      "sha256": "46173c7c846d391bf8ad41285c58648eed15eec38ebc88d337b38b714dc7a537"
+    }
+  ],
   "regenerate": "CONNECTORS_WRITE_RELEASED_LOWERING=1 cargo test --locked -p connectors-catalog-provider --test main -- --ignored --exact released_lowering::slow_lane_the_committed_lowering_equals_a_fresh_lowering"
 }
