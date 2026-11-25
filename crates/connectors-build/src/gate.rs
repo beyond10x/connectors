@@ -134,6 +134,8 @@ fn host_probe(root: &Path) -> impl Fn(&str) -> bool + '_ {
 
 /// The gate step that fails when a page the documentation site generates (CLI, crates, contract
 /// and model reference, status) differs from what its sources generate now.
+/// It names its program with `--bin`, which keeps the feature set of the workspace build
+/// (`one_feature_set_tests`).
 fn docs_check(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
     let mut cmd = cargo(root, temp, ess, None)?;
     cmd.args([
@@ -141,7 +143,7 @@ fn docs_check(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
         "--locked",
         "--offline",
         "-q",
-        "-p",
+        "--bin",
         "connectors-docs",
         "--",
         "generate",
@@ -304,13 +306,14 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     execute(command(None)?.args(["build", "--workspace", "--locked", "--offline"]))?;
     test_step(root, &|| command(None), &execute, &mut steps)?;
     // Each adapter's committed tool contract (contracts/tools/v1alpha1) from its descriptor
-    // and the tool profiles authored beside it.
+    // and the tool profiles authored beside it. `--bin` keeps the feature set of the build
+    // above (`one_feature_set_tests`).
     steps.begin("tool contracts check");
     execute(command(None)?.args([
         "run",
         "--locked",
         "--offline",
-        "-p",
+        "--bin",
         "connectors-tool-contracts",
         "--",
         "generate",
@@ -1076,7 +1079,7 @@ mod tests {
                 "--locked",
                 "--offline",
                 "-q",
-                "-p",
+                "--bin",
                 "connectors-docs",
                 "--",
                 "generate",
@@ -1971,5 +1974,53 @@ mod windows_lint_adversary_tests {
         let [absent, ..] = libdirs(scratch.path());
         assert!(answer_under_a_planted_rustc(test, "mutant", &absent));
         assert!(!answer_under_a_planted_rustc(test, "gate", &absent));
+    }
+}
+
+/// Cargo resolves features for the packages a call selects. `cargo run -p <package>` selects one
+/// package, so the crates it shares with the rest of the workspace are built with fewer
+/// features, and the build of the workspace compiles them again. Read from the forge on
+/// 2026-11-24 (the gate job of pull request 294): 40 crates compiled twice by the first two
+/// builds, 250 s for the second; 51 crates and 65 s for the tool contracts. In this workspace,
+/// which has no root package, `cargo run --bin <name>` selects every member, resolves the
+/// features of the workspace and builds the one program.
+#[cfg(test)]
+mod one_feature_set_tests {
+    /// The three calls of the forge that start the build program select the workspace.
+    #[test]
+    fn the_forge_starts_the_build_program_with_the_feature_set_of_the_workspace() {
+        let workflow = include_str!("../../../.github/workflows/rust-gate.yml");
+        let calls: Vec<&str> = workflow
+            .lines()
+            .map(str::trim)
+            .filter(|line| line.contains("connectors-build -- "))
+            .collect();
+        assert_eq!(calls.len(), 3, "calls of the build program: {calls:?}");
+        for call in calls {
+            assert!(
+                call.contains("cargo run --locked --bin connectors-build -- "),
+                "selects one package: {call}"
+            );
+        }
+    }
+
+    /// Every `cargo run` the gate starts itself (the documentation check, the tool contracts)
+    /// names its program with `--bin` and selects no package.
+    #[test]
+    fn the_gate_runs_its_programs_with_the_feature_set_of_the_workspace() {
+        let source: String = include_str!("gate.rs").split_whitespace().collect();
+        let needle = ["\"run\",", "\"--locked\","].concat();
+        let calls: Vec<&str> = source
+            .match_indices(&needle)
+            .map(|(at, _)| {
+                let rest = &source[at..];
+                &rest[..rest.find("\"--\",").expect("a program argument separator")]
+            })
+            .collect();
+        assert!(calls.len() >= 3, "cargo run calls: {calls:?}");
+        for call in calls {
+            assert!(call.contains("\"--bin\","), "names no program: {call}");
+            assert!(!call.contains("\"-p\","), "selects one package: {call}");
+        }
     }
 }
