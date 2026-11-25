@@ -15,7 +15,7 @@ use super::{
 use crate::{Failure, MAX_BYTES, Material, ReadBackend, Result, Scope, State, Version, contract};
 use std::{
     fs,
-    os::unix::fs::{PermissionsExt, symlink},
+    os::unix::fs::{MetadataExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
     process::Stdio,
 };
@@ -602,4 +602,146 @@ fn an_item_is_opened_for_reading_only_after_its_checks() {
         Some(&1),
         "the admitted item, opened once to read"
     );
+}
+
+/// A file `program` with `mode` in a directory of its own in the temporary
+/// directory, where a jail's root is made too.
+fn program(mode: u32, bytes: &[u8]) -> (tempfile::TempDir, PathBuf) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("program");
+    write(&path, bytes, mode);
+    (directory, path)
+}
+
+/// What `path` names itself, a symbolic link not followed.
+fn named(path: &Path) -> fs::Metadata {
+    fs::symlink_metadata(path).unwrap()
+}
+
+fn inode(stat: &fs::Metadata) -> (u64, u64) {
+    (stat.dev(), stat.ino())
+}
+
+/// `installed` is a file of its own with the bytes of `source`, owner-only.
+fn copied(installed: &fs::Metadata, source: &fs::Metadata) {
+    assert!(installed.is_file(), "a file, not a link to one");
+    assert_ne!(inode(installed), inode(source), "another inode");
+    assert_eq!(installed.len(), source.len(), "the source's length");
+    assert_eq!(installed.mode() & 0o7777, 0o700, "owner-only");
+}
+
+/// A source only its owner can write, on the jail's file system, is linked:
+/// one file under two names, and the source keeps the mode it had.
+#[test]
+fn install_links_a_source_on_the_jails_file_system() {
+    let (_directory, source) = program(0o755, b"#!/bin/sh\n");
+    let jail = Jail::new();
+    let installed = jail.install(&source, "/bin-test/program");
+    assert_eq!(installed, jail.path("/bin-test/program"));
+    assert_eq!(
+        inode(&named(&installed)),
+        inode(&named(&source)),
+        "one inode"
+    );
+    assert_eq!(named(&source).mode() & 0o7777, 0o755, "the source's mode");
+}
+
+/// The pair of places every caller has: a binary cargo built under `target/`
+/// and a jail root in the temporary directory. The test asks the host first,
+/// with the link call itself: equal device numbers do not say it, because
+/// two mounts of one device refuse a link between them. Linked where that
+/// call works and cargo gave the binary no group or other write bit; a copy
+/// where the call crosses devices or the binary has such a bit.
+#[test]
+fn install_links_the_running_test_binary_where_the_link_call_works() {
+    let source = std::env::current_exe().unwrap();
+    let jail = Jail::new();
+    let probe = jail.path("/probe");
+    let links = match fs::hard_link(&source, &probe) {
+        Ok(()) => {
+            fs::remove_file(&probe).unwrap();
+            true
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::CrossesDevices => false,
+        Err(error) => panic!("the probe link into the jail's directory: {error}"),
+    };
+    let installed = jail.install(&source, "/bin-test/custody");
+    let private = named(&source).mode() & 0o022 == 0;
+    eprintln!("the link call works: {links}; no group or other write bit: {private}");
+    if links && private {
+        assert_eq!(
+            inode(&named(&installed)),
+            inode(&named(&source)),
+            "one inode"
+        );
+    } else {
+        copied(&named(&installed), &named(&source));
+        assert!(
+            fs::read(&installed).unwrap() == fs::read(&source).unwrap(),
+            "the source's bytes"
+        );
+    }
+}
+
+/// A link is the source itself, so a source that group or others can write
+/// would be an executable they can write: it is copied, and keeps its mode.
+#[test]
+fn install_copies_a_source_with_a_group_or_other_write_bit() {
+    for mode in [0o775, 0o757] {
+        let (_directory, source) = program(mode, b"#!/bin/sh\n");
+        let jail = Jail::new();
+        let installed = jail.install(&source, "/bin-test/program");
+        copied(&named(&installed), &named(&source));
+        assert_eq!(named(&source).mode() & 0o7777, mode, "the source's mode");
+    }
+}
+
+/// `/proc/self/exe` is a name on another file system than a jail's root:
+/// the link call does not follow it and is refused for crossing devices, on
+/// every host. The file it names is copied.
+#[test]
+fn install_copies_a_source_on_another_file_system() {
+    let source = Path::new("/proc/self/exe");
+    let jail = Jail::new();
+    let refused = fs::hard_link(source, jail.path("/probe")).unwrap_err();
+    assert_eq!(
+        refused.raw_os_error(),
+        Some(libc::EXDEV),
+        "the link call crosses devices"
+    );
+    let installed = jail.install(source, "/bin-test/custody");
+    copied(&named(&installed), &fs::metadata(source).unwrap());
+}
+
+/// The link call does not follow a symbolic link: on the jail's file system
+/// it would put a second name of the link into the jail, where what the link
+/// names does not exist. What it names is copied.
+#[test]
+fn install_copies_what_a_symbolic_link_names() {
+    let (directory, target) = program(0o755, b"#!/bin/sh\n");
+    let link = directory.path().join("link");
+    symlink(&target, &link).unwrap();
+    let jail = Jail::new();
+    let installed = jail.install(&link, "/bin-test/program");
+    copied(&named(&installed), &named(&target));
+    assert_eq!(fs::read(installed).unwrap(), b"#!/bin/sh\n");
+}
+
+/// An install at a place that holds an earlier link replaces the name and
+/// never writes through it: the earlier source keeps its bytes.
+#[test]
+fn install_at_the_place_of_an_earlier_link_leaves_its_source_alone() {
+    let (_first, first) = program(0o755, b"first");
+    let (_second, second) = program(0o775, b"second, a copy");
+    let jail = Jail::new();
+    let installed = jail.install(&first, "/bin-test/program");
+    assert_eq!(inode(&named(&installed)), inode(&named(&first)), "linked");
+    // The same source again: a copy onto the link would empty it first.
+    jail.install(&first, "/bin-test/program");
+    assert_eq!(fs::read(&first).unwrap(), b"first");
+    // Another source, one that is copied: the copy would land in the first.
+    jail.install(&second, "/bin-test/program");
+    assert_eq!(fs::read(&first).unwrap(), b"first");
+    assert_eq!(fs::read(&installed).unwrap(), b"second, a copy");
+    copied(&named(&installed), &named(&second));
 }

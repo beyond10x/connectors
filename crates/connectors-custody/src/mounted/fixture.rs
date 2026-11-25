@@ -115,11 +115,35 @@ impl Jail {
         self.binds.push((source, target, false));
     }
 
-    /// Copy an executable into the jail, owner-only.
+    /// Put an executable into the jail: a hard link to `source` where one can
+    /// be made, an owner-only copy where not.
+    ///
+    /// A link is the source itself under a second name, mode included. So a
+    /// source is linked only when group and others cannot write it, and its
+    /// mode is left as it is. Everything else is copied with mode 0700: a
+    /// source on another file system, a link the host refuses, a source that
+    /// group or others can write, and a symbolic link.
+    ///
+    /// Nothing may write the installed file or change its mode: where it is
+    /// a link, that writes the source.
     pub fn install(&self, source: &Path, inside: &str) -> PathBuf {
         let destination = self.path(inside);
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent).unwrap();
+        }
+        // An earlier install here may be a link: a copy onto it would be
+        // written into its source.
+        if destination.symlink_metadata().is_ok() {
+            fs::remove_file(&destination).unwrap();
+        }
+        let private = fs::metadata(source).unwrap().permissions().mode() & 0o022 == 0;
+        if private && fs::hard_link(source, &destination).is_ok() {
+            if !destination.is_symlink() {
+                return destination;
+            }
+            // The link call does not follow a symbolic link: this is a second
+            // name of the link, and what it names is not inside the jail.
+            fs::remove_file(&destination).unwrap();
         }
         fs::copy(source, &destination).unwrap();
         fs::set_permissions(&destination, fs::Permissions::from_mode(0o700)).unwrap();
