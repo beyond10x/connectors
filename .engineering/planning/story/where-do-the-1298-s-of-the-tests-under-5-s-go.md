@@ -9,7 +9,7 @@ relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 ---
 ## Defect
 
@@ -20,6 +20,11 @@ tests no story covers: about 755 s in the band of 1 s to under 5 s and 543.1 s i
 under 1 s (test-plan:where-the-gates-test-step-spends-its-time, the table of bands and section 3).
 The scope critic of round 2 (review-result:test-step-stories-scope-round-2, finding 1) found that
 no story, question or follow-up owns that gap.
+
+Since the re-plan of 2026-11-25 the parent's arithmetic gives 1,671.6 s, 417.9 s of wall time at
+four tests at a time. Before it the parent gave 1,650.9 s; the 1,643.2 s above predate the
+eleventh revision of story:seven-cli-tests-shorten-their-waits-or-a-production-wait. The 1,298 s
+are unchanged.
 
 This story is a question. It changes no product code and no test. The store has no kind for a
 spike, so it is a story with one acceptance: a written answer.
@@ -34,6 +39,14 @@ What the test plan has, and what it says it has not:
   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run for every test that builds
   one. The plan's own estimate with the fixture cost halved is about 1,155 s summed, 289 s of wall
   time: still over 120 s.
+- That candidate was measured on 2026-11-25 and is closed: one `Metadata::initialize` costs 46 to
+  67 ms on the build host and a template saves 33 to 38 ms per store (the section "Measured
+  (2026-11-25): not built as written" of that story, which is archived). The measurement named
+  another cost that every test with a persist pays, 13.67 ms per persist on the build host:
+  story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process removes
+  it. Its share in the tests under 5 s is not measured; item 11 of
+  story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves names the
+  reading, from the gate job of that story's pull request.
 - Not measured: the cost of `Metadata::initialize`, of `Container::new`, of one run of the CLI and
   of `definition::lower`, each taken apart; no source of a test under 1 s was read.
 
@@ -63,7 +76,7 @@ Questions:
    here: the choice is the operator's.
    The run is the baseline run of the test plan: job 138270416028 of pull request 291. The
    computation is arithmetic on that run's durations: the tests the stories of the set cover are
-   taken at the stories' estimates, as the parent sums them (1,643.2 s), and the costs of
+   taken at the stories' estimates, as the parent sums them (1,671.6 s since the re-plan of 2026-11-25), and the costs of
    question 1 are taken off that sum. It reads no run made after a story of the set landed, so it
    needs no story of the set to have landed.
    "More tests at a time on the forge's runner" and "a split of the step" are listed with their

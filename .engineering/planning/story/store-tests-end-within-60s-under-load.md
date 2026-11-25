@@ -7,7 +7,7 @@ title: Five store tests end within 60 s at host load
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-- depends_on: story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run
+- depends_on: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
 scope:
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/governed/tests/bounded_realization_security.rs
@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/tests/metadata_reopen_adversary.rs
-revision: 9
+revision: 10
 ---
 ## Defect
 
@@ -140,9 +140,12 @@ What each test asserts.
 ## Order with the test-step stories
 
 The stories that decompose story:the-gates-test-step-ends-within-120-s-on-the-forge own the change
-for the tests they name (story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run for
-eight tests named here and the two of the `http_standing_grant` binaries,
+for the tests they name
+(story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process for
+eight tests named here and the two of the `http_standing_grant` binaries; until 2026-11-25 that
+was story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, which was measured and
+is not built,
 story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate for the stress test,
 story:seven-cli-tests-of-a-slow-owner-start-no-longer-wait-out-the-10-s-connect-wait for one test);
-this story keeps its acceptance, 60 s at host load, and is measured after the eighteen-tests story
+this story keeps its acceptance, 60 s at host load, and is measured after the registry story
 lands, which its `depends_on` edge to that story records.

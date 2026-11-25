@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run
 kind: story
-status: draft
+status: archived
 title: 'Twelve tests take a template store or generated schemas built once per run: 115.0 s become an estimated 55.9 s'
 summary: A store from nothing and a run of ess generate are made per test; a setup step builds each once per run under target/, keyed by a digest of its sources
 relations:
@@ -44,7 +44,9 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/template_store.rs
-revision: 13
+revision: 15
+transitions:
+- {from: "draft", to: "archived", at: "2026-11-25T10:33:35Z", actor: "human:operator", revision: 15}
 ---
 ## Defect
 
@@ -275,3 +277,105 @@ after this story lands; it has a `depends_on` edge to this story.
   template reaches the three tests named above; every "after" figure on the forge.
   The gate's test step has a setup step of its own already (`crates/connectors-build/src/gate.rs`
   lines 550 to 558, `baseline_suite`); the revision placed this one in `.config/nextest.toml`.
+
+## Measured (2026-11-25): not built as written
+
+The operator's decision of 2026-11-25: this story is not built as written. It is planned again
+from the measurement below, and the new drafts go to their critics before any implementation.
+
+All figures are from the build host at head d5cf22480, read from runs unless marked as
+arithmetic. The forge figures are the ones this story lists (gate job 138270416028 of pull
+request 291).
+
+### What a store from nothing costs, and what a template saves
+
+- One `Metadata::initialize` on an empty directory: 51.2 to 66.5 ms in six rounds, median
+  53.6 ms (test build); 46.0 to 63.5 ms, median 47.1 ms, with nothing else running; 59.9 ms in
+  the library built without `cfg(test)`.
+- The first `Metadata::update` after it: 3.9 to 5.6 ms. The handle is pooled.
+- A copy of the four files of a template: 0.23 to 0.32 ms. The first `Metadata::update` after
+  the copy: 18.5 to 25.1 ms, because it is a fresh open.
+- So a store from the template costs 18 to 20 ms where a store from nothing costs 51 to 58 ms.
+  The template saves 33 to 38 ms per store.
+- In sum: the files of this story reach 7 of the 11 store tests and 21 stores (counted in the
+  source). 21 × 33 to 38 ms = 0.7 to 0.8 s (arithmetic). With `audit/tests.rs` and
+  `owner/governed/tests.rs`, both outside this story, it is 99 stores and 3.3 to 3.8 s.
+- Cross-check from run 5 (timers, one test at a time): the eleven tests call
+  `Metadata::initialize` 101 times, 5,545.6 ms in all, 54.9 ms each (arithmetic). That is 4.7 %
+  of their 117.685 s.
+- The shared schemas: `ess generate` took 0.10, 0.13, 0.54 and 0.69 s in four runs on the build
+  host, so one test saves 0.1 to 0.7 s.
+- The setup step itself costs about 0.27 s per run for a `cargo run` that builds nothing, and
+  the setup script needs the nextest setting `experimental = ["setup-scripts"]`.
+
+### Acceptance 3 cannot be met
+
+Acceptance 3 asks for at most 84 s where "before" is 115.0 s: 31 s must go. The template removes
+0.7 to 0.8 s within this story's files and the shared schemas 0.1 to 0.7 s: 1.5 s at most
+(arithmetic). The plan's "after", 50 % of "before" for the eleven store tests, was an assumption;
+the plan did not measure `Metadata::initialize`.
+
+### Where the time goes instead
+
+The eleven store tests, run 5, timers around the calls, 117.685 s summed (the forge: 108.0 s).
+Names of the costs as the new drafts use them. For the tests with several threads the figures
+are thread-seconds.
+
+| Cost | What | Seconds | Share |
+|---|---|---|---|
+| BATCH | the write of the Entity Runtime batch, 1,293 calls | 30.29 | 25.7 % |
+| REG | `er::registry()`, 2,729 calls | 29.00 | 24.6 % |
+| READBACK | the read after the batch | 7.00 | 5.9 % |
+| PARSE2 | second parse of the bundle per persist, 2,293 calls | 6.97 | 5.9 % |
+| CATCHUP | catch-up of a pooled handle on open | 5.75 | 4.9 % |
+| PROJ | building the projection, 2,973 calls | 5.67 | 4.8 % |
+| VALID | `Metadata::validate`, 5,318 calls | 5.53 | 4.7 % |
+| Named | sum of the seven | 90.21 | 76.7 % |
+| Rest | everything else, with the 5.55 s of `initialize` | 27.47 | 23.3 % |
+
+REG and PARSE2 together: 35.98 s, 30.6 %. Part of the 5.55 s of `initialize` is REG and PARSE2
+of its own persists; that split was not summed.
+
+`every_page_is_one_the_model_admits` (run 6, `strace`): 9.229 s, of it 8.437 s (91.4 %) in
+`epoll_wait` and 0.568 s (6.2 %) in the child `ess generate`.
+
+Ruled out: `fsync` (at most 1.05 s in any test, run 2 under `strace`). The host tests are bound
+by CPU: user and system time are 88 to 124 % of their wall time.
+
+### Which drafts take over
+
+- `the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process`: REG and
+  PARSE2, product code in `metadata/er.rs`. Eleven tests, 108.0 s, estimate 76 s.
+- `the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold`: the SQL test, test code
+  only, 7.0 s, estimate 0.6 s. Its cause is a reading; its first acceptance statement decides.
+- story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves holds the
+  rest as questions: BATCH, READBACK, CATCHUP, PROJ, VALID, the migrate with nothing to migrate,
+  the lock poll, the fresh opens, `ess generate` per test.
+- Two stories named this story in `depends_on`. Both edges are removed with this section.
+  story:the-gates-test-step-ends-within-120-s-on-the-forge had the edge because this story
+  edited `test_step` in `crates/connectors-build/src/gate.rs`; no draft of the re-plan writes
+  that file, so it gets no new edge. story:store-tests-end-within-60s-under-load is measured
+  after the registry draft lands and has a `depends_on` edge to it.
+- This story is archived with this section. The two drafts carry a `supersedes` edge to it.
+
+### Errors found in this story
+
+- "About 13 cases" in the row of `bounded_owner_serves_exactly…` and "13 cases" in acceptance 4:
+  the test runs 43 cases (counted in the source: 1 + 10 + 4 + 1 + 5 + 20 + 2), each with its own
+  store.
+- That test's stores are made by `Target::new` through `Config::initialize`, which is product
+  code. The files of this story do not reach them.
+- `final_audit_recovery_preserves_every_live_business_result` does not take its stores at
+  `owner/mutation/tests.rs` line 177. It takes them from `audit::tests::fixture()`
+  (`audit/tests.rs` line 12), a file outside this story's scope.
+- `registry/store_cost_tests.rs` line 847 is inside an ignored timing test (it starts at line
+  832). `a_reopen_after_its_own_write_refuses_every_blob_altered_since` (line 583) takes its
+  store from `fixture()` at line 586.
+- The two `http_standing_grant` tests are integration tests. They cannot see a `cfg(test)`
+  module of the host crate, so the template does not reach them.
+- "The helper `schema` runs `ess generate` per test" names one test. 16 of the 17 tests of
+  `ess_model.rs` run it.
+- The other line references were read again and point where the story says: `registry/tests.rs`
+  line 858, `mutations/tests.rs` line 35, `owner/refresh/tests.rs` line 314,
+  `owner/refresh/tests/issue.rs` line 309, `owner/governed/tests.rs` line 59, `metadata.rs` line
+  372, `ess_model.rs` line 24.
