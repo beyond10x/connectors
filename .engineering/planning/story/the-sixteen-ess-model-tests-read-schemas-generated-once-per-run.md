@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T14:38:57Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"review_outcome":19}}}
 - {from: "proposed", to: "active", at: "2026-11-25T16:33:13Z", actor: "human:operator", revision: 12, decided_on: {"recorded":{"review_outcome":19}}}
@@ -200,7 +200,8 @@ was written; acceptances 4, 7, 8 and 9 and the 17 durations of the two gate jobs
 the pull request's job and added here then.
 
 Read on the build host on 2026-11-25, `cargo nextest run --locked -p connectors-sql --test
-ess_model`, with a 1-minute load average above 100 on 20 processors:
+ess_model`, on 20 processors with a 1-minute load average of 60 at the end of the full run
+and 57 to 79 around the two single runs of acceptance 2:
 
 - Acceptance 1: `four_processes_on_an_empty_directory_generate_once` passed (6.451 s; the
   child test alone 0.013 s).
@@ -214,8 +215,12 @@ ess_model`, with a 1-minute load average above 100 on 20 processors:
 - Acceptance 3: `a_changed_source_byte_makes_a_new_directory` passed (12.815 s, two calls of
   `ess generate`).
 - 20 of 20 tests passed in 12.935 s. The default parent's `generations.log` held 1 line after
-  the run. Before the change, on the same host and load, the 17 tests took 0.061 to 21.332 s
+  the run. A second full run at a load average of 112 to 141: 20 of 20 in 21.558 s, the
+  three new tests 0.029 s, 14.737 s and 20.058 s. Before the change, on the same host an
+  hour earlier (its load was not written to the log), the 17 tests took 0.061 to 21.332 s
   each and the run 49.007 s.
+- A full run on an empty default directory starts `ess generate` 4 times: once for the 16
+  tests, once in the four-process test and twice in the changed-source test.
 - Acceptance 5: the diff removes no line that contains `assert`.
 - Acceptance 6: `Command::new` of `ess` is at one place, line 91, inside `schemas_in`;
   `schemas_in` is called at lines 118 (`schema`), 1837 (the child test), 1925 and 1932
@@ -223,5 +228,5 @@ ess_model`, with a 1-minute load average above 100 on 20 processors:
 - `cargo clippy -p connectors-sql --all-targets --locked --offline -- -D warnings` and
   `cargo fmt -p connectors-sql -- --check` ended without a finding.
 
-The times of the three new tests under that load (0.013 s, 6.451 s, 12.815 s) are not the ones
-acceptance 8 reads; it reads the forge's job.
+The times of the three new tests on that host are not the ones acceptance 8 reads; it reads
+the forge's job.
