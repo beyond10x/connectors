@@ -80,6 +80,8 @@ struct Entry {
     family: Option<Family>,
     helper: bool,
     prerequisites: Vec<&'static str>,
+    /// Classified by the `slow_lane_` name rule and by no entry of the table.
+    slow_lane: bool,
 }
 impl Entry {
     fn id(&self) -> String {
@@ -139,6 +141,7 @@ const GNOME_SHA256: &str = "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02
 
 /// Each entry names an exact package, target and test. New tests, even in an
 /// existing module, are unknown until someone reviews their authority and needs.
+/// One rule goes by the name alone: a `slow_lane_` test, see the end of this function.
 /// The catalog provider's integration tests are one target, `main`, so their names
 /// start with the module of the file that held them (`local_runtime::cli_journey::...`).
 fn classify(suite: &Suite, name: &str) -> Entry {
@@ -149,6 +152,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         family: None,
         helper: false,
         prerequisites: vec![],
+        slow_lane: false,
     };
     let classification = match (suite.package.as_str(), suite.target.as_str(), name) {
         ("connectors-host", "connectors_host", name) => match name {
@@ -166,6 +170,16 @@ fn classify(suite: &Suite, name: &str) -> Entry {
                 return entry;
             }
             "local::clock::tests::independent_live_quorum" => Some((Live, vec![])),
+            // Measurements no job runs; none ends within the 60 s the lane `slow` gives a test.
+            // Each was run alone with a limit of 600 s, 2026-11-25, on a workstation with a load
+            // average of 14 to 27. One line per test, with the draft story that holds it:
+            // `read_invoke_metadata_time` 468.8 s, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
+            // `read_invoke_cost_by_store_size` 186.6 s, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
+            // `batch_cost_by_subject` 178.7 s, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
+            // `first_owner_open_of_a_grown_store` fails at once on `CONNECTORS_STORE_COST_STORES` and `CONNECTORS_STORE_COST_EVENTS`, which no job sets, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
+            // `owner_start_of_a_grown_store` fails at once on the same two variables, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
+            // `two_revalidations_of_a_grown_store` 133.1 s, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
+            // `fresh_open_passes_of_a_blob_heavy_store` 266.9 s, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
             "local::registry::tests::read_invoke_metadata_time"
             | "local::registry::store_cost_tests::read_invoke_cost_by_store_size"
             | "local::registry::store_cost_tests::batch_cost_by_subject"
@@ -173,7 +187,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::registry::store_cost_tests::owner_start_of_a_grown_store"
             | "local::registry::store_cost_tests::two_revalidations_of_a_grown_store"
             | "local::registry::store_cost_tests::fresh_open_passes_of_a_blob_heavy_store" => {
-                Some((Timing, vec![]))
+                Some((Deferred, vec![]))
             }
             "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted"
             | "local::oauth_adversary_tests::chrome_opens_one_connection_per_navigation"
@@ -506,11 +520,14 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "remove_without_an_authority_deletes_nothing"
             | "the_listing_groups_foreign_authorities_and_says_it_cannot_see_other_stores",
         ) => Some((Disposable, vec![CUSTODY])),
+        // A measurement no job runs, the eighth of the seven of `connectors-host` above: run
+        // alone with a limit of 600 s, 2026-11-25, on a workstation with a load average of 14 to 27.
+        // `a_cold_describe_and_read_of_a_large_store_answer_within_60_seconds` not ended at 600 s, story:eight-timing-tests-have-no-job-and-none-ends-within-60-s
         (
             "connectors",
             "cold_owner_start",
             "a_cold_describe_and_read_of_a_large_store_answer_within_60_seconds",
-        ) => Some((Timing, vec![])),
+        ) => Some((Deferred, vec![])),
         (
             "connectors",
             "local_cli",
@@ -559,6 +576,15 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         ) => Some((Deferred, vec![])),
         _ => None,
     };
+    // The one rule by name, after every exact entry above: an ignored test whose function
+    // name (the part after the last `::`) starts with `slow_lane_` waits in real time and
+    // runs in the lane `slow`, with no prerequisite. It needs no entry here. The mark it
+    // gets, and not the family, decides its time limit (`time_limit`).
+    let function = name.rsplit("::").next().unwrap_or(name);
+    let classification = classification.or_else(|| {
+        entry.slow_lane = function.starts_with("slow_lane_");
+        entry.slow_lane.then_some((Timing, vec![]))
+    });
     if let Some((family, prerequisites)) = classification {
         entry.family = Some(family);
         entry.prerequisites = prerequisites;
@@ -790,13 +816,15 @@ impl Drop for FixtureGroup {
 }
 
 /// Execute one exact test, preserve its output and refuse an empty green selection.
-/// The owned process group gets ten minutes, including costly opt-in probes.
+/// The owned process group gets `limit` (see `time_limit`). A test still running then is
+/// ended with its group; its log holds no result line, so the call returns an error.
 fn execute_test(
     suite: &Suite,
     name: &str,
     temp: &Path,
     logs: &Path,
     environment: &BTreeMap<&str, OsString>,
+    limit: Duration,
 ) -> Result<bool> {
     let log = logs.join(format!(
         "{}.log",
@@ -839,7 +867,7 @@ fn execute_test(
         finished: false,
         leader_status: None,
     };
-    let until = Instant::now() + Duration::from_secs(600);
+    let until = Instant::now() + limit;
     let timed_out = loop {
         if group.exited()? {
             break false;
@@ -858,13 +886,34 @@ fn execute_test(
         .lines()
         .any(|line| line.starts_with("test result: FAILED. 0 passed; 1 failed; 0 ignored;"));
     if !passed && !failed {
+        if timed_out {
+            return Err(format!(
+                "test was still running at its limit of {} s and was ended with its process group; see log",
+                limit.as_secs()
+            )
+            .into());
+        }
         return Err("test did not report exactly one executed case (empty selection, timeout or runner error); see log".into());
     }
     Ok(success && passed)
 }
+/// The time `run` gives one test: 60 s to a test the `slow_lane_` name rule classified, which
+/// the lane `slow` runs (no single test of a lane runs longer), and ten minutes to every entry
+/// of the table, whatever its family, including costly opt-in probes. The table's own `Timing`
+/// entry waits 60 s for evidence to lapse and so cannot end within 60 s.
+fn time_limit(entry: &Entry) -> Duration {
+    Duration::from_secs(if entry.slow_lane { 60 } else { 600 })
+}
 #[cfg(test)]
 fn execute_one(suite: &Suite, name: &str, temp: &Path) -> Result<bool> {
-    execute_test(suite, name, temp, temp, &BTreeMap::new())
+    execute_test(
+        suite,
+        name,
+        temp,
+        temp,
+        &BTreeMap::new(),
+        Duration::from_secs(600),
+    )
 }
 
 #[cfg(unix)]
@@ -1339,7 +1388,14 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
         },
         |entry| {
             eprintln!("ignored: running {}", entry.id());
-            execute_test(&entry.suite, &entry.name, temp.path(), &logs, &environment)
+            execute_test(
+                &entry.suite,
+                &entry.name,
+                temp.path(),
+                &logs,
+                &environment,
+                time_limit(entry),
+            )
         },
     );
     let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "only_prerequisite":options.only_prerequisite, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
@@ -2433,6 +2489,756 @@ fn selected_fixture() {{
                 1
             );
             assert_eq!(select(vec![Supplied::Cli], vec![CLI, CUSTODY]), 0);
+        }
+    }
+
+    /// The lane `slow` read from the documents that declare it: the workflow, the development
+    /// guide and the classification (story:the-lane-slow-runs-the-ignored-timing-family).
+    mod slow_lane {
+        use super::*;
+        use serde_yaml_ng::Value;
+
+        const WORKFLOW: &str = include_str!("../../../.github/workflows/slow.yml");
+        const GATE: &str = include_str!("../../../.github/workflows/rust-gate.yml");
+        const GUIDE: &str = include_str!("../../../docs/development.md");
+        const SDK: &str = include_str!("../../connectors-sdk/src/lib.rs");
+        const LIFECYCLE: &str =
+            include_str!("../../../adapters/catalog/tests/local_runtime/lifecycle.rs");
+        const CATALOG_LOCAL: &str = include_str!("../../../adapters/catalog/src/local.rs");
+        /// The gate's ignored step, as `rust-gate.yml` runs it.
+        const GATE_IGNORED: &str = "cargo run --locked --bin connectors-build -- ignored --required --only-prerequisite provider";
+        const NAMESPACES: &str = "Permit unprivileged user namespaces";
+        const NEXTEST: &str = "Install the pinned cargo-nextest release";
+        /// A test the rule classifies, in a package and target no entry of the table names.
+        const RULED: (&str, &str, &str) = ("connectors", "probe", "tests::slow_lane_example");
+        /// The eight measurements that were `Timing` entries without a prerequisite before the
+        /// lane selected the family. None ends within the lane's 60 s; they are `Deferred`.
+        const EIGHT: [(&str, &str, &str); 8] = [
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::tests::read_invoke_metadata_time",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::store_cost_tests::read_invoke_cost_by_store_size",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::store_cost_tests::batch_cost_by_subject",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::store_cost_tests::first_owner_open_of_a_grown_store",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::store_cost_tests::owner_start_of_a_grown_store",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::store_cost_tests::two_revalidations_of_a_grown_store",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::registry::store_cost_tests::fresh_open_passes_of_a_blob_heavy_store",
+            ),
+            (
+                "connectors",
+                "cold_owner_start",
+                "a_cold_describe_and_read_of_a_large_store_answer_within_60_seconds",
+            ),
+        ];
+        /// `Timing` with prerequisites the lane does not supply.
+        const NEEDS_CUSTODY: (&str, &str, &str) = (
+            "connectors-catalog-provider",
+            "main",
+            "local_runtime::cli_journey::lifecycle::catalog_cli_read_recollects_expired_evidence_without_reentry",
+        );
+
+        fn id((package, target, name): (&str, &str, &str)) -> String {
+            format!("{package}::{target}::{name}")
+        }
+        fn options_of(command: &str) -> Option<Options> {
+            let (_, args) = command.trim().split_once("connectors-build -- ")?;
+            let argv: Vec<&str> = std::iter::once("connectors-build")
+                .chain(args.split_whitespace())
+                .collect();
+            match crate::Args::try_parse_from(argv).ok()?.command {
+                crate::Action::Ignored(options) => Some(options),
+                _ => None,
+            }
+        }
+        fn steps(workflow: &str, job: &str) -> Vec<Value> {
+            let workflow: Value = serde_yaml_ng::from_str(workflow).unwrap();
+            workflow
+                .get("jobs")
+                .and_then(|jobs| jobs.get(job))
+                .and_then(|job| job.get("steps"))
+                .and_then(Value::as_sequence)
+                .unwrap_or_else(|| panic!("the job {job} has steps"))
+                .clone()
+        }
+        fn text<'a>(step: &'a Value, key: &str) -> &'a str {
+            step.get(key).and_then(Value::as_str).unwrap_or("")
+        }
+        fn named(steps: &[Value], name: &str) -> Option<usize> {
+            steps.iter().position(|step| text(step, "name") == name)
+        }
+        fn status<'a>(report: &'a Report, test: (&str, &str, &str)) -> (bool, &'a str) {
+            report
+                .outcomes
+                .iter()
+                .find(|outcome| outcome.name == id(test))
+                .map(|outcome| (outcome.selected, outcome.status.as_str()))
+                .unwrap()
+        }
+
+        /// The rule, both ways: the name alone classifies a `slow_lane_` test, the gate's
+        /// ignored step leaves it alone, and any other new ignored test is still unknown.
+        #[test]
+        fn a_slow_lane_name_is_timing_and_the_gates_ignored_step_does_not_select_it() {
+            for test in [
+                RULED,
+                ("connectors-build", "connectors-build", "slow_lane_example"),
+                (
+                    "connectors-host",
+                    "connectors_host",
+                    "local::registry::tests::slow_lane_example",
+                ),
+                (
+                    "connectors-catalog-provider",
+                    "main",
+                    "served::slow_lane_example",
+                ),
+            ] {
+                let entry = classified(&[test]).pop().unwrap();
+                assert_eq!(entry.family, Some(Family::Timing), "{}", id(test));
+                assert!(entry.prerequisites.is_empty(), "{}", id(test));
+                assert!(!entry.helper, "{}", id(test));
+            }
+            // The function name decides: the part after the last `::`, from its first letter.
+            for name in [
+                "tests::example",
+                "slow_lane_tests::example",
+                "tests::a_slow_lane_example",
+                "tests::slow_lane",
+            ] {
+                let entry = classified(&[("connectors", "probe", name)]).pop().unwrap();
+                assert_eq!(entry.family, None, "{name}");
+                assert!(!entry.helper, "{name}");
+            }
+            // An exact entry of the table is matched first.
+            let helper = classified(&[(
+                "connectors-host",
+                "connectors_host",
+                "local::audit::tests::crash_child",
+            )])
+            .pop()
+            .unwrap();
+            assert!(helper.helper && helper.family.is_none());
+
+            assert!(
+                GATE.lines()
+                    .any(|line| line.trim() == format!("run: {GATE_IGNORED}")),
+                "rust-gate.yml runs another ignored step than this test reads"
+            );
+            let gate = options_of(GATE_IGNORED).unwrap();
+            assert!(gate.required);
+            assert_eq!(gate.family, [Family::Disposable]);
+            assert_eq!(gate.only_prerequisite, [Supplied::Provider]);
+            let mut ran = vec![];
+            let report = evaluate(
+                classified(&[RULED, PROVIDER_ONLY]),
+                &gate,
+                |_| vec![],
+                |entry| {
+                    ran.push(entry.id());
+                    Ok(true)
+                },
+            );
+            assert_eq!(ran, [id(PROVIDER_ONLY)]);
+            assert_eq!(status(&report, RULED), (false, "not-selected"));
+            assert_eq!((report.unknown, report.selected, report.failed), (0, 1, 0));
+            assert!(report.accepted(gate.required));
+
+            let report = evaluate(
+                classified(&[
+                    ("connectors", "probe", "tests::example"),
+                    RULED,
+                    PROVIDER_ONLY,
+                ]),
+                &gate,
+                |_| vec![],
+                |entry| panic!("{} executed beside unknown inventory", entry.id()),
+            );
+            assert_eq!((report.unknown, report.executed), (1, 0));
+            assert!(!report.accepted(false));
+        }
+
+        /// A change under `crates/`, `apps/` or `adapters/` starts the workflow, as a pull
+        /// request and as a push to `main`; the seven paths it had stay.
+        #[test]
+        fn a_change_under_crates_apps_or_adapters_starts_the_lane() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let trigger = workflow.get("on").expect("the workflow names its triggers");
+            for event in ["pull_request", "push"] {
+                let paths: Vec<&str> = trigger
+                    .get(event)
+                    .and_then(|event| event.get("paths"))
+                    .and_then(Value::as_sequence)
+                    .unwrap_or_else(|| panic!("{event} has a paths list"))
+                    .iter()
+                    .map(|path| path.as_str().unwrap())
+                    .collect();
+                for path in [
+                    "crates/**",
+                    "apps/**",
+                    "adapters/**",
+                    "ess/**",
+                    "Cargo.lock",
+                    "crates/connectors-spec/toolchain.json",
+                    "crates/connectors-build/src/metadata_emissions.rs",
+                    "crates/connectors-build/src/metadata_entities.rs",
+                    "crates/connectors-build/generated/metadata-emissions/**",
+                    ".github/workflows/slow.yml",
+                    "Cargo.toml",
+                    ".cargo/**",
+                    "rust-toolchain.toml",
+                ] {
+                    assert!(paths.contains(&path), "{event}: {path} is missing");
+                }
+                assert_eq!(paths.len(), 13, "{event}: {paths:?}");
+            }
+            let branches = trigger.get("push").and_then(|push| push.get("branches"));
+            assert_eq!(branches.and_then(Value::as_sequence).map(Vec::len), Some(1));
+            assert_eq!(branches.unwrap()[0].as_str(), Some("main"));
+        }
+
+        /// The second command of the lane exists to show that `--release` resolves to a
+        /// profile without `debug_assertions`. The files that decide that are the root
+        /// manifest, `.cargo/config.toml` and the pinned toolchain; a change to one of them
+        /// alone must start the lane, or the command never runs against it.
+        #[test]
+        fn a_change_of_a_build_profile_or_of_the_toolchain_starts_the_lane() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let trigger = workflow.get("on").expect("the workflow names its triggers");
+            let mut missing = vec![];
+            for event in ["pull_request", "push"] {
+                let paths: Vec<&str> = trigger
+                    .get(event)
+                    .and_then(|event| event.get("paths"))
+                    .and_then(Value::as_sequence)
+                    .unwrap_or_else(|| panic!("{event} has a paths list"))
+                    .iter()
+                    .map(|path| path.as_str().unwrap())
+                    .collect();
+                for accepted in [
+                    &["Cargo.toml", "Cargo.*"][..],
+                    &[".cargo/**", ".cargo/config.toml"][..],
+                    &["rust-toolchain.toml"][..],
+                ] {
+                    if !accepted.iter().any(|path| paths.contains(path)) {
+                        missing.push(format!("{event}: {}", accepted[0]));
+                    }
+                }
+            }
+            assert!(
+                missing.is_empty(),
+                "a change to one of these files alone does not start the lane: {missing:?}"
+            );
+        }
+
+        /// The steps of the lane in their order: user namespaces, cargo-nextest, the timing
+        /// family, the release tests. The two setup steps are the gate job's, byte for byte.
+        #[test]
+        fn the_lane_permits_user_namespaces_then_runs_the_timing_family_and_the_release_tests() {
+            let lane = steps(WORKFLOW, "slow");
+            let gate = steps(GATE, "gate");
+            let step = |name: &str| {
+                named(&lane, name).unwrap_or_else(|| panic!("slow.yml has no step {name:?}"))
+            };
+            let fetch = step("Fetch locked dependencies");
+            let namespaces = step(NAMESPACES);
+            let nextest = step(NEXTEST);
+            let timing = lane
+                .iter()
+                .position(|step| {
+                    options_of(text(step, "run"))
+                        .is_some_and(|options| options.family.contains(&Family::Timing))
+                })
+                .expect("a step of slow.yml runs the timing family");
+            let release = lane
+                .iter()
+                .position(|step| text(step, "run").trim().starts_with("cargo nextest run "))
+                .expect("a step of slow.yml runs cargo nextest");
+            assert!(
+                fetch < namespaces && namespaces < nextest && nextest < timing && timing < release,
+                "order of the steps: fetch {fetch}, user namespaces {namespaces}, cargo-nextest {nextest}, timing family {timing}, release tests {release}"
+            );
+            for (name, index) in [(NAMESPACES, namespaces), (NEXTEST, nextest)] {
+                let of_gate = &gate[named(&gate, name).expect("the gate job has the step")];
+                for key in ["run", "working-directory"] {
+                    assert_eq!(
+                        text(&lane[index], key),
+                        text(of_gate, key),
+                        "{name}: {key} differs from the gate job's"
+                    );
+                }
+            }
+            assert!(
+                text(&lane[namespaces], "run")
+                    .contains("sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0")
+            );
+            for index in [namespaces, nextest, timing, release] {
+                let holder = &lane[index];
+                assert!(
+                    holder.get("if").is_none() && holder.get("continue-on-error").is_none(),
+                    "{}: a conditional step can pass the lane unrun",
+                    text(holder, "name")
+                );
+            }
+
+            let command = text(&lane[timing], "run").trim();
+            assert!(
+                command.starts_with("cargo run --locked --bin connectors-build -- "),
+                "the timing step starts connectors-build as the gate job does: {command}"
+            );
+            let options = options_of(command).unwrap();
+            assert_eq!(options.family, [Family::Timing]);
+            assert!(options.required, "the lane must refuse an empty selection");
+            assert_eq!(options.only_prerequisite, [Supplied::Provider]);
+            assert!(!options.inventory);
+
+            let command = text(&lane[release], "run").trim();
+            let words: Vec<&str> = command.split_whitespace().collect();
+            let pair = |flag: &str, value: &str| words.windows(2).any(|two| two == [flag, value]);
+            assert!(words.contains(&"--release"), "{command}");
+            assert!(words.contains(&"--locked"), "{command}");
+            assert!(pair("--no-tests", "fail"), "{command}");
+            assert!(pair("-p", "connectors-sdk"), "{command}");
+            let filter = *words.last().unwrap();
+            assert_eq!(filter, "release_build_", "{command}");
+            // The filter matches a test that compiles only without `debug_assertions`.
+            assert!(
+                SDK.contains(&format!(
+                    "#[cfg(all(test, not(debug_assertions)))]\n#[test]\nfn {filter}has_no_debug_assertions() {{}}\n"
+                )),
+                "connectors-sdk holds no release-only test the filter {filter} matches"
+            );
+
+            for index in [timing, release] {
+                let command = text(&lane[index], "run").trim();
+                assert!(
+                    GUIDE.lines().any(|line| line == command),
+                    "docs/development.md shows another command than the lane runs: {command}"
+                );
+            }
+        }
+
+        /// A failed lane test says "see log", and the log is a file on the runner. Two steps
+        /// after the timing step print the outcomes that did not pass and keep the report and
+        /// the logs, also when the timing step failed. They are the journeys job's steps, with
+        /// an artifact name of the lane's own. The emissions check stays in the job.
+        #[test]
+        fn the_lane_prints_and_keeps_the_logs_of_its_tests_and_still_checks_the_emissions() {
+            let lane = steps(WORKFLOW, "slow");
+            let journeys = steps(GATE, "journeys");
+            let timing = lane
+                .iter()
+                .position(|step| {
+                    options_of(text(step, "run"))
+                        .is_some_and(|options| options.family.contains(&Family::Timing))
+                })
+                .expect("a step of slow.yml runs the timing family");
+            let printed = named(&lane, "Name each lane test that did not pass")
+                .expect("slow.yml has a step that names each lane test that did not pass");
+            let kept = named(&lane, "Keep the lane report and logs")
+                .expect("slow.yml has a step that keeps the lane report and logs");
+            assert!(
+                timing < printed && printed < kept,
+                "order of the steps: timing family {timing}, print {printed}, keep {kept}"
+            );
+            let of_journeys = |name: &str| {
+                &journeys[named(&journeys, name).expect("the journeys job has the step")]
+            };
+            let print = of_journeys("Name each journey that did not pass");
+            let keep = of_journeys("Keep the journeys report and logs");
+            for index in [printed, kept] {
+                let holder = &lane[index];
+                assert_eq!(text(holder, "if"), "always()", "{}", text(holder, "name"));
+                assert!(holder.get("continue-on-error").is_none());
+            }
+
+            // The steps read the files the lane's command writes.
+            assert_eq!(
+                lane_options().report,
+                PathBuf::from(".local/ignored-suites.json")
+            );
+            let script = text(&lane[printed], "run");
+            assert_eq!(script, text(print, "run"));
+            assert!(script.contains(".local/ignored-suites.json"));
+            assert!(script.contains(".local/ignored-suites.logs/*.log"));
+
+            assert!(text(&lane[kept], "uses").starts_with("actions/upload-artifact@"));
+            assert_eq!(text(&lane[kept], "uses"), text(keep, "uses"));
+            let with =
+                |step: &Value, key: &str| step.get("with").and_then(|with| with.get(key)).cloned();
+            for key in [
+                "path",
+                "if-no-files-found",
+                "include-hidden-files",
+                "retention-days",
+            ] {
+                assert!(with(&lane[kept], key).is_some(), "{key}");
+                assert_eq!(with(&lane[kept], key), with(keep, key), "{key}");
+            }
+            let paths = with(&lane[kept], "path").unwrap();
+            let paths = paths.as_str().unwrap();
+            assert!(paths.contains(".local/ignored-suites.json"));
+            assert!(paths.contains(".local/ignored-suites.logs/"));
+            let name = with(&lane[kept], "name");
+            assert_eq!(
+                name.as_ref().and_then(Value::as_str),
+                Some("ignored-slow-lane")
+            );
+            assert_ne!(
+                name,
+                with(keep, "name"),
+                "the artifact has the journeys job's name"
+            );
+
+            let emissions = lane
+                .iter()
+                .position(|step| {
+                    text(step, "run").trim()
+                        == "cargo run --locked --offline -p connectors-build -- metadata-conformance emissions --check"
+                })
+                .expect("the lane still checks the metadata emissions");
+            let holder = &lane[emissions];
+            assert!(holder.get("if").is_none() && holder.get("continue-on-error").is_none());
+        }
+
+        /// The options of the lane's first command, parsed as the binary parses them.
+        fn lane_options() -> Options {
+            steps(WORKFLOW, "slow")
+                .iter()
+                .find_map(|step| {
+                    options_of(text(step, "run"))
+                        .filter(|options| options.family.contains(&Family::Timing))
+                })
+                .expect("a step of slow.yml runs the timing family")
+        }
+
+        /// What the lane's first command selects: a test the rule classifies, and no entry of
+        /// the table. `--required` refuses an empty selection, so the lane needs one
+        /// `slow_lane_` test.
+        #[test]
+        fn the_lane_selects_a_slow_lane_test_and_no_entry_of_the_table() {
+            let options = lane_options();
+            let mut tests = vec![RULED, NEEDS_CUSTODY, PROVIDER_ONLY];
+            tests.extend(EIGHT);
+            let mut ran = vec![];
+            let report = evaluate(
+                classified(&tests),
+                &options,
+                |_| vec![],
+                |entry| {
+                    ran.push(entry.id());
+                    Ok(true)
+                },
+            );
+            assert_eq!(ran, [id(RULED)]);
+            assert_eq!(
+                (
+                    report.unknown,
+                    report.selected,
+                    report.executed,
+                    report.failed
+                ),
+                (0, 1, 1, 0)
+            );
+            assert_eq!(status(&report, RULED), (true, "passed"));
+            let custody = classified(&[NEEDS_CUSTODY]).pop().unwrap();
+            assert_eq!(custody.family, Some(Family::Timing));
+            assert_eq!(custody.prerequisites, [CUSTODY, CLI]);
+            for test in tests.iter().skip(1) {
+                assert_eq!(
+                    status(&report, *test),
+                    (false, "not-selected"),
+                    "{}",
+                    id(*test)
+                );
+            }
+            assert!(report.accepted(options.required));
+
+            // Without a test of the rule the selection is empty, and `--required` refuses it.
+            let report = evaluate(
+                classified(&tests[1..]),
+                &options,
+                |_| vec![],
+                |entry| panic!("{} is an entry of the table the lane executed", entry.id()),
+            );
+            assert_eq!((report.unknown, report.selected), (0, 0));
+            assert!(!report.accepted(options.required));
+
+            // Every `Timing` entry of the table, read from the source of `classify`, has a
+            // prerequisite the lane does not supply. An entry without one would run in the lane.
+            let table = crate::steps::body(
+                include_str!("ignored.rs"),
+                "fn classify(suite: &Suite, name: &str) -> Entry {\n",
+            );
+            let opening = "Some((Timing, vec![";
+            let mut entries = 0;
+            for (at, _) in table.match_indices(opening) {
+                let (keys, _) = table[at + opening.len()..].split_once("]))").unwrap();
+                entries += 1;
+                assert!(
+                    keys.split(',')
+                        .map(str::trim)
+                        .any(|key| !key.is_empty() && key != "PROVIDER"),
+                    "a `Timing` entry of the table with the prerequisites [{keys}] runs in the lane"
+                );
+            }
+            assert!(
+                entries > 0,
+                "the `Timing` entries of the table are no longer found in the source"
+            );
+            assert!(table.contains(".then_some((Timing, vec![]))"));
+
+            let prose = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                prose.contains("starts with `slow_lane_`"),
+                "docs/development.md does not state the rule"
+            );
+            for path in ["`crates/`", "`apps/`", "`adapters/`"] {
+                assert!(
+                    prose.contains(path),
+                    "docs/development.md does not name {path}"
+                );
+            }
+        }
+
+        /// The eight are `Deferred` without a prerequisite, and the lane does not select them.
+        #[test]
+        fn the_eight_timing_measurements_are_deferred_and_the_lane_does_not_select_them() {
+            let options = lane_options();
+            assert_eq!(options.family, [Family::Timing]);
+            assert!(options.required);
+            assert_eq!(options.only_prerequisite, [Supplied::Provider]);
+            let mut tests = vec![RULED];
+            tests.extend(EIGHT);
+            let report = evaluate(classified(&tests), &options, |_| vec![], |_| Ok(true));
+            assert_eq!(report.unknown, 0);
+            for test in EIGHT {
+                let entry = classified(&[test]).pop().unwrap();
+                assert_eq!(entry.family, Some(Family::Deferred), "{}", id(test));
+                assert!(entry.prerequisites.is_empty(), "{}", id(test));
+                assert!(!entry.helper, "{}", id(test));
+                assert_eq!(
+                    status(&report, test),
+                    (false, "not-selected"),
+                    "{}",
+                    id(test)
+                );
+            }
+            assert_eq!((report.selected, report.executed), (1, 1));
+        }
+
+        /// The limits `run` passes. A test the rule classified gets 60 s: no test of the lane
+        /// runs longer. Every entry of the table keeps 600 s, whatever its family: the one
+        /// `Timing` entry among them waits 60 s by design.
+        #[test]
+        fn a_slow_lane_test_gets_60_seconds_and_every_entry_of_the_table_600() {
+            fn limit(test: (&str, &str, &str)) -> Duration {
+                time_limit(&classified(&[test]).pop().unwrap())
+            }
+            for test in [
+                RULED,
+                (
+                    "connectors",
+                    "local_cli",
+                    "slow_lane_adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs",
+                ),
+            ] {
+                assert_eq!(limit(test), Duration::from_secs(60), "{}", id(test));
+            }
+            let mut table = vec![
+                NEEDS_CUSTODY,
+                PROVIDER_ONLY,
+                PROVIDER_AND_CUSTODY,
+                CHROME_ONLY,
+                (
+                    "connectors-host",
+                    "connectors_host",
+                    "local::clock::tests::independent_live_quorum",
+                ),
+            ];
+            table.extend(EIGHT);
+            for test in table {
+                let entry = classified(&[test]).pop().unwrap();
+                assert!(entry.family.is_some(), "{}", id(test));
+                assert_eq!(time_limit(&entry), Duration::from_secs(600), "{}", id(test));
+            }
+            // A test given the family by hand, as a later entry of the table would be.
+            let mut by_hand = classified(&[("connectors", "probe", "tests::example")])
+                .pop()
+                .unwrap();
+            by_hand.family = Some(Family::Timing);
+            assert_eq!(time_limit(&by_hand), Duration::from_secs(600));
+            let run = crate::steps::body(
+                include_str!("ignored.rs"),
+                "pub fn run(root: &Path, options: Options) -> Result<()> {\n",
+            );
+            assert!(
+                run.contains("time_limit(entry)"),
+                "`run` does not pass the limit of the entry to `execute_test`"
+            );
+        }
+
+        /// The entry the table keeps in `Timing` waits until the evidence of its connection
+        /// has lapsed, and a profile's evidence lasts 60 000 ms unless its configuration says
+        /// otherwise. So its limit is longer than that wait; it had 600 s before the lane.
+        #[test]
+        fn the_timing_entry_that_waits_out_its_evidence_gets_longer_than_that_wait() {
+            assert!(
+                CATALOG_LOCAL.contains("fn default_evidence_lifetime() -> u64 {\n    60_000\n}"),
+                "the default evidence lifetime is no longer 60 000 ms"
+            );
+            let (_, rest) = LIFECYCLE
+                .split_once("fn catalog_cli_read_recollects_expired_evidence_without_reentry() {")
+                .expect("lifecycle.rs holds the test");
+            let (body, _) = rest.split_once("\n}\n").unwrap();
+            assert!(body.contains("let until = connected[\"valid_until_ms\"].as_u64().unwrap();"));
+            assert!(body.contains("while connectors_sdk::now_ms() <= until {"));
+            assert!(
+                !LIFECYCLE.contains("evidence_lifetime_ms"),
+                "the fixture of lifecycle.rs sets an evidence lifetime of its own"
+            );
+            let wait = Duration::from_millis(60_000);
+
+            let entry = classified(&[NEEDS_CUSTODY]).pop().unwrap();
+            assert_eq!(entry.family, Some(Family::Timing));
+            let limit = time_limit(&entry);
+            assert!(
+                limit > wait,
+                "{} waits {wait:?} for its evidence to lapse and is ended at {limit:?}",
+                entry.id()
+            );
+        }
+
+        /// A fixture test that sleeps 30 s gets a limit of 1 s: it is ended with its process
+        /// group and its child, the call returns an error, and the report counts it as failed.
+        /// The fixture writes its two process ids in its first milliseconds; the call has 4 s
+        /// beyond the limit to end the group and read the log (the cleanup itself gives up
+        /// after 2 s).
+        #[cfg(unix)]
+        #[test]
+        fn a_test_over_its_limit_is_ended_and_counts_as_failed() {
+            let root = tempfile::tempdir().unwrap();
+            let source = root.path().join("sleeper.rs");
+            let leader = root.path().join("leader.pid");
+            let descendant = root.path().join("descendant.pid");
+            std::fs::write(
+                &source,
+                format!(
+                    r#"
+#[test]
+#[ignore]
+fn slow_lane_sleeper() {{
+    std::fs::write({leader:?}, std::process::id().to_string()).unwrap();
+    let child = std::process::Command::new("/bin/sleep")
+        .arg("900")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn().unwrap();
+    std::fs::write({descendant:?}, child.id().to_string()).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(30));
+}}
+"#,
+                ),
+            )
+            .unwrap();
+            let executable = root.path().join("sleeper");
+            let output = Command::new("rustc")
+                .args(["--test", "--edition=2024"])
+                .arg(source)
+                .arg("-o")
+                .arg(&executable)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{output:?}");
+            let suite = Suite {
+                package: "connectors".into(),
+                target: "probe".into(),
+                executable,
+            };
+            let mut options = options();
+            options.family = vec![Family::Timing];
+            let mut elapsed = Duration::ZERO;
+            let report = evaluate(
+                discover(&suite).unwrap(),
+                &options,
+                |_| vec![],
+                |entry| {
+                    let started = Instant::now();
+                    let outcome = execute_test(
+                        &entry.suite,
+                        &entry.name,
+                        root.path(),
+                        root.path(),
+                        &BTreeMap::new(),
+                        Duration::from_secs(1),
+                    );
+                    elapsed = started.elapsed();
+                    outcome
+                },
+            );
+            let pids = [&leader, &descendant].map(|path| std::fs::read_to_string(path).ok());
+            let running = pids
+                .clone()
+                .map(|pid| pid.is_some_and(|pid| descendant_running(&pid)));
+            // Clean exactly the processes this test created before any assertion can panic.
+            for (pid, running) in pids.iter().zip(running) {
+                if running {
+                    let killed = Command::new("/bin/kill")
+                        .args(["-KILL", "--", pid.as_deref().unwrap().trim()])
+                        .status()
+                        .unwrap();
+                    assert!(killed.success());
+                }
+            }
+            assert_eq!((report.selected, report.executed, report.failed), (1, 0, 1));
+            let outcome = &report.outcomes[0];
+            assert_eq!(outcome.name, "connectors::probe::slow_lane_sleeper");
+            assert_eq!(outcome.family, Some(Family::Timing));
+            assert_eq!(outcome.status, "execution-error");
+            assert!(
+                outcome.reasons[0].contains("still running at its limit of 1 s"),
+                "{:?}",
+                outcome.reasons
+            );
+            assert!(!report.accepted(false));
+            assert!(
+                elapsed >= Duration::from_secs(1) && elapsed < Duration::from_secs(5),
+                "a limit of 1 s ended the test after {elapsed:?}"
+            );
+            assert!(
+                pids.iter().all(Option::is_some),
+                "the fixture did not start within its limit of 1 s: {pids:?}"
+            );
+            assert_eq!(
+                running,
+                [false, false],
+                "the fixture test or its child was still running after the call returned: {pids:?}"
+            );
         }
     }
 }

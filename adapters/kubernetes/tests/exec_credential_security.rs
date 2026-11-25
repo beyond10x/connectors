@@ -461,6 +461,19 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
     }
 }
 
+/// Paths the test below tries before it walks the host, at most 3: files of the
+/// gate job's runner image (the key `runs-on` of the job `gate` in
+/// `.github/workflows/rust-gate.yml`) that a user other than root and the
+/// job's own owns. Whoever changes that image updates this list in the same
+/// change. In a gate job the test fails when its file came from the walk, and
+/// the failure names up to 3 files the walk found: they are this list.
+const CANDIDATES: &[&str] = &[
+    "/var/lib/landscape/.cleanup.user",
+    "/etc/postgresql/16/main/pg_ctl.conf",
+    "/etc/postgresql/16/main/environment",
+];
+const _: () = assert!(CANDIDATES.len() <= 3);
+
 /// A file owned by a user other than root and the adapter's own is refused
 /// even when its digest matches; a hard link to such a file is the same
 /// inode, so this is also the hard-link case.
@@ -468,12 +481,32 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
 fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
     // SAFETY: geteuid has no preconditions.
     let euid = unsafe { libc::geteuid() };
+    let fits = |path: &Path, meta: &fs::Metadata| {
+        meta.is_file()
+            && meta.uid() != 0
+            && meta.uid() != euid
+            && meta.mode() & 0o6022 == 0
+            && meta.len() < 1 << 20
+            && fs::read(path).is_ok()
+    };
+    let mut found: Vec<PathBuf> = CANDIDATES
+        .iter()
+        .map(PathBuf::from)
+        .find(|path| fs::symlink_metadata(path).is_ok_and(|meta| fits(path, &meta)))
+        .into_iter()
+        .collect();
+    let walked = found.is_empty();
+    // A gate job that has to walk fails below. Only its walk goes on past the
+    // first file, to 3 of them, so that one failure gives the whole list.
+    let listless_gate_job = walked && std::env::var_os("GITHUB_ACTIONS").is_some();
+    let wanted = if listless_gate_job { 3 } else { 1 };
     let mut queue: Vec<(PathBuf, usize)> = ["/etc", "/var/lib", "/usr/share", "/usr/include"]
         .iter()
         .map(|p| (PathBuf::from(p), 0))
         .collect();
-    let mut found = None;
-    while let Some((dir, depth)) = queue.pop() {
+    while found.len() < wanted
+        && let Some((dir, depth)) = queue.pop()
+    {
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;
         };
@@ -484,33 +517,37 @@ fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
             };
             if meta.is_dir() && depth < 3 {
                 queue.push((path, depth + 1));
-            } else if meta.is_file()
-                && meta.uid() != 0
-                && meta.uid() != euid
-                && meta.mode() & 0o6022 == 0
-                && meta.len() < 1 << 20
-                && fs::read(&path).is_ok()
-            {
-                found = Some(path);
-                break;
+            } else if fits(&path, &meta) {
+                found.push(path);
+                if found.len() == wanted {
+                    break;
+                }
             }
         }
-        if found.is_some() {
-            break;
-        }
     }
-    let Some(path) = found else {
+    let Some(path) = found.first() else {
         eprintln!("skipped: no readable file owned by another user");
         return;
     };
-    let credentials = Credentials::new(binding(&path)).unwrap();
+    let credentials = Credentials::new(binding(path)).unwrap();
     assert_eq!(
         credentials
-            .token(&kubeconfig(&path, &[]), &now, &no_ambient)
+            .token(&kubeconfig(path, &[]), &now, &no_ambient)
             .err(),
         Some(Refusal::PluginUnavailable(None)),
         "{}",
         path.display()
+    );
+    assert!(
+        !listless_gate_job,
+        "no path of the list `CANDIDATES` in {} is a file of this runner image that another \
+         user owns; the walk found {}: put them in that list, in this order",
+        file!(),
+        found
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 }
 

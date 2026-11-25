@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:five-host-unit-tests-shorten-the-waits-they-chose
 kind: story
-status: active
+status: implemented
 title: 'Five host unit tests shorten the waits they chose: 48.6 s become an estimated 18.2 s'
 summary: Budgets, lifetimes and late answers of 2 s to 10 s that are the tests' own values, and one unasserted second measurement
 relations:
@@ -20,10 +20,11 @@ scope:
   path: crates/connectors-host/src/local/protected/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-revision: 6
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T02:37:20Z", actor: "human:operator", revision: 4}
 - {from: "proposed", to: "active", at: "2026-11-25T02:37:21Z", actor: "human:operator", revision: 5}
+- {from: "active", to: "implemented", at: "2026-11-25T04:01:07Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Defect
 
@@ -95,8 +96,8 @@ The plan names nothing that stays in the lane `slow` for this story.
 - `crates/connectors-host/src/local/clock/tests.rs`: the one test.
 
 No other story of this set touches the other four files. `clock.rs` itself is not changed here.
-story:seven-cli-tests-shorten-their-waits-or-a-production-wait changes `query_timeout()` in
-`clock.rs` for builds that are not the unit-test build, and it `depends_on` this story. The
+story:seven-cli-tests-shorten-their-waits-or-a-production-wait planned an override of
+`query_timeout()` in `clock.rs` and an edge to this story; since its revision 11 it has neither. The
 `#[cfg(test)]` definition that this story's test reaches through `set_test_query_timeout` stays as
 it is.
 

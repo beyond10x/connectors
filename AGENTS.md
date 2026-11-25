@@ -96,6 +96,11 @@ planning-store mutation, including prose, relations and evidence. Discover kinds
 legal lifecycle moves and existing owners through the CLI. Never edit
 `.engineering/planning/` directly. Use one writer for the planning store.
 
+Every `aep` command that writes the store runs with `AEP_ACTOR=human:operator`
+in its environment. Without the variable `aep` records the login of the
+workstation as the actor, and this repository is public. Before a commit,
+`git diff --cached | grep '^+.*actor'` shows no other actor of the kind `human:`.
+
 The original handoff is `specification:contract-driven-connectors-design`.
 `specification:core-model-closure-20260909` records the reviewed model baseline;
 `specification:public-documentation-website` owns the documentation, website design

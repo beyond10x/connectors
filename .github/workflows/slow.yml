@@ -10,6 +10,12 @@ on:
       - crates/connectors-build/src/metadata_entities.rs
       - crates/connectors-build/generated/metadata-emissions/**
       - .github/workflows/slow.yml
+      - crates/**
+      - apps/**
+      - adapters/**
+      - Cargo.toml
+      - .cargo/**
+      - rust-toolchain.toml
   push:
     branches: [main]
     paths:
@@ -20,6 +26,12 @@ on:
       - crates/connectors-build/src/metadata_entities.rs
       - crates/connectors-build/generated/metadata-emissions/**
       - .github/workflows/slow.yml
+      - crates/**
+      - apps/**
+      - adapters/**
+      - Cargo.toml
+      - .cargo/**
+      - rust-toolchain.toml
 
 permissions:
   contents: read
@@ -55,5 +67,49 @@ jobs:
           echo "$PWD/ess-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
       - name: Fetch locked dependencies
         run: cargo fetch --locked
+      - name: Permit unprivileged user namespaces
+        run: |
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Install the pinned cargo-nextest release
+        working-directory: ${{ runner.temp }}
+        run: |
+          version=0.9.143
+          archive="cargo-nextest-$version-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLO "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$version/$archive"
+          echo "66786b9abe23920d022a182d1416b1bbc8130dd4872a9553d76985a1708dcd1e  $archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$HOME/.cargo/bin" cargo-nextest
+          cargo nextest --version
+      - name: Run the ignored slow_lane_ tests, 60 s each
+        run: cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider
+      - name: Name each lane test that did not pass
+        if: always()
+        run: |
+          test -f .local/ignored-suites.json || exit 0
+          jq -r '.result.outcomes[] | select(.selected and .status != "passed") | "\(.status)\t\(.name)\t\(.reasons | join("; "))"' .local/ignored-suites.json
+          shown=0
+          for log in .local/ignored-suites.logs/*.log; do
+            [ -f "$log" ] || continue
+            grep -q '^test result: ok. 1 passed' "$log" && continue
+            echo "::group::$log"
+            tail -n 60 "$log"
+            echo "::endgroup::"
+            shown=$((shown + 1))
+            [ "$shown" -lt 5 ] || break
+          done
+      - name: Keep the lane report and logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ignored-slow-lane
+          path: |
+            .local/ignored-suites.json
+            .local/ignored-suites.logs/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+      - name: Run the tests of connectors-sdk that need a build without debug_assertions
+        run: cargo nextest run --release --locked -p connectors-sdk --no-tests fail release_build_
       - name: Regenerate the metadata emissions and compare them byte for byte
         run: cargo run --locked --offline -p connectors-build -- metadata-conformance emissions --check

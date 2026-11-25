@@ -1685,17 +1685,30 @@ fn adversary2_code(output: &Output) -> Value {
 /// Adversary pass 2, the pass-1 measurement against the corrected binary: 32
 /// idle clients fill the real owner, the CLI of the SAME build asks for status,
 /// and one held client is released at a seeded random point. No run may report
-/// the owner as another build.
+/// the owner as another build. The gate keeps 10 runs; the 100 runs of the
+/// measurement are a `slow_lane_` test, which the lane `slow` runs.
 #[cfg(unix)]
 #[test]
-fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs() {
+fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_10_runs() {
+    adversary2_a_same_build_owner_at_capacity_is_never_another_build(10);
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "lane slow"]
+fn slow_lane_adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs() {
+    adversary2_a_same_build_owner_at_capacity_is_never_another_build(100);
+}
+
+#[cfg(unix)]
+fn adversary2_a_same_build_owner_at_capacity_is_never_another_build(runs: usize) {
     let root = adversary_owner_root();
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let mut owner = start_owner(binary, &root);
     let directory = sockets::Directory::open(&root.path().join("state"));
     let mut seed: u64 = 0x5eed_2026_0929;
     let mut tally = std::collections::BTreeMap::<String, usize>::new();
-    for _ in 0..100 {
+    for _ in 0..runs {
         seed = seed
             .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
@@ -1720,8 +1733,13 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
         drop(held);
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
-    eprintln!("adversary2 tally over 100 runs: {tally:?}");
+    eprintln!("adversary2 tally over {runs} runs: {tally:?}");
     assert!(owner.0.try_wait().unwrap().is_none(), "owner died");
+    assert_eq!(
+        tally.values().sum::<usize>(),
+        runs,
+        "the tally does not hold every run: {tally:?}"
+    );
     assert_eq!(
         tally.get("\"owner_build_mismatch\""),
         None,

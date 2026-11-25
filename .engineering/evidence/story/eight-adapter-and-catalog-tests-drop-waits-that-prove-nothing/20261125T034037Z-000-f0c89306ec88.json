@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-25T03:40:37Z",
+  "actor": "human:operator",
+  "artifact": "story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing",
+  "kind": "story",
+  "revision": 16,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:eight-tests-adversary-pass-1",
+    "review": "review-result:eight-tests-adversary-pass-1",
+    "outcome": "fixed"
+  }
+}

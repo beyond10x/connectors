@@ -491,3 +491,11 @@ impl Cursors {
         Ok(cursor.continuation)
     }
 }
+
+/// Compiled only without `debug_assertions`, and it asserts nothing but that it runs. The lane
+/// `slow` runs the tests of this crate whose name holds `release_build_` with
+/// `cargo nextest run --release ... --no-tests fail`: zero such tests means that `--release`
+/// resolved to a profile with `debug_assertions`, and the step fails.
+#[cfg(all(test, not(debug_assertions)))]
+#[test]
+fn release_build_has_no_debug_assertions() {}
