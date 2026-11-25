@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:seven-mcp-tests-use-a-4-s-request-budget-and-shorter-holds
 kind: story
-status: draft
+status: active
 title: 'Six MCP tests use a 4 s request budget and shorter holds: 85.3 s become an estimated 28.0 s'
 summary: Three tests chose a request budget of 20 s and three sleep or hold the store for 4 s to 9 s; all values are the tests' own; a seventh test of 16.5 s has no value to shorten and stays unclaimed
 relations:
@@ -17,7 +17,10 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 8
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T07:57:04Z", actor: "human:operator", revision: 9}
+- {from: "proposed", to: "active", at: "2026-11-25T07:57:04Z", actor: "human:operator", revision: 10}
 ---
 ## Defect
 

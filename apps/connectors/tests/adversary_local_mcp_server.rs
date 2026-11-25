@@ -58,6 +58,9 @@ const STALL: &str = "998";
 /// The input whose answer the provider holds for 25 s: longer than the 20 s
 /// execution budget of a read.
 const HOLD: &str = "997";
+/// The input whose answer the provider holds for 2.4 s: longer than one data
+/// lease (`LEASE_MS`, 1.9 s, in `src/mcp/session.rs`).
+const LEASED: &str = "996";
 /// An input number no f64 holds: it reaches the provider and comes back as
 /// these digits only through lossless reads.
 const WIDE: &str = "1844674407370955161701";
@@ -228,6 +231,8 @@ struct Provider {
     requests: Arc<AtomicUsize>,
     /// [`STALL`] answers whose connection the client still held open 8 s on.
     stalled_open: Arc<AtomicUsize>,
+    /// [`STALL`] answers whose connection the client closed inside those 8 s.
+    stalled_closed: Arc<AtomicUsize>,
 }
 
 impl Provider {
@@ -238,11 +243,14 @@ impl Provider {
         let counted = requests.clone();
         let stalled_open = Arc::new(AtomicUsize::new(0));
         let open = stalled_open.clone();
+        let stalled_closed = Arc::new(AtomicUsize::new(0));
+        let closed = stalled_closed.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { return };
                 let counted = counted.clone();
                 let open = open.clone();
+                let closed = closed.clone();
                 std::thread::spawn(move || {
                     loop {
                         let mut head = Vec::new();
@@ -267,9 +275,30 @@ impl Provider {
                         if n == HOLD {
                             std::thread::sleep(Duration::from_secs(25));
                         }
+                        if n == LEASED {
+                            std::thread::sleep(Duration::from_millis(2400));
+                        }
                         if n == STALL {
-                            std::thread::sleep(Duration::from_secs(8));
+                            // The answer is held 8 s. A client that closes
+                            // the connection inside them is counted at once
+                            // and gets no answer; one that still holds it
+                            // open after them is counted then, as before.
+                            let until = Instant::now() + Duration::from_secs(8);
                             stream.set_nonblocking(true).unwrap();
+                            while Instant::now() < until {
+                                match stream.peek(&mut [0u8; 1]) {
+                                    // Open and silent, or open with bytes waiting.
+                                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                    Ok(waiting) if waiting > 0 => {}
+                                    // End of file or a reset: the client let go.
+                                    _ => {
+                                        closed.fetch_add(1, Ordering::SeqCst);
+                                        let _ = stream.shutdown(Shutdown::Both);
+                                        return;
+                                    }
+                                }
+                                std::thread::sleep(Duration::from_millis(10));
+                            }
                             if stream
                                 .peek(&mut [0u8; 1])
                                 .is_err_and(|e| e.kind() == std::io::ErrorKind::WouldBlock)
@@ -294,6 +323,7 @@ impl Provider {
             address,
             requests,
             stalled_open,
+            stalled_closed,
         }
     }
     fn requests(&self) -> usize {
@@ -1112,7 +1142,9 @@ fn adversary_legacy_window_admits_no_tool_request() {
 /// a call's read budget, so a read dispatched under a live lease now runs to
 /// its declared budget. Once the session has ended (`lost`, exit 1, about
 /// 5 s after stdin closed), the provider read it started must not still be
-/// held open by the owner side 8 s after dispatch.
+/// held open by the owner side 8 s after dispatch. The provider watches the
+/// read's connection for those 8 s, so the test ends when the provider has
+/// seen it closed and sleeps nothing out.
 #[test]
 fn adversary_a_lost_session_leaves_no_provider_read_open() {
     let served = Served::new();
@@ -1131,9 +1163,22 @@ fn adversary_a_lost_session_leaves_no_provider_read_open() {
     std::thread::sleep(Duration::from_millis(100));
     let _ = peer.exit(false);
     let ended = dispatched.elapsed();
-    std::thread::sleep(Duration::from_millis(9000).saturating_sub(dispatched.elapsed()));
+    // The provider's verdict on the read: closed, as soon as it sees that, or
+    // still open 8 s after it took the request. Waiting for the verdict, not
+    // for a time, keeps a slow machine from passing before the provider has
+    // looked. The 20 s bound outlasts the provider's 8 s two and a half times
+    // and is reached only when the provider gave no verdict at all.
+    let open = &served.provider.stalled_open;
+    let closed = &served.provider.stalled_closed;
+    while open.load(Ordering::SeqCst) + closed.load(Ordering::SeqCst) == 0 {
+        assert!(
+            dispatched.elapsed() < Duration::from_secs(20),
+            "the provider gave no verdict on the stalled read"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
     assert_eq!(
-        served.provider.stalled_open.load(Ordering::SeqCst),
+        open.load(Ordering::SeqCst),
         0,
         "the session ended {ended:?} after dispatch, yet 8 s after dispatch its provider \
          read was still open, waiting for the answer"
@@ -1162,17 +1207,19 @@ fn hold_store(served: &Served) -> fs::File {
 }
 
 /// story:mcp-long-read-exits-under-load, both halves at once: a read longer
-/// than one lease (§ 3.3, provider answers in 3 s) while the store is held
-/// from the moment the provider has the request until 1 s after it answers,
-/// so the owner's own record of the read waits on the lock too. Renewal must
-/// not wait on it: the reply arrives under a renewed lease and a later ping is
-/// answered.
+/// than one lease (§ 3.3, provider answers in 2.4 s, a lease lasts 1.9 s)
+/// while the store is held from the moment the provider has the request until
+/// 0.5 s after it answers, so the owner's own record of the read waits on the
+/// lock too. Renewal must not wait on it: the reply arrives under a renewed
+/// lease and a later ping is answered. The hold starts after the provider's
+/// 2.4 s did, so it ends at least 0.5 s after the answer is due on any
+/// machine; a slower owner only reaches its record later in that half second.
 #[test]
 fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     let (tool, revision) = listed(&mut peer);
-    send_call(&mut peer, 2, &tool, SLOW, &revision);
+    send_call(&mut peer, 2, &tool, LEASED, &revision);
     let until = Instant::now() + Duration::from_secs(10);
     while served.provider.requests() == 0 {
         assert!(
@@ -1182,7 +1229,7 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
         std::thread::sleep(Duration::from_millis(5));
     }
     let lock = hold_store(&served);
-    std::thread::sleep(Duration::from_secs(4));
+    std::thread::sleep(Duration::from_millis(2900));
     let status = peer.child.try_wait().unwrap();
     if status.is_some() {
         let stderr = peer.errors.take().unwrap().join().unwrap();
@@ -1259,26 +1306,30 @@ fn adversary_a_request_past_its_deadline_answers_timeout_and_the_session_continu
 
 /// § 3.5 graceful close with the store held: end-of-file ends the session
 /// without any renewal, so the lock the owner (here the test) holds does not
-/// delay the exit, and the exit is successful.
+/// delay the exit, and the exit is successful. The store stays held until the
+/// exit has been timed: a thread holds it and lets go when the test says so,
+/// or when the test fails and drops its end of the channel.
 #[test]
 fn adversary_stdin_closed_while_the_store_is_held_exits_successfully() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     assert!(peer.request(1, "ping", json!({})).get("result").is_some());
     let lock = hold_store(&served);
-    let release = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(7));
+    let (release, released) = mpsc::channel::<()>();
+    let holder = std::thread::spawn(move || {
+        let _ = released.recv();
         drop(lock);
     });
     let started = Instant::now();
     let (lines, _) = peer.exit(true);
+    let exited = started.elapsed();
     assert!(
-        started.elapsed() < Duration::from_secs(3),
-        "exit took {:?} with the store held",
-        started.elapsed()
+        exited < Duration::from_secs(3),
+        "exit took {exited:?} with the store held"
     );
     assert_eq!(lines.len(), 1, "only the ping reply: {lines:?}");
-    release.join().unwrap();
+    release.send(()).unwrap();
+    holder.join().unwrap();
 }
 
 /// § 3.3 renewal "re-admits the same owner incarnation" and starts nothing:

@@ -726,14 +726,20 @@ fn security_requests_past_their_deadline_each_get_one_reply_on_their_own_id() {
     peer.finish();
 }
 
-/// The request budget of the paused cases: the least that still lists the tools.
+/// The request budget of the on-time case: the least that still lists the tools.
 const BUDGET: Duration = Duration::from_millis(20_000);
+
+/// The request budget of the control. Its reply is the `timeout` refusal, which
+/// is written whether or not the budget lists a tool, so the control does not
+/// wait out the 20 s of [`BUDGET`]. The server's own start is bounded by the
+/// same 4 s (stdio.rs `serve`).
+const LATE_BUDGET: Duration = Duration::from_millis(4_000);
 
 /// What a client saw that shrank its stdout pipe to 4096 bytes, sent a
 /// `tools/list` while the store was held, released the store after `release`,
 /// and began reading only `read_at` after sending, past the request budget
 /// `budget`. A budget under the operations' 20 s `execution_ms` lists no tool
-/// (projection.rs `limits`), so the cases below use 20 s.
+/// (projection.rs `limits`), so the case whose reply is the list uses 20 s.
 struct Paused {
     /// Whether the list's reply had begun (the pipe full, the reply blocked
     /// mid-frame) before the request's deadline: the reply was on time.
@@ -836,15 +842,18 @@ fn paused(budget: Duration, release: Duration, read_at: Duration) -> Paused {
     }
 }
 
-/// Control: the owner is held past the 20 s deadline, so the list's reply is
-/// the late `timeout` refusal. The client that starts reading 0.5 s after the
-/// deadline gets it, and the session answers the next ping.
+/// Control: the owner is held past the 4 s deadline of [`LATE_BUDGET`], so the
+/// list's reply is the late `timeout` refusal. The client that starts reading
+/// 0.5 s after the deadline gets it, and the session answers the next ping.
+/// The store is released 0.6 s after the deadline as the test counts it: the
+/// server's own deadline starts when it reads the request, and the hold has to
+/// outlast that too, or the owner answers in time and the reply is the list.
 #[test]
 fn security_control_a_late_reply_to_a_paused_reader_keeps_the_session() {
     let seen = paused(
-        BUDGET,
-        BUDGET + Duration::from_millis(600),
-        BUDGET + Duration::from_millis(500),
+        LATE_BUDGET,
+        LATE_BUDGET + Duration::from_millis(600),
+        LATE_BUDGET + Duration::from_millis(500),
     );
     let reply = seen.reply.as_ref().map(outcome);
     assert!(
@@ -857,11 +866,12 @@ fn security_control_a_late_reply_to_a_paused_reader_keeps_the_session() {
     );
 }
 
-/// The same client, the same pause, but the store is released at once, so
-/// the owner answers inside the deadline and the reply (several 12 KB tools)
-/// is blocked mid-frame in the 4096-byte pipe when the deadline passes. The
-/// request is past its deadline with its reply unwritten, as in the control;
-/// the only difference is that the owner was faster. The brief's invariant: a
+/// The same client, the same pause past the deadline, but under the 20 s
+/// budget that lists the tools ([`BUDGET`]) and with the store released at
+/// once, so the owner answers inside the deadline and the reply (several 12 KB
+/// tools) is blocked mid-frame in the 4096-byte pipe when the deadline passes.
+/// The request is past its deadline with its reply unwritten, as in the
+/// control; here the owner was faster. The brief's invariant: a
 /// request past its deadline never ends the session and never leaves the
 /// client without a reply. (A store held to 1.5 s before the deadline did not
 /// build this: the owner still answered `timeout`.) Should the reply not have
