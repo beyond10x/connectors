@@ -24,7 +24,7 @@ scope:
   path: adapters/kubernetes/tests/exec_credential_security.rs
 - confidence: cited
   path: crates/connectors-catalog/tests/bundle_adversary_2.rs
-revision: 15
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T02:53:29Z", actor: "human:operator", revision: 13}
 - {from: "proposed", to: "active", at: "2026-11-25T02:53:30Z", actor: "human:operator", revision: 14}
@@ -213,13 +213,20 @@ Where the implementation differs from the Change section, and what each differen
 Durations are from the build host of the shared pool: one run before the change, and the range of
 ten runs in a row after it. The forge's are read from the pull request's gate job.
 
-1. `bundle_adversary_2.rs`, the swap race (Change 1). The figures of the Change section fail as
-   written: 1,000 calls of `load` take 12 ms to 51 ms, and in 3 of 10 runs the swapping thread had
-   completed fewer than 100 swaps by then. The loop runs until 1,000 calls and 100 swaps are both
-   done, for at most 2 s, and then asserts `swaps >= 100`. The 2 s are at least 55 times the
-   slowest 100 swaps measured (36 ms). With the swapping thread stopped the test fails after
-   2.005 s with `the race was not run: 0 swaps during 1000 calls of load`. Before: 20.021 s.
-   After: 0.022 s to 0.095 s.
+1. `bundle_adversary_2.rs`, the swap race (Change 1). The figures of the Change section do not
+   hold. 1,000 calls of `load` take 12 ms to 51 ms, and in 3 of 10 runs the swapping thread had
+   completed fewer than 100 swaps by then. A count of swaps does not show that the race ran
+   either: the adversary read ran a loop of 1,000 calls and 100 swaps against a `load` that
+   checks the file and then reads it by path, the defect this test file was written against. That
+   loop missed the defect in 8 of 240 runs, and in 210 of 240 with both threads on one CPU.
+   The loop as built counts the calls of `load` during which the swap counter advanced. It ends at
+   the first followed link, at 500 such calls, or after 20 s, and the test asserts that the 500
+   were reached. Against the defective `load` it caught the defect in 40 of 40 loops on any CPU
+   and in 40 of 40 on one CPU; the most overlapped calls before the catch were 207. Against the
+   product's `load` it reached 500 in 40 of 40 loops, in 32 ms to 279 ms on any CPU and in
+   0.2 s to 5.3 s on one CPU. The defective `load` and those loops are not in the change: a test
+   that asserts a catch in every run of a race fails by chance. Before: 20.021 s. After, 20 runs
+   in a row: 0.037 s to 0.238 s.
 2. The push after a hang-up (Change 5). The 3 s sleep is not a 700 ms sleep. It is a poll for the
    outcome line in the log every 50 ms, for at most 3 s. The sleep starts after the forge applied
    the push, so its length is the time the relay has to write the line. The step took at most
@@ -227,8 +234,13 @@ ten runs in a row after it. The forge's are read from the pull request's gate jo
    hang-up. A late hang-up makes the test weaker, not red. Before: 7.674 s. After: 1.172 s to
    2.532 s.
 3. The kubernetes test (Change 4). The list `CANDIDATES` is empty in the first commit of this
-   story's pull request, as the Change section says: the first gate job fails at this test and
-   its failure names the path the walk found. That path is added in a second commit.
+   story's pull request, as the Change section says: the first gate job fails at this test. In
+   that failing case only, the walk goes on until it has up to 3 fitting files, and the failure
+   names them in the order found. They are added in a later commit. A passing run walks no
+   further than before. The adversary read notes what this design costs: when the image behind
+   the runner's label changes and none of the listed files is left, every gate job fails at this
+   test until the list is changed, and the local gate does not show it, because `GITHUB_ACTIONS`
+   is not set there.
 4. The timed-out check keeps a wait. `sleep 2` and `sleep 4` in the check, and the test sleeps
    2 s in place of 5 s. The check outlasts the 1 s timeout 4 times. The relay kills the check's
    process group once, at the timeout, and a survivor would write 1 s later. The test looks at

@@ -466,7 +466,7 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
 /// `.github/workflows/rust-gate.yml`) that a user other than root and the
 /// job's own owns. Whoever changes that image updates this list in the same
 /// change. In a gate job the test fails when its file came from the walk, and
-/// the failure names that file: it goes first in this list.
+/// the failure names up to 3 files the walk found: they are this list.
 const CANDIDATES: &[&str] = &[];
 const _: () = assert!(CANDIDATES.len() <= 3);
 
@@ -485,16 +485,22 @@ fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
             && meta.len() < 1 << 20
             && fs::read(path).is_ok()
     };
-    let mut found = CANDIDATES
+    let mut found: Vec<PathBuf> = CANDIDATES
         .iter()
         .map(PathBuf::from)
-        .find(|path| fs::symlink_metadata(path).is_ok_and(|meta| fits(path, &meta)));
-    let walked = found.is_none();
+        .find(|path| fs::symlink_metadata(path).is_ok_and(|meta| fits(path, &meta)))
+        .into_iter()
+        .collect();
+    let walked = found.is_empty();
+    // A gate job that has to walk fails below. Only its walk goes on past the
+    // first file, to 3 of them, so that one failure gives the whole list.
+    let listless_gate_job = walked && std::env::var_os("GITHUB_ACTIONS").is_some();
+    let wanted = if listless_gate_job { 3 } else { 1 };
     let mut queue: Vec<(PathBuf, usize)> = ["/etc", "/var/lib", "/usr/share", "/usr/include"]
         .iter()
         .map(|p| (PathBuf::from(p), 0))
         .collect();
-    while found.is_none()
+    while found.len() < wanted
         && let Some((dir, depth)) = queue.pop()
     {
         let Ok(entries) = fs::read_dir(&dir) else {
@@ -508,30 +514,36 @@ fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
             if meta.is_dir() && depth < 3 {
                 queue.push((path, depth + 1));
             } else if fits(&path, &meta) {
-                found = Some(path);
-                break;
+                found.push(path);
+                if found.len() == wanted {
+                    break;
+                }
             }
         }
     }
-    let Some(path) = found else {
+    let Some(path) = found.first() else {
         eprintln!("skipped: no readable file owned by another user");
         return;
     };
-    let credentials = Credentials::new(binding(&path)).unwrap();
+    let credentials = Credentials::new(binding(path)).unwrap();
     assert_eq!(
         credentials
-            .token(&kubeconfig(&path, &[]), &now, &no_ambient)
+            .token(&kubeconfig(path, &[]), &now, &no_ambient)
             .err(),
         Some(Refusal::PluginUnavailable(None)),
         "{}",
         path.display()
     );
     assert!(
-        !(walked && std::env::var_os("GITHUB_ACTIONS").is_some()),
+        !listless_gate_job,
         "no path of the list `CANDIDATES` in {} is a file of this runner image that another \
-         user owns; the walk found {}: add it to that list",
+         user owns; the walk found {}: put them in that list, in this order",
         file!(),
-        path.display()
+        found
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 }
 

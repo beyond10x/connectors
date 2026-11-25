@@ -95,18 +95,20 @@ fn a_bundle_file_swapped_for_a_link_after_the_check_is_not_followed() {
         })
     };
 
-    // 1,000 calls of `load` take some 20 ms, less than the swapper needs for 100
-    // swaps in some runs: the loop goes on until both are done, for 2 s at most.
-    let deadline = Instant::now() + Duration::from_secs(2);
+    // Only a call of `load` during which a swap completes can follow the link.
+    // Those calls are counted, and the loop ends when 500 of them are done.
+    let deadline = Instant::now() + Duration::from_secs(20);
     let mut attempts = 0u64;
+    let mut overlapped = 0u64;
     let mut followed = 0u64;
-    while (attempts < 1_000 || swapped.load(Ordering::Relaxed) < 100)
-        && Instant::now() < deadline
-        && followed == 0
-    {
+    while overlapped < 500 && followed == 0 && Instant::now() < deadline {
+        let before = swapped.load(Ordering::Relaxed);
         attempts += 1;
         if load(&directory, "fixture").is_ok() {
             followed += 1;
+        }
+        if swapped.load(Ordering::Relaxed) != before {
+            overlapped += 1;
         }
     }
     stop.store(true, Ordering::Relaxed);
@@ -119,6 +121,12 @@ fn a_bundle_file_swapped_for_a_link_after_the_check_is_not_followed() {
         target.display(),
         directory.display()
     );
-    // Without swaps the loop above raced nothing and its zero proves nothing.
+    // With too few such calls the loop above raced nothing and its zero proves nothing.
+    assert!(
+        overlapped >= 500,
+        "the race was not run: a swap overlapped {overlapped} of {attempts} calls of load \
+         ({swaps} swaps)"
+    );
+    // Each of those calls saw another swap complete.
     assert!(swaps >= 100, "the race was not run: {swaps} swaps");
 }
