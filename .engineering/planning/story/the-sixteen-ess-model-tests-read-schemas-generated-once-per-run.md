@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 8
+revision: 9
 ---
 ## Defect
 
@@ -52,8 +52,9 @@ Test code only, one file, `adapters/sql/tests/ess_model.rs`.
 
 1. `schema` reads from one directory per test run, under the target directory:
    `CARGO_TARGET_TMPDIR/connectors-sql-ess-model-schemas/<key>`. The key is a SHA-256 over the
-   names and bytes of the 4 files under `adapters/sql/spec/ess`, in name order, and the
-   version of the pinned `ess` (`connectors_spec::toolchain::version()`). The name of the
+   names and bytes of the 4 files under the source directory (`sources`; by default
+   `adapters/sql/spec/ess`), in name order, and the version of the pinned `ess`
+   (`connectors_spec::toolchain::version()`). The name of the
    parent directory holds the crate and the binary, because `target/tmp` is shared by every
    package of the tree.
 2. Creation is single-flight across processes. A caller opens the file `<key>.lock` beside the
@@ -108,7 +109,8 @@ product that takes at most 0.3 s to make.
    binary at once (each runs the one child test, which calls `schemas_in` with the pinned
    `ess` on the new, empty parent directory of the test) and then reads `generations.log`: 1
    line.
-   The 4 children exit 0 and each printed the same directory.
+   The 4 children exit 0 and each printed the same directory. The children run with
+   `--exact` and `--nocapture`, so that the line each child prints reaches the test.
 2. Acceptance 1 is red-capable: with the lock removed (not committed), one run of the test is
    recorded in "As built" with its line count. If that run still shows 1 line, "As built" says
    so and names what the test does not see.
@@ -116,8 +118,8 @@ product that takes at most 0.3 s to make.
    `a_changed_source_byte_makes_a_new_directory` copies the 4 files to a temporary directory,
    calls `schemas_in` on a parent directory of its own, changes one byte that the schema
    carries in the copy of `domains/profiles.yaml` (the bound `lte: 64` of
-   `connectors_sql.profiles.ProfileId` becomes `lte: 65`) and calls it again: the two
-   directories differ, that parent's `generations.log` holds 2 lines, and the file
+   `connectors_sql.profiles.ProfileId` becomes `lte: 65`: the first occurrence, line 20 of
+   the copy) and calls it again: the two directories differ, that parent's `generations.log` holds 2 lines, and the file
    `schemas/schema/types/connectors_sql.profiles.ProfileId.schema.json` holds
    `"maxLength": 64` in the first directory and `"maxLength": 65` in the second. That shows
    that `ess` read the copy. No file under `adapters/sql/spec/ess` changes.
