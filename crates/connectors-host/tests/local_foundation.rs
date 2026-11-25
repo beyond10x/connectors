@@ -302,8 +302,12 @@ fn concurrent_initialization_round() {
     }
 }
 
+/// Lane `slow`: this is the one run that lives through production's
+/// `WAIT_BOUND`. The gate's test step holds the same assertions at a wait of
+/// 1 s in `local::metadata::tests::contending_metadata_open_refuses_at_a_short_bound_and_recovers_after_release`.
 #[test]
-fn contending_metadata_open_refuses_at_its_bound_and_recovers_after_release() {
+#[ignore = "lane slow: waits out the production lock wait of 30 s"]
+fn slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release() {
     let root = root();
     let paths = paths(&root);
     Config::initialize(&paths).unwrap();

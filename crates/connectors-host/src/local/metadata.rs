@@ -251,8 +251,9 @@ pub(super) fn child_lock_wait(
     command: &mut std::process::Command,
     wait: Duration,
 ) -> &mut std::process::Command {
-    // Every caller starts a child that waits on a lock another process holds:
-    // one a killed test could otherwise leave waiting.
+    // Every caller whose child does more than report its wait starts a child
+    // that waits on a lock another process holds: one a killed test could
+    // otherwise leave waiting.
     super::parent_death::bind(command).env(
         LOCK_WAIT_ENV,
         format!("{}:{}", std::process::id(), wait.as_millis()),
@@ -1742,6 +1743,52 @@ mod tests {
         assert_eq!(handed(Some("120000")), None);
         assert_eq!(handed(Some("41:")), None);
         assert_eq!(handed(None), None);
+    }
+
+    /// The assertions of `connectors-host::local_foundation`'s
+    /// `slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release`
+    /// at a wait of 1 s. That test keeps production's `WAIT_BOUND` and runs in
+    /// the lane `slow`; an integration test cannot set a wait.
+    #[cfg(unix)]
+    #[test]
+    fn contending_metadata_open_refuses_at_a_short_bound_and_recovers_after_release() {
+        use crate::local::config::{Config, Paths};
+        let wait = Duration::from_secs(1);
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        let configuration = std::fs::read(&paths.config).unwrap();
+        // Current ER inspection releases the physical lifecycle lock after it
+        // closes the legacy SQLite handle. Hold the lock as a migration or
+        // serialized business transaction would, so this tests its actual bound.
+        let held = std::fs::File::open(paths.state.join(LOCK)).unwrap();
+        // SAFETY: held owns the live descriptor. Dropping it releases the lock.
+        assert_eq!(unsafe { libc::flock(held.as_raw_fd(), libc::LOCK_EX) }, 0);
+        let state = paths.state.clone();
+        let (send, receive) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            // The wait is per thread: the one that opens sets it.
+            set_lifecycle_lock_wait(wait);
+            let started = Instant::now();
+            send.send((Metadata::initialize(&state).map(|_| ()), started.elapsed()))
+                .unwrap();
+        });
+        // The refusal has 10 s after the wait to arrive, and arrives 19 s
+        // before a worker that still waited `WAIT_BOUND` would answer.
+        let (result, elapsed) = receive
+            .recv_timeout(wait + Duration::from_secs(10))
+            .unwrap();
+        assert_eq!(result, Err(Failure::MetadataUnavailable));
+        assert!(elapsed >= wait, "refused after {elapsed:?}");
+        worker.join().unwrap();
+        drop(held);
+        drop(Metadata::initialize(&paths.state).unwrap());
+        Metadata::inspect(&paths.state).unwrap();
+        assert_eq!(std::fs::read(&paths.config).unwrap(), configuration);
     }
 
     #[cfg(unix)]
