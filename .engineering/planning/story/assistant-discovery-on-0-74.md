@@ -6,7 +6,7 @@ status: draft
 title: A private consumer keeps the instances connectors 0.74 discovers
 relations:
 - decomposes: epic:review-20261123-findings
-revision: 3
+revision: 4
 ---
 ## Finding 4
 
@@ -15,7 +15,7 @@ https://github.com/beyond10x/loom/blob/fa6a8a136692da8693cbac2f78923ab4a0e54f03/
 
 ## Source
 
-Source: the connectors review of 2026-11-23 (Connectors 0.74.1 with Definitions 0.8.0, checked against main 45276d755c4), handed to this session by Timo the same day. The finding is restated from it: the consumer is a private repository of the organization, so its name is replaced by "a private consumer" and the review's three links into that repository are left out. The link that stays is the review's citation of Loom.
+Source: the connectors review of 2026-11-23 (Connectors 0.74.1 with Definitions 0.8.0, checked against main 45276d755c4), handed to this session by the owner the same day. The finding is restated from it: the consumer is a private repository of the organization, so its name is replaced by "a private consumer" and the review's three links into that repository are left out. The link that stays is the review's citation of Loom.
 
 ## Acceptance
 
