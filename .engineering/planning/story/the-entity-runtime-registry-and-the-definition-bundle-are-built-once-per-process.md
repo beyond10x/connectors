@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
 kind: story
-status: draft
+status: proposed
 title: 'The Entity Runtime registry is built once per process: 108.0 s become an estimated 76 s'
 summary: Every persist and fresh open of the metadata store parses the compiled-in bundle and builds the registry again; one process-wide value replaces 2,729 builds and 2,293 second parses in eleven tests
 relations:
@@ -14,7 +14,9 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-revision: 6
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 7}
 ---
 ## Defect
 

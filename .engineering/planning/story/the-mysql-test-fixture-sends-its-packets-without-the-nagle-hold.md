@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold
 kind: story
-status: draft
+status: active
 title: 'The MySQL test fixture sets TCP_NODELAY: 7.0 s become an estimated 0.6 s if the cause holds'
 summary: One SQL test spends 91 % of its time in epoll_wait on its own fixture server, which writes each packet in two parts without TCP_NODELAY; the first acceptance statement confirms or refutes that cause
 relations:
@@ -13,7 +13,10 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/mysql/fixture.rs
-revision: 4
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 5}
+- {from: "proposed", to: "active", at: "2026-11-25T11:18:23Z", actor: "human:operator", revision: 6}
 ---
 ## Defect
 

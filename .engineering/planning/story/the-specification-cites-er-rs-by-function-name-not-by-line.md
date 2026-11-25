@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-specification-cites-er-rs-by-function-name-not-by-line
 kind: story
-status: draft
+status: active
 title: The specification cites er.rs by function name, so moved lines no longer break a test or leave a stale citation
 summary: Two comments under ess/domains cite er.rs by line and a connectors-build test holds one of them within a window of three lines; the citations name a function, the test finds it and holds the arm, and the emissions record is regenerated
 relations:
@@ -17,7 +17,10 @@ scope:
   path: ess/domains/auth_bindings.yaml
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 7
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 9}
+- {from: "proposed", to: "active", at: "2026-11-25T11:18:23Z", actor: "human:operator", revision: 10}
 ---
 ## Defect
 
@@ -66,14 +69,20 @@ No test time is claimed: the test takes milliseconds before and after (it reads 
 1. `ess/domains/cli.yaml`, the comment at line 2218: the citation names the function and no
    line numbers, in the form the specification already uses elsewhere, the file name followed
    by the function name in backticks (`ess/domains/execution_audit.yaml` lines 282 and 378,
-   `ess/domains/credentials.yaml` lines 70 to 71): here `er.rs` and `removal_command`.
+   `ess/domains/credentials.yaml` lines 70 to 71). The exact text, on one comment line with
+   one space between the two parts and no backticks around the file name: metadata/er.rs
+   followed by `removal_command`, as line 282 of `execution_audit.yaml` writes
+   metadata/er.rs followed by `command_arguments`.
 2. `ess/domains/auth_bindings.yaml`, the comment at line 521: the same form with
-   `update_command`. Line 487 of that file already cites `update_command` by name. The registry
+   `update_command`, the path before it kept as it is written there today
+   (`crates/connectors-host/src/local/metadata/er.rs`), on one comment line. Line 487 of that
+   file already cites `update_command` by name, without backticks; it is not changed. The registry
    story does not need this point: no test reads the citation. It is here because the check of
    point 3 fails on every `er.rs:<digits>` under `ess/`, and this is the only other one.
 3. `crates/connectors-build/tests/cli_spec_mapping_adversary.rs`: the test holds two claims,
-   one per comment. For each it requires that the file still holds the citation (the function
-   name in backticks after `er.rs`), finds the one function of that name in `er.rs` (a line
+   one per comment. For each it requires that the file still holds the citation as one
+   literal on one line (metadata/er.rs, one space, the function name in backticks), finds the
+   one function of that name in `er.rs` (a line
    that starts with `fn <name>(`; exactly one), takes its text up to the next line that is `}`
    in the first column, and requires the arm the comment speaks of, as text:
    - `removal_command`, for "only expires Active cursors": exactly one line of the body holds
@@ -98,9 +107,14 @@ No test time is claimed: the test takes milliseconds before and after (it reads 
    one job per part, `--part component`, `--part connectors.oauth2` and
    `--part connectors.approval_issuers`, and each part also rewrites `inputs.json`.
    - This story runs one part, `--part component`: one pool job on the build host that names
-     30 minutes and brings the directory back with
-     `--fetch crates/connectors-build/generated/metadata-emissions`. `connectors-build` is built
-     in a job before it, so the build is not in the 30 minutes.
+     30 minutes and brings the directory back. `--timeout` and `--fetch` are flags of `slot`,
+     not of `connectors-build`:
+     `slot run --timeout 30m --fetch crates/connectors-build/generated/metadata-emissions -- cargo run --locked -p connectors-build -- metadata-conformance emissions --part component`.
+     `cargo build --locked -p connectors-build` runs as a job before it, so the build is not in
+     the 30 minutes. The form `slot run --fetch … -- cargo …` is the one that brought the
+     committed lowering of
+     story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition back
+     from the build host.
    - Why one part is enough: `inputs.json` is the same whichever part writes it, and a comment
      changes no emitted manifest (the two commits of 2026-11-23 and 2026-11-24 above). The
      diff under `generated/metadata-emissions/` is that one file. If the job changes another
@@ -115,8 +129,9 @@ The rule for later changes stands in the test's doc comment: a comment under `es
 ## Acceptance
 
 1. The test no longer depends on line numbers. Shown red first, once, in the pull request's
-   body: at the base commit, with 10 empty lines inserted at line 1 of `er.rs` and nothing else
-   changed, `the_er_rs_citation_lands_on_the_cursor_expiry_path` fails (command and failing
+   body: at the base commit (the commit of main the pull request's branch starts from;
+   f9f263a2 when this was written), with 10 empty lines inserted at line 1 of `er.rs` and
+   nothing else changed, `the_er_rs_citation_lands_on_the_cursor_expiry_path` fails (command and failing
    assertion quoted; 3 lines are the least that make it fail). With this change and the same 10
    inserted lines, the test passes. The inserted lines are not committed. Run on the build
    host:
@@ -167,7 +182,8 @@ Shared files, from the `scope` of each story's frontmatter (2026-11-25):
   scope, so it does not separate them from this story. They are unassessed. The same rule
   holds for them: a draft that writes `cli.yaml` starts from a head that holds this change.
 - `inputs.json` holds a sha256 of the 27 files under `ess/domains/`, so every story that changes
-  one of them regenerates it: the thirteen above and `spec-models-operation-admission`
+  one of them regenerates it: at most the thirteen above (one of them records only the
+  directory `ess`) and `spec-models-operation-admission`
   (`ess/domains/declarations.yaml`). `owner-observe-request-is-modelled-in-ess` records the
   directory `crates/connectors-build/generated/metadata-emissions`. Whoever merges second
   regenerates the record on a head that holds the first; it cannot be merged by hand. Each
