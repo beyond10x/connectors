@@ -107,6 +107,7 @@ mod openrouter;
 mod opsgenie;
 mod parameter_types;
 mod parameter_types_adversary;
+mod released_lowering;
 mod runpod;
 mod runpod_adversary;
 mod security_git_relay;
