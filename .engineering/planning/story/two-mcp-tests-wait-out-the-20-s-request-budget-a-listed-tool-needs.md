@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: story:two-mcp-tests-wait-out-the-20-s-request-budget-a-listed-tool-needs
 kind: story
-status: draft
+status: proposed
 title: Two MCP tests wait out the 20 s request budget a listed tool needs
 summary: Two MCP tests wait 21.7 s and 16.9 s on the forge because a read is listed only at a request budget of 20 s; two debug-only overrides read through the merged helper let both run at 4 s
 relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - depends_on: story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build
 - depends_on: story:seven-mcp-tests-use-a-4-s-request-budget-and-shorter-holds
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: apps/connectors/src/mcp/projection.rs
@@ -16,7 +17,9 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 8
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T14:07:37Z", actor: "human:operator", revision: 9, decided_on: {"recorded":{"review_outcome":11}}}
 ---
 ## Defect
 

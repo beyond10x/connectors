@@ -9,10 +9,11 @@ relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - informed_by: story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves
 - depends_on: story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 5
+revision: 6
 ---
 ## Defect
 
@@ -72,11 +73,13 @@ Test code only, one file, `adapters/sql/tests/ess_model.rs`.
    targets. The file is a test binary compiled with the pinned toolchain alone; the gate's
    check at 1.88 compiles the library of `connectors-sql`, not its tests. The file carries
    `#![cfg(unix)]`, so the lock is `flock` on Linux and macOS.
-4. The helper takes the parent directory and the source directory as arguments, so that a
-   test can point it at directories of its own. The 16 tests pass the two defaults.
-5. The `out` argument and the per-test temporary directory go where a test used them only for
-   the schemas. The executable `ess` is started in one place of the file, the helper's
-   generation under the lock.
+4. Two functions. `schemas_in(parent, sources)` does items 1 and 2 for a parent directory and
+   a source directory and returns the directory of the key. `schema(name)` loses its `out`
+   argument, calls `schemas_in` with the two defaults and reads one schema from the result.
+   The 16 tests call `schema(name)`. The two new tests and the child test call `schemas_in`
+   with directories of their own.
+5. The per-test temporary directory goes where a test used it only for the schemas. The
+   executable `ess` is started in one place of the file, inside `schemas_in` under the lock.
 6. The child test of acceptance 1 reads the parent directory from an environment variable and
    returns at once when the variable is absent, as an ordinary run has it. It is not an
    ignored test.
@@ -94,23 +97,29 @@ product that takes at most 0.3 s to make.
 
 1. Made once on a cold directory, across processes: a new test
    `four_processes_on_an_empty_directory_generate_once` starts 4 children of its own test
-   binary at once (each runs the one child test, which calls the helper with the pinned `ess`
-   on the new, empty parent directory of the test) and then reads `generations.log`: 1 line.
+   binary at once (each runs the one child test, which calls `schemas_in` with the pinned
+   `ess` on the new, empty parent directory of the test) and then reads `generations.log`: 1
+   line.
    The 4 children exit 0 and each printed the same directory.
 2. Acceptance 1 is red-capable: with the lock removed (not committed), one run of the test is
    recorded in "As built" with its line count. If that run still shows 1 line, "As built" says
    so and names what the test does not see.
 3. A changed source makes a new product: a new test
    `a_changed_source_byte_makes_a_new_directory` copies the 4 files to a temporary directory,
-   calls the helper on a parent directory of its own, changes one byte of one copy and calls
-   it again: the two directories differ and that parent's `generations.log` holds 2 lines. No file under `adapters/sql/spec/ess` changes.
+   calls `schemas_in` on a parent directory of its own, changes one byte inside a comment
+   line of the copy of `domains/profiles.yaml` and calls it again: the two directories differ
+   and that parent's `generations.log` holds 2 lines. No file under `adapters/sql/spec/ess`
+   changes.
 4. The 17 tests that exist today pass in the test step of the forge's "repository gate" job of
    the pull request.
 5. No assertion of an existing test changes: the pull request's diff of
-   `adapters/sql/tests/ess_model.rs` removes no line that contains `assert`.
-6. The 16 tests use the helper: in `adapters/sql/tests/ess_model.rs` as the pull request
-   leaves it, `Command::new` of the `ess` executable appears once, inside the helper's
-   generation, and no call of `schema` passes a temporary directory.
+   `adapters/sql/tests/ess_model.rs` removes no line that contains `assert` from a function
+   marked `#[test]` or `#[tokio::test]`. The helper's own `assert!(status.success(), …)`
+   moves into `schemas_in` and is not such a line.
+6. The 16 tests use the shared directory: in `adapters/sql/tests/ess_model.rs` as the pull
+   request leaves it, `Command::new` of the `ess` executable appears once, inside
+   `schemas_in`; `schema` takes the name alone; and `schemas_in` is called from `schema`,
+   from the two new tests and from the child test, and from nowhere else.
 7. `git diff --stat` of the pull request names one file outside the planning store.
 8. The three new tests, the child test among them, end within 5 s each in the same job; none
    is a `slow_lane_` test.
@@ -122,8 +131,8 @@ acceptance.
 
 ## Scope
 
-- `adapters/sql/tests/ess_model.rs`: the helper `schema`, its call sites, the two new tests
-  and the child test.
+- `adapters/sql/tests/ess_model.rs`: `schema`, the new `schemas_in`, the call sites of
+  `schema`, the two new tests and the child test.
 
 No `Cargo.toml` changes: `sha2`, `hex`, `tempfile` and `connectors-spec` are dev-dependencies
 of `connectors-sql` already. Nothing but the tests writes under
@@ -143,7 +152,7 @@ Other stories near this file:
 
 - The fixture's hold: story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold.
 - `the_model_admits_exactly_the_read_profiles_the_executable_admits`, 0.559 to 0.700 s as the
-  code is and 0.557 to 0.800 s with the probe: its time is not in the call.
+  code is and 0.557 to 0.800 s with the probe: its time is not in the call. No story.
 - The other test files that start `ess generate` (found with a search for `"generate"` under
   `adapters/*/tests` and `crates/connectors-build/tests`):
   `adapters/sql/tests/mysql_adversary.rs`, `adapters/sql/tests/mysql_adversary_2.rs`,
@@ -151,5 +160,9 @@ Other stories near this file:
   `adapters/loki/tests/adversary_pass1.rs`, `adapters/prometheus/tests/ess_model.rs`,
   `crates/connectors-build/tests/catalog_guard_model.rs`, `catalog_walk_model.rs`,
   `catalog_binary_model.rs`, `catalog_amendment_model.rs`, `catalog_identity_model.rs` and
-  `fresh_checkout_regeneration.rs` of the same directory. Their calls are not counted and not
-  measured here; they belong to story:where-do-the-1298-s-of-the-tests-under-5-s-go.
+  `fresh_checkout_regeneration.rs` of the same directory. Each file starts it in one place,
+  and the 12 files hold 42 test functions, so a run makes at most 42 such calls. Their calls
+  per run and their times are not measured. No story claims them:
+  story:where-do-the-1298-s-of-the-tests-under-5-s-go reads four other binaries. At the 0.088 s
+  that a call takes at most on the forge for this story's sources, 42 calls are at most 3.7 s
+  (arithmetic; their sources differ). No story.

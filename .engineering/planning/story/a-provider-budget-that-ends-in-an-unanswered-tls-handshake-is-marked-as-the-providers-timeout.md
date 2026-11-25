@@ -8,6 +8,7 @@ summary: With a provider budget shorter than the connect timeout, a timeout duri
 relations:
 - informed_by: story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts
 - depends_on: story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: Cargo.lock
@@ -17,7 +18,7 @@ scope:
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 8
+revision: 9
 ---
 ## Defect
 
@@ -44,8 +45,9 @@ budget the same peer is cut by the connect timeout and the timeout is not marked
 (`a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked` in
 `crates/connectors-host/tests/provider_timeout_adversary.rs`).
 
-Inferred, not read in reqwest's source: reqwest reports a request timeout that passes during
-the connect as a timeout that is not a connect error. The run above agrees with it.
+Read in the source of reqwest 0.13.5: `PendingRequest::poll` polls the request's own timers
+before the request and, when one has passed, returns a timeout that carries no connect error
+(`src/async_impl/client.rs:3096-3113`). The run above agrees with it.
 
 Three places set a timeout from the budget:
 
@@ -92,24 +94,26 @@ The form:
    reqwest's request and connection types are private to it, so the layer and its service
    are generic over the inner service and the request type, and the service maps its error
    to reqwest's boxed error. reqwest's own `connect_timeout` stays the outermost layer.
-2. With a provider budget, `send` and the read POST run `request.send()` inside the scope of
-   that task-local, set to the end of the budget less a lead of 250 ms (a named constant).
-   Without a budget neither sets it. The request's own timeout stays what it is today. The
-   lead is there so that a connect the budget cuts ends by the connect's bound: reqwest
-   polls the request's own timer before the request (`PendingRequest::poll`,
-   `src/async_impl/client.rs:3096-3113`), so when both have passed at one poll the marked
-   timeout wins, and the lead is the time the task may go unpolled without that. With less
-   than the lead left, a call that needs a new connection fails at once with the unmarked
-   `Timeout`; that loss is accepted. A call on a pooled connection is not touched.
-3. The read POST's own timeout is `remaining.min(read_post_timeout)`, and
-   `read_post_timeout` may be 1 ms to 180 s (`with_read_posts`; 15 s by default). The
-   deadline of the task-local is the budget's, also there. A read POST whose own timeout is
-   the shorter one and passes during the handshake stays marked, as it is without a budget
-   today: that cut is not the budget's, and a lead cannot be taken from a timeout of 1 ms.
+2. `send` reads the time the budget has left, as today. When at least 500 ms are left (twice
+   the lead, a named constant), it runs `request.send()` inside the scope of that
+   task-local, set to the end of the budget less a lead of 250 ms (a named constant). With
+   less left, and without a budget, it sets nothing and the call is as today. The request's
+   own timeout stays what it is today. The lead is there so that a connect the budget cuts
+   ends by the connect's bound: reqwest polls the request's own timer before the request
+   (`PendingRequest::poll`, `src/async_impl/client.rs:3096-3113`), so when both have passed
+   at one poll the marked timeout wins, and the lead is the time the task may go unpolled
+   without that.
+3. A call that connects with less than 500 ms of its budget left is as today: a cut during
+   the handshake is marked. Two tests that exist hold that band as it is, on a client that
+   has no connection yet: `provider_budget_cannot_be_reset_by_another_request_or_derived_capability`
+   (200 ms left, the first `get` answers 200) and
+   `provider_budget_uses_the_earlier_execution_deadline_during_http` (150 ms left, one
+   request sent, a marked `Timeout`), both in `crates/connectors-host/tests/http_budget.rs`.
+   A lead taken from so short a time would cut their connects.
 4. `provider_error` does not change. reqwest reports the layer's failure as a connect error
    (`is_connect()`: the error comes from the connector) that is a timeout (`is_timeout()`:
    an `io::Error` of kind `TimedOut` in its sources), and that branch is unmarked today.
-5. For `send` and the read POST the case of the defect becomes an unmarked `Timeout`:
+5. For `send` with at least 500 ms left the case of the defect becomes an unmarked `Timeout`:
    `Failure::Timeout`, reported as `timeout` at `stage = admission` with
    `next_action = retry_explicitly`. That is what the client's own connect timeout reports
    today. `Failure::from_provider` does not change. `upstream_answer` is a field of the
@@ -117,10 +121,12 @@ The form:
    case.
 6. A request that got its connection is as today: the request's timeout ends it, and the
    timeout is marked. A request sent on a pooled connection calls no connector and is as
-   today.
-7. `upgrade` is not changed. It does not set the task-local, so its connect has the client's
-   connect timeout alone, and its two timers and its choice between `Lost` and `NotSent` stay
-   as they are.
+   today. When hyper-util finds the pooled connection closed before the request was sent, it
+   calls the connector again inside the same scope; that connect has the same bound, and no
+   request was sent.
+7. `upgrade` and the read POST are not changed. Neither sets the task-local, so their
+   connects have the client's connect timeout alone. `upgrade` keeps its two timers and its
+   choice between `Lost` and `NotSent`.
 8. `tower-layer` and `tower-service` become direct dependencies of `connectors-host` at the
    versions `Cargo.lock` already holds (0.3.3 each). Both entries carry their version in
    `crates/connectors-host/Cargo.toml`, as `libc` does there; the root `Cargo.toml` does not
@@ -161,19 +167,24 @@ test step makes no network request.
    750 ms after the lead.
 4. `a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked` and
    `a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout` pass unchanged.
-5. The upgrade path is untouched: the pull request's diff changes no line of the function
-   `upgrade`, and the test binaries `http_upgrade` and `upgrade_adversary` of
-   `connectors-host` pass in the forge's "repository gate" job.
-6. No test added by this story takes over 5 s in the nextest output of the test step of the
+5. The upgrade path and the read POST are untouched: the pull request's diff changes no line
+   of the function `upgrade` and no line of the read POST, and the test binaries
+   `http_upgrade` and `upgrade_adversary` of `connectors-host` pass in the forge's
+   "repository gate" job.
+6. A budget with less than 500 ms left is as today: the pull request's diff changes no line
+   of `crates/connectors-host/tests/http_budget.rs`, and its tests pass in the same job,
+   among them `provider_budget_cannot_be_reset_by_another_request_or_derived_capability`
+   and `provider_budget_uses_the_earlier_execution_deadline_during_http`.
+7. No test added by this story takes over 5 s in the nextest output of the test step of the
    forge's "repository gate" job of the pull request; none is a `slow_lane_` test.
-7. `git diff --stat` of the pull request names, outside the planning store, `http.rs`, the
+8. `git diff --stat` of the pull request names, outside the planning store, `http.rs`, the
    test file, `crates/connectors-host/Cargo.toml` and `Cargo.lock`, and `Cargo.lock` gains no
    `[[package]]`.
 
 ## Scope
 
 - `crates/connectors-host/src/http.rs`: the layer, the task-local, the client's builder,
-  `send`, the read POST.
+  `send`.
 - `crates/connectors-host/tests/provider_timeout_adversary.rs`: the three new tests.
 - `crates/connectors-host/Cargo.toml` and `Cargo.lock`: the two direct dependencies.
 
@@ -183,7 +194,8 @@ Other stories on these files:
   (the client's builder among its lines) and the test file. This story depends on it and
   starts after it is merged.
 - `Cargo.lock` is a file every story with a new dependency writes. No story that is planned
-  beside this one adds a dependency.
+  beside this one adds a dependency. story:mcp-outbound-stdio-runtime (draft) carries
+  `Cargo.lock` as an inferred scope; it is not planned beside this story.
 - story:test-binary-per-package-rest (draft, no scope) would move the test files of
   `crates/connectors-host` under one test binary and change the binary names of
   acceptance 5. It is not planned beside this story.
@@ -200,6 +212,14 @@ Other stories on these files:
   caller that the effect may have started, which is the safe reading for a write. Whether a
   cut before a connection may become `NotSent`, and its mark, are not changed here; no story.
 - A test of a budget that ends before the TCP connection opens: see "Change"; no story.
-- A read POST cut by its own `read_post_timeout` during the handshake, with or without a
-  budget: marked today and after this story (Change, item 3); no story.
-- The contract text: §6 already says what this story makes the client do.
+- The read POST. It sets its timeout from the budget as `send` does, and a cut during the
+  handshake is marked there today and after this story. No production port has both: read
+  POSTs are admitted by `adapters/grafana/src/local.rs` (30 s) and
+  `adapters/tavily/src/local.rs` (160 s), a provider budget is set by
+  `adapters/catalog/src/local.rs` alone. Without a budget both read POST timeouts are longer
+  than the connect timeout of 5 s, which cuts first and is unmarked. No story.
+- A budget with less than 500 ms left when the call connects: a cut during the handshake
+  stays marked (Change, item 3). Inside the lead the request's own timer can win over any
+  bound of the connect, so a bound there decides nothing. No story.
+- The contract text. §6 already says what this story makes `send` do with at least 500 ms
+  left; the two lines above are the cases where the client still differs from it.
