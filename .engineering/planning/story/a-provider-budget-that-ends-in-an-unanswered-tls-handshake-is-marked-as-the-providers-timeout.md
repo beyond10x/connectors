@@ -18,7 +18,7 @@ scope:
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 14
+revision: 15
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T14:38:58Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"review_outcome":19}}}
 - {from: "proposed", to: "active", at: "2026-11-25T16:33:14Z", actor: "human:operator", revision: 14, decided_on: {"recorded":{"review_outcome":19}}}
@@ -233,3 +233,51 @@ Other stories on these files:
   bound of the connect, so a bound there decides nothing. No story.
 - The contract text. §6 already says what this story makes `send` do with at least 500 ms
   left; the two lines above are the cases where the client still differs from it.
+
+## As built
+
+Commit 55210be72 on the branch `story/provider-budget-tls-handshake`, not pushed. The branch
+starts at 7e0bb9401, the head of the integration branch that holds the five-tests story. The
+commit changes 4 files, 250 lines added and 2 removed: `crates/connectors-host/src/http.rs`,
+`crates/connectors-host/tests/provider_timeout_adversary.rs`,
+`crates/connectors-host/Cargo.toml` and `Cargo.lock`. `Cargo.lock` gains two dependency lines
+of `connectors-host` and no `[[package]]` (acceptance 8).
+
+The form is the one of "Change": `BudgetConnectLayer` and its service `BudgetConnect`, the
+task-local `CONNECT_UNTIL`, the constants `CONNECT_LEAD` (250 ms) and
+`CONNECT_BOUND_MIN_REMAINING` (twice the lead), one `connector_layer` call in the client's
+builder after `connect_timeout`, and the scope in `send`. The hunks of `http.rs` start at
+lines 100, 350, 680 and 685 of the new file; none is above line 37, none is in `upgrade` and
+none is in `post_json` (acceptance 5, the diff half).
+
+Acceptance 1, seen red. The run was made after the change was written, on the three tests
+with the product change taken out of the tree for the run, so the product code was the
+branch's base. 5 tests ran, 4 passed and 1 failed, the 2 `slow_lane_` tests were skipped. The
+failing test was `a_provider_budget_cut_during_an_unanswered_tls_handshake_is_not_marked`,
+after 1.165 s, with:
+
+    a provider budget that ended during an unanswered handshake sent no request, after 1.002467993s: upstream_answer = true
+
+The tests of acceptances 2 and 3 passed in that run (1.104 s and 1.124 s): they pass before
+the change.
+
+With the change, one run on the workstation: the 5 tests of the binary passed.
+`a_provider_budget_cut_during_an_unanswered_tls_handshake_is_not_marked` took 0.866 s,
+`a_body_that_stalls_under_a_provider_budget_is_the_providers_timeout` 1.180 s and
+`a_request_that_is_sent_and_not_answered_under_a_provider_budget_is_the_providers_timeout`
+1.262 s. The two tests of acceptance 4 passed unchanged (0.513 s and 0.551 s). The layer's
+`call` saw the task-local value: the question "Change" left to acceptance 1 is answered by
+that pass.
+
+One run of the binaries `http_budget`, `http_upgrade` and `upgrade_adversary` with the
+change: 21 of 21 tests passed. The commit changes no line of
+`crates/connectors-host/tests/http_budget.rs`.
+
+Clippy with `-D warnings` over all targets of `connectors-host` and the format check pass.
+
+One departure from the story: the test of acceptance 3 also asserts that the peer read a
+whole request head before the call ended. The story names `Timeout` and
+`upstream_answer = true` alone; the added assertion is what shows the request was sent.
+
+Not run: the two `slow_lane_` tests of the file, and no mutant of the change. The figures of
+the forge's "repository gate" job for acceptances 5, 6 and 7 are added with the pull request.
