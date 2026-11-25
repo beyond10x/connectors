@@ -58,9 +58,6 @@ const STALL: &str = "998";
 /// The input whose answer the provider holds for 25 s: longer than the 20 s
 /// execution budget of a read.
 const HOLD: &str = "997";
-/// The input whose answer the provider holds for 2.4 s: longer than one data
-/// lease (`LEASE_MS`, 1.9 s, in `src/mcp/session.rs`).
-const LEASED: &str = "996";
 /// An input number no f64 holds: it reaches the provider and comes back as
 /// these digits only through lossless reads.
 const WIDE: &str = "1844674407370955161701";
@@ -275,36 +272,30 @@ impl Provider {
                         if n == HOLD {
                             std::thread::sleep(Duration::from_secs(25));
                         }
-                        if n == LEASED {
-                            std::thread::sleep(Duration::from_millis(2400));
-                        }
                         if n == STALL {
                             // The answer is held 8 s. A client that closes
-                            // the connection inside them is counted at once
-                            // and gets no answer; one that still holds it
-                            // open after them is counted then, as before.
+                            // the connection inside them is counted closed
+                            // at once and gets no answer; one that still
+                            // holds it after them is counted open. Every
+                            // stalled read gets exactly one of the two.
                             let until = Instant::now() + Duration::from_secs(8);
                             stream.set_nonblocking(true).unwrap();
-                            while Instant::now() < until {
-                                match stream.peek(&mut [0u8; 1]) {
-                                    // Open and silent, or open with bytes waiting.
-                                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                                    Ok(waiting) if waiting > 0 => {}
-                                    // End of file or a reset: the client let go.
-                                    _ => {
-                                        closed.fetch_add(1, Ordering::SeqCst);
-                                        let _ = stream.shutdown(Shutdown::Both);
-                                        return;
-                                    }
-                                }
+                            // Held: silent, or with bytes waiting. Anything
+                            // else (end of file, a reset): the client let go.
+                            let held =
+                                |stream: &std::net::TcpStream| match stream.peek(&mut [0u8; 1]) {
+                                    Err(e) => e.kind() == std::io::ErrorKind::WouldBlock,
+                                    Ok(waiting) => waiting > 0,
+                                };
+                            while held(&stream) && Instant::now() < until {
                                 std::thread::sleep(Duration::from_millis(10));
                             }
-                            if stream
-                                .peek(&mut [0u8; 1])
-                                .is_err_and(|e| e.kind() == std::io::ErrorKind::WouldBlock)
-                            {
-                                open.fetch_add(1, Ordering::SeqCst);
+                            if !held(&stream) {
+                                closed.fetch_add(1, Ordering::SeqCst);
+                                let _ = stream.shutdown(Shutdown::Both);
+                                return;
                             }
+                            open.fetch_add(1, Ordering::SeqCst);
                             stream.set_nonblocking(false).unwrap();
                         }
                         let body = format!("{{\"observed\":{n}}}");
@@ -1207,19 +1198,19 @@ fn hold_store(served: &Served) -> fs::File {
 }
 
 /// story:mcp-long-read-exits-under-load, both halves at once: a read longer
-/// than one lease (§ 3.3, provider answers in 2.4 s, a lease lasts 1.9 s)
-/// while the store is held from the moment the provider has the request until
-/// 0.5 s after it answers, so the owner's own record of the read waits on the
-/// lock too. Renewal must not wait on it: the reply arrives under a renewed
-/// lease and a later ping is answered. The hold starts after the provider's
-/// 2.4 s did, so it ends at least 0.5 s after the answer is due on any
-/// machine; a slower owner only reaches its record later in that half second.
+/// than one lease (§ 3.3, provider answers in 3 s) while the store is held
+/// from the moment the provider has the request until 1 s after it answers,
+/// so the owner's own record of the read waits on the lock too. Renewal must
+/// not wait on it: the reply arrives under a renewed lease and a later ping is
+/// answered. No reply may be there before the release: one that is shows the
+/// owner answered without its record waiting for the store; an owner that
+/// reaches its record only after the release passes here unseen.
 #[test]
 fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     let (tool, revision) = listed(&mut peer);
-    send_call(&mut peer, 2, &tool, LEASED, &revision);
+    send_call(&mut peer, 2, &tool, SLOW, &revision);
     let until = Instant::now() + Duration::from_secs(10);
     while served.provider.requests() == 0 {
         assert!(
@@ -1229,7 +1220,7 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
         std::thread::sleep(Duration::from_millis(5));
     }
     let lock = hold_store(&served);
-    std::thread::sleep(Duration::from_millis(2900));
+    std::thread::sleep(Duration::from_secs(4));
     let status = peer.child.try_wait().unwrap();
     if status.is_some() {
         let stderr = peer.errors.take().unwrap().join().unwrap();
@@ -1238,6 +1229,11 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
             String::from_utf8_lossy(&stderr)
         );
     }
+    let early = peer.frames.try_recv().ok();
+    assert!(
+        early.is_none(),
+        "the reply came while the store was held: {early:?}"
+    );
     drop(lock);
     let reply = peer.recv();
     assert_eq!(reply["id"], 2, "{reply}");

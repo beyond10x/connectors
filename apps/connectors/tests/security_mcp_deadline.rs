@@ -736,10 +736,14 @@ const BUDGET: Duration = Duration::from_millis(20_000);
 const LATE_BUDGET: Duration = Duration::from_millis(4_000);
 
 /// What a client saw that shrank its stdout pipe to 4096 bytes, sent a
-/// `tools/list` while the store was held, released the store after `release`,
-/// and began reading only `read_at` after sending, past the request budget
-/// `budget`. A budget under the operations' 20 s `execution_ms` lists no tool
-/// (projection.rs `limits`), so the case whose reply is the list uses 20 s.
+/// `tools/list` while the store was held, and began reading only `read_at`
+/// after sending, past the request budget `budget`. The store is released
+/// `release` after sending, before anything else is done; with no `release` it
+/// stays held until the reply and the ping after it have been read. A reply
+/// under 4096 bytes is in the pipe as soon as the server writes it, whenever
+/// the client reads; only a longer one waits for the reader. A budget under the
+/// operations' 20 s `execution_ms` lists no tool (projection.rs `limits`), so
+/// the case whose reply is the list uses 20 s.
 struct Paused {
     /// Whether the list's reply had begun (the pipe full, the reply blocked
     /// mid-frame) before the request's deadline: the reply was on time.
@@ -751,7 +755,7 @@ struct Paused {
     stderr: String,
 }
 
-fn paused(budget: Duration, release: Duration, read_at: Duration) -> Paused {
+fn paused(budget: Duration, release: Option<Duration>, read_at: Duration) -> Paused {
     use std::os::fd::AsRawFd;
     let served = Served::new();
     served.exposures_within(true, budget.as_millis() as u64);
@@ -781,8 +785,14 @@ fn paused(budget: Duration, release: Duration, read_at: Duration) -> Paused {
     let list = json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{"_meta":meta()}});
     let sent = Instant::now();
     stdin.write_all(format!("{list}\n").as_bytes()).unwrap();
-    std::thread::sleep(release);
-    drop(lock);
+    let held = match release {
+        Some(after) => {
+            std::thread::sleep(after);
+            drop(lock);
+            None
+        }
+        None => Some(lock),
+    };
     let mut began_on_time = false;
     while sent.elapsed() < budget - Duration::from_millis(100) {
         let mut queued: libc::c_int = 0;
@@ -828,6 +838,7 @@ fn paused(budget: Duration, release: Duration, read_at: Duration) -> Paused {
     let ping = json!({"jsonrpc":"2.0","id":3,"method":"ping","params":{"_meta":meta()}});
     let pinged = stdin.write_all(format!("{ping}\n").as_bytes()).is_ok()
         && wait(3, Duration::from_secs(10)).is_some();
+    drop(held);
     let status = child.try_wait().unwrap();
     drop(stdin);
     let _ = child.kill();
@@ -842,19 +853,17 @@ fn paused(budget: Duration, release: Duration, read_at: Duration) -> Paused {
     }
 }
 
-/// Control: the owner is held past the 4 s deadline of [`LATE_BUDGET`], so the
-/// list's reply is the late `timeout` refusal. The client that starts reading
-/// 0.5 s after the deadline gets it, and the session answers the next ping.
-/// The store is released 0.6 s after the deadline as the test counts it: the
-/// server's own deadline starts when it reads the request, and the hold has to
-/// outlast that too, or the owner answers in time and the reply is the list.
+/// Control: the store stays held until the session has answered, so the owner
+/// cannot answer the list at any deadline, whenever the server read the
+/// request, and the list's reply is the `timeout` refusal the server writes at
+/// the 4 s deadline of [`LATE_BUDGET`]. The refusal is about 265 bytes: it is
+/// in the pipe at the deadline and the reader's pause does not hold it back.
+/// The client starts reading 0.5 s after the deadline, takes it from the pipe,
+/// and the session answers the next ping, which needs no store (a ping is
+/// answered in the serve loop, without the owner). Then the store is released.
 #[test]
 fn security_control_a_late_reply_to_a_paused_reader_keeps_the_session() {
-    let seen = paused(
-        LATE_BUDGET,
-        LATE_BUDGET + Duration::from_millis(600),
-        LATE_BUDGET + Duration::from_millis(500),
-    );
+    let seen = paused(LATE_BUDGET, None, LATE_BUDGET + Duration::from_millis(500));
     let reply = seen.reply.as_ref().map(outcome);
     assert!(
         reply.as_deref() == Some("timeout") && seen.pinged,
@@ -878,7 +887,11 @@ fn security_control_a_late_reply_to_a_paused_reader_keeps_the_session() {
 /// begun before the deadline, the case proves nothing; it says so and passes.
 #[test]
 fn security_an_on_time_reply_written_across_its_deadline_keeps_the_session() {
-    let seen = paused(BUDGET, Duration::ZERO, BUDGET + Duration::from_millis(500));
+    let seen = paused(
+        BUDGET,
+        Some(Duration::ZERO),
+        BUDGET + Duration::from_millis(500),
+    );
     if !seen.began_on_time {
         eprintln!(
             "scenario not built: the reply did not begin before the deadline: {:?}",
