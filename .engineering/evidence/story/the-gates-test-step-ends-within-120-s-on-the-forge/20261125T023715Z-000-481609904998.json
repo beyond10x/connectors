@@ -1,9 +1,9 @@
 {
-  "at": "2026-11-25T02:18:02Z",
-  "actor": "human:timo",
+  "at": "2026-11-25T02:37:15Z",
+  "actor": "human:operator",
   "artifact": "story:the-gates-test-step-ends-within-120-s-on-the-forge",
   "kind": "story",
-  "revision": 4,
+  "revision": 6,
   "change": {
     "change": "evidence",
     "kind": "review_outcome",
