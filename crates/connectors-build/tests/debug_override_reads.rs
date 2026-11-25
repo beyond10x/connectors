@@ -6,6 +6,10 @@
 //! This is a scan of the source text. It sees a name written as a literal in the call, and a
 //! constant the same file defines from such a name. It does not follow a name through a variable
 //! or across files, and it does not tell a comment from code.
+//!
+//! Forms it does not see, none of them in the sources when it was written: a literal after a
+//! comment inside the call; a literal inside a conversion (`var_os(OsStr::new("…"))`); `var`
+//! imported under another name; a search of `std::env::vars()` or `vars_os()` for the name.
 use regex::Regex;
 use std::{
     fs,
@@ -99,13 +103,15 @@ fn no_debug_override_is_read_outside_the_helper() {
     for directory in ["crates", "apps", "adapters"] {
         sources(&root, Path::new(directory), false, &mut files);
     }
-    // The scan read the tree: the helper's file and the three files that held a direct read
-    // before the helper are among the files, and this module with its own direct reads is not.
+    // The scan read the tree: the helper's file, the three files that held a direct read
+    // before the helper and one file of an adapter are among the files, so each of the three
+    // directories was read. This module with its own direct reads is not among them.
     for expected in [
         HELPER,
         "crates/connectors-host/src/local/owner/transport.rs",
         "crates/connectors-host/src/local/registry/lifecycle.rs",
         "apps/connectors/src/local/owner_stop.rs",
+        "adapters/catalog/src/lib.rs",
     ] {
         assert!(
             files.iter().any(|file| file == expected),
