@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-catalog/tests/definition_published_features.rs
-revision: 5
+revision: 7
 ---
 ## Defect
 
@@ -26,16 +26,17 @@ test, so that is not one of the two accepted forms of the folder rule "Tests sta
 revision asked for another seam: the tests read the lowering that
 story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition commits,
 except the tests that test `lower` itself. Read at 0.78.1, that seam reaches one test. The id of
-this story keeps the old name; an id cannot be changed.
+this story keeps the old name; an id cannot be changed. The words "once per process" in the id are
+from the first draft: this story adds no in-process cache.
 
 Source of the durations: the ones nextest printed in the forge's gate job 138270416028 of pull
 request 291, 2026-11-24, as listed in test-plan:where-the-gates-test-step-spends-its-time (group
 L2): one test of 7.4 s and 10 tests of 1 s to under 5 s, 24.2 s. The plan read the sources at
 0.77.2.
 
-The thirteen tests, read at 0.78.1. Both files have a helper `lower_file`, which lowers the
-released file unchanged, and a helper `lower`, which lowers the released head plus one appended
-operation (`definition_published_features.rs` lines 58 to 77,
+The thirteen tests, read at 0.78.1; the lines cited are the same at 0.78.2. Both files have a
+helper `lower_file`, which lowers the released file unchanged, and a helper `lower`, which lowers
+the released head plus one appended operation (`definition_published_features.rs` lines 58 to 77,
 `definition_published_features_adversary.rs` lines 35 to 58).
 
 `crates/connectors-catalog/tests/definition_published_features.rs`, 7 tests:
@@ -70,6 +71,9 @@ refuses before its costly steps.
    keeps its assertions. That the committed bytes are a lowering of the released file is held by
    the fast check and the lane test of
    story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition.
+   The staleness check of the fixture is a test of the provider crate, so
+   `cargo test -p connectors-catalog` alone reads a file that nothing checked in that run; the
+   gate runs both.
 2. Twelve tests keep lowering: the eleven that lower a changed definition, because a changed
    definition is not the committed one, and
    `lowering_the_released_definition_twice_writes_the_same_bytes`, because it tests `lower`.
@@ -78,16 +82,29 @@ refuses before its costly steps.
 The plan's estimate of 5.0 s for the eleven (0.3 s per test) is dropped: it rested on an ingest
 that every test reuses, and no accepted form gives that without a change of `lower`.
 
-Estimate after for the one test (computed; not timed): about 0.14 s, the mean of a test of the
-provider binary that lowers nothing (the plan: 7.5 s over 55 `slack` tests). Before: 1.583 s.
+No time bound is an acceptance of this story. Before its one call of `lower_file` (line 283) the
+test reads the released file, hashes it and runs `definition::parse` (lines 273 to 282), and it
+keeps doing so. That part was never timed, so the 1.583 s cannot be split into the lowering and
+the rest. The figure of about 0.14 s (the plan: 7.5 s over 55 `slack` tests of the provider binary,
+the mean of a test that lowers nothing) is another test's mean and is not an estimate for this
+one. The duration after is reported, not accepted: it is the duration nextest prints for the test
+in the test step of the forge's "repository gate" job of this story's pull request, and the same
+value in the JUnit report `target/nextest/default/junit.xml` that the gate reads for its list of
+the ten slowest tests (`crates/connectors-build/src/gate.rs`, `JUNIT`, line 510). Before:
+1.583 s.
 
 ## Acceptance
 
-1. `connectors-catalog::main::definition_published_features::the_released_github_definition_lowers`
-   passes in the test step of the forge's "repository gate" job of this story's pull request in at
-   most 1 s. Before: 1.583 s. Estimate: 0.14 s. Bound: 1.5 × 0.14 = 0.21, rounded up to 1 s.
-2. `grep` finds no call of `lower_file` in that test.
+1. The test no longer lowers:
+   `sed -n '/^fn the_released_github_definition_lowers/,/^}/p' crates/connectors-catalog/tests/definition_published_features.rs | grep -c 'lower_file\|lower('`
+   prints 0. Today it prints 1.
+2. `connectors-catalog::main::definition_published_features::the_released_github_definition_lowers`
+   passes in the gate's test step with the assertions it has today. Alone it runs with
+   `cargo test --locked -p connectors-catalog --test main -- --exact definition_published_features::the_released_github_definition_lowers`.
 3. The other twelve tests pass unchanged.
+4. The test reads the committed fixture:
+   `grep -n 'released-github-lowering' crates/connectors-catalog/tests/definition_published_features.rs`
+   prints at least one line. Today it prints nothing.
 
 ## Scope
 
@@ -115,4 +132,5 @@ story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing edits
 - The gate failing when its test step runs over 120 s:
   story:the-gates-test-step-ends-within-120-s-on-the-forge.
 - Not established: which two tests ran under 1 s; the cost of `definition::lower` taken apart and
-  which sub-step dominates (the plan did not measure it); the "after" figure on the forge.
+  which sub-step dominates (the plan did not measure it); the cost of `definition::parse` and of
+  the hash in `the_released_github_definition_lowers`; the "after" figure on the forge.
