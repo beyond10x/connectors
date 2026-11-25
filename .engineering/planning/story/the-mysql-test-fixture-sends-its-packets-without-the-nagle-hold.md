@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/mysql/fixture.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-25T11:18:23Z", actor: "human:operator", revision: 6}
@@ -121,7 +121,9 @@ Not established by reading: whether one of the 84 relies on the hold. Statement 
 2. The diff: `git diff --stat` of the pull request against its base names one file outside the
    planning store, `adapters/sql/tests/mysql/fixture.rs`. No test function of the ten binaries
    changes, so `every_page_is_one_the_model_admits` keeps its 7 pairs of cap and limit.
-3. Behaviour: the 84 test functions of the ten binaries pass. The run: the test step of the
+3. Behaviour: the test functions of the ten binaries that run pass. Of the 84 counted, 9 are
+   ignored: they need a real database server and do not reach the fixture (8 in
+   `catalogue_adversary.rs`, 1 in `mysql_adversary_2.rs`); 75 run. The run: the test step of the
    forge's "repository gate" job of the pull request, and before the push those ten binaries on
    the build host, each test under the 60 s bound.
 4. Time: the duration of the test in the test step of the forge's "repository gate" job of the
@@ -179,3 +181,46 @@ story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-lea
 - The MySQL adapter of the product: it already runs with `TCP_NODELAY` and is not changed.
 - The fixtures of the other engines under `adapters/sql/tests/`: not read.
 - The eleven host tests: the story of the registry built once per process.
+
+## As built
+
+Built on 2026-11-25. One file changed, `adapters/sql/tests/mysql/fixture.rs`, 3 lines added:
+`start` calls `set_nodelay(true)` on the accepted socket and fails with
+`expect("the accepted socket takes TCP_NODELAY")` when the call fails. A dropped result would
+bring the hold back without a sign; a failed call now ends the accept loop and the tests fail.
+
+Statement 1, the cause: confirmed in the first round. The test alone on the build host, six
+runs in turns, durations as nextest printed them, with the number of jobs running in the pool
+before each run:
+
+- run 1, base: 9.013 s (5 jobs)
+- run 2, change: 0.163 s (4 jobs)
+- run 3, base: 9.408 s (8 jobs)
+- run 4, change: 0.127 s (7 jobs)
+- run 5, base: 9.207 s (7 jobs)
+- run 6, change: 0.137 s (5 jobs)
+
+Each base run is over the floor of 7.0 s and each run with the change is under 3.0 s. The
+second probe was not built. No other timing run of the set ran beside them; a test job of
+another story of the set (not a timing run) ran on the build host during runs 1 to 3.
+
+The record under `strace -f -T -e trace=epoll_wait`, one run of each kind:
+
+- base: 9.863 s; 616 calls of `epoll_wait`, 8.823 s in them; 168 calls of 40 to 80 ms hold
+  8.815 s of that (105 of 40 to 50 ms, 61 of 50 to 60 ms, 1 of 60 to 70 ms, 1 of 70 to 80 ms);
+- with the change: 0.710 s; 504 calls, 0.007 s in them, none over 10 ms.
+
+Statement 3, before the push, on the build host with the final file: the nine binaries of
+`connectors-sql` ran 74 tests, 74 passed, 9 skipped (the ignored tests that need a real
+database server); `incident_call_join` of `connectors-conformance` ran 1 test, 1 passed.
+`every_page_is_one_the_model_admits` took 0.154 s in that run. One test of the ten binaries
+takes more than 5 s: `mysql_deadline_kills_the_running_query` of `mysql_protocol`, 10.013 s;
+story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts writes that file. Its
+time without this change was not measured.
+
+Against the estimate: the story estimated 0.6 s on the forge; on the build host the test takes
+0.13 to 0.21 s. Statement 4 (at most 2.0 s in the forge's gate job) is read from the pull
+request's job.
+
+The six runs made with a dropped result (`let _ =`) and the final runs with `expect` differ in
+that one expression; the six runs were not made again.
