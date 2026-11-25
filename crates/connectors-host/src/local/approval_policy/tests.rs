@@ -294,7 +294,14 @@ fn concurrent_initial_publication_has_one_winner() {
     assert_eq!(store(root.path()).status().unwrap().unwrap().revision, 1);
 }
 
-fn child(path: &Path, action: &str) -> std::process::Child {
+/// What the `blocked` child is handed. It asserts Conflict against a lease the
+/// test holds until that child has exited, so the answer is the same at any
+/// length of the wait: a slow machine makes the test slower, not red.
+const BLOCKED_LOCK_WAIT: Duration = Duration::from_secs(1);
+
+/// Starts `policy_child` with `wait` as its lock wait, or with production's
+/// when `wait` is `None`.
+fn child(path: &Path, action: &str, wait: Option<Duration>) -> std::process::Child {
     let mut command = Command::new(std::env::current_exe().unwrap());
     command
         .args([
@@ -305,17 +312,28 @@ fn child(path: &Path, action: &str) -> std::process::Child {
         ])
         .env("CONNECTORS_POLICY_TEST_PATH", path)
         .env("CONNECTORS_POLICY_TEST_ACTION", action);
-    // `blocked` asserts Conflict against a lease this test holds on purpose,
-    // so it keeps production's wait; every other child waits only on a hang.
-    if action == "blocked" {
-        crate::local::metadata::child_production_lock_wait(&mut command);
-    } else {
-        crate::local::metadata::child_lock_wait(
-            &mut command,
-            crate::local::metadata::CONTENDED_LOCK_WAIT,
-        );
-    }
+    match wait {
+        Some(wait) => crate::local::metadata::child_lock_wait(&mut command, wait),
+        None => crate::local::metadata::child_production_lock_wait(&mut command),
+    };
     command.spawn().unwrap()
+}
+
+/// Writes the lock wait of this thread, in milliseconds, into `path` under
+/// `name`: the wait a lease or the lifecycle lock is given on it.
+fn report_lock_wait(path: &Path, name: &str) {
+    let wait = crate::local::metadata::lifecycle_lock_wait();
+    std::fs::write(path.join(name), wait.as_millis().to_string()).unwrap();
+}
+
+/// The lock wait a `policy_child` wrote into `path` under `name`.
+fn reported_lock_wait(path: &Path, name: &str) -> Duration {
+    Duration::from_millis(
+        std::fs::read_to_string(path.join(name))
+            .unwrap()
+            .parse()
+            .unwrap(),
+    )
 }
 #[test]
 #[ignore = "child fixture; launched by process serialization tests"]
@@ -326,6 +344,14 @@ fn policy_child() {
         .unwrap()
         .as_str()
     {
+        // Reports the lock wait this process runs with; takes no lock.
+        "lock-wait" => report_lock_wait(&path, "child-lock-wait"),
+        // Reports its own wait, then starts a `lock-wait` child that is to
+        // keep production's whatever this process's environment carries.
+        "production-child" => {
+            report_lock_wait(&path, "parent-lock-wait");
+            assert!(child(&path, "lock-wait", None).wait().unwrap().success());
+        }
         "blocked" => assert_eq!(
             s.set_admitted(&selection(), vec![], Some(1)),
             Err(Failure::Conflict)
@@ -361,7 +387,12 @@ fn held_use_blocks_cross_process_revocation_until_release() {
     enabled(&s);
     let held = s.acquire(&selection(), "item.write").unwrap();
     let other = s.acquire(&selection(), "item.write").unwrap();
-    assert!(child(root.path(), "blocked").wait().unwrap().success());
+    assert!(
+        child(root.path(), "blocked", Some(BLOCKED_LOCK_WAIT))
+            .wait()
+            .unwrap()
+            .success()
+    );
     assert_eq!(s.status().unwrap().unwrap().revision, 1);
     drop(other);
     drop(held);
@@ -379,8 +410,22 @@ fn child_process_waits_on_the_lock_wait_its_parent_hands_it() {
     issuer(root.path(), "instance");
     let s = store(root.path());
     enabled(&s);
+    // A wait production does not have: only a child that took the wait it was
+    // handed reports it. The child reports the wait and takes no lock.
+    let handed = crate::local::metadata::WAIT_BOUND + Duration::from_secs(1);
+    assert!(
+        child(root.path(), "lock-wait", Some(handed))
+            .wait()
+            .unwrap()
+            .success()
+    );
+    assert_eq!(reported_lock_wait(root.path(), "child-lock-wait"), handed);
     let held = s.acquire(&selection(), "item.write").unwrap();
-    let mut waiter = child(root.path(), "waits");
+    let mut waiter = child(
+        root.path(),
+        "waits",
+        Some(crate::local::metadata::CONTENDED_LOCK_WAIT),
+    );
     let until = Instant::now() + crate::local::metadata::CONTENDED_LOCK_WAIT;
     while !root.path().join("child-waiting").exists() {
         if Instant::now() >= until {
@@ -390,8 +435,9 @@ fn child_process_waits_on_the_lock_wait_its_parent_hands_it() {
         }
         std::thread::sleep(Duration::from_millis(5));
     }
-    // Hold past the production wait: only a wait the child was handed outlasts it.
-    std::thread::sleep(crate::local::metadata::WAIT_BOUND + Duration::from_secs(1));
+    // A short hold. The child is admitted after the release at any length of
+    // it; how long the child would wait is asserted above on what it reports.
+    std::thread::sleep(Duration::from_millis(200));
     drop(held);
     assert!(waiter.wait().unwrap().success());
     assert_eq!(s.status().unwrap().unwrap().revision, 2);
@@ -403,7 +449,11 @@ fn child_exit_releases_lease_and_committed_unacknowledged_revision_survives() {
     issuer(root.path(), "instance");
     let s = store(root.path());
     let first = enabled(&s);
-    let mut holder = child(root.path(), "hold");
+    let mut holder = child(
+        root.path(),
+        "hold",
+        Some(crate::local::metadata::CONTENDED_LOCK_WAIT),
+    );
     let until = Instant::now() + crate::local::metadata::CONTENDED_LOCK_WAIT;
     while !root.path().join("child-ready").exists() {
         if Instant::now() >= until {
@@ -416,10 +466,14 @@ fn child_exit_releases_lease_and_committed_unacknowledged_revision_survives() {
     holder.kill().unwrap();
     holder.wait().unwrap();
     assert_eq!(
-        child(root.path(), "crash-after-commit")
-            .wait()
-            .unwrap()
-            .code(),
+        child(
+            root.path(),
+            "crash-after-commit",
+            Some(crate::local::metadata::CONTENDED_LOCK_WAIT)
+        )
+        .wait()
+        .unwrap()
+        .code(),
         Some(71)
     );
     let retained = store(root.path()).status().unwrap().unwrap();

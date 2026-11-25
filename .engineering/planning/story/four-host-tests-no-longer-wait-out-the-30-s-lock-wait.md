@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:four-host-tests-no-longer-wait-out-the-30-s-lock-wait
 kind: story
-status: draft
+status: active
 title: 'Four host tests no longer wait out the 30 s lock wait: 122.0 s become an estimated 5.5 s'
 summary: Four tests of connectors-host live through WAIT_BOUND (30 s); existing test seams and one new child action replace the wait, and one run at 30 s stays in the lane slow
 relations:
@@ -19,7 +19,10 @@ scope:
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/tests/local_foundation.rs
-revision: 7
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 8}
+- {from: "proposed", to: "active", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 9}
 ---
 ## Defect
 
@@ -128,3 +131,46 @@ input of a digest and does not write it.
 - Not established: every "after" figure on the forge. The plan says "one run at the real 30 s wait
   that proves WAIT_BOUND itself" and names no test; the choice of the test of `local_foundation.rs`
   is this story's.
+
+## As built (2026-11-25)
+
+Where the implementation differs from the Change and Acceptance sections. Durations are from the
+build host of the shared pool: one run before the change, one after, and the range of ten runs in
+a row after it (10 of 10 passed).
+
+1. The helper `child` of `approval_policy/tests.rs` takes the wait as a third argument; `None`
+   means production's wait.
+2. Change 4 is two actions of `policy_child`, not one. `lock-wait` reports the child's effective
+   wait and takes no lock. `production-child` reports its own wait and starts a `lock-wait` child
+   with production's wait.
+3. `blocked_policy_child_keeps_production_wait_when_the_variable_is_inherited` no longer runs
+   `held_use_blocks_cross_process_revocation_until_release` in a child. It starts `policy_child`
+   handed 600 s through `child_lock_wait` and asserts that this child reports 600 s and that the
+   child it starts reports 30 s. Before: 30.720 s. After: 0.009 s to 0.010 s. Not shown by a
+   mutation: on Unix two things hold the 30 s of the inner child, the removed variable and the
+   binding of the variable to a process id; removing one alone would leave the test green.
+4. `child_production_lock_wait` has one caller now, that reporting child. No child of a test that
+   takes a real lock keeps production's wait.
+5. `child_process_waits_on_the_lock_wait_its_parent_hands_it` asserts that a child handed 31 s
+   reports 31 s, and keeps its `waits` child, which is admitted after the release. The hold
+   before the release is 200 ms in place of 31 s; no assertion depends on its length. Before:
+   31.579 s. After: 0.531 s to 0.676 s.
+6. `held_use_blocks_cross_process_revocation_until_release`: the `blocked` child waits 1 s
+   (`BLOCKED_LOCK_WAIT`) in place of 30 s. The test holds the lease until that child has exited,
+   so a slow machine makes the test slower and not red. Before: 30.716 s. After: 1.359 s to
+   1.454 s.
+7. The new `local::metadata::tests::contending_metadata_open_refuses_at_a_short_bound_and_recovers_after_release`
+   waits 1 s, and the refusal must arrive within 11 s. It is `#[cfg(unix)]`, because it uses
+   `flock`. After: 1.098 s to 1.132 s. The test it takes over took 30.181 s.
+8. `metadata.rs`: no helper changed its behaviour. One comment of `child_lock_wait` is reworded.
+9. `slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release` was
+   compiled and listed, and not run: the operator allows no run of a test of the timing family
+   outside the forge's lane (2026-11-25).
+
+Sum of the four tests on the build host: 3.3 s. Before, with the test that is now in the lane:
+123.2 s. The 52 tests of the touched modules passed in one run; the slowest took 3.9 s.
+
+Open until the jobs of the pull request: acceptance 1 (at most 9 s in the gate job), acceptance 2
+(the lane lists the `slow_lane_` test as `passed`), acceptance 3 (the gate's ignored step). The
+pull request opens after story:the-lane-slow-runs-the-ignored-timing-family is on main: without
+that story's rule the new ignored test is unknown to the gate's ignored step.
