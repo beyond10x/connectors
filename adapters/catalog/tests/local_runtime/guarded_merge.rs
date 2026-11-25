@@ -76,9 +76,12 @@ pub(super) fn owner_handles(cli: &Cli) -> (OwnedFd, Vec<OwnedFd>) {
     (owner, children)
 }
 
+/// `timeout_ms` bounds each of the three polls: the owner's exit, its exit
+/// after the forced signal and each observation-only child's exit.
 pub(super) fn finish_filtered_owner(
     (owner, children): (OwnedFd, Vec<OwnedFd>),
     acknowledged: bool,
+    timeout_ms: libc::c_int,
 ) -> bool {
     let mut failures = Vec::new();
     if !acknowledged {
@@ -91,7 +94,7 @@ pub(super) fn finish_filtered_owner(
     };
     // SAFETY: only this owner slot comes from the authenticated private socket's
     // SO_PEERPIDFD. A timeout does not grant signal authority to child-list fds.
-    if unsafe { libc::poll(&mut event, 1, 5000) } != 1 || event.revents & libc::POLLIN == 0 {
+    if unsafe { libc::poll(&mut event, 1, timeout_ms) } != 1 || event.revents & libc::POLLIN == 0 {
         failures.push("strongly identified owner required forced cleanup".to_owned());
         let result = unsafe {
             libc::syscall(
@@ -108,7 +111,9 @@ pub(super) fn finish_filtered_owner(
                 std::io::Error::last_os_error()
             ));
         }
-        if unsafe { libc::poll(&mut event, 1, 5000) } != 1 || event.revents & libc::POLLIN == 0 {
+        if unsafe { libc::poll(&mut event, 1, timeout_ms) } != 1
+            || event.revents & libc::POLLIN == 0
+        {
             failures.push("strongly identified owner exit was not observed".to_owned());
         }
     }
@@ -120,7 +125,9 @@ pub(super) fn finish_filtered_owner(
         };
         // SAFETY: poll only. The numeric child-list capture does not establish
         // ownership at acquisition and therefore NEVER authorizes signalling.
-        if unsafe { libc::poll(&mut event, 1, 5000) } != 1 || event.revents & libc::POLLIN == 0 {
+        if unsafe { libc::poll(&mut event, 1, timeout_ms) } != 1
+            || event.revents & libc::POLLIN == 0
+        {
             failures
                 .push("observation-only child exit was not observed; no signal sent".to_owned());
         }
@@ -168,7 +175,7 @@ fn catalog_fault_cleanup_observation_handle_cannot_authorize_signal() {
     owner.0.kill().unwrap();
     owner.0.wait().unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        finish_filtered_owner((owner_fd, vec![observation_fd]), true)
+        finish_filtered_owner((owner_fd, vec![observation_fd]), true, 100)
     }));
     let status = observation_only.0.try_wait().unwrap();
     eprintln!(
@@ -190,7 +197,7 @@ fn catalog_fault_cleanup_observation_handle_cannot_authorize_signal() {
     let mut owner = spawn();
     let owner_fd = handle(&owner);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        finish_filtered_owner((owner_fd, vec![]), false)
+        finish_filtered_owner((owner_fd, vec![]), false, 100)
     }));
     use std::os::unix::process::ExitStatusExt;
     assert_eq!(owner.0.wait().unwrap().signal(), Some(libc::SIGKILL));

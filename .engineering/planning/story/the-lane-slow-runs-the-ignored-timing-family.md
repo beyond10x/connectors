@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-lane-slow-runs-the-ignored-timing-family
 kind: story
-status: active
+status: implemented
 title: The lane slow runs the ignored timing family
 summary: The lane slow runs no test today; one naming rule in classify() and four steps make it run every slow_lane_ test, for changes under crates, apps and adapters; the eight old timing entries are deferred
 relations:
@@ -18,10 +18,11 @@ scope:
   path: crates/connectors-sdk/src/lib.rs
 - confidence: cited
   path: docs/development.md
-revision: 15
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T02:53:29Z", actor: "human:operator", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-25T02:53:29Z", actor: "human:operator", revision: 9}
+- {from: "active", to: "implemented", at: "2026-11-25T05:49:06Z", actor: "human:operator", revision: 16, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Defect
 

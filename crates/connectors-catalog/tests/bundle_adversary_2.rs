@@ -10,7 +10,7 @@ use connectors_catalog::bundle::{Bundle, INDEX_FILE, load, write};
 use connectors_catalog::{ingest, inventory::extract};
 use serde_json::json;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 fn bundle(provider: &str) -> Bundle {
@@ -72,8 +72,10 @@ fn a_bundle_file_swapped_for_a_link_after_the_check_is_not_followed() {
     std::fs::write(&inside, b"{}").expect("decoy regular file");
 
     let stop = Arc::new(AtomicBool::new(false));
+    let swapped = Arc::new(AtomicU64::new(0));
     let swapper = {
         let stop = Arc::clone(&stop);
+        let swapped = Arc::clone(&swapped);
         let inside = inside.clone();
         let target = target.clone();
         let staging = root.path().join("staging");
@@ -83,24 +85,35 @@ fn a_bundle_file_swapped_for_a_link_after_the_check_is_not_followed() {
             let link = staging.join("link");
             while !stop.load(Ordering::Relaxed) {
                 let _ = std::fs::write(&regular, b"{}");
-                let _ = std::fs::rename(&regular, &inside);
+                let decoy = std::fs::rename(&regular, &inside);
                 let _ = std::os::unix::fs::symlink(&target, &link);
-                let _ = std::fs::rename(&link, &inside);
+                // One swap: the name held the regular file and now holds the link.
+                if std::fs::rename(&link, &inside).is_ok() && decoy.is_ok() {
+                    swapped.fetch_add(1, Ordering::Relaxed);
+                }
             }
         })
     };
 
+    // Only a call of `load` during which a swap completes can follow the link.
+    // Those calls are counted, and the loop ends when 500 of them are done.
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut attempts = 0u64;
+    let mut overlapped = 0u64;
     let mut followed = 0u64;
-    while Instant::now() < deadline && followed == 0 {
+    while overlapped < 500 && followed == 0 && Instant::now() < deadline {
+        let before = swapped.load(Ordering::Relaxed);
         attempts += 1;
         if load(&directory, "fixture").is_ok() {
             followed += 1;
         }
+        if swapped.load(Ordering::Relaxed) != before {
+            overlapped += 1;
+        }
     }
     stop.store(true, Ordering::Relaxed);
     swapper.join().expect("swapper");
+    let swaps = swapped.load(Ordering::Relaxed);
     assert_eq!(
         followed,
         0,
@@ -108,4 +121,12 @@ fn a_bundle_file_swapped_for_a_link_after_the_check_is_not_followed() {
         target.display(),
         directory.display()
     );
+    // With too few such calls the loop above raced nothing and its zero proves nothing.
+    assert!(
+        overlapped >= 500,
+        "the race was not run: a swap overlapped {overlapped} of {attempts} calls of load \
+         ({swaps} swaps)"
+    );
+    // Each of those calls saw another swap complete.
+    assert!(swaps >= 100, "the race was not run: {swaps} swaps");
 }
