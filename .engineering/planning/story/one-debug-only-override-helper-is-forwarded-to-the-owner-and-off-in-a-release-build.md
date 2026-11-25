@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build
 kind: story
-status: draft
+status: active
 title: One debug-only override helper is forwarded to the owner and off in a release build
 summary: A copied cfg(debug_assertions) pattern becomes one helper in connectors-sdk; the owner spawn forwards by prefix; one release-build test proves an override is off
 relations:
@@ -14,6 +14,8 @@ scope:
 - confidence: cited
   path: apps/connectors/src/local/owner_stop.rs
 - confidence: cited
+  path: crates/connectors-build/src/ignored.rs
+- confidence: cited
   path: crates/connectors-build/tests/debug_override_reads.rs
 - confidence: cited
   path: crates/connectors-build/tests/main.rs
@@ -23,7 +25,10 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: cited
   path: crates/connectors-sdk/src/lib.rs
-revision: 6
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T05:07:24Z", actor: "human:operator", revision: 7}
+- {from: "proposed", to: "active", at: "2026-11-25T05:07:25Z", actor: "human:operator", revision: 8}
 ---
 ## Defect
 
@@ -161,3 +166,52 @@ that test, and the proof of point 4 would not cover them.
 - Not established: whether a hidden public function in `connectors-sdk` is acceptable in the crate
   the adapters build against; whether a read of an override through a name built at run time
   exists or will exist (the test of point 5 would not see it).
+
+## As built (2026-11-25)
+
+Where the implementation differs from the Change and Acceptance sections, and what was run. All
+runs are from the build host of the shared pool.
+
+1. The extracted function is `owner_environment` (`transport.rs`). Its test is
+   `a_started_owner_gets_every_override_and_the_seven_named_variables_and_no_other`: 0.010 s, 10
+   of 10 repeated runs.
+2. The helper's tests in `connectors-sdk` are three, not two: the child
+   `child_prints_what_the_helper_returns`, the debug test
+   `a_child_with_the_variable_gets_its_value_and_one_without_it_the_production_value` (0.065 s),
+   and `release_build_ignores_a_debug_override` (0.007 s in a release build). A variable that
+   holds no number gives the production value.
+3. The scan has three tests (0.35 s together):
+   `no_debug_override_is_read_outside_the_helper` and two tests of the scan on texts of its own.
+4. Acceptance 5: the 17 tests of package `connectors` that set one of the five older variables
+   passed unchanged in one run of 56.7 s. Three took over 30 s in that run of 17 at once (32.9 s,
+   38.2 s and 31.2 s). The third, `owner_stop_during_a_slow_owner_start_stops_that_owner`, takes
+   16.3 s alone before the change and 17.2 s alone after it.
+5. `cargo clippy --all-targets -- -D warnings` ended 0 for `connectors-sdk`, `connectors-host`,
+   `connectors` and `connectors-build`, and for `connectors-host` and `connectors` on the target
+   `x86_64-pc-windows-gnu`.
+6. Second commit, after the adversary read (review-result:debug-override-adversary-pass-1):
+   `crates/connectors-build/src/ignored.rs` pins `release_build_ignores_a_debug_override` by its
+   text in `connectors-sdk`, in the test that already pins the lane's release step. Before, a
+   rename of that test out of the prefix `release_build_` left the lane green on
+   `release_build_has_no_debug_assertions` alone. This file was not in the Scope section.
+7. Second commit: the scan asserts that it read `adapters/catalog/src/lib.rs`. Before, the scan
+   stayed green with `adapters` dropped from its list of directories.
+8. Second commit: the scan's module comment names four forms of a read it does not see: a literal
+   after a comment inside the call, a literal inside a conversion (`OsStr::new`), `var` imported
+   under another name, and a search of `std::env::vars()` or `vars_os()`. No source file uses one
+   of them for an override today (read by the adversary with `grep`). They are limits of a scan
+   of the text, like the two the Change section names.
+9. Runs of the second commit: the three scan tests and the lane test of `ignored.rs` passed, and
+   clippy of `connectors-build` ended 0. With `release_build_ignores_a_debug_override` renamed
+   to `release_ignores_a_debug_override` the lane test failed with "connectors-sdk holds no
+   release-only test release_build_ignores_a_debug_override". With `adapters` dropped from the
+   scan's directories `no_debug_override_is_read_outside_the_helper` failed. Both edits were
+   taken back.
+
+Not changed, with its own draft story: `contracts/cli/v1alpha1/owner.md` line 80 says that a debug
+CLI passes `CONNECTORS_TEST_OWNER_PARENT` alone to the owner. Before this change the CLI passed
+seven names; with it, also every `CONNECTORS_TEST_OVERRIDE_` variable
+(story:the-owner-contract-names-every-test-variable-a-debug-cli-passes-to-the-owner).
+
+Open until the jobs of the pull request: acceptance 2 in the lane `slow` (the lane job runs 2
+`release_build_` tests), and acceptances 1, 3, 5 and 6 in the gate job.
