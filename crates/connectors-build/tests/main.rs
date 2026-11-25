@@ -11,6 +11,7 @@ mod catalog_walk_model;
 mod cli_spec_mapping_adversary;
 mod cli_spec_mapping_adversary_pass2;
 mod connection_vocabulary_authored_execution_adversary;
+mod debug_override_reads;
 mod fresh_checkout_regeneration;
 mod mcp_composition_provenance;
 mod mcp_domain_model_adversary;

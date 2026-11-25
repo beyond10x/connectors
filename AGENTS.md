@@ -165,6 +165,12 @@ target before the push (`cargo clippy --locked -p connectors-host -p connectors 
 --target x86_64-pc-windows-gnu -- -D warnings`). On 2026-11-24 pull request 290 failed six such
 tests and the Windows lint on the forge after green targeted tests.
 
+A sub-agent brief names the absolute path of its worktree and says that no `cargo` command,
+`--help` included, starts without a `cd` into that tree in the same command. Where `cargo` is a
+shim that sends the build to a build node, it syncs the directory it is called in. On 2026-11-25
+one `cargo nextest run --help` from the folder above the repositories synced that folder to the
+node and back and moved the modification time of 1,417 files in four other repositories.
+
 For documentation-only changes, check links, factual support claims and AEP
 consistency; do not rerun unrelated live-provider tests. Report actual commands,
 results and material limitations. Relay AEP validation output as its skill requires.

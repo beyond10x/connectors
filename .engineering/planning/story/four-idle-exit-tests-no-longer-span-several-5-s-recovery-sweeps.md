@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/owner/maintenance.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 8
+revision: 9
 ---
 ## Defect
 
@@ -168,7 +168,7 @@ production idle exit is not tested here".
 
   Two other stories edit other regions of this file:
   story:seven-cli-tests-shorten-their-waits-or-a-production-wait
-  (`clock_check_below_quorum_refusal`, line 325, and `clock_unavailable`, lines 153 to 171) and
+  (`clock_check_below_quorum_refusal`, lines 325 to 393) and
   story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate (the test at line 1691). Neither
   edits lines 935 to 1024; the 100-run test starts its owner through `start_owner` (line 1694)
   with `None`.

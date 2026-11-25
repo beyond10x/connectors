@@ -206,9 +206,15 @@ fn the_refusal_after_two_attempts_names_the_second_attempts_sources() {
 
 /// An `until` that has passed and a reserve no deadline holds each leave one
 /// attempt, and neither panics.
+///
+/// The query deadline is 2 s, and the test takes two of them. An attempt
+/// starts its deadline before it starts the thread of each source, and a
+/// thread that starts after the deadline sends nothing. With 200 ms a
+/// Windows runner under load asked one source and not the other, and the
+/// count below read `[2, 1]`.
 #[test]
 fn a_passed_deadline_and_an_unbounded_reserve_leave_one_attempt() {
-    let query = Duration::from_millis(200);
+    let query = Duration::from_secs(2);
     set_test_query_timeout(query);
     let (a, b) = (Server::silent(), Server::silent());
     let config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
