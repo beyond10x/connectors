@@ -518,7 +518,7 @@ commands:
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
     # DECIDED 2026-09-27: PublishBinding with decision allow on a Revoked Connection refuses
     # with ConnectionStateConflict, as RevokeConnection does; input guards decide first (refuse → Refused, unknown → Unavailable).
-    # The host (crates/connectors-host/src/local/metadata/er.rs:4245-4258) maps no
+    # The host (crates/connectors-host/src/local/metadata/er.rs `update_command`) maps no
     # Revoked row change to this command, so no code states another answer.
     # On a Stale Connection any allowed publication moves it back to Live: the
     # provider accepted a credential, through a reconnect or a revalidation it
