@@ -1,9 +1,9 @@
 {
-  "at": "2026-11-25T02:10:16Z",
-  "actor": "human:timo",
+  "at": "2026-11-25T02:37:22Z",
+  "actor": "human:operator",
   "artifact": "story:five-host-unit-tests-shorten-the-waits-they-chose",
   "kind": "story",
-  "revision": 9,
+  "revision": 6,
   "change": {
     "change": "evidence",
     "kind": "review_outcome",

@@ -20,10 +20,10 @@ scope:
   path: crates/connectors-host/src/local/protected/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-revision: 9
+revision: 6
 transitions:
-- {from: "draft", to: "proposed", at: "2026-11-25T01:32:07Z", actor: "human:timo", revision: 4}
-- {from: "proposed", to: "active", at: "2026-11-25T01:32:07Z", actor: "human:timo", revision: 5}
+- {from: "draft", to: "proposed", at: "2026-11-25T02:37:20Z", actor: "human:operator", revision: 4}
+- {from: "proposed", to: "active", at: "2026-11-25T02:37:21Z", actor: "human:operator", revision: 5}
 ---
 ## Defect
 
