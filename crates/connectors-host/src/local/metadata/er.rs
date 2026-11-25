@@ -989,7 +989,26 @@ impl std::fmt::Debug for ErAuthority {
     }
 }
 
-pub(super) fn registry() -> Result<Registry> {
+/// The Entity Runtime definitions compiled into this binary: the registry
+/// every record is checked against and the bundle's commands by name.
+struct Definitions {
+    registry: Registry,
+    commands: BTreeMap<String, CommandEntry>,
+}
+
+/// The definitions of this binary, parsed and checked by the first call in the
+/// process and shared by every handle, store and thread after it. The bundle is
+/// compiled in, so a build that failed would fail again: its refusal is kept
+/// and answered on every call.
+fn shared_definitions() -> Result<&'static Definitions> {
+    static DEFINITIONS: std::sync::OnceLock<Option<Definitions>> = std::sync::OnceLock::new();
+    DEFINITIONS
+        .get_or_init(|| timed("er.definitions_build", || build_definitions().ok()))
+        .as_ref()
+        .ok_or(Failure::MetadataUnavailable)
+}
+
+fn build_definitions() -> Result<Definitions> {
     let bundle = definition_bundle()?;
     if bundle.format != "connectors.entity-runtime-definitions/1" {
         return Err(Failure::MetadataUnavailable);
@@ -1006,12 +1025,25 @@ pub(super) fn registry() -> Result<Registry> {
     registry
         .validate_all()
         .map_err(|_| Failure::MetadataUnavailable)?;
-    Ok(registry)
+    let commands = bundle
+        .commands
+        .into_iter()
+        .map(|command| (command.name.clone(), command))
+        .collect();
+    Ok(Definitions { registry, commands })
+}
+
+/// A registry of this binary's definitions for the caller to own: a copy of
+/// the shared one, which a provider facade takes by value.
+pub(super) fn registry() -> Result<Registry> {
+    Ok(shared_definitions()?.registry.clone())
 }
 
 fn definition_bundle() -> Result<DefinitionBundle> {
-    serde_json::from_slice(include_bytes!("entity-runtime-definitions.json"))
-        .map_err(|_| Failure::MetadataUnavailable)
+    timed("er.bundle_parse", || {
+        serde_json::from_slice(include_bytes!("entity-runtime-definitions.json"))
+            .map_err(|_| Failure::MetadataUnavailable)
+    })
 }
 
 /// The store writer marker (`ess/domains/cli.yaml`, `connectors.cli.StoreWriter`):
@@ -1167,13 +1199,7 @@ fn writer_action(
 
 #[cfg(any(test, feature = "test-support"))]
 pub(super) fn record_writer_for_tests(er: &ErAuthority, version: &str, digest: &str) -> Result<()> {
-    let bundle = definition_bundle()?;
-    let commands = bundle
-        .commands
-        .into_iter()
-        .map(|command| (command.name.clone(), command))
-        .collect::<BTreeMap<_, _>>();
-    let registry = registry()?;
+    let Definitions { registry, commands } = shared_definitions()?;
     let mut next = RowImage {
         entity: WRITER_ENTITY.into(),
         id: WRITER_ID.into(),
@@ -1187,16 +1213,16 @@ pub(super) fn record_writer_for_tests(er: &ErAuthority, version: &str, digest: &
     let key = (WRITER_ENTITY.to_owned(), WRITER_ID.to_owned());
     let action = match er.baseline.get(&key) {
         None => create_action(
-            &registry,
-            &commands,
+            registry,
+            commands,
             &next,
             "connectors.cli.RecordStoreWriter",
         )?,
         Some(current) => {
             next.revision = current.revision + 1;
             command_action(
-                &registry,
-                &commands,
+                registry,
+                commands,
                 &er.baseline,
                 current,
                 &next,
@@ -4325,13 +4351,10 @@ fn persist_batch(
             return Err(Failure::MetadataUnavailable);
         }
     }
-    let bundle = definition_bundle()?;
-    let commands = bundle
-        .commands
-        .into_iter()
-        .map(|command| (command.name.clone(), command))
-        .collect::<BTreeMap<_, _>>();
-    let runtime_registry = registry()?;
+    let Definitions {
+        registry: runtime_registry,
+        commands,
+    } = shared_definitions()?;
     let mut actions = Vec::new();
     // Recorded expiries of transient subjects whose SQL rows disappeared.
     let mut expiries = Vec::new();
@@ -4346,8 +4369,8 @@ fn persist_batch(
             Some(next) => {
                 let command = update_command(current, next)?;
                 actions.push(command_action(
-                    &runtime_registry,
-                    &commands,
+                    runtime_registry,
+                    commands,
                     &desired,
                     current,
                     next,
@@ -4357,8 +4380,8 @@ fn persist_batch(
             None => {
                 if let Some((command, next)) = removal_command(current)? {
                     expiries.push(command_action(
-                        &runtime_registry,
-                        &commands,
+                        runtime_registry,
+                        commands,
                         &desired,
                         current,
                         &next,
@@ -4377,12 +4400,8 @@ fn persist_batch(
         if !reference.contains_key(key) {
             let mut stages = creation_stages(next, admitted_registry_use)?;
             let initial = stages.remove(0);
-            let mut action = create_action(
-                &runtime_registry,
-                &commands,
-                &initial,
-                create_command(next)?,
-            )?;
+            let mut action =
+                create_action(runtime_registry, commands, &initial, create_command(next)?)?;
             if let (Some(held), BatchAction::Create(request)) =
                 (held_connection(&desired, &initial), &mut action)
             {
@@ -4394,8 +4413,8 @@ fn persist_batch(
                 stage.revision = current.revision + 1;
                 let command = update_command(&current, &stage)?;
                 actions.push(command_action(
-                    &runtime_registry,
-                    &commands,
+                    runtime_registry,
+                    commands,
                     &desired,
                     &current,
                     &stage,
@@ -4409,8 +4428,8 @@ fn persist_batch(
     // staged beside, in this same batch.
     actions.extend(ledger::actions(
         reference,
-        &runtime_registry,
-        &commands,
+        runtime_registry,
+        commands,
         staged,
     )?);
     if prepared_observation && !reference.keys().any(registry_clock_key) {
@@ -4444,7 +4463,7 @@ fn persist_batch(
     }
     // A write records or raises the store's writer marker in its own batch,
     // against the newest marker this handle has read.
-    if let Some(action) = writer_action(&er.baseline, &runtime_registry, &commands)? {
+    if let Some(action) = writer_action(&er.baseline, runtime_registry, commands)? {
         actions.push(action);
     }
     let batch = BatchKey::Named(format!(
@@ -9050,5 +9069,193 @@ mod tests {
             "a byte size above 65536 was recorded"
         );
         transition(&authority, &candidate, &stored(65_536), acknowledge).unwrap();
+    }
+
+    /// The compiled-in definitions are parsed and built into a registry once
+    /// in a process: no persist and no fresh open does either again, whichever
+    /// handle, simulated process, store or thread makes it
+    /// (story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process).
+    #[test]
+    fn persists_and_fresh_opens_build_the_definitions_once_per_process() {
+        use crate::local::{metadata::Metadata, runtime::state::State};
+        // Builds of the shared value and parses of the bundle among `costs`.
+        let definitions = |costs: &BTreeMap<&'static str, (u64, Duration)>| {
+            let calls = |kind| costs.get(kind).map_or(0, |cost| cost.0);
+            (calls("er.definitions_build"), calls("er.bundle_parse"))
+        };
+        let store = || {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("state");
+            crate::local::filesystem::directory(&path, true, true).unwrap();
+            drop(Metadata::initialize(&path).unwrap());
+            (root, path)
+        };
+        let processes = own_processes();
+        let (_root, path) = store();
+        // The shared value exists from here on, whichever thread built it.
+        registry().unwrap();
+        take_costs();
+        let opens = fresh_opens();
+
+        // Five persists that each change a record.
+        let state = State::new(&path);
+        for round in 0..5 {
+            state.suppress("fixture", round % 2 == 0).unwrap();
+        }
+        // Three opens, each as a process that verified nothing yet.
+        for process in 1..=3 {
+            simulate_process(process);
+            drop(Metadata::update(&path, false).unwrap());
+        }
+        // A second store, and one persist there.
+        let (_other_root, other_path) = store();
+        State::new(&other_path).suppress("fixture", true).unwrap();
+
+        assert!(
+            fresh_opens() - opens >= 3,
+            "the three new processes made {} fresh opens",
+            fresh_opens() - opens
+        );
+        let costs = take_costs();
+        assert!(
+            costs.get("er.execute_batch").map_or(0, |cost| cost.0) >= 6,
+            "the six persists recorded fewer than six batches: {costs:?}"
+        );
+        assert_eq!(
+            definitions(&costs),
+            (0, 0),
+            "(builds, parses) of the definitions over five persists, three fresh opens and a \
+             second store on this thread: {costs:?}"
+        );
+
+        // Another thread of this process: one persist on the first store and
+        // one open of it as a further new process.
+        let namespace = processes.namespace();
+        let (thread_opens, thread_costs) = std::thread::spawn(move || {
+            namespace.enter();
+            State::new(&path).suppress("fixture", false).unwrap();
+            simulate_process(4);
+            drop(Metadata::update(&path, false).unwrap());
+            (fresh_opens(), take_costs())
+        })
+        .join()
+        .unwrap();
+        assert!(thread_opens >= 1, "the new thread made no fresh open");
+        assert_eq!(
+            definitions(&thread_costs),
+            (0, 0),
+            "(builds, parses) of the definitions over one persist and one fresh open on a new \
+             thread: {thread_costs:?}"
+        );
+        simulate_process(0);
+    }
+
+    /// The test above counts a parse of the bundle only where it is made in
+    /// `definition_bundle()` and a build only in the closure of
+    /// `shared_definitions()`: a persist that reads the compiled-in bytes at a
+    /// place of its own, as `model_digest()` does once, is counted nowhere.
+    /// This test holds the two seams by their effect and by the text of this
+    /// file and of `er/ledger.rs`: one call of `definition_bundle()` is one
+    /// counted parse, and outside the test module the bundle is named at two
+    /// places (`definition_bundle()` and `model_digest()`),
+    /// `definition_bundle()` and `build_definitions()` are each called at one,
+    /// a registry is started at one, and each of the two kinds is counted at
+    /// one.
+    #[test]
+    fn adversary_the_bundle_is_read_only_where_the_once_test_counts_it() {
+        take_costs();
+        definition_bundle().unwrap();
+        let costs = take_costs();
+        assert_eq!(
+            costs.get("er.bundle_parse").map(|cost| cost.0),
+            Some(1),
+            "one call of definition_bundle() is one counted parse: {costs:?}"
+        );
+        let (product, _) = include_str!("er.rs")
+            .split_once("\n#[cfg(test)]\nmod tests {\n")
+            .expect("er.rs holds its test module");
+        let product = [product, include_str!("er/ledger.rs")].concat();
+        let found = [
+            "\"entity-runtime-definitions.json\"",
+            "definition_bundle()",
+            "build_definitions()",
+            "Registry::new()",
+            "timed(\"er.bundle_parse\"",
+            "timed(\"er.definitions_build\"",
+        ]
+        .map(|text| (text, product.matches(text).count()));
+        assert_eq!(
+            found,
+            [
+                ("\"entity-runtime-definitions.json\"", 2),
+                // The function and its one call, in `build_definitions()`.
+                ("definition_bundle()", 2),
+                // The function and its one call, in `shared_definitions()`.
+                ("build_definitions()", 2),
+                ("Registry::new()", 1),
+                ("timed(\"er.bundle_parse\"", 1),
+                ("timed(\"er.definitions_build\"", 1),
+            ],
+            "places outside the test module that read the bundle or build a registry"
+        );
+    }
+
+    /// First use from several threads at once: eight threads, started
+    /// together, each initialize a store of their own and persist once there.
+    /// All end, and among them they count at most one build and one parse.
+    /// nextest runs this test as a process of its own (it sets `NEXTEST`), so
+    /// there the first use is here and the count is exactly one.
+    #[test]
+    fn adversary_first_use_from_eight_threads_at_once_builds_the_definitions_once() {
+        use crate::local::{metadata::Metadata, runtime::state::State};
+        let processes = own_processes();
+        let namespace = processes.namespace();
+        let start = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let (sender, results) = std::sync::mpsc::channel();
+        for process in 1..=8 {
+            let (start, sender) = (start.clone(), sender.clone());
+            std::thread::spawn(move || {
+                namespace.enter();
+                simulate_process(process);
+                let root = tempfile::tempdir().unwrap();
+                let path = root.path().join("state");
+                crate::local::filesystem::directory(&path, true, true).unwrap();
+                take_costs();
+                start.wait();
+                drop(Metadata::initialize(&path).unwrap());
+                State::new(&path).suppress("fixture", true).unwrap();
+                let _ = sender.send(take_costs());
+            });
+        }
+        drop(sender);
+        let calls = |costs: &BTreeMap<&'static str, (u64, Duration)>, kind: &str| {
+            costs.get(kind).map_or(0, |cost| cost.0)
+        };
+        let (mut builds, mut parses) = (0, 0);
+        for thread in 1..=8 {
+            let costs = results
+                .recv_timeout(Duration::from_secs(30))
+                .unwrap_or_else(|error| {
+                    panic!("thread {thread} of 8 did not end its first persist: {error}")
+                });
+            assert!(
+                calls(&costs, "er.execute_batch") >= 1,
+                "a thread's persist recorded no batch: {costs:?}"
+            );
+            builds += calls(&costs, "er.definitions_build");
+            parses += calls(&costs, "er.bundle_parse");
+        }
+        assert!(
+            builds <= 1 && parses == builds,
+            "(builds, parses) of the definitions among eight threads that first use them \
+             together: ({builds}, {parses})"
+        );
+        if std::env::var_os("NEXTEST").is_some() {
+            assert_eq!(
+                (builds, parses),
+                (1, 1),
+                "(builds, parses) of the definitions in a process whose first use is this test"
+            );
+        }
     }
 }

@@ -1,5 +1,5 @@
 {
-  "digest": "b52e6000cd3f528c40bfc3dea74bf5ad4044537aaf999f4af4f7c5b595949f2e",
+  "digest": "7b96534513c1a46cd146e0d07e696bfacb9fbd6e317562e5ac367d31b5edc259",
   "ess_crates": [
     "entity-core 0.28.0",
     "entity-core 0.33.1",
@@ -50,11 +50,11 @@
     },
     {
       "path": "ess/domains/auth_bindings.yaml",
-      "sha256": "d68636574976036d1cab2d58d9d684553e8ac41275cb6a6d4d205a1322a6aef9"
+      "sha256": "54cd8e4ef816c37bfeb77b40b62101662d7a9234983725f11d3058435112aa17"
     },
     {
       "path": "ess/domains/cli.yaml",
-      "sha256": "d51ad2e2fdcfb651db5f16c46c87a16a0a061b40aa17d45449ee83558a6af7d4"
+      "sha256": "0ae3e5208ecbd5b54ddf7b5c2cb2c8aab46c4cfaf0cfd18c94c34e4cf8954ff7"
     },
     {
       "path": "ess/domains/clock.yaml",

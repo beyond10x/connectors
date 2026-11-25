@@ -17,7 +17,7 @@ scope:
   path: ess/domains/auth_bindings.yaml
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 9}
 - {from: "proposed", to: "active", at: "2026-11-25T11:18:23Z", actor: "human:operator", revision: 10}
@@ -228,3 +228,69 @@ Shared files, from the `scope` of each story's frontmatter (2026-11-25):
 - The sentence of `docs/development.md` that the parts ran "on this workstation": the jobs of
   this story run on the build host, where every pool job of the workstation runs today. The
   document is not changed here.
+
+## As built
+
+Built on 2026-11-25. Four files changed, the four of the scope: one comment line in
+`ess/domains/cli.yaml`, one in `ess/domains/auth_bindings.yaml`, the test file
+`crates/connectors-build/tests/cli_spec_mapping_adversary.rs` and
+3 lines of `crates/connectors-build/generated/metadata-emissions/inputs.json`. `er.rs` is
+unchanged.
+
+The test code:
+
+- `function_body(source, name)` takes the text of a Rust file. It requires exactly one line
+  that starts with `fn <name>(` and returns the lines from it through the next line that
+  equals `}`.
+- `the_er_rs_citation_lands_on_the_cursor_expiry_path` keeps its name and holds both claims.
+  It first walks every file under `ess/` and fails on a line that matches
+  `(?:^|[^A-Za-z0-9_])er\.rs:[0-9]`, naming `<path>:<line>: <text>`.
+- One new test, `the_body_finder_returns_the_same_function_from_two_texts`. The module
+  `cli_spec_mapping_adversary` runs 6 tests where it ran 5.
+
+Every run below is
+`cargo nextest run -p connectors-build -E 'test(/^cli_spec_mapping_adversary::/)'` on the build
+host. The edits of the red runs were taken back and are not committed.
+
+- Statement 1, red: the old test with 10 empty lines at line 1 of `er.rs` failed with "cli.yaml
+  cites er.rs:5095-5097 for the cursor removal path", 4 of 5 passed. The run was made at the
+  head of the planning branch, which differs from the base commit of main only in files of the
+  planning store. Green: with the change and the same 10 lines, 6 of 6 passed.
+- An extra run, test first: the new test with both comments still citing by line failed and
+  named `ess/domains/auth_bindings.yaml:521` and `ess/domains/cli.yaml:2218`.
+- Statement 2: with the finder changed to start at the first line that starts with `fn `, the
+  finder's test failed (it returned the body of `fn other`), and the citation test failed too.
+- Statement 3: with `"Active" | "Expired"` in the arm of `removal_command` the test failed with
+  "cli.yaml says the host removal path only expires Active cursors"; with `"Revoked"` added to
+  the state pattern of the `PublishBinding` arm it failed with "auth_bindings.yaml says the
+  host maps no Revoked row change to PublishBinding".
+- Statement 4: with `er.rs:5095-5097` back in `cli.yaml` the test failed and named
+  `ess/domains/cli.yaml:2218`.
+- Final tree: 6 tests run, 6 passed; the slowest took 0.019 s.
+
+Point 4, the regeneration: `cargo build --locked -p connectors-build` as its own job, then the
+one command of the story with `--part component`. The job ran 69 s with its wait in the queue,
+not the 8 to 27 minutes that `docs/development.md` names for a part. It wrote 2 files; the only
+file that differs from the committed one is `inputs.json`: its `digest` and the `sha256` of the
+two changed files, which equal `sha256sum` of those files. The other two parts were not run.
+Statement 5, the half on the build host: `the_committed_metadata_emissions_are_current` passed.
+It was not shown red between the comment change and the regeneration.
+
+The steps the repository's `AGENTS.md` asks of a change under `ess/domains`, on the final tree,
+one pool job each, all with exit status 0: `connectors-build metadata-entities --check`,
+`ess-boundary`, `cli --check`, `mcp-bindings --check`, `service-metadata --check`,
+`connectors-docs generate --check`, and `cargo nextest run --locked -p connectors-build`: 380
+tests run, 380 passed, 17.2 s. No file changed in those runs.
+
+One check is tighter than point 3 wrote it. Point 3 says that a second arm for the same command
+fails the test, and its rule for `removal_command` ("the next line holds
+`"connectors.cli.ExpireConnectionListCursor"`") did not hold that: an arm that names the
+command without the entity literal, such as `(_, "Expired")`, passed. The test now requires
+exactly one line of `removal_command` that holds the command's literal, and that it is the line
+after the arm for an Active cursor. Shown red once, not committed: with the arm
+`(_, "Expired") => { "connectors.cli.ExpireConnectionListCursor" }` added to `removal_command`
+the test fails with "exactly one line of `removal_command` in er.rs holds
+"connectors.cli.ExpireConnectionListCursor"".
+
+Read from the pull request's jobs and not from a run on the build host: the second half of
+statement 5 (the forge's `slow` job) and statement 6 (the gate's test step).
