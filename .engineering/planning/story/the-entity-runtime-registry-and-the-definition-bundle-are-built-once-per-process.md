@@ -10,10 +10,11 @@ relations:
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
 - supersedes: story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run
+- depends_on: story:the-specification-cites-er-rs-by-function-name-not-by-line
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-revision: 4
+revision: 5
 ---
 ## Defect
 
@@ -65,6 +66,9 @@ tests are under `crates/connectors-host/src/local/`, the last two under
 | 11 | 7.1 | 9.778 | 2.649 | 27.1 % |
 | Sum | 108.0 | 117.685 | 35.979 | 30.6 % |
 
+The rounded rows of the R+P column sum to 35.981 s; 35.979 s is REG plus PARSE2 from the timers
+(29,004.2 + 6,974.3 ms, arithmetic).
+
 The cause, in `crates/connectors-host/src/local/metadata/er.rs` at head d5cf22480:
 
 - REG: `registry()` (line 992) calls `definition_bundle()` (line 1012), which parses the 469,676
@@ -115,8 +119,15 @@ Product behaviour does not change: same records, same errors, same order. All po
    clone of the shared registry. `registry()` keeps its signature and returns that clone.
 4. `record_writer_for_tests` (line 1169, test support) borrows the shared value as
    `persist_batch` does.
-5. The build runs inside the existing test seam `timed("er.definitions_build", …)` (lines 3187
-   to 3204). Outside `cfg(test)` `timed` only calls its closure, so the product gets no counter.
+5. Two test seams, both through the existing `timed` (lines 3187 to 3204). Outside `cfg(test)`
+   `timed` only calls its closure, so the product gets no counter.
+   `timed("er.definitions_build", …)` is called inside the closure handed to the `OnceLock`,
+   around the build: a call that finds the value counts nothing.
+   `timed("er.bundle_parse", …)` is around the parse in `definition_bundle()`. Today
+   `definition_bundle()` is called at six places besides `registry()`: lines 1170
+   (`record_writer_for_tests`) and 4328 (`persist_batch`), which points 2 and 4 remove, and
+   four in the test module (lines 6119, 6460, 6539 and 6784), which stay and parse as before.
+   After points 1, 2 and 4 the build is its only caller outside the test module.
 
 Established by reading:
 
@@ -131,10 +142,19 @@ Established by reading:
   worker thread. `Registry` derives `Clone` (`crates/entity-core/src/registry.rs` line 108). The
   cost of a clone is not measured. A clone skips the JSON parse, the validation and the
   serialize-and-parse round trip of `record_form`; it copies two `EntityDefinition` values per
-  definition.
-- (c) Who relies on a fresh registry per call: nobody found. `registry()` has five callers, all
-  in `er.rs`: three move the value into a facade or a provisioning call, two borrow it; none
-  changes it. `Registry::new()` and `register` occur in the host crate only in `registry()`
+  definition. The clone is forced: the facade takes the value, the field of `Registry` is
+  private, and the dependency has no shared form. A reading of its size: the bundle holds 28
+  definitions and 73 commands; one parse of it, which allocates each definition once, takes
+  3.04 ms. A clone that costs one to two such parses makes the 436 clones of run 5 1.3 to 2.7 s
+  (arithmetic), 1.1 to 2.3 % of 117.685 s and inside the 16.0 s margin of statement 4.
+- (c) Who relies on a fresh registry per call: nobody found. Outside its test module
+  `registry()` has five callers, all in `er.rs`: three move the value into a facade or a
+  provisioning call, two borrow it; none changes it. The test module calls it at eight more
+  places (lines 6127, 6467, 6547, 6876, 7084, 7562, 7598 and 8299); each borrows the value it
+  gets, so the kept signature serves them unchanged. No test expects `registry()` to fail.
+  `Failure` is `Copy` and `MetadataUnavailable` carries no message (`local/mod.rs` lines 48 to
+  58), so a stored failure is the same value on every call. The build reads only the
+  compiled-in bytes, so a failure cannot be one that a later call would not see. `Registry::new()` and `register` occur in the host crate only in `registry()`
   itself (lines 997 and 1003), in the test helper `registry_of` (line 5562) and in
   `adversary_w3_tests.rs` (lines 24 and 26). The tests that need other definitions
   (`newer_registry`, `future_registry`, lines 5519 and 5541) build their own registry from the
@@ -146,74 +166,148 @@ Established by reading:
   `CommandEntry` holds strings and vectors of strings. The compiler confirms the reading: a
   `static OnceLock<T>` builds only when `T` is `Send` and `Sync`. The registry is already moved
   to another thread today.
+- (e) Tests that race, read for what makes their threads overlap. Five of the eleven run
+  several threads (tests 2, 6, 8, 10 and 11). Three do not depend on how long a persist takes:
+  tests 6 and 8 start their threads at a `Barrier` (`registry/tests.rs` line 805,
+  `mutations/tests.rs` line 497), and test 11 holds the provider's answer with a lock until it
+  has counted the waiters (`tests/http_standing_grant.rs` lines 957 to 984). Two do: test 2
+  spreads its 16 callers by a sleep of 3 ms times their index (`owner/refresh/tests/issue.rs`
+  line 319), and test 10 spawns its 8 tasks with no common start
+  (`tests/http_standing_grant_adversary.rs` lines 272 to 287). Both assert a result that also
+  holds when the callers run one after another, and neither shows that two overlapped. A
+  shorter persist can make fewer of them overlap. That is not established, and how many overlap
+  today is not either. This story changes neither test. Open question 13 counts the overlaps
+  before and after this change and names the story when they fall.
 
 Not measured: the memory the shared value holds for the life of the process.
 
 ## Acceptance
 
-1. A new unit test in the test module of `er.rs`,
-   `persists_and_fresh_opens_build_the_definitions_at_most_once`, fails before point 1 and passes
-   after it. On one thread it initializes a store in a temporary directory, empties the counts
-   with `take_costs()`, makes 5 persists that each change a record, then 3 opens that each act
-   as a new process (`simulate_process`, line 3000). It asserts that `fresh_opens()` rose by 3
-   and that `take_costs()` counts at most 1 call of `er.definitions_build`. The red run is the
-   test with the seam of point 5 on today's uncached function: at least 8 calls. "At most 1" and
-   not "1": under plain `cargo test` the tests of the binary are threads of one process, and
-   another thread may have built the value. The test holds no time window. Run:
-   `cargo nextest run -p connectors-host -E 'test(<name of the test>)'`.
-2. Behaviour: the tests of `connectors-host` that touch the store pass unchanged. The pull
-   request changes no test file and no assertion; its only test change is the test of
-   statement 1. The run that shows it: the test step of the forge's "repository gate" job of the
-   pull request, and before the push the eleven tests above and the tests of `local::metadata`
-   on the build host, each under the 60 s bound.
-3. Kept runs: the pull request changes no loop count, round count or trial count in the eleven
-   tests (43 cases in the first, counted in the source: 1 + 10 + 4 + 1 + 5 + 20 + 2).
+1. A new unit test in `mod tests` of `er.rs`,
+   `persists_and_fresh_opens_build_the_definitions_once_per_process`, fails before points 1 and 2
+   and passes after them. It reads two kinds of the cost counter (`take_costs()`, which counts
+   per thread): `er.definitions_build`, one per run of the closure that builds the shared value,
+   and `er.bundle_parse`, one per parse in `definition_bundle()` (point 5). The test:
+   - takes `own_processes()`, as the tests of fresh opens do;
+   - initializes a store in a temporary directory (`Metadata::initialize`) and calls
+     `registry()` once, so that the shared value exists whichever thread built it;
+   - empties the counts with `take_costs()`;
+   - makes 5 persists that each change a record: `runtime::state::State::suppress` on that
+     store with alternating values, the call the test at line 5617 makes once;
+   - makes 3 opens that each act as a new process: `simulate_process` with a new id, then
+     `Metadata::update`;
+   - initializes a second store in another temporary directory and makes one persist there;
+   - asserts that `fresh_opens()` rose by at least 3;
+   - asserts that `take_costs()` holds 0 calls of `er.definitions_build` and 0 calls of
+     `er.bundle_parse`;
+   - starts one more thread that makes one persist on the first store and one open of it as a
+     further new process, and returns its own `take_costs()`: 0 calls of both kinds there too.
+
+   What the counts exclude. A value kept per handle or per simulated process is built again in
+   the 3 opens. A value kept per store is built again for the second store. A value kept per
+   thread is built once on the new thread. A `persist_batch` that kept its own parse counts 6
+   parses.
+
+   The red run is point 5 alone on today's code: the two `timed` calls around today's build and
+   today's parse, nothing else changed. Expected by reading, not run: at least 8 builds (5
+   persists and 3 opens) and at least 13 parses (two per persist, one per open) on the test's
+   thread before the second store. The pull request's body carries the command of the red run
+   and the failing assertion with its counts.
+
+   The test holds no time window. Run:
+   `cargo nextest run -p connectors-host -E 'test(persists_and_fresh_opens_build_the_definitions_once_per_process)'`.
+2. The diff: `git diff --stat` of the pull request against its base names one file under
+   `crates/`, `er.rs`. Outside `mod tests` of that file the pull request changes no test code,
+   so no assertion and no loop, round or trial count of the eleven tests changes (43 cases in
+   the first, counted in the source: 1 + 10 + 4 + 1 + 5 + 20 + 2).
+3. Behaviour: the tests of `connectors-host` pass. The run that shows it: the test step of the
+   forge's "repository gate" job of the pull request, and before the push the eleven tests above,
+   the tests of `local::metadata` and the tests of the module `cli_spec_mapping_adversary` of
+   `connectors-build` (one of them reads two functions of `er.rs`) on the build host, each
+   under the 60 s bound.
 4. Time: the durations of the eleven tests in the test step of the forge's "repository gate" job
-   of the pull request sum to at most 92 s. Before: 108.0 s. Estimate: 76 s. The derivation and
-   the handling of variance follow below.
+   of the pull request sum to at most "base" minus 16.0 s. "Base" is the sum of the same eleven
+   durations in the newest "repository gate" job on main that ran the test step, at or before
+   the pull request's base commit. The pull request's body names that job and its commit. When
+   main is merged into the branch again, "base" is read again for the new base commit, so a
+   pull request that merged in between (the fixture story's, for one) is in "base" and not in
+   the saving. For the base of the plan, 108.0 s (job 138270416028), the bound is 92.0 s.
+   Estimate: 76 s.
 
 Derivation of statement 4:
 
 - Estimate: each test's forge duration times its R+P share on the build host gives a saving of
-  32.0 s (arithmetic over the table: 6.20 + 6.42 + 1.55 + 2.84 + 2.34 + 2.15 + 0.67 + 2.30 +
-  2.81 + 2.77 + 1.92). 108.0 − 32.0 = 76.0 s. What stays is one build per test process (11 ×
-  10.63 ms = 0.12 s, arithmetic) and the clones (not measured).
+  32.0 s (arithmetic over the table: 6.20 + 6.42 + 1.54 + 2.84 + 2.34 + 2.15 + 0.67 + 2.30 +
+  2.81 + 2.77 + 1.92 = 31.96). 108.0 − 32.0 = 76.0 s. What stays is one build per test process
+  (11 × 10.63 ms = 0.12 s, arithmetic) and the clones (not measured; (b) above gives 1.3 to
+  2.7 s as a reading).
 - The old rule of the set, estimate times 1.5, gives 114 s. That is above "before" and holds
   nothing.
-- Proposed rule: "before" minus half the estimated saving: 108.0 − 16.0 = 92 s.
+- The rule here: "base" minus half the estimated saving, 16.0 s. It is one formula for every
+  base. A base of 108.0 s gives 92.0 s; a base of 100.0 s gives 84.0 s; a base of 130.0 s gives
+  114.0 s.
+- Why "base" is read again and not taken as 108.0 s: the forge's 108.0 s is one job of
+  2026-11-24, and main has changed since.
+- A commit on main that changed only planning files has a gate job without a test step. Then
+  the nearest earlier commit on main whose gate job ran the test step gives "base", and the
+  pull request names that commit and its job.
 - Variance: one test ran 17.6, 19.7, 24.1 and 30.3 s on the build host in four runs, so the
   bound is on the sum of eleven, not on one test. The sum of the eleven on the build host was
   117.7 s in run 5 and 127.6 s in the earlier solo run (136.889 − 9.293, arithmetic): 9.9 s
   apart. The margin of 16.0 s is wider than that. That the forge varies as little is a reading:
-  the forge's "before" is one job.
-- So "before" is read again: the pull request names the durations of the eleven tests in the
-  newest gate job of its base commit. When their sum is under 108.0 s, the bound is that sum
-  minus 16.0 s.
-- A job over the bound is not run again until it passes. The pull request then lists the eleven
-  durations of both jobs, the story stays open, and the numbers go back to the operator.
-  Statement 1 does not depend on time and holds the change on its own.
+  each forge figure is one job.
+- When the pull request's job is over the bound, it is not run again as a remedy. The pull
+  request then lists the eleven durations of both jobs. It may still merge when statements 1 to
+  3 hold: they hold the change without a clock. The story then stays active, is not moved to
+  implemented, and the two lists go to the operator.
 
 No test of the eleven is over 60 s before or after (largest: 17.5 s on the forge).
 
 ## Scope
 
 - `crates/connectors-host/src/local/metadata/er.rs`: the shared value and its build (point 1),
-  `registry()`, `persist_batch`, `record_writer_for_tests`, the seam of point 5, and the new
-  test in the test module.
+  `registry()`, `persist_batch`, `record_writer_for_tests`, the two seams of point 5, and the
+  new test in the test module.
 
-No other file is written. Stories of the set (those that decompose
-`the-gates-test-step-ends-within-120-s-on-the-forge`) that name this file: only
-`eighteen-tests-take-a-template-store-or-jail-built-once-per-run`, which is not built. Stories
-outside the set that name it and are not finished: `connections-list-answers-through-the-owner`
-(active), `post-commit-metadata-failure-is-outcome-unknown` (draft),
-`spec-models-operation-admission` (draft).
-`four-host-tests-no-longer-wait-out-the-30-s-lock-wait` writes `metadata.rs`, not this file.
+No other file is written. That holds only behind
+story:the-specification-cites-er-rs-by-function-name-not-by-line. At head f9f263a2
+`ess/domains/cli.yaml` line 2218 cites `er.rs:5095-5097`, the test
+`the_er_rs_citation_lands_on_the_cursor_expiry_path` of `connectors-build` requires the text
+`ConnectionListCursor` in those lines, and every point of this change is above line 5095.
+Without that story this pull request is red in the gate, or it writes `cli.yaml` and the record
+`crates/connectors-build/generated/metadata-emissions/inputs.json`, which holds a sha256 of
+`cli.yaml`. This story has a `depends_on` edge to that story and starts from a head that holds
+it. No committed record holds a digest of `er.rs` itself (`git grep` for the path under
+`crates/connectors-build/`: none).
 
-`aep plan artifact waves --kind story --status draft` (2026-11-25) puts this story in wave 1. It
-reports the file as shared with two drafts outside the set, both with inferred scope:
-`mcp-outbound-stdio-runtime` (wave 4) and `spec-models-operation-admission` (wave 5). No edge
-records an order. This story goes first; a later story that writes the file starts from a head
-that holds this change.
+`entity-runtime-definitions.json`, the bundle beside `er.rs`, is read and not written. A story
+that regenerates it before this one changes the cost of one build, not the counts of statement
+1 and not the formula of statement 4, which reads its "base" from main.
+
+Who else names `er.rs`, in two lists:
+
+- By recorded scope (`aep plan artifact waves --kind story --status draft`, 2026-11-25), two
+  drafts outside the set, both inferred: `spec-models-operation-admission` records the file and
+  the bundle; `mcp-outbound-stdio-runtime` records the directory
+  `crates/connectors-host/src/local`.
+- By the path in a story's text, two more: `connections-list-answers-through-the-owner`
+  (active) cites lines of `er.rs` as what it read; its recorded scope has nine paths and not
+  this file, so it does not write it. `post-commit-metadata-failure-is-outcome-unknown` (draft)
+  cites lines 4115 to 4207, the region of `persist` and `persist_batch`, and records no scope.
+- The lists differ because the tool reads only the `scope` of a draft's frontmatter.
+- Stories of the set that name the file: only the archived
+  `eighteen-tests-take-a-template-store-or-jail-built-once-per-run`.
+  `four-host-tests-no-longer-wait-out-the-30-s-lock-wait` writes `metadata.rs`, not this file.
+
+Order with the three drafts: this story goes first, and no edge records that. An edge would
+state that their content needs this change, which is not so; their scope is inferred and none
+is planned in detail. The rule for them is this sentence: a later story that writes `er.rs`
+starts from a head that holds this change, and one that cites lines of `er.rs` reads them
+again there.
+
+Order within the set: story:the-specification-cites-er-rs-by-function-name-not-by-line, then
+this story, then story:store-tests-end-within-60s-under-load and the two question stories that
+read this story's result (each has a `depends_on` edge to this story).
 
 ## Not in this story
 
@@ -224,14 +318,17 @@ story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-lea
 - The read after the batch, the catch-up of a pooled handle, the projection and the validation:
   open questions 2 to 5.
 - The migrate that has nothing to migrate and still persists: open question 6. This story takes
-  5.61 s of its 8.07 s away without touching it; 2.45 s stay.
+  5.61 s of its 8.07 s away without touching it; 2.46 s stay (arithmetic).
 - The poll of the lifecycle lock and the fresh opens of `adversary_concurrent_issues…`: open
   questions 7 and 8.
-- The template store and the shared schemas of the old story: not built, see its section
-  "Measured (2026-11-25): not built as written".
+- The template store, the shared schemas and the setup step of the old story: not built, see
+  its section "Measured (2026-11-25): not built as written".
+- A common start or a proof of overlap for tests 2 and 10: open question 13.
+- The line citations of `er.rs` in the specification:
+  story:the-specification-cites-er-rs-by-function-name-not-by-line, which this story depends on.
 - The tests under 5 s: whether they carry the same share is not measured.
-  `where-do-the-1298-s-of-the-tests-under-5-s-go` holds that question; open question 11 names
-  the measurement.
+  `where-do-the-1298-s-of-the-tests-under-5-s-go` holds that question and reads the answer from
+  the gate job of this story's pull request against its base.
 - An interface of Entity Runtime that takes a shared registry, so that a fresh open needs no
   clone: the dependency's code, not asked for here.
 - The third parse of the bundle in `model_digest()` (line 1040): it is already cached per

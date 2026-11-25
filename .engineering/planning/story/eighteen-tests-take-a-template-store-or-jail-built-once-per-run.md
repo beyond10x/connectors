@@ -44,7 +44,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/template_store.rs
-revision: 15
+revision: 16
 transitions:
 - {from: "draft", to: "archived", at: "2026-11-25T10:33:35Z", actor: "human:operator", revision: 15}
 ---
@@ -349,8 +349,13 @@ by CPU: user and system time are 88 to 124 % of their wall time.
 - `the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold`: the SQL test, test code
   only, 7.0 s, estimate 0.6 s. Its cause is a reading; its first acceptance statement decides.
 - story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves holds the
-  rest as questions: BATCH, READBACK, CATCHUP, PROJ, VALID, the migrate with nothing to migrate,
-  the lock poll, the fresh opens, `ess generate` per test.
+  rest as thirteen questions: BATCH, READBACK, CATCHUP, PROJ, VALID, the migrate with nothing to
+  migrate, the lock poll, the fresh opens, `ess generate` per test, the SQL test when the
+  fixture draft is refuted, the variance from run to run, the "Rest" row of the table above
+  without the 5.55 s of `initialize`, and two tests whose race depends on how long a persist
+  takes.
+- story:the-specification-cites-er-rs-by-function-name-not-by-line goes ahead of the registry
+  draft: a test holds a line citation of `er.rs` that the registry draft's change would move.
 - Two stories named this story in `depends_on`. Both edges are removed with this section.
   story:the-gates-test-step-ends-within-120-s-on-the-forge had the edge because this story
   edited `test_step` in `crates/connectors-build/src/gate.rs`; no draft of the re-plan writes

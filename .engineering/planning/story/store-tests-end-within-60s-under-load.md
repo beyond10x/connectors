@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/tests/metadata_reopen_adversary.rs
-revision: 10
+revision: 11
 ---
 ## Defect
 
@@ -149,3 +149,10 @@ story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate for the stress test,
 story:seven-cli-tests-of-a-slow-owner-start-no-longer-wait-out-the-10-s-connect-wait for one test);
 this story keeps its acceptance, 60 s at host load, and is measured after the registry story
 lands, which its `depends_on` edge to that story records.
+
+The registry story does not promise 60 s at load: it removes 30.6 % of the eleven tests' time on
+the build host (7.7 % in `a_read_invoke…`) and its acceptance is a sum of forge durations. When a
+test named here is still over 60 s at host load after it, this story keeps the change for that
+test. The route "a shared fixture" is measured and closed for it: a template store saves 33 to
+38 ms per store (the section "Measured (2026-11-25): not built as written" of the archived
+story).

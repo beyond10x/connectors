@@ -11,7 +11,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-build/src/gate.rs
-revision: 10
+revision: 13
 ---
 ## Defect
 
@@ -71,9 +71,17 @@ Re-planned on 2026-11-25: S9a was measured before it was built and is not built 
 decision; the section "Measured (2026-11-25): not built as written" of that story). A store from
 nothing costs 51 to 58 ms on the build host and a template saves 33 to 38 ms per store: about
 1.5 s of the 31 s its acceptance asked for. S9a is archived. Three drafts take its place: S9d and
-S9e each change code for the tests S9a named, and N6 is a question. The set is twenty-one drafts
-now: fifteen change tests or the product code their time is spent in, two build what the others
-use, and four are questions.
+S9e each change code for the tests S9a named, and N6 is a question. The critics of the re-plan
+(round 1, all four asked for a revision) found that a comment of the specification cites
+`er.rs` by line and a test holds those lines, so S9d could not change the file alone; N7 was
+added for it. The set is twenty-two drafts now: fifteen change tests or the product code their
+time is spent in, three build what the others use (N1, N2, N7), and four are questions.
+
+Two findings of that round are open: S1 (in the paragraph on `metadata.rs`) and N2 (in the
+paragraph on the setup script) still describe S9a as it was planned. Their story files are
+changed by their own open pull requests, so the two sentences are corrected in the planning
+store after those pull requests merge. The stories that are implemented keep their sentences
+about S9a as written; S9a's section names what took its place.
 
 "Before" and "after" are seconds summed over the tests of 5 s and more that a story covers,
 from the first run; every "after" is an estimate and none was timed.
@@ -120,10 +128,14 @@ Without a row, because they cover no test of their own:
 - N5 `story:where-do-the-1298-s-of-the-tests-under-5-s-go`: the question that owns the gap to the
   budget, the unexplained second run of 842.2 s, and what acceptance 1 needs beyond the other
   stories of the set (below).
-- N6 `story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves`: twelve
-  costs that the measurement of 2026-11-25 saw in the tests of S9d and S9e and did not attribute
-  far enough for a story. The largest is the write of the Entity Runtime batch, 30.29 s of
-  117.685 s on the build host.
+- N6 `story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-leaves`:
+  thirteen items that the measurement of 2026-11-25 and the critics' reading left open in the
+  tests of S9d and S9e, none attributed far enough for a story. The largest is the write of the
+  Entity Runtime batch, 30.29 s of 117.685 s on the build host.
+- N7 `story:the-specification-cites-er-rs-by-function-name-not-by-line`: two comments under
+  `ess/domains/` cite `er.rs` by line and a test of `connectors-build` holds one of them, so a
+  change above line 5095 of `er.rs` makes that test red. N7 makes the citations name a
+  function. It claims no test time. S9d has a `depends_on` edge to it.
 
 Edges (`depends_on`) order the stories that write one file.
 `aep plan artifact waves --kind story --status draft`, run after the notes of the third round,
@@ -142,6 +154,14 @@ this story in wave 5. N6 records no scope and is unassessed. This story's edge t
 it ordered two writes of `gate.rs`, and neither S9d nor S9e writes that file. Its edge to N5
 stays. S9d writes `crates/connectors-host/src/local/metadata/er.rs`, which no other story of the
 set writes; the tool reports two drafts outside the set that share it, and S9d names them.
+After the second round of the re-plan (N7, S9d's edge to it, and the edges of N5 and N6 to S9d)
+the same command derives 11 waves and puts S9e in wave 1, N7 in wave 4, S9d in wave 6, and
+story:store-tests-end-within-60s-under-load and this story in wave 7. N7 has no `depends_on`
+edge. Its wave is how the tool keeps apart the stories that record `ess/domains/cli.yaml`:
+three drafts outside the set record it with inferred scope, in waves 1, 2 and 6, and none of
+them is approved or started. N7 is the first story of the re-plan to be implemented; a draft
+that changes `cli.yaml` after it starts from a head that holds it. N5 and N6 record no scope and
+stay unassessed.
 `crates/connectors-host/src/local/owner/transport.rs` is written by N2, S4, S2, S8c and S3, in
 that order.
 
@@ -163,15 +183,24 @@ Decisions beyond the plan, each recorded in its story:
 - S8a: the test `no_suite_sees_the_installation_another_suite_sets` is removed. The plan moved it
   to the lane, where it cannot fail either.
 - S9b: no product built once per run; `Jail::install` links the file cargo built.
-- S9a, not built since 2026-11-25; its three decisions go with it: a direct dependency of
+- S9a, not built since 2026-11-25; its decisions go with it: a direct dependency of
   `connectors-build` on `connectors-host`, a digest over all of
-  `crates/connectors-host/src/local/`, and an edit of `test_step` in `gate.rs` that prints the
-  lines of the setup step.
+  `crates/connectors-host/src/local/`, an edit of `test_step` in `gate.rs` that prints the
+  lines of the setup step, and the setup step itself (a nextest setup script, which needs the
+  setting `experimental = ["setup-scripts"]` and costs about 0.27 s per run for a `cargo run`
+  that builds nothing). No story of the set uses a setup script now.
 - S9d: a change of product code, where the plan changed only tests and their fixtures. It keeps
   records, errors and their order, and its first acceptance statement is a test that counts the
   builds.
-- S9d: its bound is "before" minus half the estimated saving, 92 s. The set's rule, the estimate
-  times 1.5, gives 114 s, above the 108.0 s before.
+- S9d: its bound is "base" minus half the estimated saving (16.0 s), where "base" is the sum of
+  the eleven tests in the newest gate job on main at or before the pull request's base commit:
+  92.0 s for the 108.0 s of the plan. The set's rule, the estimate times 1.5, gives 114 s, above
+  the 108.0 s before.
+- S9d and S9e: a pull request whose gate job is over the time bound is not run again as a
+  remedy. It may merge when the other acceptance statements hold; the story then stays active
+  and the durations go to the operator.
+- N7: the specification cites code by function name, and the test that held a citation by line
+  finds the function.
 - S9e: its bound is 2.0 s. The estimate times 1.5 gives 0.9 s, narrower than one `ess generate`
   call of the test varies on the build host (0.10 to 0.69 s).
 - S9e: nothing is merged when its cause is refuted twice; N6 then holds the test.
@@ -189,9 +218,13 @@ Not claimed by a change, among the 81. Each test below keeps its time in the sum
   S8c's row).
 - A change with no estimated saving, 6 tests: the jail tests of S9b, 50.7 s before and 50.6 s
   after.
+
+Claimed by a change whose estimate is not confirmed, 12 tests. Their "after" in the sum is the
+estimate, not their time before:
+
 - An estimate carried over from another machine, 11 tests of S9d: the 76.0 s after are each
   test's duration on the forge times the share of the two costs in that test on the build host.
-  That the forge has the same shares is a reading. S9d's bound is 92 s for that reason.
+  That the forge has the same shares is a reading. S9d's bound is 92.0 s for that reason.
 - A cause not confirmed, 1 test of S9e: the 0.6 s after hold only when the whole wait of the test
   is the hold that `TCP_NODELAY` removes. When the cause is refuted twice the test keeps its
   7.0 s.
@@ -217,7 +250,7 @@ at four tests at a time, against 120 s. Before the re-plan of S9a these figures 
 1,650.9 s and 412.7 s. The rest, 1,298.0 s, is in tests the stories do not cover:
 about 755 s in the band of 1 s to under 5 s and 543 s under 1 s. S9d changes product code that
 every test with a persist runs; what it takes from the 1,298.0 s is not measured and not in these
-sums (item 11 of N6).
+sums. N5 reads it from the gate job of S9d's pull request (its question 5).
 
 N5 owns that gap. It asks what the uncovered tests pay per test, which of those costs a fixture
 built once removes, and whether changes to tests can bring the sum to 480 s; it names the draft
@@ -225,7 +258,12 @@ stories that follow, or the answers the operator chooses from. N5 also owns the 
 two forge runs. Acceptance 1 of this story is not met by the other stories of the set: beyond them
 it needs N5's answer and the stories drafted from it. The first plan's candidate, the store of S9a
 for every test that builds one, is measured and closed: 33 to 38 ms per store. One candidate that
-is not measured: the share of S9d's two costs in the tests under 5 s.
+is not measured: the share of S9d's two costs in the tests under 5 s. N5's question 5 reads it
+and has a `depends_on` edge to S9d.
+
+This story's acceptance reads the forge's test step, which S9d and S9e change. It records no
+edge to them: its own change waits until acceptance 1 holds, and that needs every story of the
+set and N5's answer. The edge to N5 orders it behind all of them.
 
 Two older drafts overlap the set.
 
