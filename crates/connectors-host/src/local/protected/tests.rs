@@ -198,9 +198,10 @@ const TERMINAL_BUDGET: Duration = Duration::from_secs(120);
 
 #[test]
 fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
-    // `late` answers the prompt 5.5 s after it appears, past the 5 s the
-    // fixture used to assume, so it passes only on the deadline this test
-    // hands the child.
+    // `late` answers the prompt 1.5 s after it appears: the read waits for a
+    // slow person under the deadline this test hands the child. It was 5.5 s
+    // while the fixture still assumed 5 s of its own; the fixture has no
+    // deadline of its own any more (`CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS`).
     for mode in ["complete", "interrupt", "late"] {
         let (mut master_fd, mut slave_fd) = (-1, -1);
         // SAFETY: initialized output slots; default terminal size/mode requested.
@@ -282,7 +283,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         }
         assert_eq!(attrs(&slave).c_lflag & libc::ECHO, 0);
         if mode == "late" {
-            std::thread::sleep(Duration::from_millis(5_500));
+            std::thread::sleep(Duration::from_millis(1_500));
         }
         master.write_all(b"fictional-inputx\x7f").unwrap();
         if mode == "interrupt" {
