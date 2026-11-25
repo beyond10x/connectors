@@ -17,7 +17,7 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T14:07:37Z", actor: "human:operator", revision: 9, decided_on: {"recorded":{"review_outcome":11}}}
 - {from: "proposed", to: "active", at: "2026-11-25T16:33:13Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"review_outcome":11}}}
@@ -161,3 +161,65 @@ Other stories on these files:
   at 6.7 s. The control and the long-read test stay over 5 s; no story.
 - `adversary_a_store_replaced_under_the_owner_ends_the_session` (16.5 s in the forge's gate job
   138270416028), which no story of the set changes.
+
+## As built
+
+Commit 8c225885e on the branch `story/two-mcp-tests-listed-budget`, not pushed. It changes 3
+files, 121 lines added and 49 removed: `apps/connectors/src/mcp/projection.rs`,
+`apps/connectors/tests/security_mcp_deadline.rs` and
+`apps/connectors/tests/mcp_tool_call_shapes_adversary.rs`.
+
+Product: `listed_request_ms(execution_ms)` and `walk_reply_reserve()` in `projection.rs` read
+`CONNECTORS_TEST_OVERRIDE_MCP_LISTED_REQUEST_MS` and
+`CONNECTORS_TEST_OVERRIDE_MCP_WALK_RESERVE_MS` through `connectors_sdk::debug_override_ms`,
+with the read's `execution_ms` and 5,000 ms as the defaults.
+
+Two departures from the story's item 4, both decided from runs on a loaded host:
+
+- `max_pages_written_as_an_integral_number_is_the_integer_the_schema_admits` keeps
+  production's 20,000 ms and passes no variable. The test waits out no budget. Under a short
+  budget its server's start, which is bounded by the request time, missed its bound.
+- The walk test runs under a request budget of 6,000 ms with a reply reserve of 1,000 ms,
+  not 4,000 ms. At 4,000 ms the server's start took 4.2 to 4.6 s in runs at a load average
+  over 100, or the first page was refused `timeout`.
+
+Seen red before the product change: with the test changes alone, 4 tests failed.
+
+Acceptance 3, one run with a mutant that was not committed: `LATE_WRITE_GRACE` in
+`apps/connectors/src/mcp/stdio.rs:43` set to `Duration::ZERO`.
+`security_an_on_time_reply_written_across_its_deadline_keeps_the_session` failed at
+`security_mcp_deadline.rs:928`: "a reply that began inside its deadline ended the session
+when its write crossed the deadline", with 4,096 bytes of the reply written after 4.500 s.
+The control and `security_requests_past_their_deadline_each_get_one_reply_on_their_own_id`
+failed in that run too, so the mutant is wider than the one case.
+
+Acceptance 4, one run with a mutant that was not committed: in `projection.rs:519-525` the
+arms of `match (answered, refused)` changed to `(Some(envelope), None)`,
+`(_, Some(Ok(envelope)))` and `(_, Some(Err(rpc)))`, so a refused page wins over the records
+taken. `a_walk_that_outlasts_the_request_budget_answers_the_records_taken` failed at
+`mcp_tool_call_shapes_adversary.rs:442`: the reply was the error `timeout` with no records.
+The other 5 tests of the binary passed.
+
+Both mutants were reverted; the diff of the tree was 3 files, 121 added and 49 removed
+before and after.
+
+One run of the two binaries with the change, on the workstation at a load average of 20 to
+23: 10 of 10 tests passed, the run took 14.924 s. Per test: the walk test 10.868 s (on main,
+one run: 19.898 s), the on-time test 9.915 s (on main: 25.235 s), the past-deadline test
+10.515 s, the control 9.940 s, the max_pages test 5.811 s,
+`a_request_budget_under_the_reads_execution_time_lists_no_tool` 4.398 s. The two tests of
+acceptance 1 were over its 9 s in this run; the forge's figures decide that acceptance and
+are added with the pull request.
+
+Six earlier runs with the change failed in part, each with 2 to 5 failing tests of the 10:
+one on the build node and five on the workstation. Three of the five have their load average
+in the log: 28 to 55 (2 failed, the walk test still at 4,000 ms), 104 to 108 (3 failed) and
+88 to 133 (2 failed, the walk test at 6,000 ms); two have none (5 failed each). The failures
+were the server's start bound (`stdio.rs:94-98`), the first page of the walk, and
+`security_requests_past_their_deadline_each_get_one_reply_on_their_own_id` (not changed by
+this story, "mcp_unavailable" under its start bound of 2 s, failed in all six). The walk test alone passed in
+24.011 s at a load average of 113 to 168. Not measured: the same tests on main at that load.
+
+Clippy with `-D warnings` over all targets of `connectors`, the format check and the three
+scan tests `debug_override_reads` of `connectors-build` pass locally. Acceptances 1, 2, 6
+and 7 are read from the forge's jobs of the pull request.
