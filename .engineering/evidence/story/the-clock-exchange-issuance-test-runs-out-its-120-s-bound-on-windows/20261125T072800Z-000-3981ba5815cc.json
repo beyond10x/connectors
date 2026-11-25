@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-25T07:28:00Z",
+  "actor": "human:operator",
+  "artifact": "story:the-clock-exchange-issuance-test-runs-out-its-120-s-bound-on-windows",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "build node, 2026-11-25 08:18 to 08:28 CET, cargo test -p connectors-host --lib, the one test, libtest times. Acceptance 2: the test of main 4bd8259f with one dropped request at the second source failed after 124.06 s with Unavailable. Acceptance 3: the changed test at 61ca7c939 passed in 1.88 s, and with one drop in 16.64 s with 2 requests at each source. Acceptance 4: without the second resolve alone the test passed in 1.04 s (the policy lease answered Forbidden); without any re-read of the policy after the clock it failed in 1.89 s, issue answered MetadataUnavailable. Acceptance 5: with two drops it failed after 32.33 s with Unavailable, 2 requests at each source, the update Ok in 171 ms. Every edit was uncommitted and taken back."
+  }
+}
