@@ -196,6 +196,9 @@ pub struct Sql {
     profiles: Arc<Vec<ReadProfile>>,
     /// The generated `profile.read` declaration each instance specializes.
     profile_template: Operation,
+    /// The time one query may run: `QUERY_TIMEOUT`, unless one of the adapter's own tests
+    /// replaced it.
+    query_timeout: Duration,
 }
 
 impl Sql {
@@ -249,7 +252,17 @@ impl Sql {
             password,
             profiles: Arc::default(),
             profile_template,
+            query_timeout: QUERY_TIMEOUT,
         })
+    }
+
+    /// For the adapter's own tests: the time one query may run, in place of `QUERY_TIMEOUT`.
+    /// No product code calls it, and no configuration reaches it. The request bound less the
+    /// cleanup time still caps the query.
+    #[doc(hidden)]
+    pub fn with_query_timeout(mut self, query_timeout: Duration) -> Self {
+        self.query_timeout = query_timeout;
+        self
     }
 
     /// The connection's read profiles, each validated as the adapter's ESS model
@@ -382,6 +395,7 @@ impl Sql {
                 &*self.password,
                 &self.descriptor.instance,
                 args,
+                self.query_timeout,
             )
             .await;
         }
@@ -391,7 +405,7 @@ impl Sql {
             .map_err(|_| query_timeout())??;
         // Reserve cleanup time inside the 15 s request bound, even after a slow
         // connection. A caller cannot extend this deadline with set_config().
-        let work_deadline = (Instant::now() + QUERY_TIMEOUT).min(deadline - CLEANUP_TIMEOUT);
+        let work_deadline = work_deadline(deadline, self.query_timeout);
         let instance = self.descriptor.instance.clone();
         let database = self.config.database.clone();
         let (mut send, receive) = oneshot::channel();
@@ -581,6 +595,16 @@ impl Sql {
             provenance: provenance(instance, database, None),
         })
     }
+}
+
+/// When a query's work ends: `query_timeout` from now, and no later than the request's
+/// `deadline` less the cleanup time. A `query_timeout` too large to add to the time now ends
+/// at that cap.
+fn work_deadline(deadline: Instant, query_timeout: Duration) -> Instant {
+    let cap = deadline - CLEANUP_TIMEOUT;
+    Instant::now()
+        .checked_add(query_timeout)
+        .map_or(cap, |end| end.min(cap))
 }
 
 fn query_timeout() -> Error {

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts
 kind: story
-status: draft
+status: active
 title: 'Five tests no longer wait out the HTTP and SQL client timeouts: 56.2 s become an estimated 5.4 s'
 summary: The HTTP client's 15 s and 5 s timeouts and the SQL QUERY_TIMEOUT of 10 s are literals and constants; two debug-only HTTP overrides and a constructor parameter for SQL let tests shorten them
 relations:
@@ -26,7 +26,10 @@ scope:
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 8
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T11:44:03Z", actor: "human:operator", revision: 9}
+- {from: "proposed", to: "active", at: "2026-11-25T11:44:03Z", actor: "human:operator", revision: 10}
 ---
 ## Defect
 
@@ -200,3 +203,84 @@ No other story of this set writes these seven files.
   (inferred from the 5.0 s of
   `a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked`, which asserts no time
   today).
+
+## As built
+
+Built on 2026-11-25 on the head of
+story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build's
+pull request. Seven files under `crates/` and `adapters/`: `crates/connectors-host/src/http.rs`,
+`adapters/sql/src/lib.rs`, `adapters/sql/src/mysql.rs` and the four test files of the Scope
+section.
+
+Where the code differs from the Change section:
+
+- Point 2, one variable per test. Each gate test's child gets only the override its case waits
+  for: `CONNECTORS_TEST_OVERRIDE_HTTP_REQUEST_MS` for the stalled body and for the budget test,
+  `CONNECTORS_TEST_OVERRIDE_HTTP_CONNECT_MS` for the handshake. With both set, 200 ms lay between
+  the connect cutoff and the request cutoff, and a request cutoff that came first failed the
+  handshake test.
+- Point 2, the child runs through the test binary itself (`current_exe`, `--exact <name>`,
+  `--nocapture`) with a marker variable, and the parent holds that the child printed
+  `test result: ok. 1 passed`. A child that runs no test, or is killed, fails the parent.
+- The three HTTP gate tests are ignored in a build without `debug_assertions`, as the four older
+  override tests are.
+- Point 3, the lane test of the stalled body asserts at least 15 s, not 10 s. With 10 s a request
+  timeout of 10 s to under 40 s passed, and this story says the lane test proves the length.
+- The handshake fixture is reached by its address, not by the name `localhost`, and both
+  handshake tests assert that the peer read at least one byte before the refusal. A name with
+  two address families can spend a connect timeout of 300 ms before a handshake starts; the test
+  then passed with no handshake.
+- Point 4, a function `work_deadline` in `adapters/sql/src/lib.rs` holds the one expression both
+  paths used. It ends at the request bound less the cleanup time when the query timeout is too
+  large to add to the time now. Before, `with_query_timeout(Duration::MAX)` panicked on that sum.
+  No product code passes such a value.
+
+Shown red on the build host, one run each, with the tests on their short values and the
+product still on its literals:
+
+- the budget test: failed with "the legacy timeout did not cut a client with no budget";
+- the stalled body: "refused after 15.000583146s, outside 500ms..10s";
+- the handshake: "refused after 5.000945064s, outside 300ms..5s";
+- the PostgreSQL and the MySQL deadline tests: no refusal within their 6 s bound
+  (6.009 s and 6.011 s);
+- with the product change, the stalled body with the request variable not given to the
+  child: "refused after 15.001702863s, outside 500ms..10s".
+
+Shown red after the independent read, one run each, each taken back or fixed:
+
+- `the_largest_query_timeout_is_capped_by_the_request_bound` (`protocol.rs`, added by the read):
+  failed with "overflow when adding duration to instant" before `work_deadline`, passes with it;
+- the handshake test against a fixture that accepts nothing for 40 s: failed with "the peer
+  read no byte before the refusal after 302.649612ms".
+
+Green on the build host, final tree, one run of the four test binaries
+(`provider_timeout_adversary`, `http_budget`, `protocol`, `mysql_protocol`): 53 run, 53 passed,
+3 skipped (the lane tests). The five tests of this story: handshake 0.313 s, stalled body
+0.514 s, budget 1.215 s, PostgreSQL deadline 1.105 s, MySQL deadline 1.296 s, 4.443 s summed
+(arithmetic). None is over 5 s.
+
+The lane tests, single runs on the build host: stalled body 15.008 s with the bound of 15 s,
+handshake 5.009 s, PostgreSQL deadline 10.10 s (run before the read; its code did not change
+after it).
+
+Lints and guards, exit status 0 each: `cargo fmt --check` for the two crates,
+`cargo clippy --locked -p connectors-host -p connectors-sql --all-targets -- -D warnings`, the
+same lint for `x86_64-pc-windows-gnu` with `-p connectors-host -p connectors`, and
+`cargo nextest run --locked -p connectors-build --test main debug_override_reads` (3 passed).
+
+The independent read found no path by which a release build reads the two variables, no test of
+another binary that inherits them, and no caller of `with_query_timeout` outside
+`adapters/sql/tests/`. A query timeout of 3,600 s was refused after 13.07 s, the request bound
+less the cleanup time. What an override value does in a debug build, by one probe run that
+waited 2.5 s: 0 cuts at once; a value that does not parse, and the largest 64-bit value, gave no
+cutoff within the 2.5 s.
+
+One finding of the read is outside this story and has a draft of its own,
+story:a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout.
+
+Read from the pull request's jobs and not from a run on the build host: acceptance 1 (the five
+durations in the gate job, at most 9 s), acceptance 2 and 5 (the lane `slow` lists the three
+lane tests as passed; the gate's ignored step passes), and the three HTTP gate tests on Windows.
+
+Not run: a build without `debug_assertions`; the MySQL path at `Duration::MAX` (it calls the
+same `work_deadline`).

@@ -177,9 +177,49 @@ async fn provider_budget_uses_the_earlier_execution_deadline_during_http() {
     fixture.close().await;
 }
 
+/// The legacy request timeout of a client with no provider budget, in a test build
+/// (`connectors_host::http`, production 15 s).
+const REQUEST_MS: &str = "CONNECTORS_TEST_OVERRIDE_HTTP_REQUEST_MS";
+/// What the test below sets it to.
+const SHORT_REQUEST: Duration = Duration::from_millis(500);
+/// Present in the child the test below starts: that process runs the test's body.
+const CHILD: &str = "CONNECTORS_HTTP_TEST_CHILD";
+
+/// Runs `test` of this binary alone in a child process whose environment holds the short
+/// request timeout, and holds that the child ran that one test and that it passed. The
+/// variable reaches the child only: no other test of this binary sees it.
+fn run_in_short_timeout_child(test: &str) {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", test, "--nocapture"])
+        .env(CHILD, "1")
+        .env(REQUEST_MS, SHORT_REQUEST.as_millis().to_string())
+        .output()
+        .unwrap();
+    let printed = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && printed.contains("test result: ok. 1 passed"),
+        "the child failed or ran no test: {}\n{printed}\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// The body runs in a child process whose legacy request timeout is 500 ms in place of 15 s.
+/// The fixture answers 200 ms after it. A selected budget of 30 s gets the answer; the same
+/// client with no budget is cut at the legacy timeout, which shows that the answer came
+/// after it.
 #[tokio::test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the request timeout override is debug-only"
+)]
 async fn provider_budget_generic_30_seconds_is_not_clipped_to_legacy_15() {
-    let fixture = Fixture::new(Duration::from_secs(16)).await;
+    if std::env::var_os(CHILD).is_none() {
+        return run_in_short_timeout_child(
+            "provider_budget_generic_30_seconds_is_not_clipped_to_legacy_15",
+        );
+    }
+    let fixture = Fixture::new(SHORT_REQUEST + Duration::from_millis(200)).await;
     let http = fixture
         .http
         .with_provider_budget(
@@ -194,6 +234,15 @@ async fn provider_budget_generic_30_seconds_is_not_clipped_to_legacy_15() {
     assert_eq!(response.status, 200);
     assert_eq!(response.body, b"{}");
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    let error = fixture
+        .http
+        .get(&["call"], &[])
+        .await
+        .err()
+        .expect("the legacy timeout did not cut a client with no budget");
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert!(error.upstream_answer);
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 2);
     fixture.close().await;
 }
 

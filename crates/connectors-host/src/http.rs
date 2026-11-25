@@ -77,6 +77,26 @@ pub const READ_POST_BODY_LIMIT: usize = 64 * 1024;
 /// The longest deadline composition may give a read sent as a POST.
 pub const READ_POST_MAX_TIMEOUT: Duration = Duration::from_secs(180);
 const READ_POST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
+/// The legacy per-request timeout: the cutoff of a request sent with no provider budget.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+/// The bound on opening a connection to the provider, the TLS handshake included.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// Test builds may shorten the timeout through the environment
+/// (`connectors_sdk::debug_override_ms`); a release build has no override.
+fn request_timeout() -> Duration {
+    Duration::from_millis(connectors_sdk::debug_override_ms(
+        "CONNECTORS_TEST_OVERRIDE_HTTP_REQUEST_MS",
+        REQUEST_TIMEOUT.as_millis() as u64,
+    ))
+}
+/// Test builds may shorten the timeout through the environment
+/// (`connectors_sdk::debug_override_ms`); a release build has no override.
+fn connect_timeout() -> Duration {
+    Duration::from_millis(connectors_sdk::debug_override_ms(
+        "CONNECTORS_TEST_OVERRIDE_HTTP_CONNECT_MS",
+        CONNECT_TIMEOUT.as_millis() as u64,
+    ))
+}
 /// The longest value of a header composition fixes on a port (`with_fixed_header`).
 pub const FIXED_HEADER_VALUE_LIMIT: usize = 1024;
 
@@ -235,8 +255,8 @@ impl ScopedHttp {
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
-            .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(15));
+            .connect_timeout(connect_timeout())
+            .timeout(request_timeout());
         if let Some(bytes) = ca {
             let certificates = reqwest::Certificate::from_pem_bundle(bytes)
                 .map_err(|_| Error::invalid("invalid configured CA"))?;
