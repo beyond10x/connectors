@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build
 kind: story
-status: draft
+status: active
 title: One debug-only override helper is forwarded to the owner and off in a release build
 summary: A copied cfg(debug_assertions) pattern becomes one helper in connectors-sdk; the owner spawn forwards by prefix; one release-build test proves an override is off
 relations:
@@ -23,7 +23,10 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: cited
   path: crates/connectors-sdk/src/lib.rs
-revision: 6
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T05:07:24Z", actor: "human:operator", revision: 7}
+- {from: "proposed", to: "active", at: "2026-11-25T05:07:25Z", actor: "human:operator", revision: 8}
 ---
 ## Defect
 
