@@ -33,6 +33,7 @@ mod platform_gated;
 mod release_binaries;
 mod service_metadata;
 mod source_hashes;
+mod steps;
 mod upstream_redaction;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

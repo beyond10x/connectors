@@ -1287,7 +1287,12 @@ fn temporary(root: &Path, selected: Option<&Path>) -> Result<tempfile::TempDir> 
 }
 
 pub fn run(root: &Path, options: Options) -> Result<()> {
+    // One line per step with its wall time and a closing table, printed for a failed run too.
+    // The report below is this program's standard output.
+    let mut steps = crate::steps::Steps::new("ignored", crate::steps::Stream::Err);
+    steps.begin("build of the test binaries");
     let (suites, environment) = workspace(root)?;
+    steps.begin("listing of the ignored tests");
     let mut entries = Vec::new();
     let mut names = BTreeSet::new();
     for suite in &suites {
@@ -1321,6 +1326,7 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
             })
             .or_insert_with(|| reason.into());
     }
+    steps.begin("ignored tests");
     let report = evaluate(
         entries,
         &options,
@@ -1337,8 +1343,10 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
         },
     );
     let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "only_prerequisite":options.only_prerequisite, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
+    steps.begin("report");
     crate::save_json(&report_path, &value)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
+    steps.finish();
     if !report.accepted(options.required) {
         return Err(
             "ignored suite execution refused or failed; see the named outcomes in the report"
@@ -1346,6 +1354,40 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
         );
     }
     Ok(())
+}
+/// The ignored step prints its wall time per step
+/// (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step): the build of the
+/// test binaries, the listing and the tests are separate rows, so the time before the first
+/// test is read from the log.
+#[cfg(test)]
+mod step_time_tests {
+    use crate::steps::{begun, body};
+
+    const RUN: &str = "pub fn run(root: &Path, options: Options) -> Result<()> {\n";
+
+    #[test]
+    fn the_ignored_step_begins_a_step_for_the_build_the_listing_and_the_tests() {
+        assert_eq!(
+            begun(body(include_str!("ignored.rs"), RUN)),
+            [
+                "\"build of the test binaries\"",
+                "\"listing of the ignored tests\"",
+                "\"ignored tests\"",
+                "\"report\"",
+            ]
+        );
+    }
+
+    /// The report is the program's standard output: the step lines go to standard error.
+    #[test]
+    fn the_step_lines_of_the_ignored_step_go_to_standard_error() {
+        let run = body(include_str!("ignored.rs"), RUN);
+        assert!(
+            run.lines().any(|line| line
+                == "    let mut steps = crate::steps::Steps::new(\"ignored\", crate::steps::Stream::Err);"),
+            "`run` does not print its steps on standard error"
+        );
+    }
 }
 #[cfg(test)]
 mod tests {

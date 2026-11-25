@@ -7,7 +7,7 @@ title: Scope of connectors 0.78.1
 summary: What 0.78.1 holds, what a consumer reads and what is known open at the release
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "accepted", at: "2026-11-24T15:40:53Z", actor: "human:timo", revision: 2}
 ---
@@ -51,3 +51,24 @@ here is the workstation's bot install, whose first `file.upload` was refused.
 - The upload is verified against the fixture through the provider child, not yet against a live
   workspace; the live upload through the workstation's bot install follows the release and is
   recorded below.
+
+## Verified after the release (2026-11-24)
+
+- Pull request 294 merged 17:38 CET as `cff90705b`; tag `v0.78.1` on that commit; the release
+  page was a pre-release until its four archives matched `SHA256SUMS`, then the newest release
+  (18:30 CET). The container image of the tag lists `linux/amd64` and `linux/arm64`.
+- One job of the pull request, "release-built providers start through the host on
+  macos-latest", ended `cancelled` with no step: "The job was not acquired by Runner of type
+  hosted even after multiple attempts". It was run again once and passed.
+- The live upload: 18:31 CET, binaries of the release archive (`connectors 0.78.1`), the
+  workstation's bot install, one `file.upload` of a text file of 82 bytes into the operator's
+  test thread: `applied`, read back in the thread with its name, title and size, the comment
+  parsed as mrkdwn. story:a-file-upload-through-the-local-cli-is-sent-with-its-ports holds the
+  record. Not verified live: bytes that are not text.
+- On the workstation only the bot install moved to 0.78.1; the main install and the other three
+  side installs stay on 0.78.0, for which 0.78.1 changes nothing.
+- The forge's gate job of the pull request: 51 min 18 s. The step of the ignored tests took 6 s
+  (617 s on pull request 293, 752 s on 292) and `ring` was compiled 3 times (5 before). The
+  gate's second build did not get shorter: 250 s (209 s on 293). The changelog entry of 0.78.1
+  named those 209 s as a cost of `ring`; that was wrong, and the entry says so since the next
+  change. story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step holds the lines.

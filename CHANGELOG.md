@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.78.2 — 2026-11-24
+
+### Changed
+
+- The repository's gate and its step of the ignored tests print how long each of their steps
+  ran (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step).
+  `connectors-build gate` prints `gate: step ran <seconds> s: <name>` when a step ends and a
+  table `gate: time per step` with one row per step and their sum when the program ends, also
+  when an error ended a step; without `--msrv` the gate has 27 steps. `connectors-build
+  ignored` prints the same lines on standard error for its four steps, so its report on
+  standard output stays one JSON document. No step is added, removed or reordered, and no
+  command of a step changes ([development guide](docs/development.md)). Read from the gate job
+  of pull request 295, the first run with the lines: 1,948.1 s in the 27 steps, of them 638.6 s
+  the tests, 599.3 s the build of the test binaries and 203.2 s the build of the workspace,
+  after 344 s for the build of `connectors-build` itself. Nothing changes for an installed
+  binary.
+
 ## 0.78.1 — 2026-11-24
 
 ### Changed
@@ -12,7 +29,10 @@
   of the gate, and compiled `ring` and everything that depends on it again: in the gate job of
   pull request 293, 209 s inside the gate and 48 s at the start of the ignored step were read
   from the log, and the 567 s without a line in that step are inferred to be the same, of
-  3,175 s. Nothing changes for an installed binary.
+  3,175 s. Nothing changes for an installed binary. Corrected after the release, from the gate
+  job of pull request 294, the first with the change: the ignored step took 6 s (617 s on 293)
+  and `ring` was compiled 3 times (5 on 293), but the build inside the gate still took 250 s,
+  so the 209 s above were not a cost of `ring`.
 
 ### Fixed
 

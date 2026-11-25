@@ -7,7 +7,7 @@ title: The forge's gate job compiles its test binaries once and prints its time 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
@@ -127,10 +127,66 @@ Change made with this measurement: every cargo that `connectors-build` starts fo
 `CARGO_PKG_*` variables it inherited (`cargo_program` in `crates/connectors-build/src/main.rs`;
 two tests there). What the forge's job takes after it is read from the first run that has it.
 
+### Measured 2026-11-24: the first forge run without the package variables
+
+Job 138569201465 of run 45429122108 (pull request 294, release 0.78.1), 16:46:03 to 17:37:21
+CET, 51 min 18 s (3,078 s). Each line is read from the job's log.
+
+| part | 292 | 293 | 294 |
+|---|---|---|---|
+| whole job | 3,808 s | 3,175 s | 3,078 s |
+| first build (`cargo run … gate` from the shell) | 449 s | 343 s | 449 s |
+| second build inside the gate (`cargo build --workspace`) | 261 s | 209 s | 250 s |
+| build of the test binaries | 750 s | 615 s | 758 s |
+| test step | 842.2 s | 735.4 s | 856.7 s |
+| step of the ignored tests | 752 s | 617 s | 6 s |
+| `Compiling ring` lines | not counted | 5 | 3 |
+
+What the change did:
+
+- The step of the ignored tests: ``Finished `dev` profile`` in 0.26 s, the first test 4 s after
+  the program started, the report 6 s after the step began. The 48 s build at its start and the
+  567 s without a line are gone. The inference above (the 567 s were the test binaries built
+  again) is confirmed by this: nothing else changed in that step.
+- `ring` is compiled 3 times: by the first build (16:47:58 CET), by the Windows lint
+  (17:29:52, another target) and by `cargo build -p connectors-sql --lib --no-default-features`
+  (17:34:29, another feature set). The compile 1 s after the gate's own build began is gone.
+
+What it did not do, against the expectation written above:
+
+- The second build inside the gate still takes 250 s. Its log has 100 `Compiling` lines (104 on
+  293): without `ring` and what was built again with it, the build compiles 100 crates the
+  first build did not make in that form, among them `connectors-sdk`, `connectors-client`,
+  `connectors-host`, `connectors-spec`, `connectors-build` and `connectors-docs`. So the 209 s
+  of pull request 293 were not the cost of `ring`. Not measured yet: why a build of the
+  workspace compiles `connectors-spec` and `connectors-build` again after `cargo run -p
+  connectors-build` built them. Inferred: `--workspace` selects more features of shared
+  dependencies (`tokio`, `hyper`, `reqwest` are in the list), so the crates above them are
+  built a second time. That is change 3.
+- Of the 824 s named above, 611 s are confirmed (the ignored step, 617 s to 6 s) and 209 s are
+  not.
+- The job is 97 s shorter than on 293 and 730 s shorter than on 292. The runner of 294 was as
+  slow as the one of 292 in every other row (first build 449 s on both, test binaries 750 s
+  and 758 s, tests 842 s and 857 s), and the one of 293 faster, so 292 is the fairer
+  comparison; that is a reading of three runs, not a measurement of the runners.
+
+Also seen in that run: 4,483 tests across 241 binaries, `Summary [ 854.839s] 4483 tests run:
+4483 passed (9 slow), 223 skipped`; the three slowest are the same as on 292 (47.8 s, 36.5 s,
+34.9 s).
+
 ## Change
 
 1. The gate and the ignored step print one line per step with its wall time, and a closing table
    of the steps, so the split above is read from one place and not from timestamps.
+   Made 2026-11-24 (`crates/connectors-build/src/steps.rs`): `gate: step ran <seconds> s: <name>`
+   when a step ends, then `gate: time per step` with one row per step and `sum of <n> steps`;
+   27 steps without `--msrv`, 8 of them the library-boundary builds, 4 the test step's. A run an
+   error ended prints the table too and names the step that did not end. `connectors-build
+   ignored` prints the same on standard error with four rows: the build of the test binaries, the
+   listing of the ignored tests, the ignored tests, the report. The row "build of the test
+   binaries" of the ignored step is the measurement change 2 asks for. Not in a row: the build
+   of `connectors-build` itself by `cargo run`, which cargo prints as ``Finished `dev` profile``.
+   The numbers of a forge run with it are not read yet.
 2. Measure the 688 s of the ignored step (a run with the build's output shown). Then remove them:
    the step reads the test binaries the gate built, or the gate hands their list over, so that the
    job compiles the test binaries once.

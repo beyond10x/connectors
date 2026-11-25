@@ -58,6 +58,28 @@ under nextest too, through the same `--config`. A package with `autotests = fals
 integration tests into `tests/main.rs`, one module per file; declare a new file there, or
 `every_integration_test_file_is_built` fails.
 
+The gate prints one line when a step ends and a closing table with one row per step and their
+sum:
+
+```text
+gate: step ran 449.2 s: build of the workspace
+…
+gate: time per step
+gate:    449.2 s  build of the workspace
+…
+gate:   3084.6 s  sum of 27 steps
+```
+
+The numbers above are an example. Without `--msrv` the gate has 27 steps: 8 of them are the
+library-boundary builds, one per package, and 4 belong to the test step (the build of the test
+binaries, the metadata baseline suite, the tests, the doctests).
+
+A run that an error ended prints the table too; the step that did not end has `(ended by an
+error)` after its name. The time `cargo run` takes to build `connectors-build` itself is before
+the first step and in no row. `connectors-build ignored` prints the same lines with the prefix
+`ignored:` on standard error, because its report is its standard output; its rows are the build
+of the test binaries, the listing of the ignored tests, the ignored tests and the report.
+
 Mutation emission of the local metadata authority takes minutes, so no test runs it.
 `connectors-build metadata-conformance emissions` writes the component's precedence-swap
 emission manifest and the all-class emission manifests of `connectors.oauth2` and
