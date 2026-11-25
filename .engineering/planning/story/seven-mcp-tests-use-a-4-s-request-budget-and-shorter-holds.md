@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:seven-mcp-tests-use-a-4-s-request-budget-and-shorter-holds
 kind: story
-status: draft
+status: active
 title: 'Six MCP tests use a 4 s request budget and shorter holds: 85.3 s become an estimated 28.0 s'
 summary: Three tests chose a request budget of 20 s and three sleep or hold the store for 4 s to 9 s; all values are the tests' own; a seventh test of 16.5 s has no value to shorten and stays unclaimed
 relations:
@@ -17,7 +17,10 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 8
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T07:57:04Z", actor: "human:operator", revision: 9}
+- {from: "proposed", to: "active", at: "2026-11-25T07:57:04Z", actor: "human:operator", revision: 10}
 ---
 ## Defect
 
@@ -156,3 +159,88 @@ No other story of this set writes these three files.
     the plan's 3 s holds only if that end comes sooner.
   The bound of acceptance 1 is kept at the plan's rows. If the two tests take what the values
   above give, the sum is about 34 s (inferred: 18 + 7 + 4 + 5), still under 42 s.
+
+## As built (2026-11-25)
+
+Where the implementation differs from the Change and Acceptance sections, and what was run. All
+runs are from the build host of the shared pool.
+
+The story's request budget of 4 s does not work. `limits` in
+`apps/connectors/src/mcp/projection.rs` lists an implemented read only when the configuration's
+`request_milliseconds` is at least the read's `execution_ms`, and it accepts 20,000 ms alone for
+that. Run with the story's values (`BUDGET` 4,000, `REQUEST_MS` 4,000, `delay_ms` 800): 4 tests
+run, 2 passed, 2 failed.
+
+- `a_walk_that_outlasts_the_request_budget_answers_the_records_taken` failed with `not_found`.
+- `max_pages_written_as_an_integral_number_is_the_integer_the_schema_admits`, which shares that
+  file's configuration and is not one of the six, failed with `not_found`.
+- `security_an_on_time_reply_written_across_its_deadline_keeps_the_session` passed and printed
+  "scenario not built": the reply held no tool, was 215 bytes long and did not fill the pipe.
+- `security_control_a_late_reply_to_a_paused_reader_keeps_the_session` passed.
+
+A second bound holds the walk test: `WALK_REPLY_RESERVE` is 5 s, more than a budget of 4 s.
+
+Point by point:
+
+1. `BUDGET` stays 20,000 ms, for the on-time test. The control runs on a budget of its own,
+   `LATE_BUDGET`, 4,000 ms: its reply is the `timeout` refusal, which needs no listed tool. The
+   control and the on-time case no longer share a budget.
+2. Not done: `REQUEST_MS` and `delay_ms` are unchanged. The walk test is unchanged.
+3. Not done: no lane test. The case with the budget of 20 s is still in the gate.
+4. Done as written: the stdin-closed test releases the store on a channel after the exit was
+   timed.
+5. Taken back after the adversary read (review-result:mcp-budget-adversary-pass-1, finding 2).
+   With the provider at 2.4 s and the hold at 2.9 s the store was released 0.5 s after the
+   provider's answer; an owner slower than that left the test green without its record having met
+   the held store. The test keeps the provider's 3 s and the hold of 4 s. The saving was 0.7 s.
+6. Done differently: the provider's stalled branch watches the read's connection during its 8 s
+   and counts a close at once; the test waits for that verdict. The story's wording (the
+   session's end plus 500 ms) would have asserted nothing, because the provider looked only after
+   its 8 s. A copy of the test that kept the session alive failed at 8.6 s.
+7. As written: `adversary_a_store_replaced_under_the_owner_ends_the_session` is not changed.
+
+Second commit, after the adversary read:
+
+8. The long-read test asserts, before it releases the store, that no reply has come. With a
+   mutant of product code in which nobody waits for the store's lock the test failed at that
+   assertion ("the reply came while the store was held"); without the assertion it passed under
+   the same mutant. The assertion does not see an owner that reaches its record after the
+   release.
+9. The control holds the store until its reply and the following ping have been read, in place
+   of a release 600 ms after the budget as the test counts it. Before, a server that read the
+   request late answered `result` and the control was red for no defect. A `ping` needs no
+   store. With a mutant in which the session closes after the late refusal the control failed
+   ("pinged false").
+10. After its 8 s the provider's stalled branch counts a read as open or closed in every case.
+    Before, a close in the last poll counted as neither. No run shows this.
+
+Durations, one run before the change and one after the second commit:
+
+- `security_control_a_late_reply_to_a_paused_reader_keeps_the_session`: 22.8 s, then 6.3 s.
+- `adversary_stdin_closed_while_the_store_is_held_exits_successfully`: 9.5 s, then 1.8 s.
+- `adversary_a_lost_session_leaves_no_provider_read_open`: 11.3 s, then 4.5 s.
+- `adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready`: 7.1 s,
+  then 6.7 s (not shortened).
+- `a_walk_that_outlasts_the_request_budget_answers_the_records_taken`: 17.5 s, then 17.0 s (not
+  changed).
+- `security_an_on_time_reply_written_across_its_deadline_keeps_the_session`: 22.5 s, then 22.3 s
+  (not changed).
+
+Sum of the six: 90.7 s before, 58.7 s after. The four tests of the two commits passed 10 of 10
+repeated runs (the slowest: control 7.6 s, lost session 6.7 s, stdin closed 3.2 s, long read
+8.5 s). `cargo clippy --locked -p connectors --tests -- -D warnings` ended 0. Both test files are
+compiled on Linux alone.
+
+Acceptance as built:
+
+- Acceptance 1 is not met: 58.7 s against the bound of 42 s. The two tests on the budget of 20 s
+  take 39.3 s of it.
+- Acceptance 2 holds for the control in another form: its store is held until the reply is read,
+  and its reader starts 500 ms after the budget. The walk's page delay is unchanged.
+- Acceptance 3 and 4 have no subject: no ignored test was added.
+
+The operator's decision (2026-11-25, taken on default): the walk test and the on-time test stay in
+the gate at 20 s. story:two-mcp-tests-wait-out-the-20-s-request-budget-a-listed-tool-needs (draft)
+holds them and names three ways to shorten them.
+
+Open until the jobs of the pull request: the durations of the six tests in the forge's gate job.
