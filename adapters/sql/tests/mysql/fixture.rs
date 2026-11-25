@@ -211,6 +211,9 @@ pub async fn start(script: Script) -> Server {
             let Ok((stream, _)) = listener.accept().await else {
                 return;
             };
+            stream
+                .set_nodelay(true)
+                .expect("the accepted socket takes TCP_NODELAY");
             shared.lock().unwrap().sessions += 1;
             let (log, script, killed) = (shared.clone(), script.clone(), killed.clone());
             tokio::spawn(async move { session(Box::new(stream), script, log, killed).await });
