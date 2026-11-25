@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T05:24:53Z",
+  "actor": "human:operator",
+  "artifact": "story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing",
+  "kind": "story",
+  "revision": 16,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate of pull request 302, head 2290c4e0e: the six tests passed in 0.235 s, 1.094 s, 8.290 s, 3.358 s, 0.208 s and 0.004 s, sum 13.2 s, bound 25 s, before 73.0 s for seven; the kubernetes test passed with a path of its list",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45545802863/job/138975006444"
+  }
+}

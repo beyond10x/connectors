@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T07:46:14Z",
+  "actor": "human:operator",
+  "artifact": "story:the-clock-exchange-issuance-test-runs-out-its-120-s-bound-on-windows",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job host and CLI on windows-latest of pull request 305, head 61ca7c939: passed (acceptance 1)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45564811307/job/139037016326"
+  }
+}
