@@ -23,13 +23,14 @@
 //!
 //! and commits the directory with the new `inputs.json`; when the lowering's bytes did not
 //! change, only `inputs.json` changes. `the_committed_lowering_is_current` enforces the
-//! rule: it is red in the gate until the change regenerates. It also hashes the lowered
-//! files and is red when one of them is not the file the record names, so the directory is
-//! written by the command and never by hand. Only the value `1` writes; any other value of
-//! the variable is refused, and so is every value where `CI` is set. `Cargo.lock` is not an
-//! input: a dependency that changes the bytes is caught by the lane test
+//! rule: it is red in the gate until the change regenerates. It also binds every lowered
+//! file to the sha256 the record holds for it: it is red when a lowered file was edited,
+//! removed or added and the record was not. A lowered file edited together with its row
+//! passes it; what sees that is the lane test
 //! `slow_lane_the_committed_lowering_equals_a_fresh_lowering`, which lowers again and
-//! compares every byte.
+//! compares every byte. `Cargo.lock` is not an input: a dependency that changes the bytes is
+//! caught by the lane test as well. Only the value `1` writes; any other value of the
+//! variable is refused, and so is every value where `CI` is set.
 #![cfg(unix)]
 use connectors_catalog::{bundle, definition};
 use connectors_catalog_provider::{Engine, Selection};
@@ -164,16 +165,23 @@ fn rows_json(rows: &Rows) -> Value {
         .collect()
 }
 
-/// The rows of a list of the record; a list that is none reads as no rows.
-fn rows(list: &Value) -> Rows {
-    list.as_array()
-        .into_iter()
-        .flatten()
-        .map(|file| {
-            let text = |key: &str| file[key].as_str().unwrap_or_default().to_owned();
-            (text("path"), text("sha256"))
-        })
-        .collect()
+/// The rows of the list `list` of a record; a list that is none reads as no rows. A path that
+/// two rows name is a failure, whatever their sha256: neither row is the one that counts.
+fn rows(record: &Value, list: &str) -> Result<Rows, String> {
+    let mut rows = Rows::new();
+    for file in record[list].as_array().into_iter().flatten() {
+        let text = |key: &str| file[key].as_str().unwrap_or_default().to_owned();
+        let path = text("path");
+        if rows.insert(path.clone(), text("sha256")).is_some() {
+            return Err(format!(
+                "the list `{list}` in the record of the committed lowering \
+                 ({DIRECTORY}/{INPUTS_FILE}) names the path `{path}` twice. The record was not \
+                 written by the regeneration command. {}",
+                regenerate()
+            ));
+        }
+    }
+    Ok(rows)
 }
 
 /// The record of the digest's inputs: every input file under `roots`, each a directory under
@@ -249,8 +257,10 @@ fn differences(recorded: &Rows, current: &Rows, words: [&str; 3]) -> String {
 
 /// The inputs half of the fast check: the record was made from the inputs as they are now.
 /// Its failure says that the committed lowering is stale, names the command that regenerates
-/// it and lists the input files that changed; a digest that is not the one of the record's
-/// own rows is said to be that.
+/// it and lists the input files that changed; a record of another format, a path that two
+/// rows name and a digest that is not the one of the record's own rows are each said to be
+/// that. No failure prints a value that makes the check pass when it is pasted into the
+/// record's digest or rows.
 fn check(recorded: &Value, current: &Value) -> Result<(), String> {
     if recorded["format"] != current["format"] {
         return Err(format!(
@@ -262,14 +272,16 @@ fn check(recorded: &Value, current: &Value) -> Result<(), String> {
         ));
     }
     let changed = differences(
-        &rows(&recorded["files"]),
-        &rows(&current["files"]),
+        &rows(recorded, "files")?,
+        &rows(current, "files")?,
         ["changed", "added", "removed"],
     );
     if !changed.is_empty() {
         return Err(format!(
             "the committed lowering of the released definition is stale: an input changed after \
-             {DIRECTORY} was made. {}\ninput files that changed:{changed}",
+             {DIRECTORY} was made. A file listed as added that is not to be committed (an \
+             editor's backup, a `.orig`) is removed instead of regenerating. {}\n\
+             input files that changed:{changed}",
             regenerate()
         ));
     }
@@ -277,9 +289,8 @@ fn check(recorded: &Value, current: &Value) -> Result<(), String> {
         return Err(format!(
             "the digest in the record of the committed lowering ({DIRECTORY}/{INPUTS_FILE}) is \
              not the digest of the input files it lists: every listed sha256 is the current one, \
-             the digest over them is {}, the record holds {}. The record was not written by the \
-             regeneration command. {}",
-            current["digest"],
+             and the record holds {} as the digest over them, which it is not. The record was \
+             not written by the regeneration command. {}",
             recorded["digest"],
             regenerate()
         ));
@@ -288,8 +299,10 @@ fn check(recorded: &Value, current: &Value) -> Result<(), String> {
 }
 
 /// The fast check on `directory`: its record reads, was made from the inputs `current`, and
-/// names every lowered file of the directory with the sha256 the file has. Each failure names
-/// what differs and the command that regenerates. Nothing is lowered.
+/// names every lowered file of the directory with the sha256 the file has. Each of these
+/// failures names what differs and the command that regenerates. A file of the directory that
+/// cannot be read (a link that points nowhere, which only a commit by hand puts there) panics
+/// with its path and without the command. Nothing is lowered.
 fn check_directory(directory: &Path, current: &Value) -> Result<(), String> {
     let path = directory.join(INPUTS_FILE);
     let text = fs::read(&path)
@@ -303,7 +316,7 @@ fn check_directory(directory: &Path, current: &Value) -> Result<(), String> {
     })?;
     check(&recorded, current)?;
     let differing = differences(
-        &rows(&recorded["lowered"]),
+        &rows(&recorded, "lowered")?,
         &lowered(directory),
         ["changed", "not in the record", "missing"],
     );
@@ -430,6 +443,14 @@ fn copy_of_committed() -> (tempfile::TempDir, PathBuf) {
     (temp, copy)
 }
 
+/// The paths of the input rows of a record, in path order.
+fn input_paths(record: &Value) -> Vec<String> {
+    match rows(record, "files") {
+        Ok(rows) => rows.into_keys().collect(),
+        Err(failure) => panic!("{failure}"),
+    }
+}
+
 /// Change one byte in the middle of the file; the byte's offset.
 fn change_the_middle_byte(path: &Path) -> usize {
     let mut bytes = read(path);
@@ -506,9 +527,42 @@ fn a_name_that_starts_with_a_dot_is_not_an_input() {
         "the hidden names change neither the digest nor the rows"
     );
     assert_eq!(
-        rows(&second["files"]).keys().collect::<Vec<_>>(),
+        input_paths(&second),
         ["one.yaml", "two.rs"],
         "the record names the two inputs and no hidden file"
+    );
+}
+
+/// A root with an extension takes the files of that extension under it, at any depth, and no
+/// other file: not a file of another extension, not one whose name only ends in the letters,
+/// not one whose extension follows it, and not one of the extension beside the root.
+#[test]
+fn an_extension_root_takes_its_files_at_any_depth_and_no_file_of_another_extension() {
+    let temp = tempfile::tempdir().unwrap();
+    for name in [
+        "src/a.rs",
+        "src/deep/b.rs",
+        "src/deep/deeper/c.rs",
+        "src/deep/e.yaml",
+        "src/d.txt",
+        "src/f.rs.orig",
+        "src/rs",
+        "src/grs",
+        "beside/h.rs",
+    ] {
+        let path = temp.path().join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, format!("{name}\n")).unwrap();
+    }
+    assert_eq!(
+        input_paths(&inputs(temp.path(), &[("src", Some("rs"))])),
+        ["src/a.rs", "src/deep/b.rs", "src/deep/deeper/c.rs"],
+        "the `.rs` files under `src`, at every depth, and nothing else"
+    );
+    assert_eq!(
+        input_paths(&inputs(temp.path(), &[("src/deep", None)])),
+        ["src/deep/b.rs", "src/deep/deeper/c.rs", "src/deep/e.yaml"],
+        "a root without an extension takes every file under it"
     );
 }
 
@@ -551,8 +605,69 @@ fn a_stale_digest_prints_the_regeneration_command() {
     );
 }
 
+/// The rows count, not only the digest over them: a row whose sha256 is not the current one
+/// is reported as changed where the recorded digest is the current one too.
+#[test]
+fn a_changed_row_under_the_current_digest_is_reported_as_changed() {
+    let current = inputs(&repository(), &ROOTS);
+    let mut recorded = current.clone();
+    recorded["files"][0]["sha256"] = json!("0".repeat(64));
+    let path = recorded["files"][0]["path"].as_str().unwrap().to_owned();
+    assert_eq!(
+        recorded["digest"], current["digest"],
+        "the digests are equal"
+    );
+    let stale = check(&recorded, &current).expect_err("a row that is not the current one");
+    assert!(
+        stale.contains("stale")
+            && stale.contains(&format!("changed: {path}"))
+            && stale.contains(REGENERATE),
+        "the failure says stale, lists `{path}` and holds the regeneration command: {stale}"
+    );
+}
+
+/// An input that was added lists as added, and the failure says the other way out beside the
+/// regeneration command: a file that is not to be committed (here an editor's backup, which is
+/// an input because it lies under a root) is removed.
+#[test]
+fn an_added_input_is_listed_and_the_failure_says_to_remove_one_that_is_not_to_be_committed() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("one.yaml"), "one\n").unwrap();
+    let roots: [Root<'_>; 1] = [("", None)];
+    let first = inputs(temp.path(), &roots);
+    fs::write(temp.path().join("one.yaml~"), "one\n").unwrap();
+    let second = inputs(temp.path(), &roots);
+    let stale = check(&first, &second).expect_err("an added input makes the record stale");
+    assert!(
+        stale.contains("added: one.yaml~") && stale.contains(REGENERATE),
+        "the failure lists the added file and holds the regeneration command: {stale}"
+    );
+    assert!(
+        stale.contains("that is not to be committed") && stale.contains("is removed instead"),
+        "the failure says that a file not to be committed is removed: {stale}"
+    );
+}
+
+/// A record of another format fails the check before its rows are read, and the failure names
+/// the record's format, the format this check reads and the regeneration command.
+#[test]
+fn a_record_of_another_format_fails_with_both_formats_and_the_regeneration_command() {
+    let current = inputs(&repository(), &ROOTS);
+    let mut recorded = current.clone();
+    recorded["format"] = json!("connectors-released-lowering/1");
+    let failure = check(&recorded, &current).expect_err("a record of format 1 is not read");
+    assert!(
+        failure.contains("has the format \"connectors-released-lowering/1\"")
+            && failure.contains(&format!("this check reads \"{FORMAT}\""))
+            && failure.contains(REGENERATE),
+        "the failure names both formats and the regeneration command: {failure}"
+    );
+}
+
 /// A recorded digest that is not the digest of the record's own rows, each of them current,
-/// is not reported as a stale lowering with an empty list: the failure says what is wrong.
+/// is not reported as a stale lowering with an empty list: the failure says what is wrong. It
+/// does not print the current digest: pasted into the record, that value would pass the check
+/// with nothing regenerated.
 #[test]
 fn a_wrong_digest_over_current_rows_says_that_the_digest_is_not_theirs() {
     let current = inputs(&repository(), &ROOTS);
@@ -567,6 +682,65 @@ fn a_wrong_digest_over_current_rows_says_that_the_digest_is_not_theirs() {
     assert!(
         !failure.contains("input files that changed"),
         "no empty list of changed files: {failure}"
+    );
+    let digest = current["digest"].as_str().expect("the digest is text");
+    assert!(
+        digest.len() == 64 && !failure.contains(digest),
+        "the failure does not print the current digest `{digest}`: {failure}"
+    );
+}
+
+/// A path that two rows name fails the fast check, in the list of the inputs and in the list
+/// of the lowered files, whether the first of the two rows holds another sha256 (the later
+/// row would hide it) or the same. The failure names the list, the path and the command.
+#[test]
+fn a_path_that_two_rows_name_fails_the_fast_check() {
+    let (_temp, copy) = copy_of_committed();
+    let path = copy.join(INPUTS_FILE);
+    let committed = read_json(&path);
+    check_directory(&copy, &committed).expect("an unchanged copy passes the fast check");
+    for list in ["files", "lowered"] {
+        let row = committed[list][0].clone();
+        let name = row["path"].as_str().unwrap().to_owned();
+        let own = row["sha256"].as_str().unwrap().to_owned();
+        for first in ["0".repeat(64), own] {
+            let mut recorded = committed.clone();
+            let listed = recorded[list].as_array_mut().unwrap();
+            listed.insert(0, json!({"path": name, "sha256": first}));
+            write_json(&path, &recorded);
+            let Err(failure) = check_directory(&copy, &committed) else {
+                panic!("`{name}` twice in `{list}`, first with {first}, passes the fast check");
+            };
+            assert!(
+                failure.contains(&format!("the list `{list}`"))
+                    && failure.contains(&format!("names the path `{name}` twice"))
+                    && failure.contains(REGENERATE),
+                "the failure names `{list}`, `{name}` and the regeneration command: {failure}"
+            );
+        }
+    }
+    write_json(&path, &committed);
+    check_directory(&copy, &committed).expect("the restored record passes again");
+}
+
+/// The fast check on a directory compares the directory's record with the inputs it is given,
+/// not with itself: where an input has another sha256 now than the record of the copy holds,
+/// it fails as stale and names that input.
+#[test]
+fn the_fast_check_of_a_directory_fails_when_a_current_input_is_not_the_recorded_one() {
+    let (_temp, copy) = copy_of_committed();
+    let recorded = read_json(&copy.join(INPUTS_FILE));
+    check_directory(&copy, &recorded).expect("an unchanged copy passes the fast check");
+    let mut current = recorded.clone();
+    current["files"][0]["sha256"] = json!("0".repeat(64));
+    current["digest"] = json!("1".repeat(64));
+    let name = current["files"][0]["path"].as_str().unwrap().to_owned();
+    let failure = check_directory(&copy, &current).expect_err("an input changed after the record");
+    assert!(
+        failure.contains("stale")
+            && failure.contains(&format!("changed: {name}"))
+            && failure.contains(REGENERATE),
+        "the failure says stale, lists `{name}` and holds the regeneration command: {failure}"
     );
 }
 
@@ -686,6 +860,34 @@ fn a_missing_and_an_extra_lowered_file_fail_the_fast_check() {
     );
 }
 
+/// In the committed directory a name that starts with `.` is a file like any other: the record
+/// does not name it, so the fast check fails and names it. (Among the inputs such a name is
+/// left out; here nothing is.)
+#[test]
+fn a_name_that_starts_with_a_dot_in_the_directory_fails_the_fast_check_as_not_in_the_record() {
+    let (_temp, copy) = copy_of_committed();
+    let current = read_json(&copy.join(INPUTS_FILE));
+    for name in [
+        ".DS_Store",
+        "github/.operations.json.swp",
+        ".cache/index.json",
+    ] {
+        let path = copy.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "{}\n").unwrap();
+        let Err(failure) = check_directory(&copy, &current) else {
+            panic!("`{name}` in the directory passes the fast check");
+        };
+        assert!(
+            failure.contains(&format!("not in the record: {name}")) && failure.contains(REGENERATE),
+            "the failure names `{name}` and the regeneration command: {failure}"
+        );
+        fs::remove_file(&path).unwrap();
+    }
+    fs::remove_dir(copy.join(".cache")).unwrap();
+    check_directory(&copy, &current).expect("the copy without the three passes again");
+}
+
 /// The comparison the lane test makes fails on one changed byte and names the file. Nothing is
 /// lowered here: the second directory is a copy of the committed one.
 #[test]
@@ -720,7 +922,7 @@ fn only_the_value_1_outside_ci_writes_and_every_other_set_value_is_refused() {
             "the refusal of `{other}` names the variable and the one value: {refused}"
         );
     }
-    for ci in ["true", "1", ""] {
+    for ci in ["true", "1", "", "false", "0"] {
         for value in ["1", "0", ""] {
             let Err(refused) = mode(Some(value), Some(ci)) else {
                 panic!("the value `{value}` writes or compares where CI is `{ci}`");
