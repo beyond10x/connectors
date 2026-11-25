@@ -761,7 +761,7 @@ fn a_timed_out_pre_push_check_leaves_no_process_behind() {
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "(sleep 3; : > /srv/work/survived) </dev/null >/dev/null 2>&1 & sleep 8",
+                    "(sleep 2; : > /srv/work/survived) </dev/null >/dev/null 2>&1 & sleep 4",
                 ],
                 "timeout_seconds": 1,
             });
@@ -779,7 +779,9 @@ fn a_timed_out_pre_push_check_leaves_no_process_behind() {
         served.log()
     );
     assert_eq!(forge.pushes(), 0);
-    std::thread::sleep(Duration::from_secs(5));
+    // A survivor writes its file 2 s after the check started, 1 s after the
+    // timeout. The refusal comes after the timeout, so this looks 1 s later.
+    std::thread::sleep(Duration::from_secs(2));
     assert!(
         !served.jail.path("/srv/work/survived").exists(),
         "a process the timed-out pre-push check started kept running after the refusal"

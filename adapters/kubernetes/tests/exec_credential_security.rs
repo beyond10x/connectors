@@ -461,6 +461,15 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
     }
 }
 
+/// Paths the test below tries before it walks the host, at most 3: files of the
+/// gate job's runner image (the key `runs-on` of the job `gate` in
+/// `.github/workflows/rust-gate.yml`) that a user other than root and the
+/// job's own owns. Whoever changes that image updates this list in the same
+/// change. In a gate job the test fails when its file came from the walk, and
+/// the failure names that file: it goes first in this list.
+const CANDIDATES: &[&str] = &[];
+const _: () = assert!(CANDIDATES.len() <= 3);
+
 /// A file owned by a user other than root and the adapter's own is refused
 /// even when its digest matches; a hard link to such a file is the same
 /// inode, so this is also the hard-link case.
@@ -468,12 +477,26 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
 fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
     // SAFETY: geteuid has no preconditions.
     let euid = unsafe { libc::geteuid() };
+    let fits = |path: &Path, meta: &fs::Metadata| {
+        meta.is_file()
+            && meta.uid() != 0
+            && meta.uid() != euid
+            && meta.mode() & 0o6022 == 0
+            && meta.len() < 1 << 20
+            && fs::read(path).is_ok()
+    };
+    let mut found = CANDIDATES
+        .iter()
+        .map(PathBuf::from)
+        .find(|path| fs::symlink_metadata(path).is_ok_and(|meta| fits(path, &meta)));
+    let walked = found.is_none();
     let mut queue: Vec<(PathBuf, usize)> = ["/etc", "/var/lib", "/usr/share", "/usr/include"]
         .iter()
         .map(|p| (PathBuf::from(p), 0))
         .collect();
-    let mut found = None;
-    while let Some((dir, depth)) = queue.pop() {
+    while found.is_none()
+        && let Some((dir, depth)) = queue.pop()
+    {
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;
         };
@@ -484,19 +507,10 @@ fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
             };
             if meta.is_dir() && depth < 3 {
                 queue.push((path, depth + 1));
-            } else if meta.is_file()
-                && meta.uid() != 0
-                && meta.uid() != euid
-                && meta.mode() & 0o6022 == 0
-                && meta.len() < 1 << 20
-                && fs::read(&path).is_ok()
-            {
+            } else if fits(&path, &meta) {
                 found = Some(path);
                 break;
             }
-        }
-        if found.is_some() {
-            break;
         }
     }
     let Some(path) = found else {
@@ -510,6 +524,13 @@ fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
             .err(),
         Some(Refusal::PluginUnavailable(None)),
         "{}",
+        path.display()
+    );
+    assert!(
+        !(walked && std::env::var_os("GITHUB_ACTIONS").is_some()),
+        "no path of the list `CANDIDATES` in {} is a file of this runner image that another \
+         user owns; the walk found {}: add it to that list",
+        file!(),
         path.display()
     );
 }
