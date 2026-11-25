@@ -445,13 +445,18 @@ impl Connected {
     }
 
     fn described(&self) -> registry::ObservedConnection {
+        self.described_at(now())
+    }
+
+    /// The connection as a reader at `at` sees it.
+    fn described_at(&self, at: u64) -> registry::ObservedConnection {
         Registry::new(&self.path)
             .describe(
                 INSTANCE,
                 &self.binding.adapter_id,
                 &self.binding.configuration_revision,
                 &self.connection,
-                now(),
+                at,
                 true,
             )
             .unwrap()
@@ -1010,8 +1015,12 @@ fn a_stored_response_is_published_by_an_owner_restarting_after_the_evidence_life
     std::thread::sleep(Duration::from_millis(LIFETIME_MS + 500));
     let restarted = connected.refresher("owner-two", &server);
     assert_eq!(restarted.recover().unwrap(), 1);
+    // The state is read as of the instant recovery returned: the evidence
+    // recovery dated is valid for LIFETIME_MS from inside that call, and the
+    // two store reads below take time of their own on a loaded runner.
+    let recovered_at = now();
     let (attempt, commands) = connected.attempt();
-    let state = connected.described().state;
+    let state = connected.described_at(recovered_at).state;
     assert_eq!(
         (attempt.state, state),
         (RefreshState::Published, State::Ready),

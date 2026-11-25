@@ -59,8 +59,7 @@ fn preparation_whose_deadline_passes_in_preflight_times_out_and_terminates_the_c
             "partition",
             &connectors_sdk::Secret(b"fictional-only".to_vec()),
             br#"{"value":true}"#,
-            // Shorter than the 1.2 s the `stalled-preflight` fixture sleeps.
-            connectors_sdk::now_ms() + 1_000,
+            connectors_sdk::now_ms() + 2_000,
         )
         .err();
     // private-adapter.md: a peer that closes at its deadline is observed as

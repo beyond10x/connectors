@@ -93,11 +93,14 @@ impl Adapter for Fixture {
         if self.mode == "slow-preflight" {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
-        // Stands in for a scheduler that spends the first budget before the
-        // preparation can answer: longer than the 1 s `expiring` starts with
-        // and than the deadline of `adversary_w2_tests`, shorter than the 2 s
-        // of the second attempt.
+        // Outlasts the 2 s deadline `adversary_w2_tests` hands it.
         if self.mode == "stalled-preflight" {
+            tokio::time::sleep(Duration::from_millis(2_500)).await;
+        }
+        // Stands in for a scheduler that spends the first budget before the
+        // preparation can answer: longer than the 1 s `drop_eof…` starts
+        // `expiring` with, shorter than the 2 s of its second attempt.
+        if self.mode == "briefly-stalled-preflight" {
             tokio::time::sleep(Duration::from_millis(1_200)).await;
         }
         Ok(Box::new(Pending {
@@ -528,11 +531,18 @@ const EXPIRING_CAP: Duration = Duration::from_secs(64);
 /// passed is discarded, and the next one, on a fresh child and root, gets
 /// twice the budget. A preparation that fails before its deadline is a real
 /// failure.
+///
+/// `first` is the first attempt's budget. A `run` that sleeps past the budget
+/// it is handed can start at 1 s: whatever a loaded scheduler adds only makes
+/// it later. A `run` that needs the child to act inside the budget after the
+/// preparation answered (a commit whose `send` the test counts) gets no
+/// retry here, so it starts at 2 s.
 fn expiring<R>(
+    first: Duration,
     mode: &str,
     mut run: impl FnMut(&Path, PreparedInvocation<'_>, Duration) -> R,
 ) -> (tempfile::TempDir, Child, R) {
-    let mut budget = Duration::from_secs(1);
+    let mut budget = first;
     loop {
         let root = temp();
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
@@ -616,7 +626,9 @@ fn native_outcomes_and_lost_replies_never_repeat_a_send() {
         // past whatever a loaded scheduler spends before `prepare` returns; the rest never
         // consult theirs. See story:host-suite-subprocess-bounds.
         let (root, mut child, result) = if matches!(mode, "timeout" | "peer-expired-eof") {
-            expiring(mode, |_, pending, _| pending.commit())
+            expiring(Duration::from_secs(2), mode, |_, pending, _| {
+                pending.commit()
+            })
         } else {
             let root = temp();
             let mut child =
@@ -696,8 +708,11 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
         "eof",
         "expiry",
         "slow-preflight",
-        "stalled-preflight",
+        "briefly-stalled-preflight",
     ] {
+        // Every expiring mode below sleeps past or reads to the budget it is
+        // handed, so the first budget is 1 s.
+        let first = Duration::from_secs(1);
         // `drop` and `eof` never consult the deadline, so theirs is out of reach; the
         // other modes expire on a budget `expiring` grows past whatever a loaded
         // scheduler spends before `prepare` returns. See story:host-suite-subprocess-bounds.
@@ -727,7 +742,7 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
                 drop(pending);
                 (root, child, ())
             }
-            "expiry" => expiring(mode, |root, pending, budget| {
+            "expiry" => expiring(first, mode, |root, pending, budget| {
                 let result = channel::read::<Value>(
                     &mut pending.child.channel,
                     Instant::now() + budget + Duration::from_secs(30),
@@ -738,7 +753,7 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
                 assert_eq!(count(root, "destroy"), 1);
                 drop(pending);
             }),
-            _ => expiring(mode, |_, pending, budget| {
+            _ => expiring(first, mode, |_, pending, budget| {
                 // Sleep past the budget rather than a hand-tuned margin over it.
                 std::thread::sleep(budget + Duration::from_millis(100));
                 assert_eq!(pending.remaining(), Err(Failure::Timeout));

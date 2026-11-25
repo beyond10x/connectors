@@ -11,8 +11,6 @@ relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
-  path: crates/connectors-host/src/local/adversary_w2_tests.rs
-- confidence: cited
   path: crates/connectors-host/src/local/clock/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/oauth_adversary_pass2_tests.rs
@@ -22,7 +20,7 @@ scope:
   path: crates/connectors-host/src/local/protected/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T01:32:07Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-11-25T01:32:07Z", actor: "human:timo", revision: 5}
@@ -95,10 +93,6 @@ The plan names nothing that stays in the lane `slow` for this story.
 - `crates/connectors-host/src/local/oauth_adversary_pass2_tests.rs`: the one test.
 - `crates/connectors-host/src/local/protected/tests.rs`: the one test.
 - `crates/connectors-host/src/local/clock/tests.rs`: the one test.
-- `crates/connectors-host/src/local/adversary_w2_tests.rs`: one value, the deadline that
-  `preparation_whose_deadline_passes_in_preflight_times_out_and_terminates_the_child` hands the
-  fixture mode `stalled-preflight` (2 s to 1 s). It must stay below that mode's stall, which this
-  story shortens to 1.2 s. Added at implementation.
 
 No other story of this set touches the other four files. `clock.rs` itself is not changed here.
 story:seven-cli-tests-shorten-their-waits-or-a-production-wait changes `query_timeout()` in
@@ -119,36 +113,44 @@ it is.
 ## As built (2026-11-25)
 
 Values chosen at implementation, where they differ from the plan's, and what each keeps. Durations
-are from one local run before and one after, on the workstation; the forge's are read from the
-pull request's gate job.
+are local, on the workstation: one run before the change, and the range of ten runs in a row after
+it. The forge's are read from the pull request's gate job.
 
-1. `drop_eof_and_original_deadline_destroy_pending_without_a_write`: `expiring` starts at 1 s and
-   the fixture mode `stalled-preflight` sleeps 1.2 s (was 2.5 s). The stall is longer than the first
-   budget and shorter than the second (2 s). A runner that spends the second budget before the
-   preparation answers gets a discarded attempt and a doubled budget, as before: slower, not red.
-   13.7 s became 7.5 s; the plan's estimate was 6 s. The test stays over 5 s: its stalled mode
-   needs one failed attempt of 1 s, then a budget of 2 s that the test sleeps through.
-   `adversary_w2_tests.rs` hands the same fixture mode a deadline that the stall must outlast; it
-   was 2 s and is 1 s. That file was not in the plan's scope; it is one value.
-   `native_outcomes_and_lost_replies_never_repeat_a_send` uses `expiring` too and takes 3.2 s.
+1. `drop_eof_and_original_deadline_destroy_pending_without_a_write`: `expiring` takes the first
+   budget as a parameter and this test passes 1 s. Its stalled mode is a new fixture mode,
+   `briefly-stalled-preflight`, that sleeps 1.2 s: longer than the first budget, shorter than the
+   second (2 s). A runner that spends the second budget before the preparation answers gets a
+   discarded attempt and a doubled budget, as before: slower, not red. 13.7 s became 7.2 to 9.2 s;
+   the plan's estimate was 6 s. The test stays over 5 s: its stalled mode needs one failed attempt
+   of 1 s, then a budget of 2 s that the test sleeps through.
+   Two things stay as they were, after review-result:five-host-waits-adversary-pass-1 (findings 2
+   and 3). The mode `stalled-preflight` still sleeps 2.5 s, and `adversary_w2_tests.rs`, its other
+   user, is not changed: that test has no retry and its 2 s deadline has to cover the child's
+   start on a loaded runner. `native_outcomes_and_lost_replies_never_repeat_a_send` passes 2 s to
+   `expiring`, as before: its two expiring modes need the child to record `send` inside the budget
+   after the preparation answered, and `expiring` retries only a failed preparation.
 2. `a_stored_response_is_published_by_an_owner_restarting_after_the_evidence_lifetime`:
    `LIFETIME_MS` is 2,000, not the plan's 1,000, and the test sleeps the lifetime plus 500 ms. The
-   lifetime also bounds the time between collecting evidence and validating it inside one refresh
-   or one recovery (`owner/refresh.rs`, `valid_until_ms`), and 2 s is kept for that step on a
-   loaded runner. Probed once, not committed: with a lifetime of 300 ms and a sleep of 400 ms
-   before the refresh the test passes, so the first part of the test does not need the initial
-   evidence to be valid. 12.6 s became 4.4 s.
+   lifetime bounds two spans on a loaded runner. One is from collecting evidence to validating it
+   inside one refresh or one recovery (`owner/refresh.rs`, `valid_until_ms`). The other was the
+   test's own: recovery dates the evidence from inside `recover()`, and the test read `Ready` with
+   the clock of a later call, after two more store reads (finding 1 of the same review: 257 to
+   470 ms locally against 2 s, where it was 10 s). The test now reads the state as of the instant
+   `recover()` returned (`described_at`), so the store reads after it do not count. Probed once,
+   not committed: with 2.2 s slept after that instant the test passes. 12.6 s became 3.4 to 5.9 s.
 3. `how_long_sixty_four_idle_connections_delay_the_redirect`: the second measurement is dropped
-   as planned; `redirect_delay` keeps its `refresh` parameter. 10.5 s became 2.1 s.
+   as planned; `redirect_delay` keeps its `refresh` parameter. 10.5 s became 2.0 to 2.2 s.
 4. `controlling_terminal_hides_input_and_restores_echo_after_sigint`: the mode `late` answers
    1.5 s after the prompt (was 5.5 s). The deadline handed to the child stays 120 s: it is a
-   ceiling for a slow machine and costs no time. What the mode no longer shows: that a fixture
-   which assumes 5 s of its own fails. The fixture has had no deadline of its own since it reads
-   `CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS`. 6.7 s became 2.6 s.
+   ceiling for a slow machine and costs no time. The 1.5 s stays above the 1 s slice the read polls
+   in (`protected.rs`), so the mode still crosses one slice. What the mode no longer shows: that a
+   fixture which assumes 5 s of its own fails. The fixture has had no deadline of its own since it
+   reads `CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS`. 6.7 s became 1.6 to 2.7 s.
 5. `quorum_below_quorum_names_each_source`: the query deadline is 1 s, not the 500 ms of the
    second-attempt tests. The three answering sources are loopback fixtures and must answer inside
    the deadline; story:clock-quorum-test-tolerates-a-slow-loopback-source records a runner on
-   which one answered later than 2 s. 6.3 s became 3.3 s; the plan's estimate was 1 s.
+   which one answered later than 2 s. 6.3 s became 3.2 to 3.4 s; the plan's estimate was 1 s.
 
-Sum of the five, local: 49.8 s before, 19.9 s after. Ten runs in a row of the five tests and the
-two neighbours named in point 1: 10 of 10 passed.
+Sum of the five, local: 49.8 s before; 20.7 s after (the mean of the ten runs; one single run
+gave 21.5 s). Ten runs in a row of the five tests and the two neighbours named in point 1: 10 of
+10 passed.
