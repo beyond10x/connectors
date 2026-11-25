@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-25T06:02:00Z",
+  "actor": "human:operator",
+  "artifact": "story:seven-cli-tests-shorten-their-waits-or-a-production-wait",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:seven-cli-shorten-scope-reread-revision-10",
+    "review": "review-result:seven-cli-shorten-scope-reread-revision-10",
+    "outcome": "fixed"
+  }
+}

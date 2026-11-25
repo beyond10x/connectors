@@ -20,7 +20,7 @@ scope:
   path: crates/connectors-host/src/local/protected/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T02:37:20Z", actor: "human:operator", revision: 4}
 - {from: "proposed", to: "active", at: "2026-11-25T02:37:21Z", actor: "human:operator", revision: 5}
@@ -96,8 +96,8 @@ The plan names nothing that stays in the lane `slow` for this story.
 - `crates/connectors-host/src/local/clock/tests.rs`: the one test.
 
 No other story of this set touches the other four files. `clock.rs` itself is not changed here.
-story:seven-cli-tests-shorten-their-waits-or-a-production-wait changes `query_timeout()` in
-`clock.rs` for builds that are not the unit-test build, and it `depends_on` this story. The
+story:seven-cli-tests-shorten-their-waits-or-a-production-wait planned an override of
+`query_timeout()` in `clock.rs` and an edge to this story; since its revision 11 it has neither. The
 `#[cfg(test)]` definition that this story's test reaches through `set_test_query_timeout` stays as
 it is.
 
