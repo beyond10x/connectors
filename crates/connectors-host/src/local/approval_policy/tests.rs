@@ -296,7 +296,8 @@ fn concurrent_initial_publication_has_one_winner() {
 
 /// What the `blocked` child is handed. It asserts Conflict against a lease the
 /// test holds until that child has exited, so the answer is the same at any
-/// length of the wait: a slow machine makes the test slower, not red.
+/// length of the wait. The test bounds the child's whole run at half of
+/// production's wait: the lease has to wait this, not production's.
 const BLOCKED_LOCK_WAIT: Duration = Duration::from_secs(1);
 
 /// Starts `policy_child` with `wait` as its lock wait, or with production's
@@ -387,11 +388,20 @@ fn held_use_blocks_cross_process_revocation_until_release() {
     enabled(&s);
     let held = s.acquire(&selection(), "item.write").unwrap();
     let other = s.acquire(&selection(), "item.write").unwrap();
+    let started = Instant::now();
     assert!(
         child(root.path(), "blocked", Some(BLOCKED_LOCK_WAIT))
             .wait()
             .unwrap()
             .success()
+    );
+    // The lease waits what the child was handed. One that waited production's
+    // `WAIT_BOUND` would keep the child that long; the child has 14 s beside
+    // its wait of 1 s to start, answer and exit.
+    let blocked = started.elapsed();
+    assert!(
+        blocked < crate::local::metadata::WAIT_BOUND / 2,
+        "the blocked child took {blocked:?}: its lease did not wait the handed {BLOCKED_LOCK_WAIT:?}"
     );
     assert_eq!(s.status().unwrap().unwrap().revision, 1);
     drop(other);
@@ -438,6 +448,14 @@ fn child_process_waits_on_the_lock_wait_its_parent_hands_it() {
     // A short hold. The child is admitted after the release at any length of
     // it; how long the child would wait is asserted above on what it reports.
     std::thread::sleep(Duration::from_millis(200));
+    // The child contends: it needs the lease this test holds, so it has
+    // neither exited nor published. It was handed 120 s and cannot end before
+    // them while the lease is held, so a slow machine does not turn this red.
+    assert!(
+        waiter.try_wait().unwrap().is_none(),
+        "the child ended under a held lease"
+    );
+    assert_eq!(s.status().unwrap().unwrap().revision, 1);
     drop(held);
     assert!(waiter.wait().unwrap().success());
     assert_eq!(s.status().unwrap().unwrap().revision, 2);

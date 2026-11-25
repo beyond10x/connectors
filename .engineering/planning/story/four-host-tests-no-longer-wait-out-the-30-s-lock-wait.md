@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/tests/local_foundation.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 9}
@@ -166,9 +166,25 @@ a row after it (10 of 10 passed).
 9. `slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release` was
    compiled and listed, and not run: the operator allows no run of a test of the timing family
    outside the forge's lane (2026-11-25).
+10. Second commit, after the adversary read (review-result:four-host-lock-adversary-pass-1):
+    `held_use_blocks_cross_process_revocation_until_release` times its `blocked` child and asserts
+    that it ended before `WAIT_BOUND / 2` (15 s). A lease that waits production's 30 s keeps the
+    child 30 s and turns the test red. With the hold of 200 ms of item 5 no other test showed that
+    the policy lease uses the wait handed to the child.
+11. Second commit: `child_process_waits_on_the_lock_wait_its_parent_hands_it` asserts, before the
+    lease is released, that its `waits` child is still running and that the revision is still 1.
+    The child was handed 120 s and ends only by getting the lease.
+12. Second commit: a fifth test in the gate, Unix only,
+    `a_wait_handed_to_a_parent_is_not_its_childs_but_that_of_a_process_replacing_the_parent`
+    (`adversary_w2_tests.rs`, through `/bin/sh`): a child of a shell that was handed 600 s reports
+    30 s, and a process that replaces the shell reports 600 s. It is not one of the four tests of
+    acceptance 1.
+    In one run on the build host after the second commit the five tests passed in 2.5 s of wall
+    time (0.02, 0.03, 1.2, 1.4 and 2.5 s); 10 of 10 repeated runs passed in 28.6 s; `cargo clippy
+    --locked -p connectors-host --all-targets -- -D warnings` ended 0.
 
-Sum of the four tests on the build host: 3.3 s. Before, with the test that is now in the lane:
-123.2 s. The 52 tests of the touched modules passed in one run; the slowest took 3.9 s.
+Sum of the four tests of acceptance 1 on the build host: 5.1 s after the second commit (0.02, 1.2,
+1.4 and 2.5 s), 3.3 s after the first. Before, with the test that is now in the lane: 123.2 s. The 52 tests of the touched modules passed in one run; the slowest took 3.9 s.
 
 Open until the jobs of the pull request: acceptance 1 (at most 9 s in the gate job), acceptance 2
 (the lane lists the `slow_lane_` test as `passed`), acceptance 3 (the gate's ignored step). The
