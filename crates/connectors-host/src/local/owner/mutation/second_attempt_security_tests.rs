@@ -564,23 +564,31 @@ fn the_first_reading_makes_no_second_attempt_inside_its_reserve() {
     assert!(spent < Duration::from_millis(2_400), "{spent:?}");
 }
 
-/// I4. The second reading's reserve is one second. With 2 s to the deadline
-/// less than 1.5 s are left after the first attempt of the second reading
-/// (the first reading and the preflight came before it), and a second
-/// attempt needs 1.5 s. A reserve of zero would admit it. No second attempt
-/// is made, nothing is sent and the refusal is the clock's.
+/// I4. The second reading's reserve is one second. With 5 s to the deadline
+/// and a query deadline of 2 s, less than 3 s are left after the first
+/// attempt of the second reading (the first reading and the preflight came
+/// before it), and a second attempt needs 3 s. A reserve of zero would admit
+/// it. No second attempt is made, nothing is sent and the refusal is the
+/// clock's.
+///
+/// The query deadline is 2 s here, as in a release build, not [`QUERY`].
+/// Everything the write does besides that one wait (the first reading, the
+/// admission, the prepare, the stores, the release) has to end before the
+/// deadline, or the write answers `Timeout` and not the clock's refusal.
+/// With [`QUERY`] and 2 s that was 1.5 s, and a loaded macOS runner took
+/// longer once (pull request 296). Here it is 3 s. The deadline stays twice
+/// the query deadline plus the reserve, so the first attempt always leaves
+/// less than a second one needs.
 #[test]
 fn the_second_reading_makes_no_second_attempt_inside_its_reserve() {
+    let query = Duration::from_secs(2);
     let mut site = site();
-    clock::set_test_query_timeout(QUERY);
-    assert_eq!(
-        QUERY + clock::RESERVE_AFTER_CLOCK,
-        Duration::from_millis(1_500)
-    );
+    clock::set_test_query_timeout(query);
+    assert_eq!(query + clock::RESERVE_AFTER_CLOCK, Duration::from_secs(3));
     let before = site.asked();
     site.script(&[Reply::At(T), Reply::Drop, Reply::Drop]);
     let started = Instant::now();
-    let delivery = site.write_until(started + Duration::from_secs(2));
+    let delivery = site.write_until(started + query + query + clock::RESERVE_AFTER_CLOCK);
     let spent = started.elapsed();
     // One attempt of each reading.
     assert_eq!(site.asked_since(before), [2, 2], "{spent:?}");
