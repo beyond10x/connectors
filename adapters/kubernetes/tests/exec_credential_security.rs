@@ -467,7 +467,11 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
 /// job's own owns. Whoever changes that image updates this list in the same
 /// change. In a gate job the test fails when its file came from the walk, and
 /// the failure names up to 3 files the walk found: they are this list.
-const CANDIDATES: &[&str] = &[];
+const CANDIDATES: &[&str] = &[
+    "/var/lib/landscape/.cleanup.user",
+    "/etc/postgresql/16/main/pg_ctl.conf",
+    "/etc/postgresql/16/main/environment",
+];
 const _: () = assert!(CANDIDATES.len() <= 3);
 
 /// A file owned by a user other than root and the adapter's own is refused
