@@ -97,6 +97,97 @@ fn connect_timeout() -> Duration {
         CONNECT_TIMEOUT.as_millis() as u64,
     ))
 }
+
+/// How long before the end of a provider budget `send` ends a connect, the TLS handshake
+/// included. reqwest polls a request's own timer before the request, so when both have
+/// passed at one poll the request's timeout wins, and that one is marked as the provider's.
+/// The lead is the time the task may go unpolled without that.
+const CONNECT_LEAD: Duration = Duration::from_millis(250);
+/// The least time a provider budget has left when `send` bounds the connect: twice the lead.
+/// With less, the call is as it is without the bound.
+const CONNECT_BOUND_MIN_REMAINING: Duration = CONNECT_LEAD.saturating_mul(2);
+
+tokio::task_local! {
+    /// When the connects of the request `send` runs in this scope end: the end of the
+    /// provider budget less [`CONNECT_LEAD`]. `BudgetConnect` reads it.
+    static CONNECT_UNTIL: tokio::time::Instant;
+}
+
+/// The error of a connector service, as reqwest boxes it.
+type ConnectError = Box<dyn std::error::Error + Send + Sync>;
+
+/// A connect the provider budget cut. It comes from the connector, so reqwest reports a
+/// connect error, and its kind makes that a timeout: `provider_error` leaves it unmarked,
+/// as a connection that never opened sent nothing.
+fn connect_cut() -> ConnectError {
+    Box::new(std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "provider budget ended before the connection opened",
+    ))
+}
+
+/// The client's one connector layer: a connect, the TLS handshake included, that starts
+/// inside the scope of [`CONNECT_UNTIL`] ends at that instant. Outside such a scope it
+/// changes nothing. reqwest's request and connection types are private to it, so the
+/// service is generic over the inner service and the request.
+#[derive(Clone)]
+struct BudgetConnectLayer;
+
+impl<S> tower_layer::Layer<S> for BudgetConnectLayer {
+    type Service = BudgetConnect<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        BudgetConnect { inner }
+    }
+}
+
+#[derive(Clone)]
+struct BudgetConnect<S> {
+    inner: S,
+}
+
+impl<S, R> tower_service::Service<R> for BudgetConnect<S>
+where
+    S: tower_service::Service<R>,
+    S::Response: Send + 'static,
+    S::Error: Into<ConnectError>,
+    S::Future: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = ConnectError;
+    type Future = std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = std::result::Result<S::Response, ConnectError>> + Send,
+        >,
+    >;
+
+    fn poll_ready(
+        &mut self,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), ConnectError>> {
+        self.inner.poll_ready(context).map_err(Into::into)
+    }
+
+    fn call(&mut self, request: R) -> Self::Future {
+        // Read here, on the task that polls the request, and kept in the future: a connect
+        // that goes on in another task after a pooled connection won keeps its bound.
+        let Ok(until) = CONNECT_UNTIL.try_with(|until| *until) else {
+            let connect = self.inner.call(request);
+            return Box::pin(async move { connect.await.map_err(Into::into) });
+        };
+        if until <= tokio::time::Instant::now() {
+            return Box::pin(std::future::ready(Err(connect_cut())));
+        }
+        let connect = self.inner.call(request);
+        Box::pin(async move {
+            match tokio::time::timeout_at(until, connect).await {
+                Ok(connected) => connected.map_err(Into::into),
+                Err(_) => Err(connect_cut()),
+            }
+        })
+    }
+}
+
 /// The longest value of a header composition fixes on a port (`with_fixed_header`).
 pub const FIXED_HEADER_VALUE_LIMIT: usize = 1024;
 
@@ -256,6 +347,7 @@ impl ScopedHttp {
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
             .connect_timeout(connect_timeout())
+            .connector_layer(BudgetConnectLayer)
             .timeout(request_timeout());
         if let Some(bytes) = ca {
             let certificates = reqwest::Certificate::from_pem_bundle(bytes)
@@ -585,11 +677,23 @@ impl ScopedHttp {
         // Compute at the send boundary, after credential and body construction.
         // Reqwest retains this timeout through response-body consumption. This
         // explicit timeout overrides the legacy client's 15-second default.
-        let request = match self.remaining()? {
+        let remaining = self.remaining()?;
+        let request = match remaining {
             Some(remaining) => request.timeout(remaining),
             None => request,
         };
-        request.send().await.map_err(provider_error)
+        // With enough of the budget left, a connect of this request ends a lead before the
+        // budget does, as a connect error: a budget that ends in an unanswered connect or
+        // TLS handshake sent no request and is not the provider's timeout.
+        let sent = match (self.provider_until, remaining) {
+            (Some(until), Some(remaining)) if remaining >= CONNECT_BOUND_MIN_REMAINING => {
+                CONNECT_UNTIL
+                    .scope(until - CONNECT_LEAD, request.send())
+                    .await
+            }
+            _ => request.send().await,
+        };
+        sent.map_err(provider_error)
     }
 
     fn url(&self, segments: &[&str]) -> Result<Url> {
