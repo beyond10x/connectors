@@ -369,6 +369,9 @@ fn sixty_four_idle_connections_delay_the_redirect_until_a_slot_frees() {
 /// 100 ms while a local process holds 64 idle connections once (`refresh`
 /// false) or re-opens each as the listener drops it (`refresh` true). The
 /// flow survives both; this reports how long the redirect is turned away.
+/// The test below measures the first case only: the second took its whole
+/// 8 s in every gate run and no assertion read it. Its recorded result is in
+/// review-result:adversary-cli-oauth-acquisition-pass-2.
 fn redirect_delay(refresh: bool, give_up: Duration) -> (Option<Duration>, u32) {
     let flow = start(20_000, None);
     let mut idle: Vec<TcpStream> = (0..64).map(|_| flow.connect()).collect();
@@ -402,8 +405,7 @@ fn redirect_delay(refresh: bool, give_up: Duration) -> (Option<Duration>, u32) {
 #[test]
 fn how_long_sixty_four_idle_connections_delay_the_redirect() {
     let once = redirect_delay(false, Duration::from_secs(8));
-    let held = redirect_delay(true, Duration::from_secs(8));
-    eprintln!("adversary-measure: held once {once:?}; re-opened {held:?}");
+    eprintln!("adversary-measure: held once {once:?}");
     assert!(once.0.is_some(), "one-shot exhaustion: {once:?}");
 }
 

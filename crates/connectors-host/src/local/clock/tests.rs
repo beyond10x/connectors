@@ -439,6 +439,13 @@ fn quorum_overlapping_liar_cannot_exclude_truth() {
 
 #[test]
 fn quorum_below_quorum_names_each_source() {
+    // The silent source costs the query deadline in each of the three
+    // acquisitions below. One second, not production's two: the answering
+    // sources are loopback fixtures and must answer inside the deadline, and
+    // a loaded runner answered late once
+    // (story:clock-quorum-test-tolerates-a-slow-loopback-source), so this
+    // stays twice the 500 ms of the second-attempt tests below.
+    set_test_query_timeout(Duration::from_secs(1));
     let good = answering(7, T, 1);
     let silent = Server::silent();
     let wrong_key = answering(8, T, 1);

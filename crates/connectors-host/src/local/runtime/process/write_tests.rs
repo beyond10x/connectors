@@ -94,9 +94,11 @@ impl Adapter for Fixture {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
         // Stands in for a scheduler that spends the first budget before the
-        // preparation can answer.
+        // preparation can answer: longer than the 1 s `expiring` starts with
+        // and than the deadline of `adversary_w2_tests`, shorter than the 2 s
+        // of the second attempt.
         if self.mode == "stalled-preflight" {
-            tokio::time::sleep(Duration::from_millis(2_500)).await;
+            tokio::time::sleep(Duration::from_millis(1_200)).await;
         }
         Ok(Box::new(Pending {
             root: self.root.clone(),
@@ -530,7 +532,7 @@ fn expiring<R>(
     mode: &str,
     mut run: impl FnMut(&Path, PreparedInvocation<'_>, Duration) -> R,
 ) -> (tempfile::TempDir, Child, R) {
-    let mut budget = Duration::from_secs(2);
+    let mut budget = Duration::from_secs(1);
     loop {
         let root = temp();
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();

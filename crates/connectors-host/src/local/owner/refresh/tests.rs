@@ -988,11 +988,13 @@ fn connected_for(server: &Server, lifetime_ms: u64) -> Connected {
 /// is durable and its access token valid for an hour, but recovery dates its
 /// evidence from the store acknowledgement (`Refresher::resolve`), so an
 /// owner that restarts later than the profile's evidence lifetime after the
-/// crash (60 s by default; 10 s here) refuses its own durable candidate,
+/// crash (60 s by default; 2 s here) refuses its own durable candidate,
 /// discards the rotated refresh token and marks the connection Stale.
 #[test]
 fn a_stored_response_is_published_by_an_owner_restarting_after_the_evidence_lifetime() {
-    const LIFETIME_MS: u64 = 10_000;
+    // The profile's lifetime also bounds the time between collecting evidence
+    // and validating it inside one refresh or recovery, so it stays at 2 s.
+    const LIFETIME_MS: u64 = 2_000;
     let server = Server::start(vec![token(Some(ROTATED), Some("read"))]);
     let connected = connected_for(&server, LIFETIME_MS);
     let before = connected.active();
@@ -1005,7 +1007,7 @@ fn a_stored_response_is_published_by_an_owner_restarting_after_the_evidence_life
     assert_eq!(stored.state, RefreshState::ResponseStored);
     // The owner comes back after the evidence lifetime, well inside the
     // stored access token's hour.
-    std::thread::sleep(Duration::from_millis(LIFETIME_MS + 1_000));
+    std::thread::sleep(Duration::from_millis(LIFETIME_MS + 500));
     let restarted = connected.refresher("owner-two", &server);
     assert_eq!(restarted.recover().unwrap(), 1);
     let (attempt, commands) = connected.attempt();

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:five-host-unit-tests-shorten-the-waits-they-chose
 kind: story
-status: draft
+status: active
 title: 'Five host unit tests shorten the waits they chose: 48.6 s become an estimated 18.2 s'
 summary: Budgets, lifetimes and late answers of 2 s to 10 s that are the tests' own values, and one unasserted second measurement
 relations:
@@ -10,6 +10,8 @@ relations:
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
 scope:
+- confidence: cited
+  path: crates/connectors-host/src/local/adversary_w2_tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/clock/tests.rs
 - confidence: cited
@@ -20,7 +22,10 @@ scope:
   path: crates/connectors-host/src/local/protected/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-revision: 3
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T01:32:07Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-11-25T01:32:07Z", actor: "human:timo", revision: 5}
 ---
 ## Defect
 
@@ -90,6 +95,10 @@ The plan names nothing that stays in the lane `slow` for this story.
 - `crates/connectors-host/src/local/oauth_adversary_pass2_tests.rs`: the one test.
 - `crates/connectors-host/src/local/protected/tests.rs`: the one test.
 - `crates/connectors-host/src/local/clock/tests.rs`: the one test.
+- `crates/connectors-host/src/local/adversary_w2_tests.rs`: one value, the deadline that
+  `preparation_whose_deadline_passes_in_preflight_times_out_and_terminates_the_child` hands the
+  fixture mode `stalled-preflight` (2 s to 1 s). It must stay below that mode's stall, which this
+  story shortens to 1.2 s. Added at implementation.
 
 No other story of this set touches the other four files. `clock.rs` itself is not changed here.
 story:seven-cli-tests-shorten-their-waits-or-a-production-wait changes `query_timeout()` in
@@ -106,3 +115,40 @@ it is.
 - The gate failing when its test step runs over 120 s:
   story:the-gates-test-step-ends-within-120-s-on-the-forge.
 - Not checked by the plan: every "after" figure on the forge.
+
+## As built (2026-11-25)
+
+Values chosen at implementation, where they differ from the plan's, and what each keeps. Durations
+are from one local run before and one after, on the workstation; the forge's are read from the
+pull request's gate job.
+
+1. `drop_eof_and_original_deadline_destroy_pending_without_a_write`: `expiring` starts at 1 s and
+   the fixture mode `stalled-preflight` sleeps 1.2 s (was 2.5 s). The stall is longer than the first
+   budget and shorter than the second (2 s). A runner that spends the second budget before the
+   preparation answers gets a discarded attempt and a doubled budget, as before: slower, not red.
+   13.7 s became 7.5 s; the plan's estimate was 6 s. The test stays over 5 s: its stalled mode
+   needs one failed attempt of 1 s, then a budget of 2 s that the test sleeps through.
+   `adversary_w2_tests.rs` hands the same fixture mode a deadline that the stall must outlast; it
+   was 2 s and is 1 s. That file was not in the plan's scope; it is one value.
+   `native_outcomes_and_lost_replies_never_repeat_a_send` uses `expiring` too and takes 3.2 s.
+2. `a_stored_response_is_published_by_an_owner_restarting_after_the_evidence_lifetime`:
+   `LIFETIME_MS` is 2,000, not the plan's 1,000, and the test sleeps the lifetime plus 500 ms. The
+   lifetime also bounds the time between collecting evidence and validating it inside one refresh
+   or one recovery (`owner/refresh.rs`, `valid_until_ms`), and 2 s is kept for that step on a
+   loaded runner. Probed once, not committed: with a lifetime of 300 ms and a sleep of 400 ms
+   before the refresh the test passes, so the first part of the test does not need the initial
+   evidence to be valid. 12.6 s became 4.4 s.
+3. `how_long_sixty_four_idle_connections_delay_the_redirect`: the second measurement is dropped
+   as planned; `redirect_delay` keeps its `refresh` parameter. 10.5 s became 2.1 s.
+4. `controlling_terminal_hides_input_and_restores_echo_after_sigint`: the mode `late` answers
+   1.5 s after the prompt (was 5.5 s). The deadline handed to the child stays 120 s: it is a
+   ceiling for a slow machine and costs no time. What the mode no longer shows: that a fixture
+   which assumes 5 s of its own fails. The fixture has had no deadline of its own since it reads
+   `CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS`. 6.7 s became 2.6 s.
+5. `quorum_below_quorum_names_each_source`: the query deadline is 1 s, not the 500 ms of the
+   second-attempt tests. The three answering sources are loopback fixtures and must answer inside
+   the deadline; story:clock-quorum-test-tolerates-a-slow-loopback-source records a runner on
+   which one answered later than 2 s. 6.3 s became 3.3 s; the plan's estimate was 1 s.
+
+Sum of the five, local: 49.8 s before, 19.9 s after. Ten runs in a row of the five tests and the
+two neighbours named in point 1: 10 of 10 passed.
