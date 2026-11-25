@@ -268,7 +268,7 @@ impl Cli {
             if self.fault.is_some() {
                 let handles = guarded_merge::owner_handles(self);
                 let answer = client.shutdown(&host);
-                if !guarded_merge::finish_filtered_owner(handles, answer.is_ok()) {
+                if !guarded_merge::finish_filtered_owner(handles, answer.is_ok(), 5000) {
                     return;
                 }
                 let directory = filesystem::directory(&self.paths.state, false, true).unwrap();

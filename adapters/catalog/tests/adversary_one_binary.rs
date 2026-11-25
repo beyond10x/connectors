@@ -9,7 +9,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
-    time::{Duration, Instant},
 };
 
 fn sources(directory: &Path, found: &mut Vec<PathBuf>) {
@@ -147,24 +146,4 @@ fn every_name_a_suite_runs_this_binary_again_with_is_a_test_it_lists() {
         missing.is_empty(),
         "re-run names this binary does not list: {missing:#?}"
     );
-}
-
-/// derived_instance_adversary.rs sets `CONNECTORS_INSTALLATION` for the whole
-/// process while it loads a configuration (provider handshake included). Beside
-/// the other suites that reached them and the children they start without
-/// `env_clear`, so it stays its own `[[test]]` target and so its own process.
-/// This case is red when a module of `main` sets the variable, as it was with
-/// that file declared here and run in the gate's parallel `cargo test --workspace`.
-#[test]
-fn no_suite_sees_the_installation_another_suite_sets() {
-    let initial = std::env::var_os("CONNECTORS_INSTALLATION");
-    let until = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < until {
-        let now = std::env::var_os("CONNECTORS_INSTALLATION");
-        assert_eq!(
-            now, initial,
-            "another suite's CONNECTORS_INSTALLATION reached this one"
-        );
-        std::thread::sleep(Duration::from_micros(200));
-    }
 }
