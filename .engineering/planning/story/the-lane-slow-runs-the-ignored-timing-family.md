@@ -18,7 +18,7 @@ scope:
   path: crates/connectors-sdk/src/lib.rs
 - confidence: cited
   path: docs/development.md
-revision: 14
+revision: 15
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T02:53:29Z", actor: "human:operator", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-25T02:53:29Z", actor: "human:operator", revision: 9}
@@ -295,33 +295,50 @@ The nextest ids of the same six stories carry the binary's name too
 Where the implementation differs from the Change and Acceptance sections. Nothing of the timing
 family was run after the runs of the section "Measured".
 
-1. `ignored.rs` has a new function `time_limit(family)`: 60 s for `Family::Timing`, 600 s for
-   every other family. `run()` passes its value to `execute_test()`. The unit test
-   `a_timing_test_gets_60_seconds_and_a_test_of_another_family_600` holds the values and that
-   `run()` calls the function. Change 5 names no such function.
+1. The limit of 60 s goes by the name rule, not by the family (Change 5 says "for a test of
+   `Family::Timing`"). An entry has a field `slow_lane`, set only by the rule in `classify()`,
+   and `time_limit(entry)` reads it: 60 s for a `slow_lane_` test, 600 s for every entry of the
+   exact table. The adversary read showed why: the table's one `Timing` entry left
+   (`connectors-catalog-provider::main`, `catalog_cli_read_recollects_expired_evidence_without_reentry`,
+   which needs custody and the CLI) waits out 60,000 ms of evidence by design and had 600 s
+   before this story. No job runs it. Tests:
+   `a_slow_lane_test_gets_60_seconds_and_every_entry_of_the_table_600` and
+   `the_timing_entry_that_waits_out_its_evidence_gets_longer_than_that_wait`.
 2. A test ended at its limit returns "test was still running at its limit of N s and was ended
-   with its process group; see log" in place of the generic message, so the report names the
-   time-out.
-3. The comment of Change 7 is two blocks, because the eighth entry is in another arm of the table
+   with its process group; see log" in place of the generic message.
+3. Both `paths:` lists of `slow.yml` hold 13 paths, not 10 (Change 4): `Cargo.toml`, `.cargo/**`
+   and `rust-toolchain.toml` were added after the adversary read. They decide whether a release
+   build has debug assertions, which the lane's second command exists to show. Test:
+   `a_change_of_a_build_profile_or_of_the_toolchain_starts_the_lane`.
+4. The lane has two steps the Change does not name, after the timing step, both with
+   `if: always()`: "Name each lane test that did not pass" prints each selected test that did not
+   pass with the end of its log, and "Keep the lane report and logs" uploads them as the artifact
+   `ignored-slow-lane`. Their script and upload settings are those of the journeys job of
+   `rust-gate.yml`. Without them a red lane test says "see log" about a file on the runner.
+   Test: `the_lane_prints_and_keeps_the_logs_of_its_tests_and_still_checks_the_emissions`.
+5. The four steps of Change 2 sit directly after "Fetch locked dependencies", so the emissions
+   check is the last step of the job, and a test holds that it is still there. A red lane test
+   ends the job before that check. The timing step is named "Run the ignored slow_lane_ tests,
+   60 s each". The workflow file holds no comment line.
+6. The comment of Change 7 is two blocks, because the eighth entry is in another arm of the table
    (`connectors`, `cold_owner_start`). Each block opens with a line that says where the times
    were measured and holds no story id. The lines of `first_owner_open_of_a_grown_store` and
    `owner_start_of_a_grown_store` say "fails at once" and name the two unset variables; they
    carry no time.
-4. The unit test `the_lane_selects_a_slow_lane_test_and_no_entry_of_the_table` also reads the
+7. The unit test `the_lane_selects_a_slow_lane_test_and_no_entry_of_the_table` also reads the
    source of `classify()`: every `Timing` entry of the table has a prerequisite other than the
-   provider. A later `Timing` entry without one fails this test. The same test holds that the
-   lane's selection is empty without a `slow_lane_` test and that `--required` then refuses it.
-5. The four steps of `slow.yml` sit directly after "Fetch locked dependencies", so the emissions
-   check is the last step of the job. A red lane test ends the job before that check. The timing
-   step is named "Run the ignored slow_lane_ tests, 60 s each". The workflow file holds no
-   comment line.
-6. The unit test of acceptance 2 also holds that the two setup steps equal the gate job's `run`
+   provider. The same test holds that the lane's selection is empty without a `slow_lane_` test
+   and that `--required` then refuses it.
+8. The unit test of acceptance 2 also holds that the two setup steps equal the gate job's `run`
    text and that the guide shows both commands.
+9. Acceptance 4, "no process of the fixture is left running", holds for the test's process group.
+   A process the test started in a session of its own outlives the kill; the kill is unchanged
+   from before this story. No lane test of this change starts one.
+   story:a-lane-test-ended-at-its-limit-leaves-a-process-of-another-session-running holds it.
 
 On the build host of the shared pool: `cargo nextest run --locked -p connectors-build -E
-'test(ignored::)'` ran 36 tests, 36 passed, in 1.3 s; ten runs in a row of the seven tests of
-`ignored::tests::slow_lane`: 10 of 10, the limit test 1.1 s, the others under 0.01 s. The count
-of acceptance 7 is 8.
+'test(ignored::)'` ran 39 tests, 39 passed; ten runs in a row of the ten tests of
+`ignored::tests::slow_lane`: 10 of 10, the limit test 1.1 s. The count of acceptance 7 is 8.
 
 Open until the lane job of the pull request: acceptance 3, acceptance 6, and the report's side of
 acceptance 5.

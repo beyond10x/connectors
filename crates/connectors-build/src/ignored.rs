@@ -80,6 +80,8 @@ struct Entry {
     family: Option<Family>,
     helper: bool,
     prerequisites: Vec<&'static str>,
+    /// Classified by the `slow_lane_` name rule and by no entry of the table.
+    slow_lane: bool,
 }
 impl Entry {
     fn id(&self) -> String {
@@ -150,6 +152,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         family: None,
         helper: false,
         prerequisites: vec![],
+        slow_lane: false,
     };
     let classification = match (suite.package.as_str(), suite.target.as_str(), name) {
         ("connectors-host", "connectors_host", name) => match name {
@@ -575,12 +578,12 @@ fn classify(suite: &Suite, name: &str) -> Entry {
     };
     // The one rule by name, after every exact entry above: an ignored test whose function
     // name (the part after the last `::`) starts with `slow_lane_` waits in real time and
-    // runs in the lane `slow`, with no prerequisite. It needs no entry here.
+    // runs in the lane `slow`, with no prerequisite. It needs no entry here. The mark it
+    // gets, and not the family, decides its time limit (`time_limit`).
     let function = name.rsplit("::").next().unwrap_or(name);
     let classification = classification.or_else(|| {
-        function
-            .starts_with("slow_lane_")
-            .then_some((Timing, vec![]))
+        entry.slow_lane = function.starts_with("slow_lane_");
+        entry.slow_lane.then_some((Timing, vec![]))
     });
     if let Some((family, prerequisites)) = classification {
         entry.family = Some(family);
@@ -894,15 +897,12 @@ fn execute_test(
     }
     Ok(success && passed)
 }
-/// The time `run` gives one test: 60 s in the family `timing`, which the lane `slow` runs
-/// (no single test of a lane runs longer), and ten minutes in every other family, including
-/// costly opt-in probes.
-fn time_limit(family: Option<Family>) -> Duration {
-    Duration::from_secs(if family == Some(Family::Timing) {
-        60
-    } else {
-        600
-    })
+/// The time `run` gives one test: 60 s to a test the `slow_lane_` name rule classified, which
+/// the lane `slow` runs (no single test of a lane runs longer), and ten minutes to every entry
+/// of the table, whatever its family, including costly opt-in probes. The table's own `Timing`
+/// entry waits 60 s for evidence to lapse and so cannot end within 60 s.
+fn time_limit(entry: &Entry) -> Duration {
+    Duration::from_secs(if entry.slow_lane { 60 } else { 600 })
 }
 #[cfg(test)]
 fn execute_one(suite: &Suite, name: &str, temp: &Path) -> Result<bool> {
@@ -1394,7 +1394,7 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
                 temp.path(),
                 &logs,
                 &environment,
-                time_limit(entry.family),
+                time_limit(entry),
             )
         },
     );
@@ -2502,6 +2502,9 @@ fn selected_fixture() {{
         const GATE: &str = include_str!("../../../.github/workflows/rust-gate.yml");
         const GUIDE: &str = include_str!("../../../docs/development.md");
         const SDK: &str = include_str!("../../connectors-sdk/src/lib.rs");
+        const LIFECYCLE: &str =
+            include_str!("../../../adapters/catalog/tests/local_runtime/lifecycle.rs");
+        const CATALOG_LOCAL: &str = include_str!("../../../adapters/catalog/src/local.rs");
         /// The gate's ignored step, as `rust-gate.yml` runs it.
         const GATE_IGNORED: &str = "cargo run --locked --bin connectors-build -- ignored --required --only-prerequisite provider";
         const NAMESPACES: &str = "Permit unprivileged user namespaces";
@@ -2705,14 +2708,51 @@ fn selected_fixture() {{
                     "crates/connectors-build/src/metadata_entities.rs",
                     "crates/connectors-build/generated/metadata-emissions/**",
                     ".github/workflows/slow.yml",
+                    "Cargo.toml",
+                    ".cargo/**",
+                    "rust-toolchain.toml",
                 ] {
                     assert!(paths.contains(&path), "{event}: {path} is missing");
                 }
-                assert_eq!(paths.len(), 10, "{event}: {paths:?}");
+                assert_eq!(paths.len(), 13, "{event}: {paths:?}");
             }
             let branches = trigger.get("push").and_then(|push| push.get("branches"));
             assert_eq!(branches.and_then(Value::as_sequence).map(Vec::len), Some(1));
             assert_eq!(branches.unwrap()[0].as_str(), Some("main"));
+        }
+
+        /// The second command of the lane exists to show that `--release` resolves to a
+        /// profile without `debug_assertions`. The files that decide that are the root
+        /// manifest, `.cargo/config.toml` and the pinned toolchain; a change to one of them
+        /// alone must start the lane, or the command never runs against it.
+        #[test]
+        fn a_change_of_a_build_profile_or_of_the_toolchain_starts_the_lane() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let trigger = workflow.get("on").expect("the workflow names its triggers");
+            let mut missing = vec![];
+            for event in ["pull_request", "push"] {
+                let paths: Vec<&str> = trigger
+                    .get(event)
+                    .and_then(|event| event.get("paths"))
+                    .and_then(Value::as_sequence)
+                    .unwrap_or_else(|| panic!("{event} has a paths list"))
+                    .iter()
+                    .map(|path| path.as_str().unwrap())
+                    .collect();
+                for accepted in [
+                    &["Cargo.toml", "Cargo.*"][..],
+                    &[".cargo/**", ".cargo/config.toml"][..],
+                    &["rust-toolchain.toml"][..],
+                ] {
+                    if !accepted.iter().any(|path| paths.contains(path)) {
+                        missing.push(format!("{event}: {}", accepted[0]));
+                    }
+                }
+            }
+            assert!(
+                missing.is_empty(),
+                "a change to one of these files alone does not start the lane: {missing:?}"
+            );
         }
 
         /// The steps of the lane in their order: user namespaces, cargo-nextest, the timing
@@ -2800,6 +2840,89 @@ fn selected_fixture() {{
                     "docs/development.md shows another command than the lane runs: {command}"
                 );
             }
+        }
+
+        /// A failed lane test says "see log", and the log is a file on the runner. Two steps
+        /// after the timing step print the outcomes that did not pass and keep the report and
+        /// the logs, also when the timing step failed. They are the journeys job's steps, with
+        /// an artifact name of the lane's own. The emissions check stays in the job.
+        #[test]
+        fn the_lane_prints_and_keeps_the_logs_of_its_tests_and_still_checks_the_emissions() {
+            let lane = steps(WORKFLOW, "slow");
+            let journeys = steps(GATE, "journeys");
+            let timing = lane
+                .iter()
+                .position(|step| {
+                    options_of(text(step, "run"))
+                        .is_some_and(|options| options.family.contains(&Family::Timing))
+                })
+                .expect("a step of slow.yml runs the timing family");
+            let printed = named(&lane, "Name each lane test that did not pass")
+                .expect("slow.yml has a step that names each lane test that did not pass");
+            let kept = named(&lane, "Keep the lane report and logs")
+                .expect("slow.yml has a step that keeps the lane report and logs");
+            assert!(
+                timing < printed && printed < kept,
+                "order of the steps: timing family {timing}, print {printed}, keep {kept}"
+            );
+            let of_journeys = |name: &str| {
+                &journeys[named(&journeys, name).expect("the journeys job has the step")]
+            };
+            let print = of_journeys("Name each journey that did not pass");
+            let keep = of_journeys("Keep the journeys report and logs");
+            for index in [printed, kept] {
+                let holder = &lane[index];
+                assert_eq!(text(holder, "if"), "always()", "{}", text(holder, "name"));
+                assert!(holder.get("continue-on-error").is_none());
+            }
+
+            // The steps read the files the lane's command writes.
+            assert_eq!(
+                lane_options().report,
+                PathBuf::from(".local/ignored-suites.json")
+            );
+            let script = text(&lane[printed], "run");
+            assert_eq!(script, text(print, "run"));
+            assert!(script.contains(".local/ignored-suites.json"));
+            assert!(script.contains(".local/ignored-suites.logs/*.log"));
+
+            assert!(text(&lane[kept], "uses").starts_with("actions/upload-artifact@"));
+            assert_eq!(text(&lane[kept], "uses"), text(keep, "uses"));
+            let with =
+                |step: &Value, key: &str| step.get("with").and_then(|with| with.get(key)).cloned();
+            for key in [
+                "path",
+                "if-no-files-found",
+                "include-hidden-files",
+                "retention-days",
+            ] {
+                assert!(with(&lane[kept], key).is_some(), "{key}");
+                assert_eq!(with(&lane[kept], key), with(keep, key), "{key}");
+            }
+            let paths = with(&lane[kept], "path").unwrap();
+            let paths = paths.as_str().unwrap();
+            assert!(paths.contains(".local/ignored-suites.json"));
+            assert!(paths.contains(".local/ignored-suites.logs/"));
+            let name = with(&lane[kept], "name");
+            assert_eq!(
+                name.as_ref().and_then(Value::as_str),
+                Some("ignored-slow-lane")
+            );
+            assert_ne!(
+                name,
+                with(keep, "name"),
+                "the artifact has the journeys job's name"
+            );
+
+            let emissions = lane
+                .iter()
+                .position(|step| {
+                    text(step, "run").trim()
+                        == "cargo run --locked --offline -p connectors-build -- metadata-conformance emissions --check"
+                })
+                .expect("the lane still checks the metadata emissions");
+            let holder = &lane[emissions];
+            assert!(holder.get("if").is_none() && holder.get("continue-on-error").is_none());
         }
 
         /// The options of the lane's first command, parsed as the binary parses them.
@@ -2928,24 +3051,85 @@ fn selected_fixture() {{
             assert_eq!((report.selected, report.executed), (1, 1));
         }
 
-        /// The limits `run` passes: no test of the lane runs longer than 60 s.
+        /// The limits `run` passes. A test the rule classified gets 60 s: no test of the lane
+        /// runs longer. Every entry of the table keeps 600 s, whatever its family: the one
+        /// `Timing` entry among them waits 60 s by design.
         #[test]
-        fn a_timing_test_gets_60_seconds_and_a_test_of_another_family_600() {
-            assert_eq!(time_limit(Some(Family::Timing)), Duration::from_secs(60));
-            for family in [Family::Disposable, Family::Live, Family::Deferred] {
-                assert_eq!(
-                    time_limit(Some(family)),
-                    Duration::from_secs(600),
-                    "{family:?}"
-                );
+        fn a_slow_lane_test_gets_60_seconds_and_every_entry_of_the_table_600() {
+            fn limit(test: (&str, &str, &str)) -> Duration {
+                time_limit(&classified(&[test]).pop().unwrap())
             }
+            for test in [
+                RULED,
+                (
+                    "connectors",
+                    "local_cli",
+                    "slow_lane_adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs",
+                ),
+            ] {
+                assert_eq!(limit(test), Duration::from_secs(60), "{}", id(test));
+            }
+            let mut table = vec![
+                NEEDS_CUSTODY,
+                PROVIDER_ONLY,
+                PROVIDER_AND_CUSTODY,
+                CHROME_ONLY,
+                (
+                    "connectors-host",
+                    "connectors_host",
+                    "local::clock::tests::independent_live_quorum",
+                ),
+            ];
+            table.extend(EIGHT);
+            for test in table {
+                let entry = classified(&[test]).pop().unwrap();
+                assert!(entry.family.is_some(), "{}", id(test));
+                assert_eq!(time_limit(&entry), Duration::from_secs(600), "{}", id(test));
+            }
+            // A test given the family by hand, as a later entry of the table would be.
+            let mut by_hand = classified(&[("connectors", "probe", "tests::example")])
+                .pop()
+                .unwrap();
+            by_hand.family = Some(Family::Timing);
+            assert_eq!(time_limit(&by_hand), Duration::from_secs(600));
             let run = crate::steps::body(
                 include_str!("ignored.rs"),
                 "pub fn run(root: &Path, options: Options) -> Result<()> {\n",
             );
             assert!(
-                run.contains("time_limit(entry.family)"),
-                "`run` does not pass the limit of the test's family to `execute_test`"
+                run.contains("time_limit(entry)"),
+                "`run` does not pass the limit of the entry to `execute_test`"
+            );
+        }
+
+        /// The entry the table keeps in `Timing` waits until the evidence of its connection
+        /// has lapsed, and a profile's evidence lasts 60 000 ms unless its configuration says
+        /// otherwise. So its limit is longer than that wait; it had 600 s before the lane.
+        #[test]
+        fn the_timing_entry_that_waits_out_its_evidence_gets_longer_than_that_wait() {
+            assert!(
+                CATALOG_LOCAL.contains("fn default_evidence_lifetime() -> u64 {\n    60_000\n}"),
+                "the default evidence lifetime is no longer 60 000 ms"
+            );
+            let (_, rest) = LIFECYCLE
+                .split_once("fn catalog_cli_read_recollects_expired_evidence_without_reentry() {")
+                .expect("lifecycle.rs holds the test");
+            let (body, _) = rest.split_once("\n}\n").unwrap();
+            assert!(body.contains("let until = connected[\"valid_until_ms\"].as_u64().unwrap();"));
+            assert!(body.contains("while connectors_sdk::now_ms() <= until {"));
+            assert!(
+                !LIFECYCLE.contains("evidence_lifetime_ms"),
+                "the fixture of lifecycle.rs sets an evidence lifetime of its own"
+            );
+            let wait = Duration::from_millis(60_000);
+
+            let entry = classified(&[NEEDS_CUSTODY]).pop().unwrap();
+            assert_eq!(entry.family, Some(Family::Timing));
+            let limit = time_limit(&entry);
+            assert!(
+                limit > wait,
+                "{} waits {wait:?} for its evidence to lapse and is ended at {limit:?}",
+                entry.id()
             );
         }
 

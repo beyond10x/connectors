@@ -351,10 +351,11 @@ The gate's ignored step does not select the family. A test that leaves the gate 
 wait is added under such a name with `#[ignore]`.
 
 The workflow starts for a pull request and for a push to `main` that changes a file under
-`crates/`, `apps/` or `adapters/`, besides the inputs of the metadata emissions (`ess/`,
-`Cargo.lock`) and the workflow file itself. After the step that permits unprivileged user
-namespaces, which the tests that start the CLI in the jail need, and the install of the pinned
-cargo-nextest, it runs:
+`crates/`, `apps/` or `adapters/`, or one of the files that decide the build profile and the
+toolchain (`Cargo.toml`, `.cargo/`, `rust-toolchain.toml`), besides the inputs of the metadata
+emissions (`ess/`, `Cargo.lock`) and the workflow file itself. After the step that permits
+unprivileged user namespaces, which the tests that start the CLI in the jail need, and the
+install of the pinned cargo-nextest, it runs:
 
 ```sh
 cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider
@@ -363,9 +364,12 @@ cargo nextest run --release --locked -p connectors-sdk --no-tests fail release_b
 
 The first command runs the `slow_lane_` tests only: an entry of `ignored.rs` in the family
 `timing` has a prerequisite the lane does not supply (the Secret Service and the CLI). With
-`--required` it fails when there is no `slow_lane_` test. A test of the family `timing` gets
-60 s, a test of any other family 600 s; a test still running at its limit is ended with its
-process group and counts as failed.
+`--required` it fails when there is no `slow_lane_` test. A `slow_lane_` test gets 60 s. Every
+entry of `ignored.rs` keeps 600 s, the `timing` entry among them too: it waits 60 s for
+evidence to lapse. A test still running at its limit is ended with its process group and
+counts as failed; its outcome says "see log". Two steps that run after a failed command too
+print each selected test that did not pass with the end of its log, and keep the report and
+the logs as the artifact `ignored-slow-lane`.
 The second command runs, in a build without `debug_assertions`, the tests of `connectors-sdk`
 whose name holds `release_build_`. With `--no-tests fail` zero such tests fail the step: then
 `--release` resolved to a profile with `debug_assertions`.
