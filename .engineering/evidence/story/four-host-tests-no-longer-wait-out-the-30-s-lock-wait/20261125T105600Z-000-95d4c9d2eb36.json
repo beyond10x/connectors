@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T10:56:00Z",
+  "actor": "human:operator",
+  "artifact": "story:four-host-tests-no-longer-wait-out-the-30-s-lock-wait",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate of pull request 307, head ae27b268c: the four tests passed in 0.008 s, 0.506 s, 1.355 s and 1.123 s, sum 3.0 s, bound 9 s, before 122.0 s; test step 4516 tests run, 4516 passed; ignored step 225 in the inventory, 4 executed, 0 failed, 0 missing, 0 unknown",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45592415151/job/139129733813"
+  }
+}

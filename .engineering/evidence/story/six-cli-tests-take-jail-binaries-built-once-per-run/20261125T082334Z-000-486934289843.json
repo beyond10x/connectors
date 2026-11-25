@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T08:23:34Z",
+  "actor": "human:operator",
+  "artifact": "story:six-cli-tests-take-jail-binaries-built-once-per-run",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate of pull request 303, head fb28f7aa4: the six tests passed in 12.656 s, 5.705 s, 5.850 s, 8.396 s, 5.640 s and 12.276 s, sum 50.5 s, bound 76 s, before 50.7 s; the eight tests mounted::tests::install_ of connectors-custody passed; test step 4505 tests run, 4505 passed; ignored step 223 in the inventory, 4 executed, 0 failed, 0 missing, 0 unknown",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45570946406/job/139057150268"
+  }
+}

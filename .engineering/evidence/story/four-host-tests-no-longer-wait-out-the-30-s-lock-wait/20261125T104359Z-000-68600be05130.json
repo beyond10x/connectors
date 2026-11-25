@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T10:43:59Z",
+  "actor": "human:operator",
+  "artifact": "story:four-host-tests-no-longer-wait-out-the-30-s-lock-wait",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job slow of pull request 307, head ae27b268c: 225 ignored tests in the inventory, 2 selected, 2 executed, 0 failed, 0 missing, 0 unknown; connectors-host::local_foundation::slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release has status passed; the step of ignored tests ran 63.4 s for the two lane tests",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45592415297/job/139129734423"
+  }
+}
