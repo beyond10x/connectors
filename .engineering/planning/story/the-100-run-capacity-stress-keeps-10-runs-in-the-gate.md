@@ -13,7 +13,7 @@ relations:
 scope:
 - confidence: cited
   path: apps/connectors/tests/local_cli.rs
-revision: 2
+revision: 3
 ---
 ## Defect
 
@@ -54,7 +54,7 @@ Estimate after in the test step (the plan; not timed): 3.2 s.
 3. Kept runs in the lane `slow`:
    `connectors::local_cli::slow_lane_adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs`
    asserts that its tally sums to 100. The lane's command
-   `cargo run --locked -p connectors-build -- ignored --family timing --required --only-prerequisite provider`
+   `cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider`
    lists it as `passed`. Alone it runs with
    `cargo test --locked -p connectors --test local_cli -- --ignored --exact slow_lane_adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs`.
 4. The gate's ignored step still passes: the new ignored test is not unknown to it.

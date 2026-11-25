@@ -26,7 +26,7 @@ scope:
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 6
+revision: 8
 ---
 ## Defect
 
@@ -37,7 +37,7 @@ Together they take 56.2 s of the test step.
 Source of the durations: the ones nextest printed in the forge's gate job 138270416028 of pull
 request 291, 2026-11-24, as listed in test-plan:where-the-gates-test-step-spends-its-time (groups H
 and I). The plan read the sources at 0.77.2. The function names and lines below were read in the
-tree of 0.78.1. The sums are the plan's and equal the sums of its rows.
+tree of 0.78.1 and are the same at 0.78.2. The sums are the plan's and equal the sums of its rows.
 
 Group H:
 
@@ -86,6 +86,10 @@ story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-rele
    500 ms, connect timeout 300 ms. The fixture of
    `provider_budget_generic_30_seconds_is_not_clipped_to_legacy_15` answers after 700 ms in place
    of 16 s: 200 ms past the request timeout, under the 30 s budget, which stays.
+   `a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout` asserts today that
+   at least 10 s passed (`provider_timeout_adversary.rs` lines 57 to 61). The shared body takes
+   that lower bound from its caller: the gate's test passes the request timeout it set, the lane
+   test keeps 10 s.
 
 SQL, no environment variable:
 
@@ -96,15 +100,45 @@ SQL, no environment variable:
 5. The helpers `stalled` of the two test files (`protocol.rs` line 515, `mysql_protocol.rs` line
    556) build the adapter with `with_query_timeout` of 1,000 ms.
 
+What each wait protects, and why the shorter test value is safe:
+
+- The 15 s request timeout (`http.rs` line 239) is the per-request cutoff of a client built with
+  no provider budget: it ends a request whose provider stops answering, a body that stalls for
+  example, so the caller gets `timeout` and does not wait without end. The two tests that wait on
+  it assert what kind of timeout that is (`Timeout` with `upstream_answer` set once the request
+  was sent) and that a provider budget of 30 s is not cut by it. Both are properties of where the
+  cutoff fell and of which cutoff applies, not of its length, so 500 ms proves them as 15 s
+  does. The length is proved by the lane test at 15 s.
+- The 5 s connect timeout (`http.rs` line 238) bounds the opening of a connection, the TLS
+  handshake included, to a provider that does not answer. The test that waits on it asserts that
+  a connection that never opened sent no request and is not marked as the provider's answer.
+  That is a property of the stage at which the cutoff fell, so 300 ms proves it as 5 s does. The
+  length is proved by the lane test at 5 s.
+- `QUERY_TIMEOUT` of 10 s (`adapters/sql/src/lib.rs` line 23) is the time one query may run
+  inside the 15 s request bound, with `CLEANUP_TIMEOUT` reserved for the cancel (the comment at
+  `lib.rs` lines 392 and 393). The two tests assert what happens at that cutoff: the adapter
+  cancels the running query on the server and drains the connection. The same code runs at
+  1,000 ms: the work deadline is the smaller of the query timeout and the request bound less the
+  cleanup time, and 1,000 ms is the smaller as 10 s is today. The length is proved by the lane
+  test at 10 s for PostgreSQL.
+
+A release build ignores the two HTTP overrides, and `with_query_timeout` has no caller in the
+product (acceptance 4).
+
 Outside the gate three tests keep the production values, as ignored tests that share their body
 with the gate's test through one helper:
 
 - `slow_lane_a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout`
   (`provider_timeout_adversary.rs`): the 15 s request timeout, no variable set.
 - `slow_lane_a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked` (same file):
-  the 5 s connect timeout, no variable set. The plan names no run at 5 s; this story adds it.
+  the 5 s connect timeout, no variable set.
 - `slow_lane_deadline_sends_the_backend_cancel_key_and_drains_the_connection` (`protocol.rs`):
   `QUERY_TIMEOUT` of 10 s, no `with_query_timeout`.
+
+A decision beyond the plan: the lane test at the 5 s connect timeout. The plan names runs at 15 s
+and at 10 s and none at 5 s. This story adds the run at 5 s so that each production value a gate
+test no longer waits out is proved in one run somewhere. The parent story lists it among the
+decisions beyond the plan.
 
 The rule of story:the-lane-slow-runs-the-ignored-timing-family puts the three in the timing family
 by their names. This story edits neither `ignored.rs` nor `slow.yml`.
@@ -122,14 +156,15 @@ Estimate after (the plan; not timed): group H 1 s each, 3.0 s. Group I 1.2 s eac
    5.4 = 8.1, rounded up to 9 s. The numbers are read from the durations nextest prints in that
    job.
 2. The three lane tests pass in the lane `slow`. The lane's command
-   `cargo run --locked -p connectors-build -- ignored --family timing --required --only-prerequisite provider`
-   lists each as `passed`. Alone they run with
-   `cargo test --locked -p connectors-host --test provider_timeout_adversary -- --ignored --exact <name>`
-   and
-   `cargo test --locked -p connectors-sql --test protocol -- --ignored --exact slow_lane_deadline_sends_the_backend_cancel_key_and_drains_the_connection`.
+   `cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider`
+   lists each as `passed`. Alone they run with these three commands:
+   - `cargo test --locked -p connectors-host --test provider_timeout_adversary -- --ignored --exact slow_lane_a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout`
+   - `cargo test --locked -p connectors-host --test provider_timeout_adversary -- --ignored --exact slow_lane_a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked`
+   - `cargo test --locked -p connectors-sql --test protocol -- --ignored --exact slow_lane_deadline_sends_the_backend_cancel_key_and_drains_the_connection`
 3. The production 5 s connect timeout is covered by
    `connectors-host::provider_timeout_adversary::slow_lane_a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked`:
-   it asserts that the refusal comes no sooner than 5 s after the connect started.
+   it asserts that the refusal comes no sooner than 5 s after the connect started. It runs with
+   the second command of acceptance 2.
 4. `with_query_timeout` has no caller outside `adapters/sql/tests/`: `grep` over `adapters/sql/src`
    and `apps/` finds only its definition. The MySQL path at the production 10 s has no lane test;
    `mysql_deadline_kills_the_running_query` runs at 1,000 ms only.
@@ -161,4 +196,7 @@ No other story of this set writes these seven files.
 - Not established: every "after" figure on the forge; whether the three host tests can run their
   body in a child process as said in point 2 (their fixtures were read at the lines named only);
   whether a hidden public method on `Sql` is acceptable, the other form being a field of the
-  adapter's `Config`.
+  adapter's `Config`; whether the TLS handshake is counted under the client's connect timeout
+  (inferred from the 5.0 s of
+  `a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked`, which asserts no time
+  today).

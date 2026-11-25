@@ -3,21 +3,18 @@ format: aep.planning-md/3
 id: story:six-cli-tests-take-jail-binaries-built-once-per-run
 kind: story
 status: draft
-title: 'Six CLI tests take jail binaries built once per run: 50.7 s, estimated unchanged at 50.6 s until the copy is measured'
-summary: Each mounted-container test copies about 133 MB of binaries into its jail and hashes one; a link from a product built once per run replaces the copy
+title: 'Six CLI tests link their binaries into the jail instead of copying them: 50.7 s, no saving estimated'
+summary: Each mounted-container test copies about 133 MB of binaries into its jail; Jail::install hard-links them and copies only where it cannot link
 relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
-- depends_on: story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run
 scope:
 - confidence: cited
-  path: apps/connectors/tests/support/mounted.rs
-- confidence: inferred
-  path: crates/connectors-build/src/test_fixtures.rs
-- confidence: cited
   path: crates/connectors-custody/src/mounted/fixture.rs
-revision: 3
+- confidence: cited
+  path: crates/connectors-custody/src/mounted/tests.rs
+revision: 7
 ---
 ## Defect
 
@@ -49,62 +46,95 @@ estimate after.
 
 Sums, computed from the rows: before 50.7 s, after 50.6 s. The plan keeps the seconds of these six
 almost unchanged: it names no seam for the three CLI process loops and did not measure
-`Container::new` or one CLI run. So the plan claims no saving for these six. What this story
-changes is the copy per test; what that saves is its acceptance 3.
+`Container::new` or one CLI run. So the plan claims no saving for these six, and this story
+estimates none. What this story changes is the copy per test.
 
-Read at 0.78.1: `Container::new` in `apps/connectors/tests/support/mounted.rs` (lines 264 to 292)
-calls `jail.install` for `CARGO_BIN_EXE_connectors` and for the running test binary, then reads the
-installed test binary to take its sha256. `Jail::install` is in
-`crates/connectors-custody/src/mounted/fixture.rs` (line 119). Its body was not read; the plan says
-it copies.
+This story was drafted with a product "built once per run" by a setup step. The second round of
+critics found that the product had no producer: the CLI binary is built by cargo and named at
+compile time. The setup product is dropped. The id keeps the old name; an id cannot be changed.
+
+Read at 0.78.2:
+
+- `Container::new` in `apps/connectors/tests/support/mounted.rs` (lines 264 to 296) calls
+  `jail.install` for `env!("CARGO_BIN_EXE_connectors")` (lines 279 to 282) and for the running
+  test binary (line 283), then reads the installed test binary to take its sha256 (line 284).
+- `Jail::install` in `crates/connectors-custody/src/mounted/fixture.rs` (lines 119 to 127) creates
+  the parent directory, copies the source with `fs::copy` and sets the mode of the copy to 0700.
+- The jail root is a directory `mounted-jail-…` in the temporary directory (`Jail::new`, lines 57
+  to 61). In the gate the temporary directory of a test is `<checkout>/.local/tmp/gate-…`
+  (`crates/connectors-build/src/gate.rs`, `cargo()` lines 24 to 46 and lines 222 to 224, repeated
+  for nextest in `test_step`, lines 527 to 547). So in the gate the jail root and `target/` are
+  both under the checkout. Under plain `cargo test` the jail root is in the caller's temporary
+  directory.
+- `Jail::install` has callers beside `Container::new`: `setup_migrate_records.rs` (lines 380 to
+  385; the 12.5 s test builds its own jail), `crates/connectors-custody/src/mounted/tests.rs`
+  (line 40) and tests of `adapters/catalog/tests/`. A search for the installed paths
+  (`/bin-test/…`) found them run and read, and found no write into an installed file.
+- The product checks an adapter executable in `crates/connectors-host/src/local/config.rs` (lines
+  2429 to 2434): a regular file, owned by the user or root, not writable by group or others,
+  executable, at most 512 MiB. It does not read the link count. The check that does
+  (`check_private_file`, `crates/connectors-host/src/local/filesystem.rs` line 278) is for private
+  files.
 
 ## Change
 
-The second accepted form of the folder rule: one fixture built once per test run, kept on disk
-under `target/` and keyed by the digest of its sources. An in-process global is not this form.
-
-1. The setup step of
-   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run (`connectors-build
-   test-fixtures`) gets a third product: the CLI binary, kept in
-   `target/test-fixtures/jail-binaries/<digest>/connectors`, keyed by the sha256 of the binary. It
-   prints `test-fixtures: jail-binaries built in <ms> ms, digest <hex>` or `… reused …` and hands
-   the directory to the tests as `CONNECTORS_TEST_JAIL_BINARIES`.
-2. `Jail::install` links the file into the jail (a hard link) when the variable is set and the
-   file system allows it, and copies as today when not. It reports which of the two it did.
-3. The sha256 of the test binary is taken once per run per test binary and kept beside the
-   product, in place of once per test. Inferred: the key is the binary's path, length and
-   modification time, because a key that reads the whole file is the cost this story removes.
-4. `Container::new` uses both. A run without the setup step behaves as today.
+1. `Jail::install` links the source into the jail with a hard link and copies as today when it
+   does not link. It links when the source is not writable by group or others and the link call
+   succeeds. In every other case it copies and sets 0700, as today: a source on another file
+   system, a file system or a host setting that refuses the link, a source with a group or other
+   write bit.
+   The reason for the mode rule: a link is the same file as the source, so it keeps the mode cargo
+   gave it, and `install` must not change the mode of a file under `target/`. The copy's 0700
+   passes the product's check of an adapter executable on every host; a linked file passes it only
+   without the two write bits.
+2. Every caller gets the link without an edit, `Container::new` and the jail of
+   `setup_migrate_records.rs` among them. `install` keeps its signature.
+3. No setup step, no product under `target/test-fixtures/`, no variable and no digest: the source
+   is the file cargo built, and a link to it is always the current one.
+4. The sha256 of the test binary stays as it is, once per test (`mounted.rs` line 284). A kept hash
+   would have to be keyed by the content of the binary, and reading the content is the cost.
 
 Bound rule: bound = estimate × 1.5, rounded up to a whole second.
 
 ## Acceptance
 
-1. Built once: in the test step of the forge's "repository gate" job of this story's pull request,
-   the line `test-fixtures: jail-binaries …` appears once. A second run of the setup step with an
-   unchanged binary prints `reused`.
-2. Linked, not copied: a test of the support code asserts that after `Container::new` the file
-   `/bin-test/connectors` of the jail and the file of the product are one inode. Where the file
-   system refuses a link the test asserts the fallback copy and the report of it.
-3. The measurement: one test prints the time of `Container::new` in milliseconds. The pull
-   request's description records it from the gate job of the base and of the pull request, and
-   for each of the six tests the duration before (above) and after.
-4. The six tests pass, and their durations in the test step of that job sum to at most 76 s.
-   Before: 50.7 s. Estimate: 50.6 s. Bound: 1.5 × 50.6 = 75.9, rounded up to 76 s. The bound by the
-   rule is above the before, because the plan estimates no saving here; it guards against a slower
-   result only.
-5. Kept runs: the six tests keep their commands and loops (28 commands for 2 selectors, every
-   argument combination, three queued reads). The pull request changes no loop count in them.
+1. Linked where linking works: four unit tests in
+   `crates/connectors-custody/src/mounted/tests.rs`, run by
+   `cargo nextest run --locked -p connectors-custody -E 'test(/mounted::tests::install_/)'` and by
+   the gate's test step.
+   - `install_links_a_source_on_the_jails_file_system`: the test writes a file with mode 0755 into
+     the temporary directory and installs it. The installed file and the source are one inode, and
+     the source still has mode 0755.
+   - `install_links_the_running_test_binary_on_one_device`: it installs the running test binary, a
+     file under `target/`. When that file and the jail root are on one device and the file has no
+     group or other write bit, the two are one inode. Otherwise the installed file is a copy with
+     mode 0700.
+   - `install_copies_a_source_with_a_group_or_other_write_bit`: it installs a source with mode
+     0775 from the temporary directory. The installed file is another inode than its source, has
+     the source's length and has mode 0700.
+   - `install_copies_a_source_on_another_file_system`: it installs a source on another file system
+     (candidate: `/proc/self/exe`, inferred, not run). The installed file is another inode than
+     its source, has the source's length and has mode 0700.
+   The two copy cases are two tests, so that one failing does not hide the other.
+2. The six tests pass, and their durations in the test step of the forge's "repository gate" job
+   of this story's pull request sum to at most 76 s. Before: 50.7 s. Estimate: 50.6 s. Bound:
+   1.5 × 50.6 = 75.9, rounded up to 76 s. The bound by the rule is above the before, because the
+   plan estimates no saving here; it guards against a slower result only.
+3. Kept runs: the six tests keep their commands and loops (28 commands for 2 selectors, every
+   argument combination, three queued reads). `git diff --name-only` of this story's branch
+   against its base lists none of the six test files.
 
 ## Scope
 
-- `apps/connectors/tests/support/mounted.rs`: `Container::new` (lines 264 to 292).
-  story:eleven-connection-lease-tests-advance-a-clock-instead-of-sleeping touches another region
-  of this file: the knobs of the adapter fixture (lines 180 to 230).
-- `crates/connectors-custody/src/mounted/fixture.rs`: `Jail::install`.
-- `crates/connectors-build/src/test_fixtures.rs`: the third product. The file is created by
-  story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run; this story `depends_on`
-  it. `.config/nextest.toml` is not edited again.
+- `crates/connectors-custody/src/mounted/fixture.rs`: `Jail::install` (lines 118 to 127).
+- `crates/connectors-custody/src/mounted/tests.rs`: the four unit tests.
+
+No other story of this set writes these two files. `apps/connectors/tests/support/mounted.rs` is
+no longer edited by this story, so it shares no file with
+story:eleven-connection-lease-tests-advance-a-clock-instead-of-sleeping.
+`crates/connectors-build/src/test_fixtures.rs` is not edited either. This story reads nothing of
+story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run; its `depends_on` edge to
+that story is removed.
 
 The six test files are not edited. Other stories of this set edit other tests in two of them:
 `owner_slow_start.rs`
@@ -117,9 +147,17 @@ The six test files are not edited. Other stories of this set edit other tests in
 - The other tests that use the mounted container: among them the 14 tests of
   `connectors::adversary_local_mcp_server` and the 15 of `connectors::local_mcp_server` in the
   band of 1 s to under 5 s. They get the link too; their seconds are not counted here.
+- A test that shows the link for `/bin-test/connectors` after `Container::new`. It would sit in a
+  test file of `apps/connectors/tests/`; the second unit test above holds the same pair of places
+  (a binary under `target/` and a jail root in the temporary directory).
 - The gate failing when its test step runs over 120 s:
   story:the-gates-test-step-ends-within-120-s-on-the-forge.
-- Not established: whether the jail allows a hard link of a binary from `target/` (the plan did
-  not check; the test's directory and `target/` can be on two file systems); what `Jail::install`
-  does today beyond what the plan says; the cost of `Container::new` and of one CLI run; whether a
-  key of path, length and modification time is accepted as "the digest of its sources".
+- Not established:
+  - Whether a link from `target/` into the jail root works in the forge's gate job. Read: both
+    are under the checkout there. Not read or run: whether they are one file system on the
+    runner, whether the runner allows the link, and which mode cargo gives a binary there. Where
+    one of the three fails, the copy runs as today and this story saves nothing.
+  - Whether a test needs the installed binary to be owner-only. The comment of `install` says
+    "owner-only"; no check of it was found for an executable.
+  - The cost of the copy, of the sha256, of `Container::new` and of one CLI run. None was
+    measured, so no "after" figure is claimed.

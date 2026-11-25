@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/tests/local_foundation.rs
-revision: 6
+revision: 7
 ---
 ## Defect
 
@@ -98,7 +98,7 @@ timed).
    here only.
    `connectors-host::local_foundation::slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release`
    passes in the lane `slow`. The lane's command
-   `cargo run --locked -p connectors-build -- ignored --family timing --required --only-prerequisite provider`
+   `cargo run --locked --bin connectors-build -- ignored --family timing --required --only-prerequisite provider`
    lists it as `passed`. Alone it runs with
    `cargo test --locked -p connectors-host --test local_foundation -- --ignored --exact slow_lane_contending_metadata_open_refuses_at_its_bound_and_recovers_after_release`.
 3. The gate's ignored step still passes: the new ignored test is not unknown to it.

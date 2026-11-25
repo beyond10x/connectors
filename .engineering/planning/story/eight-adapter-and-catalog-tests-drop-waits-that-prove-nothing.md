@@ -4,19 +4,18 @@ id: story:eight-adapter-and-catalog-tests-drop-waits-that-prove-nothing
 kind: story
 status: draft
 title: 'Seven adapter and catalog tests drop waits that prove nothing: 73.0 s become an estimated 16.6 s'
-summary: Fixed deadlines, poll timeouts and a host walk per test; five get shorter, one stays and one moves to the lane slow
+summary: Fixed deadlines, poll timeouts and a host walk per test; five get shorter, one stays and one is removed
 relations:
 - decomposes: story:the-gates-test-step-ends-within-120-s-on-the-forge
 - informed_by: test-plan:where-the-gates-test-step-spends-its-time
 - serves: vision:independent-contract-adapters
-- depends_on: story:the-lane-slow-runs-the-ignored-timing-family
 scope:
 - confidence: cited
   path: adapters/catalog/tests/adversary_git_relay.rs
 - confidence: cited
   path: adapters/catalog/tests/adversary_one_binary.rs
 - confidence: cited
-  path: adapters/catalog/tests/local_runtime.rs
+  path: adapters/catalog/tests/local_runtime/cli_journey.rs
 - confidence: cited
   path: adapters/catalog/tests/local_runtime/guarded_merge.rs
 - confidence: cited
@@ -25,7 +24,7 @@ scope:
   path: adapters/kubernetes/tests/exec_credential_security.rs
 - confidence: cited
   path: crates/connectors-catalog/tests/bundle_adversary_2.rs
-revision: 6
+revision: 12
 ---
 ## Defect
 
@@ -40,8 +39,8 @@ schemas once per run. The id of this story keeps "eight"; an id cannot be change
 Source of the durations: the ones nextest printed in the forge's gate job 138270416028 of pull
 request 291, 2026-11-24, as listed in test-plan:where-the-gates-test-step-spends-its-time (three
 rows of group L, one row of group N, three rows of group M). The plan read the sources at 0.77.2.
-The function names and lines below were read in the tree of 0.78.1. The sum is computed from the
-plan: 80.0 − 7.0 = 73.0 s.
+The function names and lines below were read in the tree of 0.78.1 and again at 0.78.2. The sum is
+computed from the plan: 80.0 − 7.0 = 73.0 s.
 
 Waits that prove nothing more than a shorter one, or nothing under nextest (group L):
 
@@ -53,9 +52,9 @@ Waits that prove nothing more than a shorter one, or nothing under nextest (grou
   `adapters/catalog/tests/local_runtime/guarded_merge.rs`,
   `catalog_fault_cleanup_observation_handle_cannot_authorize_signal`: two `poll` timeouts of
   5000 ms in the helper `finish_filtered_owner` (the plan; the helper holds three `libc::poll(…,
-  5000)` calls).
+  5000)` calls, lines 94, 111 and 123).
 - 10.0 s, binary `connectors-catalog-provider::main`,
-  `adapters/catalog/tests/adversary_one_binary.rs`,
+  `adapters/catalog/tests/adversary_one_binary.rs` (lines 158 to 170),
   `no_suite_sees_the_installation_another_suite_sets`: it polls an environment variable for 10 s.
   Under nextest each test is its own process, so no other suite can write the variable and the test
   cannot fail.
@@ -63,11 +62,11 @@ Waits that prove nothing more than a shorter one, or nothing under nextest (grou
 Host work per test (group N):
 
 - 11.6 s, binary `connectors-kubernetes::exec_credential_security`,
-  `adapters/kubernetes/tests/exec_credential_security.rs` (lines 468 to 492),
-  `exec_plugin_file_owned_by_another_user_is_refused_before_the_digest`: it walks `/etc`,
+  `adapters/kubernetes/tests/exec_credential_security.rs` (lines 468 to 515; the walk is lines 471
+  to 501), `exec_plugin_file_owned_by_another_user_is_refused_before_the_digest`: it walks `/etc`,
   `/var/lib`, `/usr/share` and `/usr/include` to depth 3 for a readable file under 1 MiB whose
   owner is neither root nor the test's user and that group and others cannot write. The time
-  depends on the host.
+  depends on the host. When the walk finds no such file the test prints `skipped` and passes.
 
 Test-chosen waits and holds (group M), all in binary `connectors-catalog-provider::main`:
 
@@ -93,16 +92,36 @@ this story's choice unless it says "the plan".
    after: 2 s (the plan).
 2. `catalog_fault_cleanup_observation_handle_cannot_authorize_signal`: `finish_filtered_owner`
    takes the poll timeout as a parameter. This test passes 100 ms for each of the three polls in
-   place of 5,000 ms. Estimate after: 0.3 s (the plan; 3 × 100 ms).
-3. `no_suite_sees_the_installation_another_suite_sets`: it leaves the gate's test step. It gets
-   `#[ignore]` and the name `slow_lane_no_suite_sees_the_installation_another_suite_sets`. The
-   rule of story:the-lane-slow-runs-the-ignored-timing-family puts it in the timing family by its
-   name. This story edits neither `ignored.rs` nor `slow.yml`. Estimate after in the test step:
-   0 s. See "Not established": the lane runs it alone in a process too.
+   place of 5,000 ms. Estimate after: 0.3 s (the plan; 3 × 100 ms). The helper has a third caller,
+   `Cli::shutdown` in `adapters/catalog/tests/local_runtime/cli_journey.rs` (line 271). It passes
+   5,000 ms, so nothing changes for the tests that end through it.
+3. `no_suite_sees_the_installation_another_suite_sets`: the test is removed, with its comment
+   (lines 152 to 157). The reason, read at 0.78.2:
+   - The test fails only when another test of the same process sets `CONNECTORS_INSTALLATION`
+     while it polls. Its comment says so: "This case is red when a module of `main` sets the
+     variable".
+   - No module of `main` sets the variable. The one `set_var` under `adapters/catalog/tests/` is
+     in `derived_instance_adversary.rs` (line 59), which is its own `[[test]]` target
+     (`adapters/catalog/Cargo.toml`) and so its own process.
+   - So no filter names "the suites involved": a run of this test with any subset of `main` in one
+     process passes for the same reason the whole binary passes. Only a run of the whole binary in
+     one process would fail on a later module that sets the variable. That binary has 1,122 tests
+     with 363.5 s of summed time in the forge run (computed from the plan: 9 tests of 5 s or more
+     with 77.2 s, 75 tests in the band with 166.8 s, 1,038 tests under 1 s with 119.5 s). Inferred,
+     not run: such a run is not well under 60 s.
+   - The gate and the lane `slow` both run one test per process, so in neither can the test fail.
+   What is lost: nothing fails when a later module of `main` sets the variable for its process.
+   The file `adversary_one_binary.rs` stays with its other test. Estimate after: 0 s.
 4. `exec_plugin_file_owned_by_another_user_is_refused_before_the_digest`: the test tries a list of
-   at most 3 candidate paths before the walk and walks only when none of them fits. The first
-   candidate is the path the walk finds on the forge's runner; the test prints the path it used
-   and whether it came from the list or from the walk. Estimate after: 1 s (the plan).
+   at most 3 candidate paths before the walk and walks only when none of them fits. When the
+   variable `GITHUB_ACTIONS` is set and the path came from the walk, the test fails, and the
+   failure names the path the walk found. The first candidate is that path: the implementor reads
+   it from the failure of the first gate job and adds it to the list. When neither the list nor
+   the walk gives a file, the test prints `skipped` and passes, as today. Estimate after: 1 s (the
+   plan). Who owns the list afterwards: whoever changes the runner image of the gate job (the key
+   `runs-on` of the job `gate` in `.github/workflows/rust-gate.yml`, line 33, `ubuntu-24.04`
+   today) updates the list in the same change. The failure message of the test names the list
+   with its file, so a red gate job after a change of the image says where to add the path.
 5. `a_push_the_forge_applies_after_the_caller_hung_up_is_still_logged`: `hold_push_ms` 3000
    becomes 500, and the sleep of 3 s becomes 700 ms, 200 ms past the hold. Estimate after: 2 s
    (the plan).
@@ -118,34 +137,47 @@ Estimate after (computed from the plan's rows; not timed): 2 + 0.3 + 0 + 1 + 2 +
 
 ## Acceptance
 
-1. The six tests that stay in the test step pass, and their durations in the test step of the
-   forge's "repository gate" job of this story's pull request sum to at most 25 s. The seventh
-   does not run in that step. Before: 73.0 s for the seven. Estimate: 16.6 s. Bound: 1.5 × 16.6 =
-   24.9, rounded up to 25 s. The numbers are read from the durations nextest prints in that job.
+1. The six tests that stay pass, and their durations in the test step of the forge's "repository
+   gate" job of this story's pull request sum to at most 25 s. The seventh no longer exists.
+   Before: 73.0 s for the seven. Estimate: 16.6 s. Bound: 1.5 × 16.6 = 24.9, rounded up to 25 s.
+   The numbers are read from the durations nextest prints in that job.
 2. The race was run: the bundle test fails when the swapping thread completed fewer than 100
-   swaps.
-3. The kubernetes test prints `candidate` or `walk` with the path it used. In the gate job of this
-   story's pull request it prints `candidate`.
-4. `connectors-catalog-provider::main::adversary_one_binary::slow_lane_no_suite_sees_the_installation_another_suite_sets`
-   passes in the lane `slow`. The lane's command
-   `cargo run --locked -p connectors-build -- ignored --family timing --required --only-prerequisite provider`
-   lists it as `passed`. Alone it runs with
-   `cargo test --locked -p connectors-catalog-provider --test main -- --ignored --exact adversary_one_binary::slow_lane_no_suite_sees_the_installation_another_suite_sets`.
-5. The gate's ignored step still passes: the new ignored test is not unknown to it.
+   swaps. The check: the test counts the completed swaps in a variable named `swaps` and asserts
+   `swaps >= 100`, and
+   `grep -n 'swaps >= 100' crates/connectors-catalog/tests/bundle_adversary_2.rs` prints one line,
+   the `assert!` of this test. On the tree before this story the command prints nothing: the test
+   counts no swaps today (read at 0.78.2, lines 74 to 91).
+3. In the gate job of this story's pull request the kubernetes test passes. `GITHUB_ACTIONS` is
+   set in that job, and the test fails there when its path came from the walk. So its pass, with
+   the duration of acceptance 1, shows that a candidate of the list fit.
+4. `grep -rn no_suite_sees_the_installation_another_suite_sets adapters/ crates/ apps/` prints
+   nothing on the tree of this story.
+5. `grep -n 'finish_filtered_owner' -r adapters/catalog/tests` shows the definition and three calls,
+   each call with a timeout argument: 100 ms twice in `guarded_merge.rs` and 5,000 ms in
+   `cli_journey.rs`.
 
 ## Scope
 
 - `crates/connectors-catalog/tests/bundle_adversary_2.rs`: the one test above.
-- `adapters/catalog/tests/adversary_one_binary.rs`: the one test above.
-- `adapters/catalog/tests/local_runtime/guarded_merge.rs`: `finish_filtered_owner` and its callers.
-- `adapters/catalog/tests/local_runtime.rs`: listed by the plan; no change is named.
+- `adapters/catalog/tests/adversary_one_binary.rs`: the one test above is removed.
+- `adapters/catalog/tests/local_runtime/guarded_merge.rs`: `finish_filtered_owner` and its two
+  callers in this file (lines 171 and 193).
+- `adapters/catalog/tests/local_runtime/cli_journey.rs`: the one call at line 271 gets the timeout
+  argument.
 - `adapters/catalog/tests/adversary_git_relay.rs`: the one test above.
 - `adapters/catalog/tests/security_git_relay.rs`: the one test above.
 - `adapters/kubernetes/tests/exec_credential_security.rs`: the one test above.
 
+The plan lists `adapters/catalog/tests/local_runtime.rs`. No change is named for it, and it is not
+in this story's scope.
+
 No other story of this set writes these seven files.
 story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition writes other
 files of `adapters/catalog/tests/` (three test files, a new module and `main.rs`).
+
+This story adds no test to the lane `slow` and reads nothing of
+story:the-lane-slow-runs-the-ignored-timing-family. Its `depends_on` edge to that story is
+removed.
 
 ## Not in this story
 
@@ -153,19 +185,21 @@ files of `adapters/catalog/tests/` (three test files, a new module and `main.rs`
   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run.
 - `how_long_sixty_four_idle_connections_delay_the_redirect`, the fourth row of group L:
   story:five-host-unit-tests-shorten-the-waits-they-chose.
-- The lane `slow` itself: story:the-lane-slow-runs-the-ignored-timing-family.
+- A check that replaces the removed test: a test that reads the sources of the modules of `main`
+  and fails on a `set_var` of `CONNECTORS_INSTALLATION` would hold the same rule in under a
+  second. It is not drafted. The plan asked for a move to the lane, not for a new check.
+- A third step of the lane `slow` that runs the whole binary `main` in one process.
 - The other rows of group M and the tests of every other group.
 - The gate failing when its test step runs over 120 s:
   story:the-gates-test-step-ends-within-120-s-on-the-forge.
 - Not established:
-  - A run that can fail for `no_suite_sees_the_installation_another_suite_sets`. The plan moves
-    it to "the lane `slow` under `cargo test`, where suites share a process". The lane's command
-    runs one test per process (`execute_test` in `crates/connectors-build/src/ignored.rs`, line
-    794: `--exact`, `--test-threads=1`), as nextest does. So the test cannot fail in the lane
-    either. A run of the whole binary in one process is a step the lane does not have; whether it
-    gets one, or the test is deleted, is not decided here.
   - The candidate paths of the kubernetes test. They depend on the runner's image, which was not
-    read. The pull request takes the first from the path the walk prints in the gate job.
+    read. Whether the walk finds a file on the forge's runner at all was not read either: the
+    11.6 s say that it walks, not what it finds. If it finds none, the test keeps walking and
+    passing as skipped, acceptance 3 shows nothing and the sum of acceptance 1 is 27.2 s, over its
+    bound.
   - How many swaps and calls of `load` the bundle test completes in 2 s. The figures 1,000 and
     100 are not measured.
+  - How long the whole binary `main` runs in one process. The 363.5 s are a sum over tests that
+    each ran in a process of their own.
   - Every "after" figure on the forge.
