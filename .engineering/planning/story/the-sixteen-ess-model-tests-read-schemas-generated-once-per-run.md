@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-sixteen-ess-model-tests-read-schemas-generated-once-per-run
 kind: story
-status: proposed
+status: active
 title: 'Sixteen ess_model tests read schemas generated once per run: 2.18 s on the build host; on the forge at most 1.41 s, measured on 5 of the 16 tests'
 summary: 16 tests of adapters/sql/tests/ess_model.rs each run ess generate for the same 4 source files; one directory per test run under the target directory, keyed by a digest of its sources and filled under a file lock, replaces 15 of the 16 calls
 relations:
@@ -13,9 +13,10 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/ess_model.rs
-revision: 10
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T14:38:57Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"review_outcome":19}}}
+- {from: "proposed", to: "active", at: "2026-11-25T16:33:13Z", actor: "human:operator", revision: 12, decided_on: {"recorded":{"review_outcome":19}}}
 ---
 ## Defect
 
@@ -121,7 +122,8 @@ product that takes at most 0.3 s to make.
    calls `schemas_in` on a parent directory of its own, changes one byte that the schema
    carries in the copy of `domains/profiles.yaml` (the bound `lte: 64` of
    `connectors_sql.profiles.ProfileId` becomes `lte: 65`: the first occurrence, line 20 of
-   the copy) and calls it again: the two directories differ, that parent's `generations.log` holds 2 lines, and the file
+   the copy) and calls it again: the two directories differ, that parent's
+   `generations.log` holds 2 lines, and the file
    `schemas/schema/types/connectors_sql.profiles.ProfileId.schema.json` holds
    `"maxLength": 64` in the first directory and `"maxLength": 65` in the second. That shows
    that `ess` read the copy. No file under `adapters/sql/spec/ess` changes.
@@ -188,3 +190,38 @@ Other stories near this file:
   starts `ess generate` itself in several places, so one test makes several calls. Their
   calls per run and their times are not measured. No story claims them:
   story:where-do-the-1298-s-of-the-tests-under-5-s-go reads four other binaries. No story.
+
+## As built
+
+Commit c4bbddbe0 on the branch `story/ess-model-schemas-once`, one file,
+`adapters/sql/tests/ess_model.rs` (241 lines added, 47 removed). Its base is the head that holds
+story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold. Not pushed when this
+was written; acceptances 4, 7, 8 and 9 and the 17 durations of the two gate jobs are read from
+the pull request's job and added here then.
+
+Read on the build host on 2026-11-25, `cargo nextest run --locked -p connectors-sql --test
+ess_model`, with a 1-minute load average above 100 on 20 processors:
+
+- Acceptance 1: `four_processes_on_an_empty_directory_generate_once` passed (6.451 s; the
+  child test alone 0.013 s).
+- Acceptance 2, one run with the line `lock.lock()` removed, not committed: the test failed.
+  `generations.log` held 1 line, so the count of lines did not show the race. Three of the 4
+  children exited 101 and one 0. The three had generated into a directory of their own and
+  failed at the rename into place ("Directory not empty"); a child that fails there writes no
+  line. The log counts renames into place, not starts of `ess`: the test sees the race in
+  the children's exit codes and not in the line count. With the line back the test passed
+  (8.554 s).
+- Acceptance 3: `a_changed_source_byte_makes_a_new_directory` passed (12.815 s, two calls of
+  `ess generate`).
+- 20 of 20 tests passed in 12.935 s. The default parent's `generations.log` held 1 line after
+  the run. Before the change, on the same host and load, the 17 tests took 0.061 to 21.332 s
+  each and the run 49.007 s.
+- Acceptance 5: the diff removes no line that contains `assert`.
+- Acceptance 6: `Command::new` of `ess` is at one place, line 91, inside `schemas_in`;
+  `schemas_in` is called at lines 118 (`schema`), 1837 (the child test), 1925 and 1932
+  (`a_changed_source_byte_makes_a_new_directory`).
+- `cargo clippy -p connectors-sql --all-targets --locked --offline -- -D warnings` and
+  `cargo fmt -p connectors-sql -- --check` ended without a finding.
+
+The times of the three new tests under that load (0.013 s, 6.451 s, 12.815 s) are not the ones
+acceptance 8 reads; it reads the forge's job.
