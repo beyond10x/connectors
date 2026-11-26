@@ -212,8 +212,7 @@ async fn slow_lane_a_tls_handshake_that_never_completes_sent_no_request_and_is_n
 
 /// The provider budget of the three cases below (story
 /// a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout).
-/// The client bounds a connect by the end of the budget less a lead of 250 ms, so each connect
-/// here has 750 ms.
+/// A connect may run until the end of the budget, so each connect here has 1,000 ms.
 const BUDGET: Duration = Duration::from_millis(1000);
 
 /// A port under a provider budget of [`BUDGET`]. The three cases below have one test each,
