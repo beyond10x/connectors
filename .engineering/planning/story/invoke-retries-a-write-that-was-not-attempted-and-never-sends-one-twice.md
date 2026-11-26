@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 kind: story
-status: draft
+status: active
 title: invoke retries a write that was not attempted and never sends an applied or unknown write twice
 summary: 'invoke --retry-not-attempted <n>: the owner retries a write that was not attempted for a closed set of causes, inside the write''s deadline with a reserve; tries in the answer; exit 3 for unknown with the option'
 relations:
@@ -39,7 +39,10 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: inferred
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 23
+revision: 26
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-26T22:47:13Z", actor: "human:operator", revision: 25}
+- {from: "proposed", to: "active", at: "2026-11-26T22:47:14Z", actor: "human:operator", revision: 26}
 ---
 ## Gap
 
@@ -109,7 +112,7 @@ story:an-unknown-write-is-settled-by-a-declared-read-back.
   stops reading (`transport.rs:1330-1341`); after it no further try starts.
 - A retried try leaves no ledger row for its key: it ends before `prepare`
   (`execution.rs:557-562`), so the next try passes the replay check of the key
-  (`execution.rs:466-475`). The loop does not change how a try is audited.
+  (`observe_as`, `execution.rs:282-284`). The loop does not change how a try is audited.
 - Reserve: another try starts only while the duration of the try just ended plus 3 s (the
   first reading's reserve of `contracts/service/clock.md:251-256`) is left before the write's
   deadline (today 20 s per write: `Deadline::start()` at `apps/connectors/src/local/session.rs:68`,
@@ -130,8 +133,8 @@ The CLI passes `n` to the owner as a new member `retry_not_attempted` of `WriteR
 (`crates/connectors-host/src/local/owner/transport.rs:98-107`), read by `exchange_write`
 (`transport.rs:2551-2665`). `WRITE_VERSION` stays `connectors-owner/2` (`transport.rs:72`):
 `WriteClient::connect` refuses an owner of another build with `owner_build_mismatch`, next
-action `stop_owner`, before any `WriteRequest` is sent (`transport.rs:1291-1297`,
-`contracts/cli/v1alpha1/owner.md:94-96`), so the new member reaches only an owner of the same
+action `stop_owner`, before any `WriteRequest` is sent (`transport.rs:1291-1298`,
+`contracts/cli/v1alpha1/owner.md:94-97`), so the new member reaches only an owner of the same
 build. A bump would turn that answer into `unavailable` after the 10 s connect bound.
 
 ## Shares files with
@@ -158,7 +161,8 @@ counted preflight script (the answer of the k-th preflight, with an optional del
 commit answer (success; a refusal after the send, classified `refused`, such as a declared
 conflict status, `semantics.md:2445-2447`; or an unknown effect: the stand-in logs the commit
 line and exits without answering), and an ordered log of one line per preflight and per commit
-carrying the input's `value`; it accepts `{"value": true}` and `{"value": false}`. A provider
+carrying the input's `value`, each line written when the request arrives, before any delay;
+it accepts `{"value": true}` and `{"value": false}`. A provider
 timeout is its answer `Failure::from_provider(Timeout.answered())`; the adapter's own timeout
 is `Failure::from_provider(Timeout)` without `.answered()`, which the host reads as
 `Failure::Timeout`, origin host (`runtime.rs:524`). Each is returned at once or after the named
@@ -234,4 +238,4 @@ All calls with `--output json` and `--idempotency-key`, against the fixture abov
 ## Order
 
 Filed from a consumer repository's request on 2026-11-26, ordered after pull request 315.
-Revised after rounds 1 to 5 of the plan critics (acceptance, design, scope and parallel-safety lanes).
+Revised after rounds 1 to 6 of the plan critics (acceptance, design, scope and parallel-safety lanes).
