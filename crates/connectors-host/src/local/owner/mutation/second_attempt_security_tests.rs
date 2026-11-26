@@ -40,6 +40,10 @@ use std::{
 const WAIT: Duration = Duration::from_secs(50);
 /// The query deadline of the writes under test, on the test's thread.
 const QUERY: Duration = Duration::from_millis(500);
+/// The query deadline of the writes whose first source is closed: long
+/// enough that a loaded runner's work fits inside the deadlines it sets, and
+/// never waited for.
+const LONG_QUERY: Duration = Duration::from_secs(10);
 /// The fixtures' signed midpoint, in Unix seconds: the time the grant is
 /// signed at. It expires one hour after it.
 const T: u64 = 1_789_076_475;
@@ -313,6 +317,16 @@ impl Site {
         let now = self.asked();
         [0, 1].map(|i| now[i] - before[i])
     }
+    /// Takes the first source out of the site; the configuration still names
+    /// its port. Once the source is dropped that port is closed and each
+    /// request to it is refused at once (port unreachable on loopback), so an
+    /// attempt ends below quorum, with no reply unverified, as soon as the
+    /// second source answers. No attempt waits for the query deadline, and
+    /// the time left after the first attempt is the deadline less the work
+    /// before it: a slow runner leaves less time, never more.
+    fn take_first_source(&mut self) -> Scripted {
+        std::mem::replace(&mut self.clocks[0], scripted(7))
+    }
     fn request(&self) -> issuance::Request<'_> {
         issuance::Request {
             connection: &self.connection,
@@ -329,9 +343,13 @@ impl Site {
     }
     /// [`Self::write`] with the deadline `until`.
     fn write_until(&mut self, until: Instant) -> Delivery {
+        self.write_until_at(until, Box::new(|_| {}))
+    }
+    /// [`Self::write_until`], calling `at` at each step of the seam.
+    fn write_until_at(&mut self, until: Instant, at: Box<dyn Fn(seam::Step)>) -> Delivery {
         seam::set(Some(seam::Seam {
             credential: b"fictional-only".to_vec(),
-            at: Box::new(|_| {}),
+            at,
         }));
         let owned = Mutex::new(lifecycle::Control::default());
         let (stopped, pool) = (AtomicBool::new(false), std::sync::Weak::new());
@@ -527,26 +545,32 @@ fn a_grant_that_expires_during_the_wait_of_the_second_reading_sends_nothing() {
 }
 
 /// I4. The first reading's reserve holds one attempt of the second reading.
-/// With 2.4 s to the deadline less than 1.9 s are left after the first
-/// attempt, and a second needs 2 s: the query deadline and the reserve before
-/// the second reading (1.5 s here, 3 s in production). One second, the
-/// reserve of the other call sites, would admit it. No second attempt is
-/// made and the refusal is the clock's, inside the deadline.
+/// The first source is closed (`take_first_source`). With 2 x `LONG_QUERY`
+/// to the deadline less than that is left after the first attempt, and a
+/// second needs 2 x `LONG_QUERY` + 1 s: the query deadline and the reserve
+/// before the second reading (3 s in production). One second, the reserve of
+/// the other call sites, would admit it while the work before took under
+/// `LONG_QUERY` - 1 s. No second attempt is made and the refusal is the
+/// clock's, inside the deadline.
+///
+/// The write's other work has the whole 20 s. With a 500 ms query deadline
+/// that was waited for and 2.4 s to the deadline it had 1.9 s, and a loaded
+/// macOS runner answered `Timeout` (pull request 313).
 #[test]
 fn the_first_reading_makes_no_second_attempt_inside_its_reserve() {
     let mut site = site();
-    clock::set_test_query_timeout(QUERY);
+    clock::set_test_query_timeout(LONG_QUERY);
     assert_eq!(
-        QUERY + clock::reserve_before_second_reading(),
-        Duration::from_secs(2)
+        LONG_QUERY + clock::reserve_before_second_reading(),
+        2 * LONG_QUERY + clock::RESERVE_AFTER_CLOCK
     );
+    drop(site.take_first_source());
     let before = site.asked();
-    site.script(&[Reply::Drop, Reply::Drop]);
     let started = Instant::now();
-    let until = started + Duration::from_millis(2_400);
+    let until = started + 2 * LONG_QUERY;
     let delivery = site.write_until(until);
     let spent = started.elapsed();
-    assert_eq!(site.asked_since(before), [1, 1], "{spent:?}");
+    assert_eq!(site.asked_since(before), [0, 1], "{spent:?}");
     assert_eq!(
         site.left(&delivery),
         Left {
@@ -561,37 +585,53 @@ fn the_first_reading_makes_no_second_attempt_inside_its_reserve() {
         },
         "{spent:?}"
     );
-    assert!(spent < Duration::from_millis(2_400), "{spent:?}");
+    assert!(spent < 2 * LONG_QUERY, "{spent:?}");
 }
 
-/// I4. The second reading's reserve is one second. With 5 s to the deadline
-/// and a query deadline of 2 s, less than 3 s are left after the first
-/// attempt of the second reading (the first reading and the preflight came
-/// before it), and a second attempt needs 3 s. A reserve of zero would admit
-/// it. No second attempt is made, nothing is sent and the refusal is the
-/// clock's.
+/// I4. The second reading's reserve is one second. Both sources answer the
+/// first reading; once the write is admitted the first source is closed
+/// (`take_first_source`). With `LONG_QUERY` + 0.9 s to the deadline, less
+/// than that is left after the first attempt of the second reading (the
+/// first reading and the preflight came before it), and a second attempt
+/// needs `LONG_QUERY` + 1 s. A reserve of zero would admit it while the work
+/// before took under 0.9 s. No second attempt is made, nothing is sent and
+/// the refusal is the clock's.
 ///
-/// The query deadline is 2 s here, as in a release build, not [`QUERY`].
-/// Everything the write does besides that one wait (the first reading, the
-/// admission, the prepare, the stores, the release) has to end before the
-/// deadline, or the write answers `Timeout` and not the clock's refusal.
-/// With [`QUERY`] and 2 s that was 1.5 s, and a loaded macOS runner took
-/// longer once (pull request 296). Here it is 3 s. The deadline stays twice
-/// the query deadline plus the reserve, so the first attempt always leaves
-/// less than a second one needs.
+/// Everything the write does besides the readings (the admission, the
+/// prepare, the stores, the release) has to end before the deadline, or the
+/// write answers `Timeout` and not the clock's refusal. No attempt waits for
+/// the query deadline, so that work has the whole 10.9 s. With a 2 s query
+/// deadline that was waited for and 5 s to the deadline it had 3 s, and
+/// before that 1.5 s, which a loaded macOS runner overran once (pull request
+/// 296).
 #[test]
 fn the_second_reading_makes_no_second_attempt_inside_its_reserve() {
-    let query = Duration::from_secs(2);
     let mut site = site();
-    clock::set_test_query_timeout(query);
-    assert_eq!(query + clock::RESERVE_AFTER_CLOCK, Duration::from_secs(3));
-    let before = site.asked();
-    site.script(&[Reply::At(T), Reply::Drop, Reply::Drop]);
+    clock::set_test_query_timeout(LONG_QUERY);
+    let first = site.take_first_source();
+    let asked_first = first.server.requests.clone();
+    let before = [asked_first.load(Ordering::SeqCst), site.asked()[1]];
+    let first = std::cell::Cell::new(Some(first));
     let started = Instant::now();
-    let delivery = site.write_until(started + query + query + clock::RESERVE_AFTER_CLOCK);
+    let delivery = site.write_until_at(
+        started + LONG_QUERY + Duration::from_millis(900),
+        Box::new(move |step| {
+            if step == seam::Step::Admitted {
+                drop(first.take());
+            }
+        }),
+    );
     let spent = started.elapsed();
-    // One attempt of each reading.
-    assert_eq!(site.asked_since(before), [2, 2], "{spent:?}");
+    // Both sources answered the first reading; the second source alone
+    // answered the one attempt of the second.
+    assert_eq!(
+        [
+            asked_first.load(Ordering::SeqCst) - before[0],
+            site.asked()[1] - before[1]
+        ],
+        [1, 2],
+        "{spent:?}"
+    );
     assert_eq!(
         site.left(&delivery),
         Left {

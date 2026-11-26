@@ -290,7 +290,21 @@ it to `BINARIES`, then document it.
 cargo run --locked -p connectors-build -- release-binaries
 ```
 
-The workflow's image job copies every executable of the two Linux archives into
+The `x86_64-unknown-linux-musl` archive is built with `musl-gcc` (Ubuntu's `musl-tools`) for the C
+in `ring` and the bundled SQLite. Before it is packed,
+[`deploy/release/check-static.sh`](../deploy/release/check-static.sh) checks that each binary is
+statically linked and answers `--version` in a plain `alpine:3` container. The pull-request
+workflow [`musl-static.yml`](../.github/workflows/musl-static.yml) runs the same build and check
+when `Cargo.lock`, `rust-toolchain.toml` or `.cargo/` changes. With `musl-tools` and Docker
+installed, the check runs locally:
+
+```sh
+rustup target add x86_64-unknown-linux-musl
+cargo build --locked --release -p connectors --target x86_64-unknown-linux-musl
+deploy/release/check-static.sh check target/x86_64-unknown-linux-musl/release "$(target/x86_64-unknown-linux-musl/release/connectors --version | cut -d' ' -f2)" connectors
+```
+
+The workflow's image job copies every executable of the two glibc Linux archives into
 `linux-amd64/` and `linux-arm64/` of a build context and builds
 [`deploy/images/connectors/Dockerfile`](../deploy/images/connectors/Dockerfile) for both
 platforms; a binary added to `BINARIES` is in the image with no further change. The Dockerfile

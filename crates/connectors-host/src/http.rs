@@ -97,6 +97,121 @@ fn connect_timeout() -> Duration {
         CONNECT_TIMEOUT.as_millis() as u64,
     ))
 }
+
+/// What became of the connects started for one request `send` runs.
+///
+/// hyper-util races a connect against the pool: when an idle connection comes back to the
+/// pool first, the request is sent on it and the started connect goes on in a task of its
+/// own until it ends. A connect that was still racing for the request when the request's
+/// future was dropped never handed the request a connection. A connect that goes on in
+/// its own task, or that ended, is not dropped that way, so a request sent on a pooled
+/// connection is never counted as one whose connection did not open.
+#[derive(Default)]
+struct ConnectWatch {
+    /// A connect started for the request was dropped before it ended.
+    abandoned: std::sync::atomic::AtomicBool,
+}
+
+impl ConnectWatch {
+    /// True when a connect of the request was dropped before it ended: the request's future
+    /// ended while its connection was still opening.
+    fn abandoned(&self) -> bool {
+        self.abandoned.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+tokio::task_local! {
+    /// The watch of the request `send` runs in this scope. `WatchedConnect` reads it.
+    static CONNECTS: Arc<ConnectWatch>;
+}
+
+/// One connect of a watched request: dropped before it ends, it sets
+/// [`ConnectWatch::abandoned`].
+struct Connecting {
+    watch: Arc<ConnectWatch>,
+    ended: bool,
+}
+
+impl Drop for Connecting {
+    fn drop(&mut self) {
+        if !self.ended {
+            self.watch
+                .abandoned
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+}
+
+/// The error of a connector service, as reqwest boxes it.
+type ConnectError = Box<dyn std::error::Error + Send + Sync>;
+
+/// The client's one connector layer. A connect, the TLS handshake included, that starts
+/// inside the scope of [`CONNECTS`] reports to that watch whether it was dropped before it
+/// ended. It bounds nothing: a connect may run until the request's own timeout, the end of
+/// a provider budget included. Outside such a scope it changes nothing. reqwest's request
+/// and connection types are private to it, so the service is generic over the inner
+/// service and the request.
+#[derive(Clone)]
+struct WatchedConnectLayer;
+
+impl<S> tower_layer::Layer<S> for WatchedConnectLayer {
+    type Service = WatchedConnect<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        WatchedConnect { inner }
+    }
+}
+
+#[derive(Clone)]
+struct WatchedConnect<S> {
+    inner: S,
+}
+
+impl<S, R> tower_service::Service<R> for WatchedConnect<S>
+where
+    S: tower_service::Service<R>,
+    S::Response: Send + 'static,
+    S::Error: Into<ConnectError>,
+    S::Future: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = ConnectError;
+    type Future = std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = std::result::Result<S::Response, ConnectError>> + Send,
+        >,
+    >;
+
+    fn poll_ready(
+        &mut self,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), ConnectError>> {
+        self.inner.poll_ready(context).map_err(Into::into)
+    }
+
+    fn call(&mut self, request: R) -> Self::Future {
+        // Read here, on the task that polls the request, and kept in the future: a connect
+        // that goes on in another task after a pooled connection won still ends, and is
+        // never dropped while it runs.
+        let watch = CONNECTS.try_with(Arc::clone).ok();
+        let connect = self.inner.call(request);
+        let Some(watch) = watch else {
+            return Box::pin(async move { connect.await.map_err(Into::into) });
+        };
+        // Made before the future is first polled: a connect dropped unpolled counts too.
+        let connecting = Connecting {
+            watch,
+            ended: false,
+        };
+        Box::pin(async move {
+            let mut connecting = connecting;
+            let connected = connect.await;
+            connecting.ended = true;
+            connected.map_err(Into::into)
+        })
+    }
+}
+
 /// The longest value of a header composition fixes on a port (`with_fixed_header`).
 pub const FIXED_HEADER_VALUE_LIMIT: usize = 1024;
 
@@ -256,6 +371,7 @@ impl ScopedHttp {
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
             .connect_timeout(connect_timeout())
+            .connector_layer(WatchedConnectLayer)
             .timeout(request_timeout());
         if let Some(bytes) = ca {
             let certificates = reqwest::Certificate::from_pem_bundle(bytes)
@@ -585,11 +701,25 @@ impl ScopedHttp {
         // Compute at the send boundary, after credential and body construction.
         // Reqwest retains this timeout through response-body consumption. This
         // explicit timeout overrides the legacy client's 15-second default.
-        let request = match self.remaining()? {
+        let remaining = self.remaining()?;
+        let request = match remaining {
             Some(remaining) => request.timeout(remaining),
             None => request,
         };
-        request.send().await.map_err(provider_error)
+        // A connect of this request, the TLS handshake included, may run until the request's
+        // timeout: the end of the budget itself. The future of `send` is dropped when the
+        // await returns, so the watch then knows whether a connect was still opening.
+        let watch = Arc::new(ConnectWatch::default());
+        let sent = CONNECTS.scope(Arc::clone(&watch), request.send()).await;
+        sent.map_err(|error| {
+            // A timeout that ended a connect still racing for this request: no connection
+            // was handed to it, so it sent nothing and the timeout is not the provider's.
+            if error.is_timeout() && watch.abandoned() {
+                not_opened()
+            } else {
+                provider_error(error)
+            }
+        })
     }
 
     fn url(&self, segments: &[&str]) -> Result<Url> {
@@ -1139,6 +1269,16 @@ fn body_error(error: Error) -> Error {
     } else {
         error
     }
+}
+
+/// A request whose timeout ended while its connection was still opening, the TLS
+/// handshake included. It sent nothing, so the timeout is left unmarked, as
+/// `provider_error` leaves a connect timeout.
+fn not_opened() -> Error {
+    Error::new(
+        ErrorCode::Timeout,
+        "provider request timed out before the connection opened",
+    )
 }
 
 fn provider_error(error: reqwest::Error) -> Error {

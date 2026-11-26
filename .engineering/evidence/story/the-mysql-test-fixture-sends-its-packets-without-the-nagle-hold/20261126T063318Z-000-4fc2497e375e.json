@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-26T06:33:18Z",
+  "actor": "human:operator",
+  "artifact": "story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate 139714078337 of pull request 313 (attempt 2), head 606a611d5: the nine connectors-sql binaries 74 PASS, incident_call_join 1 PASS, no FAIL; PASS [   0.105s] connectors-sql::ess_model every_page_is_one_the_model_admits, bound 2.0 s, met; 7.022 s in main's gate job 139671125964 at e1908013e",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45748988866/job/139714078337"
+  }
+}

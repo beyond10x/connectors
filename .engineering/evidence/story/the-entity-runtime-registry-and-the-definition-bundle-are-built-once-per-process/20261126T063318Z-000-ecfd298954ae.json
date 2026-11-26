@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-26T06:33:18Z",
+  "actor": "human:operator",
+  "artifact": "story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate 139714078337 of pull request 313 (attempt 2), head 606a611d5: Summary [ 466.033s] 4546 tests run: 4546 passed (4 slow), 229 skipped; the three tests of er.rs passed; the eleven tests sum to 68.225 s against the base 139.045 s of main's gate job 139671125964 at e1908013e, bound 123.0 s (base minus 16.0 s), met",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45748988866/job/139714078337"
+  }
+}

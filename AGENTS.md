@@ -261,15 +261,16 @@ for Timo.
    that is not Latest is invisible on the repository's front page, which is how
    v0.8.0 and v0.9.0 went unnoticed after they shipped. Verify the created page's
    author, its Latest state and that it resolves to the tag's peeled commit. Besides
-   the source archives GitHub generates, the page carries the four archives
+   the source archives GitHub generates, the page carries the five archives
    `connectors-<version>-<target>.tar.gz` (`x86_64-unknown-linux-gnu`,
-   `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`) and
+   `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`,
+   `aarch64-apple-darwin`) and
    `SHA256SUMS`, which [`release-binaries.yml`](.github/workflows/release-binaries.yml)
    builds on the tag push and uploads once the page exists; it never creates or
-   edits the page. The release is verified only when those five assets are on the
+   edits the page. The release is verified only when those six assets are on the
    page and `sha256sum -c SHA256SUMS` passes on the downloaded archives. On the
    same tag push its image job pushes `ghcr.io/beyond10x/connectors:<version>`
-   (`linux/amd64`, `linux/arm64`) from the two Linux archives' binaries, and
+   (`linux/amd64`, `linux/arm64`) from the two glibc Linux archives' binaries, and
    refuses a version the registry holds unless its `org.opencontainers.image.revision`
    is the release commit (a rerun then pushes nothing and only checks the platforms);
    the release is verified only when `docker buildx imagetools inspect` of that tag

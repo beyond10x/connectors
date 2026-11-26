@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Each release page carries `connectors-<version>-x86_64-unknown-linux-musl.tar.gz` beside the
+  `x86_64-unknown-linux-gnu` archive, with the same binaries and layout, and `SHA256SUMS` names
+  it. Its binaries are statically linked and need no C library, so they run on Alpine and other
+  Linux systems without glibc. The release workflow checks each one before it is packed: `file`
+  and `readelf` show no program interpreter and no shared library, and it answers `--version`
+  in a plain `alpine:3` container with no network (`deploy/release/check-static.sh`). The
+  pull-request workflow `musl-static.yml` builds and checks them when `Cargo.lock`,
+  `rust-toolchain.toml` or the cargo configuration changes. The musl binaries use musl's own
+  memory allocator; no faster allocator is linked until one is measured on the forge.
+
+### Fixed
+
+- A provider call whose budget ends before its connection opened, the TLS handshake included,
+  answers `Timeout` without the provider's-timeout mark: no request was sent
+  (story:a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout).
+  Before, it was marked as the provider's timeout. A connect may use the whole budget; a call
+  sent on an open connection whose budget ends is the provider's timeout, as before.
+- The host and the mounted custody make the `close_range` and `renameat2` system calls
+  through `syscall`, not through the C library's wrappers, which the musl that Rust links
+  statically does not have; the workspace built for glibc only. The calls, their flags and
+  their errors are unchanged.
+
 ## 0.78.3 — 2026-11-26
 
 ### Changed

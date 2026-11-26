@@ -1,23 +1,28 @@
 # Attaches pre-built `connectors`, `connectors-catalog-provider` and the Grafana, Prometheus, Loki,
-# Kubernetes and SQL (`connectors-sql`) program binaries for Linux and macOS
-# to the GitHub Release of every `v<version>` tag, with a SHA256SUMS file. No Windows binary is
-# built. The build job's `BINARIES` is the one list of packaged binaries; every step builds,
-# checks, signs and packages each of them, and the repository gate (`connectors-build
-# release-binaries`) refuses a guide that runs an installed binary this list leaves out.
+# Kubernetes and SQL (`connectors-sql`) program binaries for Linux (glibc, and a static musl build
+# for x86_64) and macOS to the GitHub Release of every `v<version>` tag, with a SHA256SUMS file.
+# No Windows binary is built. The build job's `BINARIES` is the one list of packaged binaries;
+# every step builds, checks, signs and packages each of them, and the repository gate
+# (`connectors-build release-binaries`) refuses a guide that runs an installed binary this list
+# leaves out.
 #
 # The release page itself is created by the bot after the tag push (AGENTS.md, "Cutting a
 # release", step 7). This workflow never creates or edits a release page or its notes: its
 # publish job waits for the page of the tag to exist, then uploads the archives and SHA256SUMS,
 # and refuses rather than replace an asset already on the page.
 #
-# The image job puts the two Linux archives' binaries into the multi-arch OCI image
+# The image job puts the two glibc Linux archives' binaries into the multi-arch OCI image
 # `ghcr.io/beyond10x/connectors:<version>` (deploy/images/connectors/Dockerfile), and refuses a
 # version the registry holds unless it is this commit's image (a rerun).
 #
-# A pull request that changes this file or the image runs provenance, the four builds and the
-# image build against the workspace version and publishes nothing. A manual dispatch backfills an
-# existing annotated tag whose commit holds `rust-toolchain.toml`; the two steps that install Rust
-# refuse a tag from before that file; they do not fall back to a version.
+# The x86_64-unknown-linux-musl build is checked before it is packed: each binary is statically
+# linked and answers `--version` in a plain Alpine container (deploy/release/check-static.sh).
+# The pull-request workflow musl-static.yml runs the same check when the musl build inputs change.
+#
+# A pull request that changes this file, the image or the static check runs provenance, the five
+# builds and the image build against the workspace version and publishes nothing. A manual
+# dispatch backfills an existing annotated tag whose commit holds `rust-toolchain.toml`; the two
+# steps that install Rust refuse a tag from before that file; they do not fall back to a version.
 #
 # Every third-party action is pinned by commit; the publish and image jobs hold write authority.
 name: Release binaries
@@ -36,6 +41,7 @@ on:
     paths:
       - .github/workflows/release-binaries.yml
       - deploy/images/**
+      - deploy/release/**
 
 permissions:
   contents: read
@@ -108,6 +114,8 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-24.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
           - target: x86_64-apple-darwin
@@ -137,6 +145,23 @@ jobs:
           rustup target add "$TARGET"
           rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
           rustc --version
+      # The build scripts of ring and libsqlite3-sys (bundled) compile C; for the musl target
+      # the cc crate calls musl-gcc.
+      - name: Install the musl C compiler
+        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout 300 sudo apt-get -o Acquire::Retries=3 update \
+              && timeout 300 sudo apt-get -o Acquire::Retries=3 install --yes --no-install-recommends musl-tools; then
+              break
+            fi
+            test "$attempt" -lt 3
+            sleep 15
+          done
+          musl-gcc --version
       - name: Build the release binaries
         shell: bash
         run: |
@@ -151,6 +176,13 @@ jobs:
           for binary in $BINARIES; do
             test "$("target/${TARGET}/release/${binary}" --version)" = "${binary} ${VERSION}"
           done
+      - name: The musl binaries are static and answer --version in a plain Alpine container
+        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          deploy/release/check-static.sh self-test
+          deploy/release/check-static.sh check "target/${TARGET}/release" "$VERSION" $BINARIES
 
       - name: Signing secrets
         id: secrets
@@ -270,10 +302,10 @@ jobs:
         working-directory: dist
         run: |
           set -euo pipefail
-          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin; do
+          for target in x86_64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin; do
             test -s "connectors-${VERSION}-${target}.tar.gz"
           done
-          test "$(ls | wc -l)" -eq 4
+          test "$(ls | wc -l)" -eq 5
           sha256sum *.tar.gz > SHA256SUMS
           sha256sum --check SHA256SUMS
       - name: Wait for the release page of the tag

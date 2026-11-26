@@ -614,10 +614,12 @@ fn meta() -> Value {
     json!({"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}})
 }
 
-/// Spawn the jailed server with piped stdio, retrying a busy text file.
-fn spawn(served: &Served) -> Child {
+/// Spawn the jailed server with piped stdio and `variables` as its whole
+/// environment, retrying a busy text file.
+fn spawn(served: &Served, variables: &[(&str, &str)]) -> Child {
     let mut command = served.server();
     command
+        .envs(variables.iter().copied())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -726,13 +728,20 @@ fn security_requests_past_their_deadline_each_get_one_reply_on_their_own_id() {
     peer.finish();
 }
 
-/// The request budget of the on-time case: the least that still lists the tools.
-const BUDGET: Duration = Duration::from_millis(20_000);
+/// The request budget of the on-time case. Its reply is the list of the tools,
+/// which a budget under the operations' 20 s `execution_ms` holds only on a
+/// server started with [`LISTED`].
+const BUDGET: Duration = Duration::from_millis(4_000);
+
+/// The variable of the on-time case's server: a read is listed from a request
+/// budget of 4,000 ms on (production: its `execution_ms`). Only a build with
+/// `debug_assertions` reads it (`connectors_sdk::debug_override_ms`).
+const LISTED: (&str, &str) = ("CONNECTORS_TEST_OVERRIDE_MCP_LISTED_REQUEST_MS", "4000");
 
 /// The request budget of the control. Its reply is the `timeout` refusal, which
-/// is written whether or not the budget lists a tool, so the control does not
-/// wait out the 20 s of [`BUDGET`]. The server's own start is bounded by the
-/// same 4 s (stdio.rs `serve`).
+/// is written whether or not the budget lists a tool, so the control's server
+/// gets no variable. The server's own start is bounded by the same 4 s
+/// (stdio.rs `serve`).
 const LATE_BUDGET: Duration = Duration::from_millis(4_000);
 
 /// What a client saw that shrank its stdout pipe to 4096 bytes, sent a
@@ -742,8 +751,9 @@ const LATE_BUDGET: Duration = Duration::from_millis(4_000);
 /// stays held until the reply and the ping after it have been read. A reply
 /// under 4096 bytes is in the pipe as soon as the server writes it, whenever
 /// the client reads; only a longer one waits for the reader. A budget under the
-/// operations' 20 s `execution_ms` lists no tool (projection.rs `limits`), so
-/// the case whose reply is the list uses 20 s.
+/// operations' 20 s `execution_ms` lists no tool (projection.rs `limits`)
+/// unless the server's `variables` say otherwise, so the case whose reply is
+/// the list passes [`LISTED`].
 struct Paused {
     /// Whether the list's reply had begun (the pipe full, the reply blocked
     /// mid-frame) before the request's deadline: the reply was on time.
@@ -755,11 +765,16 @@ struct Paused {
     stderr: String,
 }
 
-fn paused(budget: Duration, release: Option<Duration>, read_at: Duration) -> Paused {
+fn paused(
+    budget: Duration,
+    release: Option<Duration>,
+    read_at: Duration,
+    variables: &[(&str, &str)],
+) -> Paused {
     use std::os::fd::AsRawFd;
     let served = Served::new();
     served.exposures_within(true, budget.as_millis() as u64);
-    let mut child = spawn(&served);
+    let mut child = spawn(&served, variables);
     let stdout = child.stdout.take().unwrap();
     let mut stderr = child.stderr.take().unwrap();
     let errors = std::thread::spawn(move || {
@@ -863,7 +878,12 @@ fn paused(budget: Duration, release: Option<Duration>, read_at: Duration) -> Pau
 /// answered in the serve loop, without the owner). Then the store is released.
 #[test]
 fn security_control_a_late_reply_to_a_paused_reader_keeps_the_session() {
-    let seen = paused(LATE_BUDGET, None, LATE_BUDGET + Duration::from_millis(500));
+    let seen = paused(
+        LATE_BUDGET,
+        None,
+        LATE_BUDGET + Duration::from_millis(500),
+        &[],
+    );
     let reply = seen.reply.as_ref().map(outcome);
     assert!(
         reply.as_deref() == Some("timeout") && seen.pinged,
@@ -875,30 +895,31 @@ fn security_control_a_late_reply_to_a_paused_reader_keeps_the_session() {
     );
 }
 
-/// The same client, the same pause past the deadline, but under the 20 s
-/// budget that lists the tools ([`BUDGET`]) and with the store released at
-/// once, so the owner answers inside the deadline and the reply (several 12 KB
-/// tools) is blocked mid-frame in the 4096-byte pipe when the deadline passes.
-/// The request is past its deadline with its reply unwritten, as in the
-/// control; here the owner was faster. The brief's invariant: a
-/// request past its deadline never ends the session and never leaves the
-/// client without a reply. (A store held to 1.5 s before the deadline did not
-/// build this: the owner still answered `timeout`.) Should the reply not have
-/// begun before the deadline, the case proves nothing; it says so and passes.
+/// The same client, the same pause past the deadline, but on a server that
+/// lists the tools under its 4 s budget ([`BUDGET`], [`LISTED`]) and with the
+/// store released at once, so the owner answers inside the deadline and the
+/// reply (several 12 KB tools) is blocked mid-frame in the 4096-byte pipe when
+/// the deadline passes. The request is past its deadline with its reply
+/// unwritten, as in the control; here the owner was faster. The brief's
+/// invariant: a request past its deadline never ends the session and never
+/// leaves the client without a reply. (A store held to 1.5 s before the
+/// deadline did not build this: the owner still answered `timeout`.) Should
+/// the reply not have begun before the deadline, the case proves nothing, and
+/// it fails.
 #[test]
 fn security_an_on_time_reply_written_across_its_deadline_keeps_the_session() {
     let seen = paused(
         BUDGET,
         Some(Duration::ZERO),
         BUDGET + Duration::from_millis(500),
+        &[LISTED],
     );
-    if !seen.began_on_time {
-        eprintln!(
-            "scenario not built: the reply did not begin before the deadline: {:?}",
-            seen.lines
-        );
-        return;
-    }
+    assert!(
+        seen.began_on_time,
+        "scenario not built: the reply did not begin before the deadline: exit {:?}, \
+         stdout {:?}, stderr {}",
+        seen.status, seen.lines, seen.stderr
+    );
     let reply = seen.reply.as_ref().map(outcome);
     eprintln!(
         "on time: reply {reply:?}, pinged {}, exit {:?}",

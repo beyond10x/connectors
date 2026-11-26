@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-26T06:33:18Z",
+  "actor": "human:operator",
+  "artifact": "story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate 139714078337 of pull request 313 (attempt 2), head 606a611d5: the five tests 1.213 + 0.513 + 0.312 + 1.011 + 1.088 = 4.137 s, bound 9 s, met; ignored step executed 4, failed 0, missing 0, unknown 0",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45748988866/job/139714078337"
+  }
+}

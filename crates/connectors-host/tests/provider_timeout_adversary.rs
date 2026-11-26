@@ -9,6 +9,7 @@
 //! `slow_lane_` test runs it in this process at production's 15 s and 5 s.
 use connectors_core::ErrorCode;
 use connectors_host::http::{HttpConfig, ScopedHttp};
+use connectors_host::local::runtime::Failure;
 use connectors_sdk::AuthenticatedHttp;
 use std::{
     ops::Range,
@@ -207,4 +208,142 @@ async fn a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked(
 async fn slow_lane_a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked() {
     an_unanswered_tls_handshake_sent_no_request(Duration::from_secs(5)..Duration::from_secs(15))
         .await;
+}
+
+/// The provider budget of the three cases below (story
+/// a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout).
+/// A connect may run until the end of the budget, so each connect here has 1,000 ms.
+const BUDGET: Duration = Duration::from_millis(1000);
+
+/// A port under a provider budget of [`BUDGET`]. The three cases below have one test each,
+/// run in this process with production's two client timeouts (15 s and 5 s): the budget is
+/// the bound that ends them, and no environment shortens a timeout.
+fn under_a_provider_budget(config: &HttpConfig) -> ScopedHttp {
+    ScopedHttp::from_config(config)
+        .unwrap()
+        .with_provider_budget(BUDGET, Instant::now() + Duration::from_secs(30))
+        .unwrap()
+}
+
+/// Reads one request's head from `socket`. False when the peer closed before its end.
+async fn read_request_head(socket: &mut tokio::net::TcpStream) -> bool {
+    let mut request = Vec::new();
+    let mut buffer = [0_u8; 1024];
+    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+        let n = socket.read(&mut buffer).await.unwrap_or(0);
+        if n == 0 {
+            return false;
+        }
+        request.extend_from_slice(&buffer[..n]);
+    }
+    true
+}
+
+/// A provider budget that ends while the peer leaves the TLS handshake unanswered: no HTTP
+/// request was sent, so the timeout is not the provider's (§6: "A connection that never
+/// opened sent nothing"). The budget cuts the connect, long before the client's connect
+/// timeout of 5 s, and the host reports its own timeout.
+#[tokio::test]
+async fn a_provider_budget_cut_during_an_unanswered_tls_handshake_is_not_marked() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (hello, mut hello_read) = tokio::sync::oneshot::channel();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut buffer = [0_u8; 4096];
+        // Read the ClientHello and never answer it.
+        let read = socket.read(&mut buffer).await.unwrap_or(0);
+        let _ = hello.send(read);
+        tokio::time::sleep(Duration::from_secs(40)).await;
+        drop(socket);
+    });
+    // The listener's own address, not a name, as in the case without a budget above.
+    let mut config = config(format!("https://{address}/"));
+    config.allow_plaintext = false;
+    let http = under_a_provider_budget(&config);
+    let started = Instant::now();
+    let Err(error) = http.get(&["items"], &[]).await else {
+        panic!("the request succeeded")
+    };
+    let elapsed = started.elapsed();
+    let hello_bytes = hello_read.try_recv().unwrap_or(0);
+    server.abort();
+    assert!(
+        hello_bytes > 0,
+        "the peer read no byte before the refusal after {elapsed:?}: no handshake started"
+    );
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "the call ended after {elapsed:?}, not within 2 s"
+    );
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert!(
+        !error.upstream_answer,
+        "a provider budget that ended during an unanswered handshake sent no request, after {elapsed:?}: upstream_answer = {}",
+        error.upstream_answer
+    );
+    assert_eq!(Failure::from_provider(error), Failure::Timeout);
+}
+
+/// Under a provider budget a stalled body stays the provider's: the request got its
+/// connection and its status line and headers, and the budget ended while the body stalled.
+#[tokio::test]
+async fn a_body_that_stalls_under_a_provider_budget_is_the_providers_timeout() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        if !read_request_head(&mut socket).await {
+            return;
+        }
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 100\r\n\r\n{\"partial\":")
+            .await
+            .unwrap();
+        socket.flush().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(40)).await;
+        drop(socket);
+    });
+    let http = under_a_provider_budget(&config(format!("http://{address}/")));
+    let Err(error) = http.get(&["items"], &[]).await else {
+        panic!("the request succeeded")
+    };
+    server.abort();
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert!(
+        error.upstream_answer,
+        "a budget that ended while the provider streamed its answer is not marked as the provider's timeout"
+    );
+    assert_eq!(Failure::from_provider(error), Failure::ProviderTimeout);
+}
+
+/// Under a provider budget a slow answer stays the provider's: the request was sent on a
+/// connection that opened, the peer read it and sent nothing, and the budget ended.
+#[tokio::test]
+async fn a_request_that_is_sent_and_not_answered_under_a_provider_budget_is_the_providers_timeout()
+{
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (request, mut request_read) = tokio::sync::oneshot::channel();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let _ = request.send(read_request_head(&mut socket).await);
+        tokio::time::sleep(Duration::from_secs(40)).await;
+        drop(socket);
+    });
+    let http = under_a_provider_budget(&config(format!("http://{address}/")));
+    let Err(error) = http.get(&["items"], &[]).await else {
+        panic!("the request succeeded")
+    };
+    let request_read = request_read.try_recv().unwrap_or(false);
+    server.abort();
+    assert!(
+        request_read,
+        "the peer did not read a whole request before the refusal"
+    );
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert!(
+        error.upstream_answer,
+        "a sent request the provider never answered before the budget ended is not marked as the provider's timeout"
+    );
 }

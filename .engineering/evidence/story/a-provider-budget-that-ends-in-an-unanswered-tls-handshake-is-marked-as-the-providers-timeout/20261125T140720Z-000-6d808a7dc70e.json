@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-25T14:07:20Z",
+  "actor": "human:operator",
+  "artifact": "story:a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave4-drafts-acceptance-round-3",
+    "review": "review-result:wave4-drafts-acceptance-round-3",
+    "outcome": "no-op"
+  }
+}

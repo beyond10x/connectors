@@ -409,14 +409,17 @@ fn rename_at(directory: &File, from: &CString, to: &CString, flags: libc::c_uint
     // SAFETY: valid directory descriptors and C strings; RENAME_NOREPLACE
     // gives concurrent creators a single winner, including symlink targets.
     // Without it the rename replaces the name itself, never a link target.
+    // The system call is made through `syscall`: the musl that Rust links
+    // statically has no `renameat2` wrapper. It returns 0 or -1.
     unsafe {
-        libc::renameat2(
+        libc::syscall(
+            libc::SYS_renameat2,
             directory.as_raw_fd(),
             from.as_ptr(),
             directory.as_raw_fd(),
             to.as_ptr(),
             flags,
-        )
+        ) as libc::c_int
     }
 }
 

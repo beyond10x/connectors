@@ -3,8 +3,10 @@
 //! The jobs `publish` and `image` both wait for `build` and then run side by side. The image
 //! build uploads one build record per build as an artifact of the run
 //! (`<owner>~<repository>~<id>.dockerbuild`). A download step without `pattern` takes every
-//! artifact of the run, so `publish` got six files where it expects four whenever `image`
+//! artifact of the run, so `publish` got six files where it expected four whenever `image`
 //! ended first: run 45358347732 of tag v0.77.1, 2026-11-24, both attempts.
+//!
+//! The musl archive is checked static before it is packed, and the checksum manifest names it.
 use regex::Regex;
 use serde_yaml_ng::Value;
 use std::{fs, path::Path};
@@ -91,7 +93,7 @@ fn every_download_step_names_its_artifacts() {
 fn the_publish_job_takes_the_archive_of_each_target() {
     let workflow = workflow();
     let targets = targets(&workflow);
-    assert_eq!(targets.len(), 4, "{targets:?}");
+    assert_eq!(targets.len(), 5, "{targets:?}");
     let pattern = download_patterns(&workflow)
         .into_iter()
         .find(|(job, _)| job == "publish")
@@ -103,4 +105,61 @@ fn the_publish_job_takes_the_archive_of_each_target() {
             "{pattern:?} of job `publish` leaves out the archive of {target}"
         );
     }
+}
+
+/// The `run` script of the step of `job` named `name`.
+fn script<'a>(workflow: &'a Value, job: &str, name: &str) -> &'a str {
+    workflow["jobs"][job]["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|step| step["name"].as_str() == Some(name))
+        .and_then(|step| step["run"].as_str())
+        .unwrap_or_else(|| panic!("job `{job}` has no step {name:?} with a script"))
+}
+
+#[test]
+fn the_musl_archive_is_checked_static_before_it_is_packed() {
+    const MUSL: &str = "x86_64-unknown-linux-musl";
+    let workflow = workflow();
+    assert!(targets(&workflow).iter().any(|target| target == MUSL));
+    let steps = workflow["jobs"]["build"]["steps"].as_sequence().unwrap();
+    let position = |found: &dyn Fn(&Value) -> bool| steps.iter().position(found);
+    let check = position(&|step| {
+        step["if"].as_str().is_some_and(|guard| guard.contains(MUSL))
+            && step["run"].as_str().is_some_and(|run| {
+                run.contains("deploy/release/check-static.sh check") && run.contains("$BINARIES")
+            })
+    })
+    .expect("no step of job `build` runs deploy/release/check-static.sh check over $BINARIES for the musl target");
+    let build = position(&|step| {
+        step["run"]
+            .as_str()
+            .is_some_and(|run| run.contains("cargo build"))
+    })
+    .expect("job `build` has a `cargo build` step");
+    let package = position(&|step| step["name"].as_str() == Some("Package"))
+        .expect("job `build` has a `Package` step");
+    assert!(
+        build < check && check < package,
+        "the static check runs at step {check}, not between the build ({build}) and Package ({package})"
+    );
+}
+
+#[test]
+fn the_checksum_manifest_names_the_archive_of_each_target() {
+    let workflow = workflow();
+    let targets = targets(&workflow);
+    let manifest = script(&workflow, "publish", "Create the checksum manifest");
+    for target in &targets {
+        assert!(
+            manifest.contains(&format!(" {target}")),
+            "the checksum manifest does not require the archive of {target}"
+        );
+    }
+    assert!(
+        manifest.contains(&format!("-eq {}", targets.len())),
+        "the checksum manifest does not count {} archives",
+        targets.len()
+    );
 }

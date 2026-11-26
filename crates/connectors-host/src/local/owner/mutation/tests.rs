@@ -1125,11 +1125,23 @@ mod recheck {
             source.drops.store(1, Ordering::SeqCst);
         }
     }
-    /// No source answers from now on.
-    fn silence(site: &Site) {
-        for source in &site.clocks {
-            source.respond.store(false, Ordering::SeqCst);
-        }
+    /// The query deadline of the cases whose first source is closed: long
+    /// enough that a loaded runner's work fits inside the deadlines it sets,
+    /// and never waited for.
+    const LONG_QUERY: Duration = Duration::from_secs(10);
+    /// Takes the first source out of the site; the configuration still
+    /// names its port. Once the source is dropped that port is closed and
+    /// each request to it is refused at once (port unreachable on loopback),
+    /// so an attempt ends below quorum, with no reply unverified, as soon as
+    /// the second source answers. No attempt waits for the query deadline,
+    /// and the time left after the first attempt is the deadline less the
+    /// work before it: a slow runner leaves less time, never more.
+    fn take_first_source(site: &mut Site) -> clock_fixture::Server {
+        std::mem::replace(&mut site.clocks[0], clock_fixture::Server::silent())
+    }
+    /// [`take_first_source`], closed now.
+    fn close_first_source(site: &mut Site) {
+        drop(take_first_source(site));
     }
     fn refused_as_unavailable_before_any_attempt(delivery: &Delivery) {
         let error = delivery.error.as_ref().expect("the write was not refused");
@@ -1168,20 +1180,24 @@ mod recheck {
         assert_eq!(asked_since(&site, before), [3, 3]);
     }
 
-    /// The reserve of the write's first reading: with 2 s to the deadline,
-    /// about 1.5 s are left after the first attempt and 2 s are needed (one
+    /// The reserve of the write's first reading: the first source is closed,
+    /// and with 2 x `LONG_QUERY` to the deadline less than that is left after
+    /// the first attempt, where a second needs 2 x `LONG_QUERY` + 1 s (one
     /// deadline, and the reserve before the second reading). No second
-    /// attempt starts, and the refusal is today's, not a timeout.
+    /// attempt starts, and the refusal is today's, not a timeout: the work of
+    /// the write has the whole 20 s. With a 500 ms query deadline that was
+    /// waited for and 2 s to the deadline, the work had 1.5 s, and a loaded
+    /// macOS runner answered `Timeout` (pull request 313).
     #[test]
     fn a_write_refused_inside_the_reserve_answers_as_today() {
         let mut site = site();
-        clock::set_test_query_timeout(QUERY);
+        clock::set_test_query_timeout(LONG_QUERY);
+        close_first_source(&mut site);
         let before = asked(&site);
-        silence(&site);
-        let (delivery, _) = write_within(&mut site, Duration::from_secs(2), None);
+        let (delivery, _) = write_within(&mut site, 2 * LONG_QUERY, None);
         refused_as_unavailable_before_any_attempt(&delivery);
         assert!(delivery.mutation.attempt.is_none());
-        assert_eq!(asked_since(&site, before), [1, 1]);
+        assert_eq!(asked_since(&site, before), [0, 1]);
         assert_eq!((count(&site, "prepare"), count(&site, "send")), (0, 0));
     }
 
@@ -1265,23 +1281,24 @@ mod recheck {
         assert_eq!(count(&site, "send"), 0);
     }
 
-    /// The reserve of recovery: with a query deadline of 1.5 s and 3.9 s to
-    /// the deadline, at most 2.4 s are left after the first attempt and 2.5 s
-    /// are needed. No second attempt starts, and the answer is today's. The
-    /// 2.4 s are what recovery's other work has on a loaded host; with the
-    /// 500 ms deadline of the tests beside this one it had 1.2 s and answered
-    /// `Timeout` in one run.
+    /// The reserve of recovery: the first source is closed, and with
+    /// `LONG_QUERY` + 0.9 s to the deadline less than that is left after the
+    /// first attempt, where a second needs `LONG_QUERY` + 1 s. No second
+    /// attempt starts, and the answer is today's. A reserve of zero would
+    /// admit it while the work before took under 0.9 s. Recovery's other work
+    /// has the whole 10.9 s; with query deadlines that were waited for it had
+    /// 1.2 s, then 2.4 s, and answered `Timeout` in one run.
     #[test]
     fn recovery_refused_inside_the_reserve_answers_as_today() {
-        let site = site();
-        clock::set_test_query_timeout(Duration::from_millis(1500));
+        let mut site = site();
+        clock::set_test_query_timeout(LONG_QUERY);
         let candidate = prepared(&site);
+        close_first_source(&mut site);
         let before = asked(&site);
-        silence(&site);
-        let delivery = recover(&site, Duration::from_millis(3900));
+        let delivery = recover(&site, LONG_QUERY + Duration::from_millis(900));
         assert!(unavailable_at_observation(&delivery));
         assert!(still_prepared(&site, &candidate));
-        assert_eq!(asked_since(&site, before), [1, 1]);
+        assert_eq!(asked_since(&site, before), [0, 1]);
     }
 
     // The adversary's cases for the reserve of each caller, in a file of

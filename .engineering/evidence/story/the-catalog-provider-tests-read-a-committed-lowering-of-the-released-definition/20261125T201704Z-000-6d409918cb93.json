@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T20:17:04Z",
+  "actor": "human:operator",
+  "artifact": "story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate 139453849771 of pull request 311, head d3a4bf0dd: Summary [ 565.166s] 4541 tests run: 4541 passed (4 slow), 226 skipped; the 40 tests sum to 1.026 s, bound 15 s, met; the 19 released_lowering tests passed; ignored step executed 4, failed 0, missing 0, unknown 0",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45684630758/job/139453849771"
+  }
+}
