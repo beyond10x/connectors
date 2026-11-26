@@ -39,7 +39,7 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: inferred
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 22
+revision: 23
 ---
 ## Gap
 
@@ -107,11 +107,12 @@ story:an-unknown-write-is-settled-by-a-declared-read-back.
 - A try after the first starts only while the client's connection is open. A write job
   carries no cancel (`transport.rs:2644-2660`), and an interrupted `invoke` (exit 130) only
   stops reading (`transport.rs:1330-1341`); after it no further try starts.
-- Each try writes its own audit record, as one attempt does today (`execution.rs:425-427`,
-  `:476-479`).
+- A retried try leaves no ledger row for its key: it ends before `prepare`
+  (`execution.rs:557-562`), so the next try passes the replay check of the key
+  (`execution.rs:466-475`). The loop does not change how a try is audited.
 - Reserve: another try starts only while the duration of the try just ended plus 3 s (the
   first reading's reserve of `contracts/service/clock.md:251-256`) is left before the write's
-  deadline (today 20 s per write: `Deadline::start()` at `apps/connectors/src/local/session.rs:69`,
+  deadline (today 20 s per write: `Deadline::start()` at `apps/connectors/src/local/session.rs:68`,
   the value at `crates/connectors-host/src/local/owner/mutation.rs:276`). Otherwise the
   loop ends with the last try's answer, so a `not_attempted` near the deadline is not turned
   into `outcome_unknown` by the write client (`transport.rs:1330-1341`). The reserve is no
@@ -127,10 +128,11 @@ story:an-unknown-write-is-settled-by-a-declared-read-back.
 
 The CLI passes `n` to the owner as a new member `retry_not_attempted` of `WriteRequest`
 (`crates/connectors-host/src/local/owner/transport.rs:98-107`), read by `exchange_write`
-(`transport.rs:2551-2665`). `WriteRequest` refuses unknown members, so `WRITE_VERSION`
-(`transport.rs:72`, `connectors-owner/2`) moves to a new version; an owner of the old version
-refuses the request before any send, and the CLI starts a current owner as it does for any
-version mismatch.
+(`transport.rs:2551-2665`). `WRITE_VERSION` stays `connectors-owner/2` (`transport.rs:72`):
+`WriteClient::connect` refuses an owner of another build with `owner_build_mismatch`, next
+action `stop_owner`, before any `WriteRequest` is sent (`transport.rs:1291-1297`,
+`contracts/cli/v1alpha1/owner.md:94-96`), so the new member reaches only an owner of the same
+build. A bump would turn that answer into `unavailable` after the 10 s connect bound.
 
 ## Shares files with
 
@@ -209,11 +211,9 @@ All calls with `--output json` and `--idempotency-key`, against the fixture abov
     succeeds, called with `--retry-not-attempted 3`, exits 1 `not_attempted` with `tries` 1,
     `error.data.code` `timeout` and `stage` `admission`; the log holds 1 preflight.
 14. A fixture whose every preflight answers the provider's timeout after 2 s, called with
-    `--retry-not-attempted 10` and sent SIGINT 1 s after start, exits 130; 6 s after the signal
-    the log holds 1 preflight.
-15. After statement 1's call, the instance's audit store (`connectors_host::local::audit`)
-    holds three finished records for the call: two `not_attempted` and one `applied`.
-16. Each test runs under 5 s, except 5 (under 21 s) and 14 (under 8 s).
+    `--retry-not-attempted 10` and sent SIGINT once the log holds its first preflight, exits 130;
+    6 s after the signal the log holds 1 preflight.
+15. Each test runs under 5 s, except 5 (under 21 s) and 14 (under 10 s).
 
 ## Not in this story
 
@@ -234,4 +234,4 @@ All calls with `--output json` and `--idempotency-key`, against the fixture abov
 ## Order
 
 Filed from a consumer repository's request on 2026-11-26, ordered after pull request 315.
-Revised after rounds 1 to 4 of the plan critics (acceptance, design, scope and parallel-safety lanes).
+Revised after rounds 1 to 5 of the plan critics (acceptance, design, scope and parallel-safety lanes).
