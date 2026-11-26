@@ -1037,3 +1037,6 @@ fn no_try_starts_after_the_caller_is_interrupted() {
     std::thread::sleep(Duration::from_secs(6).saturating_sub(signalled.elapsed()));
     assert_eq!(site.log(), ["preflight true"]);
 }
+
+#[path = "invoke_retry/adversary.rs"]
+mod adversary;
