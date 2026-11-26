@@ -8,7 +8,7 @@ summary: 'invoke --retry-not-attempted <n>: the owner retries a write that was n
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:landed-write-is-not-unknown-after-the-owners-budget
-revision: 5
+revision: 6
 ---
 ## Gap
 
@@ -55,22 +55,34 @@ story:an-unknown-write-is-settled-by-a-declared-read-back.
 
 `connectors invoke` gains `--retry-not-attempted <n>`. The CLI passes `n` to the owner.
 
-- The loop wraps the supervisor's write job (`crates/connectors-host/src/local/owner/supervisor.rs:1295-1298`,
-  `:1328`), on the instance's serialized worker. Each try launches a fresh adapter child: a
-  retried cause ends the child of the try (`execution.rs:442`,
-  `crates/connectors-host/src/local/runtime/process.rs:1388-1393`), and a later try on it would
-  answer `unavailable` (`process.rs:1027-1028`).
+- The loop wraps the supervisor's write job from the check that replaces a child that no
+  longer runs (`crates/connectors-host/src/local/owner/supervisor.rs:1133-1140`) through the
+  call of `mutation::execute` (`supervisor.rs:1326`), on the instance's serialized worker. Each
+  try runs on the worker's child, as the job does today: a provider timeout or capacity answer
+  to the preflight leaves the child live (`crates/connectors-host/src/local/runtime/process.rs:1079-1087`),
+  and a child that no longer runs is replaced by that check.
 - A try is repeated only when it answered `not_attempted` with `mutation.attempt` null and the
-  cause is the provider's own timeout or capacity answer to the preflight (`ProviderTimeout`,
-  origin provider; `next_action = retry_explicitly`, `semantics.md:2443-2444`). That is the
-  closed set. Every other `not_attempted` ends the loop with its answer: the host's own
-  timeout, a clock refusal, `idempotency_conflict`, `approval_required`, `rate_limited`,
-  `forbidden`, an aborted attempt.
+  cause is the provider's own answer to the preflight: `ProviderTimeout`, `ProviderCapacity`
+  or the provider's `unavailable` (`crates/connectors-host/src/local/runtime.rs:102-103`; code
+  `timeout`, `capacity` or `unavailable` with origin provider, `owner.rs:353-355`, `:389-395`;
+  stage `dispatch`, where the host's own timeout is stage `admission`,
+  `crates/connectors-host/src/local/runtime/process/write_tests.rs:948-965`;
+  `next_action = retry_explicitly`, `semantics.md:2443-2444`). That is the closed set. Every
+  other `not_attempted` ends the loop with its answer: the host's own timeout, a clock refusal,
+  a busy or unavailable adapter (`PluginBusy`, origin host), `idempotency_conflict`,
+  `approval_required`, `rate_limited`, `forbidden`, an aborted attempt.
+- A try after the first starts only while the client's connection is open. A write job
+  carries no cancel (`transport.rs:2644-2660`), and an interrupted `invoke` (exit 130) only
+  stops reading (`transport.rs:1330-1341`); after it no further try starts.
+- Each try writes its own audit record, as one attempt does today (`execution.rs:425-427`,
+  `:476-479`).
 - Reserve: another try starts only while the duration of the try just ended plus 3 s (the
   first reading's reserve of `contracts/service/clock.md:251-256`) is left before the write's
   deadline (today 20 s per write, `apps/connectors/src/local/session.rs:68`). Otherwise the
   loop ends with the last try's answer, so a `not_attempted` near the deadline is not turned
-  into `outcome_unknown` by the write client (`transport.rs:1329-1340`).
+  into `outcome_unknown` by the write client (`transport.rs:1330-1341`). The reserve is no
+  budget for the commit: a late try whose preflight passes can still end `unknown` in its
+  commit, as one try can today (story:landed-write-is-not-unknown-after-the-owners-budget).
 - Approvals: every retried try ends before `prepare`, where a per-input proof is spent and a
   grant use is bound (`execution.rs:565-614`); an unbound grant use is given back
   (`execution.rs:133`). So `--approval-file` and a standing grant both work with the option,
@@ -78,13 +90,18 @@ story:an-unknown-write-is-settled-by-a-declared-read-back.
 
 ## Test fixture
 
-None exists. The owner-level child of `crates/connectors-host/src/local/runtime/process/write_tests.rs`
-gains a counted preflight script (the answer of the k-th preflight, with an optional delay)
-and an ordered log of one line per preflight and per commit carrying the input's `value`; it
-accepts `{"value": true}` and `{"value": false}`. The CLI-level statements run it through a
-stand-in adapter like `apps/connectors/tests/support/standin.rs`. A provider timeout is the
-fixture's answer `Failure::from_provider(Timeout.answered())`, returned at once or after the
-named delay, not the 15 s HTTP cutoff.
+None exists. `write_tests.rs` is a `#[cfg(test)]` module of connectors-host
+(`process.rs:2389-2390`) that tests in `apps/connectors` cannot reach, and
+`apps/connectors/tests/support/standin.rs` serves no writes. The story builds one stand-in
+adapter in the harness=false test-binary pattern of `standin.rs` that serves V2 writes with a
+counted preflight script (the answer of the k-th preflight, with an optional delay) and an
+ordered log of one line per preflight and per commit carrying the input's `value`; it accepts
+`{"value": true}` and `{"value": false}`. A provider timeout is its answer
+`Failure::from_provider(Timeout.answered())`, returned at once or after the named delay, not
+the 15 s HTTP cutoff. The CLI tests configure it with mounted custody
+(`connectors_custody::mounted::fixture`, as `apps/connectors/tests/local_mcp_server_write_refusal.rs:25`)
+and a local clock source (`crates/connectors-host/tests/fixtures/clock/server.rs`), so a write
+reaches its commit.
 
 ## Acceptance
 
@@ -119,22 +136,29 @@ All calls with `--output json` and `--idempotency-key`, against the fixture abov
    nothing.
 10. The exit table of `contracts/cli/v1alpha1/semantics.md` has the row for `unknown` with
     `--retry-not-attempted`, exit 3, and `ess specify validate` passes on the changed domain.
-11. Each test runs under 5 s, except 5, which runs under 21 s.
+11. A fixture whose preflight 1 answers the provider's capacity answer and whose preflight 2
+    succeeds, called with `--approval-file` for the input and `--retry-not-attempted 2`, exits 0
+    `applied` with `tries` 2; the log reads preflight, preflight, commit.
+12. A fixture whose preflight 1 hangs past the host's own preflight timeout, called with
+    `--retry-not-attempted 3`, exits 1 `not_attempted` with `tries` 1 and the host's
+    `timeout` at stage `admission`; the log holds 1 preflight.
+13. Each test runs under 5 s, except 5 and 12, which run under 21 s.
 
 ## Not in this story
 
-- A retry of a clock refusal at `admission`: the host answers it as a bare `unavailable`
-  without a clock marker (`crates/connectors-host/src/local/owner.rs:261-272`), and the owner
-  already makes one second attempt. It can join the closed set once
-  story:a-clock-refusal-of-issue-and-invoke-names-its-sources marks it.
+- The host-side `not_attempted` causes: a clock refusal at `admission` (a bare `unavailable`
+  without a clock marker today, `crates/connectors-host/src/local/owner.rs:261-272`; the owner
+  already makes one second attempt), the host's own timeout of a hung preflight (it ends the
+  child, `process.rs:1083-1085`), and a busy or unavailable adapter. Owned by the draft
+  story:invoke-retries-host-side-not-attempted-causes, which depends on this story and on
+  story:a-clock-refusal-of-issue-and-invoke-names-its-sources.
 - The read-back of an unknown write: story:an-unknown-write-is-settled-by-a-declared-read-back.
 - An unknown whose provider request landed and settled after the owner's budget:
   story:landed-write-is-not-unknown-after-the-owners-budget.
-- The host's own timeout of a hung preflight: it ends the loop at its try.
 - A write deadline named by the caller; a change to how the host classifies a call;
   re-preparing an aborted key in the ledger; retry of a read.
 
 ## Order
 
 Filed from a consumer repository's request on 2026-11-26, ordered after pull request 315.
-Revised after rounds 1 and 2 of the plan critics (acceptance and design lanes).
+Revised after rounds 1 to 3 of the plan critics (acceptance, design and scope lanes).
