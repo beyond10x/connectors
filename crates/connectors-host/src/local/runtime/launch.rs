@@ -687,15 +687,17 @@ unsafe extern "system" fn ignore(event: u32) -> windows_sys::core::BOOL {
 /// them. Runs between fork and exec, so it is async-signal-safe: no
 /// allocation and no `/proc` read. `close_range(CLOSE_RANGE_CLOEXEC)` needs
 /// Linux 5.11; before that (`ENOSYS`, or `EINVAL` for the flag) every number up
-/// to the `RLIMIT_NOFILE` soft limit is marked one by one.
+/// to the `RLIMIT_NOFILE` soft limit is marked one by one. The system call is
+/// made through `syscall`, because musl has no `close_range` wrapper.
 #[cfg(target_os = "linux")]
 fn close_on_exec_above_three() -> std::io::Result<()> {
     // SAFETY: close_range only changes descriptor flags of this process.
     if unsafe {
-        libc::close_range(
-            4,
+        libc::syscall(
+            libc::SYS_close_range,
+            4 as libc::c_uint,
             libc::c_uint::MAX,
-            libc::CLOSE_RANGE_CLOEXEC as libc::c_int,
+            libc::CLOSE_RANGE_CLOEXEC,
         )
     } == 0
     {

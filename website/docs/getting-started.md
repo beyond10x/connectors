@@ -36,8 +36,9 @@ the first build. Package distribution is not configured.
 
 The walkthrough below builds from source because it also needs the Kubernetes service. For the
 `connectors` command alone, each release page carries `connectors-<version>-<target>.tar.gz` for
-`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
-`aarch64-apple-darwin`, with a `SHA256SUMS` file. Releases cut before the binaries workflow
+`x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-gnu`,
+`x86_64-apple-darwin` and `aarch64-apple-darwin`, with a `SHA256SUMS` file. Releases up to
+0.78.3 carry no `x86_64-unknown-linux-musl` archive. Releases cut before the binaries workflow
 existed
 ([`release-binaries.yml`](https://github.com/beyond10x/connectors/blob/main/.github/workflows/release-binaries.yml))
 carry source archives only, and there is no Windows binary.
@@ -51,8 +52,9 @@ and PostgreSQL), and `README.md` and `CHANGELOG.md`. Archives of 0.76.2 and earl
 connectors are built from source, as their guides show.
 
 A catalog instance that pins nothing is served by the `connectors-catalog-provider` next to `connectors`, so keep the
-two binaries in one directory. The Linux binaries are built on Ubuntu 24.04 and need its glibc or
-a newer one.
+two binaries in one directory. The `-linux-gnu` binaries are built on Ubuntu 24.04 and need its
+glibc or a newer one. The `x86_64-unknown-linux-musl` binaries are statically linked and need no
+C library: they run on any x86_64 Linux, Alpine included.
 
 On Linux, with the version and target you want, and `bin` a directory on your `PATH`:
 

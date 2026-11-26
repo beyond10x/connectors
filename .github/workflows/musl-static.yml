@@ -1,0 +1,84 @@
+# Builds the release binaries for x86_64-unknown-linux-musl on a pull request that changes the
+# inputs of that build (the lock file, the pinned toolchain, the cargo configuration), and checks
+# that each binary is statically linked and answers `--version` in a plain Alpine container
+# (deploy/release/check-static.sh). The list of binaries is the release workflow's `BINARIES`.
+# A change to the release workflow or to the check itself runs the release workflow's own
+# pull-request path, which builds and checks the musl archive with the four others.
+name: Static musl binaries
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/musl-static.yml
+      - .cargo/**
+      - Cargo.lock
+      - rust-toolchain.toml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musl-static-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  TARGET: x86_64-unknown-linux-musl
+
+jobs:
+  musl:
+    name: Static x86_64-unknown-linux-musl binaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: The list of binaries of the release workflow
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          binaries="$(yq '.jobs.build.env.BINARIES' .github/workflows/release-binaries.yml)"
+          test -n "$binaries"
+          test "$binaries" != null
+          echo "BINARIES=$binaries" | tee -a "$GITHUB_ENV"
+      - name: Install the Rust toolchain of rust-toolchain.toml and the musl target
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          rustup toolchain install
+          rustup target add "$TARGET"
+          rustup default "$(rustup show active-toolchain | head -n 1 | cut -d' ' -f1)"
+          rustc --version
+          version="$(cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "connectors") | .version')"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "VERSION=$version" | tee -a "$GITHUB_ENV"
+      # The build scripts of ring and libsqlite3-sys (bundled) compile C; for the musl target
+      # the cc crate calls musl-gcc.
+      - name: Install the musl C compiler
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout 300 sudo apt-get -o Acquire::Retries=3 update \
+              && timeout 300 sudo apt-get -o Acquire::Retries=3 install --yes --no-install-recommends musl-tools; then
+              break
+            fi
+            test "$attempt" -lt 3
+            sleep 15
+          done
+          musl-gcc --version
+      - name: Build the release binaries for the musl target
+        timeout-minutes: 40
+        run: |
+          set -euo pipefail
+          packages=()
+          for binary in $BINARIES; do packages+=(-p "$binary"); done
+          cargo build --locked --release "${packages[@]}" --target "$TARGET"
+      - name: The binaries are static and answer --version in a plain Alpine container
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          deploy/release/check-static.sh self-test
+          deploy/release/check-static.sh check "target/${TARGET}/release" "$VERSION" $BINARIES

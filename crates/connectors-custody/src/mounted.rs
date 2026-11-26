@@ -506,8 +506,11 @@ fn publish(directory: &File, name: &str, bytes: &[u8]) -> Result<()> {
     }
     drop(file);
     // SAFETY: both names are live C strings relative to the same directory.
+    // The system call is made through `syscall`: the musl that Rust links
+    // statically has no `renameat2` wrapper.
     let renamed = unsafe {
-        libc::renameat2(
+        libc::syscall(
+            libc::SYS_renameat2,
             directory.as_raw_fd(),
             temporary_c.as_ptr(),
             directory.as_raw_fd(),
