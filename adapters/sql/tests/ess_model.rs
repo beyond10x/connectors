@@ -18,26 +18,106 @@ use connectors_sql::{
     mysql::{Family, Rendering},
 };
 use serde_json::{Value, json};
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, process::Command, sync::Arc};
+use sha2::{Digest, Sha256};
+use std::{
+    fs,
+    io::Write as _,
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::Arc,
+};
 
-/// The schema of one model type, generated now by the pinned `ess`.
-fn schema(out: &Path, name: &str) -> Value {
-    let path = out.join(format!(
-        "schemas/schema/types/connectors_sql.{name}.schema.json"
-    ));
-    if !path.exists() {
+/// The adapter's own model, the directory `ess` reads.
+fn model_sources() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("spec/ess")
+}
+
+/// Every file under `sources` as its name below it and its bytes, in name order.
+fn source_files(sources: &Path) -> Vec<(String, Vec<u8>)> {
+    let (mut files, mut pending) = (Vec::new(), vec![sources.to_owned()]);
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                let name = path.strip_prefix(sources).unwrap().to_str().unwrap();
+                files.push((name.to_owned(), fs::read(&path).unwrap()));
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+/// The directory of the schemas the pinned `ess` generates from `sources`: `<parent>/<key>`,
+/// where the key is a digest of the names and bytes of the files under `sources` and of the
+/// pinned `ess` version. It is made once per key, also by processes that start together;
+/// cargo-nextest runs each test in its own process, so a global of this process would be
+/// filled once per test. A caller holds an exclusive lock on `<key>.lock` while it looks
+/// and, when the directory is absent, generates into `<key>.<process id>.tmp`, renames that
+/// into place and appends one line to `generations.log`. Another caller therefore reads a
+/// whole directory or waits for one. The lock ends when this function returns, so the
+/// threads of one process take it in turn, and the operating system releases it when a
+/// process is killed. A `<key>.*.tmp` beside the directory is what a killed process left.
+// `File::lock` is stable since Rust 1.89 and the workspace's `rust-version` is 1.88, which
+// clippy holds every target to. This file is a test binary, compiled with the pinned
+// toolchain alone; the check at 1.88 compiles the library, not its tests.
+#[allow(clippy::incompatible_msrv)]
+fn schemas_in(parent: &Path, sources: &Path) -> PathBuf {
+    let mut digest = Sha256::new();
+    for (name, bytes) in source_files(sources) {
+        for part in [name.as_bytes(), bytes.as_slice()] {
+            digest.update((part.len() as u64).to_be_bytes());
+            digest.update(part);
+        }
+    }
+    digest.update(connectors_spec::toolchain::version().expect("pinned ess version"));
+    let key = hex::encode(digest.finalize());
+    fs::create_dir_all(parent).unwrap();
+    let lock = fs::File::create(parent.join(format!("{key}.lock"))).unwrap();
+    lock.lock().unwrap();
+    let directory = parent.join(&key);
+    if !directory.exists() {
+        let staging = parent.join(format!("{key}.{}.tmp", std::process::id()));
+        match fs::remove_dir_all(&staging) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                panic!("{}: {error}", staging.display())
+            }
+            _ => {}
+        }
         let ess = connectors_spec::toolchain::resolve(None).expect("pinned ess");
         let status = Command::new(ess)
-            .current_dir(env!("CARGO_MANIFEST_DIR"))
-            .args([
-                "generate", "--path", "spec/ess", "--kind", "schema", "--out",
-            ])
-            .arg(out.join("schemas"))
-            .stdout(std::process::Stdio::null())
+            .current_dir(sources.parent().expect("the sources have a parent"))
+            .args(["generate", "--path"])
+            .arg(sources.file_name().expect("the sources have a name"))
+            .args(["--kind", "schema", "--out"])
+            .arg(staging.join("schemas"))
+            .stdout(Stdio::null())
             .status()
             .unwrap();
         assert!(status.success(), "ess generate exited {status}");
+        fs::rename(&staging, &directory).unwrap();
+        fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(parent.join("generations.log"))
+            .unwrap()
+            .write_all(format!("{key} by process {}\n", std::process::id()).as_bytes())
+            .unwrap();
     }
+    directory
+}
+
+/// The schema of one model type, from the directory every test of one run of this binary
+/// reads. `target/tmp` is shared by every package of the tree, so the name of the parent
+/// directory holds the crate and the binary.
+fn schema(name: &str) -> Value {
+    let parent = Path::new(env!("CARGO_TARGET_TMPDIR")).join("connectors-sql-ess-model-schemas");
+    let path = schemas_in(&parent, &model_sources()).join(format!(
+        "schemas/schema/types/connectors_sql.{name}.schema.json"
+    ));
     serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
 }
 
@@ -334,8 +414,7 @@ fn configuration(changes: Value) -> Value {
 
 #[test]
 fn the_model_admits_exactly_the_configurations_the_executable_admits() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "connection.LocalConfiguration");
+    let model = schema("connection.LocalConfiguration");
     let root = tempfile::tempdir().unwrap();
     let directory = root.path().join("private");
     connectors_host::local::filesystem::directory(&directory, true, true).unwrap();
@@ -392,8 +471,7 @@ fn the_model_admits_exactly_the_configurations_the_executable_admits() {
 
 #[test]
 fn each_engine_advertises_the_profile_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "connection.PasswordProfile");
+    let model = schema("connection.PasswordProfile");
     let root = tempfile::tempdir().unwrap();
     let directory = root.path().join("private");
     connectors_host::local::filesystem::directory(&directory, true, true).unwrap();
@@ -429,8 +507,7 @@ fn each_engine_advertises_the_profile_the_model_fixes() {
 
 #[test]
 fn the_read_binding_and_the_mysql_cell_rules_match_the_model() {
-    let out = tempfile::tempdir().unwrap();
-    let binding = schema(out.path(), "reads.ReadBinding");
+    let binding = schema("reads.ReadBinding");
     for engine in Engine::ALL {
         let mut document = json!({
             "engine": engine.name(),
@@ -462,7 +539,7 @@ fn the_read_binding_and_the_mysql_cell_rules_match_the_model() {
             assert!(conforms(&binding, &system).is_err());
         }
     }
-    let rule = schema(out.path(), "reads.MysqlCellRule");
+    let rule = schema("reads.MysqlCellRule");
     let families = rule["$defs"]["connectors_sql.reads.MysqlTypeFamily"]["enum"]
         .as_array()
         .unwrap()
@@ -565,8 +642,7 @@ async fn schema_list_call(engine: Engine, requested: Option<&str>) -> Value {
 
 #[tokio::test]
 async fn schema_list_reads_only_what_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "reads.SchemaListScope");
+    let model = schema("reads.SchemaListScope");
     for (engine, requested, outcome) in [
         (Engine::Mysql, None, "read"),
         (Engine::Mysql, Some("fixture"), "read"),
@@ -622,8 +698,7 @@ async fn query_read_call(statement: &str, qualified: Option<&str>) -> Value {
 
 #[tokio::test]
 async fn query_read_provenance_names_the_connected_database_as_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "reads.QueryReadScope");
+    let model = schema("reads.QueryReadScope");
     for (statement, qualified) in [
         ("SELECT * FROM t", None),
         ("SELECT * FROM fixture.t", Some("fixture")),
@@ -781,8 +856,7 @@ async fn catalogue_call_with(
 
 #[tokio::test]
 async fn catalogue_reads_read_only_what_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "reads.CatalogScope");
+    let model = schema("reads.CatalogScope");
     for (engine, read, schema, table, answered, outcome) in [
         (Engine::Mysql, "database.list", None, None, true, "read"),
         (Engine::Mysql, "database.list", None, None, false, "read"),
@@ -965,7 +1039,6 @@ fn row_document(result: &Value, index: usize) -> Value {
 
 #[tokio::test]
 async fn catalogue_rows_are_the_model_row_types() {
-    let out = tempfile::tempdir().unwrap();
     for (read, input, row_type) in [
         ("database.list", json!({"limit":1}), "reads.DatabaseRow"),
         ("table.list", json!({"limit":1}), "reads.TableRow"),
@@ -976,7 +1049,7 @@ async fn catalogue_rows_are_the_model_row_types() {
         ),
         ("index.list", json!({"limit":1}), "reads.IndexRow"),
     ] {
-        let model = schema(out.path(), row_type);
+        let model = schema(row_type);
         let server = fixture::start(catalogue_script(read, true)).await;
         let result = sql(Engine::Mysql, server.port)
             .invoke(read, input)
@@ -1032,7 +1105,7 @@ async fn catalogue_rows_are_the_model_row_types() {
             "ordinal_position":"1"}),
         ),
     ] {
-        let model = schema(out.path(), row_type);
+        let model = schema(row_type);
         assert!(conforms(&model, &wrong).is_err(), "{row_type} {wrong}");
     }
 }
@@ -1078,8 +1151,7 @@ fn wide_profile(count: usize) -> Value {
 
 #[test]
 fn the_model_admits_exactly_the_read_profiles_the_executable_admits() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "connection.LocalConfiguration");
+    let model = schema("connection.LocalConfiguration");
     let root = tempfile::tempdir().unwrap();
     let directory = root.path().join("private");
     connectors_host::local::filesystem::directory(&directory, true, true).unwrap();
@@ -1271,8 +1343,7 @@ fn the_model_admits_exactly_the_read_profiles_the_executable_admits() {
 
 #[test]
 fn each_columns_masking_is_the_one_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.ColumnMasking");
+    let model = schema("profiles.ColumnMasking");
     for kind in ["text", "integer", "timestamp", "phone_number"] {
         for masked in [None, Some(true), Some(false)] {
             let mut column = json!({"name": "c", "type": kind});
@@ -1300,8 +1371,7 @@ fn profile_sql(port: u16) -> Sql {
 
 #[tokio::test]
 async fn every_page_is_one_the_model_admits() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.PageScope");
+    let model = schema("profiles.PageScope");
     let expected = calls::expected();
     for (cap, limit) in [
         (None, 2),
@@ -1364,8 +1434,7 @@ async fn every_page_is_one_the_model_admits() {
 
 #[tokio::test]
 async fn every_refusal_comes_before_a_session_as_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.ProfileReadCall");
+    let model = schema("profiles.ProfileReadCall");
     let server = fixture::start(calls::script(None)).await;
     let sql = profile_sql(server.port);
     let issued = sql
@@ -1413,8 +1482,7 @@ fn each_keyset_ordering_is_the_one_the_model_fixes() {
     use connectors_sql::profile::{
         ColumnType, PostgresqlOrderingType, mysql_keyset, postgresql_keyset,
     };
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.KeysetOrdering");
+    let model = schema("profiles.KeysetOrdering");
     let mut admitted = 0;
     for kind in ColumnType::ALL {
         let mut documents = Vec::new();
@@ -1488,8 +1556,7 @@ fn encode_token(cursor: &Value) -> String {
 
 #[tokio::test]
 async fn every_issued_cursor_is_one_the_model_admits() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.Cursor");
+    let model = schema("profiles.Cursor");
     // A plain value (the call table's row key) and values JSON must escape.
     let server = fixture::start(calls::script(None)).await;
     let token = profile_sql(server.port)
@@ -1550,8 +1617,7 @@ async fn every_issued_cursor_is_one_the_model_admits() {
 
 #[tokio::test]
 async fn each_cursor_admission_is_the_one_the_model_fixes() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.CursorAdmission");
+    let model = schema("profiles.CursorAdmission");
     let server = fixture::start(calls::script(None)).await;
     let sql = profile_sql(server.port);
     let token = sql
@@ -1638,8 +1704,7 @@ async fn each_cursor_admission_is_the_one_the_model_fixes() {
 
 #[tokio::test]
 async fn every_page_boundary_is_one_the_model_admits() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "profiles.PageBoundary");
+    let model = schema("profiles.PageBoundary");
     // Row keys 11, 12, 12, 14…: the boundary after the first, the second and the third row.
     let mut rows = calls::ROWS;
     rows[2].row_key = rows[1].row_key;
@@ -1691,8 +1756,7 @@ async fn every_page_boundary_is_one_the_model_admits() {
 /// `EntryField.max_bytes`) the entry: 4,096 two-byte characters are 8,192 bytes, one more is over.
 #[test]
 fn the_password_bound_counts_bytes_in_the_model_and_the_executable() {
-    let out = tempfile::tempdir().unwrap();
-    let model = schema(out.path(), "connection.Password");
+    let model = schema("connection.Password");
     for (password, admitted) in [
         ("p".repeat(8192), true),
         ("p".repeat(8193), false),
@@ -1746,4 +1810,134 @@ async fn query_text_and_parameters_are_bounded_in_characters() {
             );
         }
     }
+}
+
+/// Names the parent directory to the children of
+/// `four_processes_on_an_empty_directory_generate_once`. An ordinary run does not set it.
+const SCHEMAS_PARENT: &str = "CONNECTORS_TEST_ESS_MODEL_SCHEMAS_PARENT";
+
+/// What a child prints before the directory `schemas_in` returned to it.
+const CHILD_ANSWER: &str = "schemas-directory=";
+
+/// A parent directory of one test's own, under the target directory. No new test writes the
+/// one `schema` reads, so its `generations.log` holds the lines of the other tests alone.
+fn own_parent() -> tempfile::TempDir {
+    fs::create_dir_all(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap()
+}
+
+/// The child process of `four_processes_on_an_empty_directory_generate_once`, which names
+/// the parent directory in the environment. Without the variable, as in an ordinary run, it
+/// returns at once.
+#[test]
+fn a_child_generates_into_the_parent_it_is_given() {
+    let Some(parent) = std::env::var_os(SCHEMAS_PARENT) else {
+        return;
+    };
+    let directory = schemas_in(Path::new(&parent), &model_sources());
+    println!("{CHILD_ANSWER}{}", directory.display());
+}
+
+/// Four processes that start together on an empty parent directory generate the schemas
+/// once: each is this binary running the one child test, as cargo-nextest runs each test.
+#[test]
+fn four_processes_on_an_empty_directory_generate_once() {
+    let parent = own_parent();
+    let children: Vec<_> = (0..4)
+        .map(|_| {
+            Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "a_child_generates_into_the_parent_it_is_given",
+                    "--exact",
+                    "--nocapture",
+                ])
+                .env(SCHEMAS_PARENT, parent.path())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap()
+        })
+        .collect();
+    let outputs: Vec<_> = children
+        .into_iter()
+        .map(|child| child.wait_with_output().unwrap())
+        .collect();
+    let log = fs::read_to_string(parent.path().join("generations.log")).unwrap_or_default();
+    // The harness writes its own text around the child's line, so the answer is what
+    // follows the marker on whichever line holds it.
+    let answers: Vec<Option<PathBuf>> = outputs
+        .iter()
+        .map(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .find_map(|line| Some(PathBuf::from(line.split_once(CHILD_ANSWER)?.1)))
+        })
+        .collect();
+    let seen = format!(
+        "generations.log holds {} line(s); the children exited {:?} and answered {answers:?}; \
+         their standard error: {:?}",
+        log.lines().count(),
+        outputs
+            .iter()
+            .map(|output| output.status.code())
+            .collect::<Vec<_>>(),
+        outputs
+            .iter()
+            .map(|output| String::from_utf8_lossy(&output.stderr))
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(log.lines().count(), 1, "{seen}");
+    assert!(
+        outputs.iter().all(|output| output.status.success()),
+        "{seen}"
+    );
+    let directory = answers[0].as_deref().unwrap_or_else(|| panic!("{seen}"));
+    assert!(
+        answers
+            .iter()
+            .all(|answer| answer.as_deref() == Some(directory)),
+        "{seen}"
+    );
+    assert_eq!(directory.parent(), Some(parent.path()), "{seen}");
+    assert!(
+        directory
+            .join("schemas/schema/types/connectors_sql.connection.LocalConfiguration.schema.json")
+            .is_file(),
+        "{seen}"
+    );
+}
+
+/// The key follows the sources, and `ess` reads the directory it is given: one changed
+/// byte of a copy of the model makes a second directory beside the first, with the changed
+/// bound in its schema.
+#[test]
+fn a_changed_source_byte_makes_a_new_directory() {
+    let parent = own_parent();
+    let copy = tempfile::tempdir().unwrap();
+    let sources = copy.path().join("ess");
+    let files = source_files(&model_sources());
+    assert_eq!(files.len(), 4, "the model's source files");
+    for (name, bytes) in &files {
+        let path = sources.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+    let first = schemas_in(parent.path(), &sources);
+    // The first `lte: 64` of the file is the bound of `connectors_sql.profiles.ProfileId`.
+    let profiles = sources.join("domains/profiles.yaml");
+    let text = fs::read_to_string(&profiles).unwrap();
+    let changed = text.replacen("lte: 64", "lte: 65", 1);
+    assert_ne!(changed, text);
+    fs::write(&profiles, changed).unwrap();
+    let second = schemas_in(parent.path(), &sources);
+    assert_ne!(first, second);
+    let log = fs::read_to_string(parent.path().join("generations.log")).unwrap();
+    assert_eq!(log.lines().count(), 2, "{log}");
+    let bound = |directory: &Path| -> Value {
+        let path =
+            directory.join("schemas/schema/types/connectors_sql.profiles.ProfileId.schema.json");
+        let document: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        document["$defs"]["connectors_sql.profiles.ProfileId"]["maxLength"].clone()
+    };
+    assert_eq!((bound(&first), bound(&second)), (json!(64), json!(65)));
 }
