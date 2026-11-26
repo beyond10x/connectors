@@ -308,7 +308,7 @@ impl Snapshot {
         let config = serde_json::to_value(&self.configuration.document().limits).ok()?;
         if config["frame_octets"].as_u64()? < expected.2 as u64 + 8192
             || config["response_octets"].as_u64()? < 7 * expected.3 as u64 + 8192
-            || config["request_milliseconds"].as_u64()? < expected.0
+            || config["request_milliseconds"].as_u64()? < listed_request_ms(expected.0)
         {
             return None;
         }
@@ -660,17 +660,35 @@ fn tool_result(value: Value, primary: bool) -> Value {
 /// `Snapshot::limits`), less room for the summary and its `resume`, a page
 /// input within the request bound.
 /// What a walk leaves of its request's time for shaping, encoding and writing
-/// its reply.
-const WALK_REPLY_RESERVE: Duration = Duration::from_secs(5);
+/// its reply: 5 s. Test builds may replace it through the environment
+/// (`connectors_sdk::debug_override_ms`); a release build has no override.
+fn walk_reply_reserve() -> Duration {
+    Duration::from_millis(connectors_sdk::debug_override_ms(
+        "CONNECTORS_TEST_OVERRIDE_MCP_WALK_RESERVE_MS",
+        5_000,
+    ))
+}
 
-/// The deadline a walk's pages share: `WALK_REPLY_RESERVE` before the
+/// The deadline a walk's pages share: `walk_reply_reserve` before the
 /// request's own `until`, or `now` when less than that is left, so that the
 /// next page is refused `timeout` without reaching the owner.
 fn walk_deadline(until: Instant, now: Instant) -> Instant {
     until
-        .checked_sub(WALK_REPLY_RESERVE)
+        .checked_sub(walk_reply_reserve())
         .unwrap_or(now)
         .max(now)
+}
+
+/// The least configured `request_milliseconds` at which a read is listed: its
+/// `execution_ms`. Test builds may replace it through the environment
+/// (`connectors_sdk::debug_override_ms`), and a read listed under a shorter
+/// request budget is ended by the request's deadline first; a release build
+/// has no override.
+fn listed_request_ms(execution_ms: u64) -> u64 {
+    connectors_sdk::debug_override_ms(
+        "CONNECTORS_TEST_OVERRIDE_MCP_LISTED_REQUEST_MS",
+        execution_ms,
+    )
 }
 
 /// A `max_pages` the advertised schema admits: a JSON Schema integer, which is

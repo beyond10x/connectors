@@ -38,9 +38,21 @@ const DESCRIPTION: &str = "desc-1";
 const REVISION_META: &str = "io.beyond10x.connectors/revision";
 const PAGES: &str = "ticket.pages";
 const OPERATIONS: [&str; 1] = [PAGES];
-/// The request budget the companion configures: the least the projection
-/// admits for an `implemented` read (`execution_ms` 20,000).
-const REQUEST_MS: u64 = 20_000;
+/// The request budget the companion configures for the walk that outlasts
+/// it. A read is listed under it only through [`OVERRIDES`]: without them the
+/// least the projection admits for an `implemented` read is its
+/// `execution_ms`, 20,000. The server's own start is bounded by the same time
+/// (stdio.rs `serve`), and the walk's first page must end before the last
+/// second of it; at 4,000 ms a busy host missed one or the other.
+const REQUEST_MS: u64 = 6_000;
+/// The variables of that walk's server: a read is listed from a request
+/// budget of 6,000 ms on (production: its `execution_ms`), and a walk leaves
+/// 1,000 ms of its request for its reply (production: 5,000). Only a build
+/// with `debug_assertions` reads them (`connectors_sdk::debug_override_ms`).
+const OVERRIDES: [(&str, &str); 2] = [
+    ("CONNECTORS_TEST_OVERRIDE_MCP_LISTED_REQUEST_MS", "6000"),
+    ("CONNECTORS_TEST_OVERRIDE_MCP_WALK_RESERVE_MS", "1000"),
+];
 
 fn walk_declaration() -> Value {
     json!({"parameter": "page[after]", "next": "/meta/after_cursor", "records": "/items",
@@ -254,8 +266,8 @@ fn configure(container: &Container, adapter: &config::Adapter) {
 }
 
 /// One jail with a connection, the curation pinned to the adapter and the
-/// read exposed as a tool, under a `REQUEST_MS` request budget.
-fn served() -> Container {
+/// read exposed as a tool, under a request budget of `request_ms`.
+fn served(request_ms: u64) -> Container {
     bootstrap()
         .validate_for(runtime::PrivateProtocol::V3)
         .expect("the fixture's description passes the child's own readiness check");
@@ -296,7 +308,7 @@ fn served() -> Container {
     private(
         &container.path(COMPANION),
         json!({"format":"connectors-mcp-local/1","limits":{"frame_octets":1048576,"response_octets":33554432,
-            "concurrent_requests":1,"request_milliseconds":REQUEST_MS},"exposures":exposures})
+            "concurrent_requests":1,"request_milliseconds":request_ms},"exposures":exposures})
         .to_string(),
     );
     assert!(container.seen("invocations").is_empty());
@@ -314,12 +326,14 @@ struct Peer {
 }
 
 impl Peer {
-    fn start(container: &Container) -> Self {
+    /// Start the server with an environment of `variables` and nothing else.
+    fn start(container: &Container, variables: &[(&str, &str)]) -> Self {
         let mut command = container.jail.command("/bin-test/connectors", Map::Own);
         command
             .args(["--config", CONFIG, "--state-dir", STATE])
             .args(["server", "--transport", "stdio"])
             .env_clear()
+            .envs(variables.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
@@ -411,16 +425,17 @@ impl Drop for Peer {
 /// time budget, so a walk that outlasts it stops refused with `timeout`", and
 /// "A page refused after the first stops the walk with `stopped: "refused"`
 /// and the refusal's service `error`; the reply is a success carrying the
-/// records already taken." Each page here takes 4 s of a 20 s budget, so the
-/// walk outlasts it after about five pages.
+/// records already taken." Each page here takes 1 s of a 6 s budget whose
+/// last second is the reply's ([`OVERRIDES`]), so the walk outlasts it after
+/// four or five pages.
 #[test]
 fn a_walk_that_outlasts_the_request_budget_answers_the_records_taken() {
-    let container = served();
-    let mut peer = Peer::start(&container);
+    let container = served(REQUEST_MS);
+    let mut peer = Peer::start(&container, &OVERRIDES);
     let revision = peer.revision();
     peer.call(
         2,
-        json!({"input":{"ticket_id":101,"delay_ms":4000},"walk":true,"max_pages":100}),
+        json!({"input":{"ticket_id":101,"delay_ms":1000},"walk":true,"max_pages":100}),
         &revision,
     );
     let reply = peer.reply(2, Duration::from_millis(REQUEST_MS + 20_000));
@@ -445,11 +460,13 @@ fn a_walk_that_outlasts_the_request_budget_answers_the_records_taken() {
 /// The advertised `max_pages` is `{"type":"integer","minimum":1,...}`, and a
 /// JSON Schema integer is any number with a zero fractional part, so `2.0`
 /// passes a client's validation against the tool's `inputSchema`. The
-/// contract refuses only a `max_pages` "outside 1 to 10,000".
+/// contract refuses only a `max_pages` "outside 1 to 10,000". This test waits
+/// out no budget, so its server runs as production does: the read's own
+/// `execution_ms` as the request budget and no override variable.
 #[test]
 fn max_pages_written_as_an_integral_number_is_the_integer_the_schema_admits() {
-    let container = served();
-    let mut peer = Peer::start(&container);
+    let container = served(20_000);
+    let mut peer = Peer::start(&container, &[]);
     let revision = peer.revision();
     peer.call(
         2,
@@ -461,6 +478,22 @@ fn max_pages_written_as_an_integral_number_is_the_integer_the_schema_admits() {
         reply["result"]["structuredContent"]["result"]["pages"],
         json!(2),
         "story:mcp-tool-call-shapes-its-result: {reply}"
+    );
+}
+
+/// Production, with no override variable: a read is listed only under a
+/// request budget of at least its `execution_ms` (20,000 here; projection.rs
+/// `Snapshot::limits`). One millisecond under it `tools/list` answers and
+/// holds no tool.
+#[test]
+fn a_request_budget_under_the_reads_execution_time_lists_no_tool() {
+    let container = served(19_999);
+    let mut peer = Peer::start(&container, &[]);
+    let list = peer.request(1, "tools/list", json!({}));
+    assert_eq!(
+        list["result"]["tools"],
+        json!([]),
+        "story:two-mcp-tests-wait-out-the-20-s-request-budget-a-listed-tool-needs: {list}"
     );
 }
 
