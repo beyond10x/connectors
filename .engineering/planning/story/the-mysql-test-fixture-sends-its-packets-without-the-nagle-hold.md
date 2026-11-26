@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-mysql-test-fixture-sends-its-packets-without-the-nagle-hold
 kind: story
-status: active
+status: implemented
 title: 'The MySQL test fixture sets TCP_NODELAY: 7.0 s become an estimated 0.6 s if the cause holds'
 summary: One SQL test spends 91 % of its time in epoll_wait on its own fixture server, which writes each packet in two parts without TCP_NODELAY; the first acceptance statement confirms or refutes that cause
 relations:
@@ -13,10 +13,11 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/mysql/fixture.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-25T11:18:23Z", actor: "human:operator", revision: 6}
+- {from: "active", to: "implemented", at: "2026-11-26T20:08:49Z", actor: "human:operator", revision: 9, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
@@ -220,7 +221,30 @@ time without this change was not measured.
 
 Against the estimate: the story estimated 0.6 s on the forge; on the build host the test takes
 0.13 to 0.21 s. Statement 4 (at most 2.0 s in the forge's gate job) is read from the pull
-request's job.
+request's job, below.
 
 The six runs made with a dropped result (`let _ =`) and the final runs with `expect` differ in
 that one expression; the six runs were not made again.
+
+Read from the forge on 2026-11-26, pull request 313, whose branch merged this story's commit
+d799174f9 with three other stories. The job: "repository gate" job 139714078337 (run
+45748988866, attempt 2) of head 606a611d5; attempt 1 (job 139671926182) was cancelled after 90
+minutes in `apt-get update`, before the gate started.
+
+- Statement 2: the diff of d799174f9 against its first parent names one file outside the
+  planning store, `adapters/sql/tests/mysql/fixture.rs`, 3 lines added. The pull request's diff
+  also holds the files of the other three stories.
+- Statement 3: the job's test step printed `Summary [ 466.033s] 4546 tests run: 4546 passed (4
+  slow), 229 skipped`. The nine binaries of `connectors-sql` have 74 `PASS` lines and no `FAIL`
+  line: `mysql_adversary` 2, `mysql_local` 6, `mysql_adversary_2` 2,
+  `query_provenance_adversary` 2, `catalogue_adversary` 1, `ess_model` 17, `mysql_protocol` 23,
+  `profiles_adversary` 4, `profiles` 17. `connectors-conformance::incident_call_join` has 1
+  `PASS`. 75 run, 75 passed, as the statement counts.
+- Statement 4: `PASS [   0.105s] … connectors-sql::ess_model every_page_is_one_the_model_admits`.
+  Bound 2.0 s; met by 1.895 s (arithmetic).
+- The record the statement asks for: in the newest gate job on main at or before the base
+  commit e1908013e (the checkout line `HEAD is now at 826ab34 Merge 606a611d5… into
+  e1908013e…`), job 139671125964 (run 45748746486, the push of e1908013e), the test took
+  7.022 s.
+
+Every statement holds; the story moved to implemented on this record.

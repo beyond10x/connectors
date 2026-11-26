@@ -7,7 +7,7 @@ title: The forge's gate job compiles its test binaries once and prints its time 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:the-gates-test-step-ends-within-120-s-on-the-forge
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-24T15:26:22Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-24T15:26:23Z", actor: "human:timo", revision: 4}
@@ -369,3 +369,31 @@ numbers, not from this list.
   60 s for a test; a number for the compile is the operator's to name.
 - Order: first story after release 0.78.0 and the move of the side installs (the operator,
   2026-11-24 11:41 CET).
+
+## As built
+
+Read from the forge on 2026-11-26: "repository gate" job 139714078337 (run 45748988866, attempt
+2) of pull request 313, head 606a611d5, 06:01:26 to 06:33:18 UTC. Attempt 1 (job 139671926182)
+was cancelled after 90 minutes in `apt-get update`, before the gate started.
+
+- Acceptance 1 holds: the job printed `gate: time per step` with 27 rows and `gate: 1480.4 s sum
+  of 27 steps`, and the step of the ignored tests printed `ignored: time per step` with 4 rows
+  and `ignored: 3.9 s sum of 4 steps`.
+- Acceptance 2 holds: the step of the ignored tests began at 06:33:12.038 (`##[group]Run cargo
+  run --locked --bin connectors-build -- ignored …`) and printed its first `ignored: running`
+  line at 06:33:14.909, 2.9 s later (arithmetic); its rows `0.4 s build of the test binaries`
+  and `2.2 s listing of the ignored tests`.
+- Acceptance 3 holds: the log has three ``Finished `test` profile`` lines, `in 9m 59s` (the
+  gate's step "build of the test binaries", 599.9 s), `in 0.29s` (the test step) and `in 0.20s`
+  (the doctests). One names more than 60 s.
+- Acceptance 4 is open: this story has no evidence record. The body holds pull request 295
+  (job 138646969126, 2,401 s) against pull request 296 (job 138682816066, 2,094 s), but pull
+  request 296 changes two crates (`connectors-build`, `connectors-host`) and the workflow.
+  Pull requests that change one crate outside the planning store and documents, with their gate
+  job's time from the jobs' start and end (UTC): 295 (`connectors-build`, before change 3) job
+  138646969126, 2,401 s; 300 (`connectors-host`, after change 3) job 138945630062, 2,736 s; 307
+  (`connectors-host`) job 139129733813, 2,076 s. No pull request before change 2 (pull request
+  294) changes one crate. Which two runs are "before" and "after" is not named by the statement;
+  the record waits for that choice.
+
+The story stays active and is not moved to implemented: acceptance 4 has no record.

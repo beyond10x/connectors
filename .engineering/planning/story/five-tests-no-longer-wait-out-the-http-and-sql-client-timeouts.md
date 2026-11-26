@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts
 kind: story
-status: active
+status: implemented
 title: 'Five tests no longer wait out the HTTP and SQL client timeouts: 56.2 s become an estimated 5.4 s'
 summary: The HTTP client's 15 s and 5 s timeouts and the SQL QUERY_TIMEOUT of 10 s are literals and constants; two debug-only HTTP overrides and a constructor parameter for SQL let tests shorten them
 relations:
@@ -26,10 +26,11 @@ scope:
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 11
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:44:03Z", actor: "human:operator", revision: 9}
 - {from: "proposed", to: "active", at: "2026-11-25T11:44:03Z", actor: "human:operator", revision: 10}
+- {from: "active", to: "implemented", at: "2026-11-26T20:08:51Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Defect
 
@@ -284,3 +285,33 @@ lane tests as passed; the gate's ignored step passes), and the three HTTP gate t
 
 Not run: a build without `debug_assertions`; the MySQL path at `Duration::MAX` (it calls the
 same `work_deadline`).
+
+Read from the forge on 2026-11-26, pull request 313, whose branch merged this story's commit
+15be8ec95 with three other stories. The diff of 15be8ec95 against its first parent names the
+seven files of the scope and no other file outside the planning store.
+
+- Acceptance 1: "repository gate" job 139714078337 (run 45748988866, attempt 2; attempt 1, job
+  139671926182, was cancelled after 90 minutes in `apt-get update`, before the gate started).
+  The test step printed `Summary [ 466.033s] 4546 tests run: 4546 passed (4 slow), 229
+  skipped`. The five tests, as nextest printed them:
+  `provider_budget_generic_30_seconds_is_not_clipped_to_legacy_15` 1.213 s,
+  `a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout` 0.513 s,
+  `a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked` 0.312 s,
+  `mysql_deadline_kills_the_running_query` 1.011 s,
+  `deadline_sends_the_backend_cancel_key_and_drains_the_connection` 1.088 s. Sum 4.137 s
+  (arithmetic), under the bound of 9 s by 4.863 s. Before: 56.2 s.
+- Acceptance 2 and 3: "slow" job 139671925405 (run 45748988824) of head 606a611d5, step "Run
+  the ignored slow_lane_ tests, 60 s each" (`ignored --family timing --required
+  --only-prerequisite provider`): `executed` 6, `failed` 0, `missing` 0, `unknown` 0; the three
+  lane tests have `"status": "passed"`. Time between the job's `ignored: running` lines: the
+  stalled body 15.014 s, the handshake 5.025 s, the PostgreSQL deadline 10.091 s (to `ignored:
+  step ran 92.5 s: ignored tests`).
+- Acceptance 4: `git grep -n with_query_timeout 606a611d5 -- adapters/sql/src apps/` prints one
+  line, the definition at `adapters/sql/src/lib.rs:263`.
+- Acceptance 5: the gate job's ignored step: `executed` 4, `failed` 0, `missing` 0, `unknown` 0,
+  `inventory` 229.
+- Windows: "host and CLI on windows-latest" job 139676682004 (run 45748988645), step "Test the
+  host and the CLI" ended `success`; the three HTTP gate tests print `... ok`, the two lane tests
+  of `provider_timeout_adversary` `ignored, lane slow: …`.
+
+Every acceptance holds; the story moved to implemented on this record.

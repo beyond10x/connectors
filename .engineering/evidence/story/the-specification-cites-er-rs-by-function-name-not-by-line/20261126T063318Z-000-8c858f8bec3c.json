@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-26T06:33:18Z",
+  "actor": "human:operator",
+  "artifact": "story:the-specification-cites-er-rs-by-function-name-not-by-line",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job repository gate 139714078337 of pull request 313 (attempt 2), head 606a611d5: Summary [ 466.033s] 4546 tests run: 4546 passed (4 slow), 229 skipped; the 6 tests of cli_spec_mapping_adversary passed, slowest 0.022 s; the_committed_metadata_emissions_are_current passed; slowest test of the step 46.6 s",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45748988866/job/139714078337"
+  }
+}

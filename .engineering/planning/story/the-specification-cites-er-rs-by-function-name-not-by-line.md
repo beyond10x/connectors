@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-specification-cites-er-rs-by-function-name-not-by-line
 kind: story
-status: active
+status: implemented
 title: The specification cites er.rs by function name, so moved lines no longer break a test or leave a stale citation
 summary: Two comments under ess/domains cite er.rs by line and a connectors-build test holds one of them within a window of three lines; the citations name a function, the test finds it and holds the arm, and the emissions record is regenerated
 relations:
@@ -17,10 +17,11 @@ scope:
   path: ess/domains/auth_bindings.yaml
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 11
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 9}
 - {from: "proposed", to: "active", at: "2026-11-25T11:18:23Z", actor: "human:operator", revision: 10}
+- {from: "active", to: "implemented", at: "2026-11-26T20:08:50Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Defect
 
@@ -293,4 +294,27 @@ the test fails with "exactly one line of `removal_command` in er.rs holds
 "connectors.cli.ExpireConnectionListCursor"".
 
 Read from the pull request's jobs and not from a run on the build host: the second half of
-statement 5 (the forge's `slow` job) and statement 6 (the gate's test step).
+statement 5 (the forge's `slow` job) and statement 6 (the gate's test step), below.
+
+Read from the forge on 2026-11-26, pull request 313, whose branch merged this story's commit
+659e9cbec with three other stories.
+
+- Statement 5, the diff: the diff of 659e9cbec against its first parent names, outside the
+  planning store, the four files of the scope and no other (`inputs.json`,
+  `cli_spec_mapping_adversary.rs`, `auth_bindings.yaml`, `cli.yaml`). The pull request's diff
+  also holds the files of the other three stories.
+- Statement 5, the forge half: "slow" job 139671925405 (run 45748988824) of head 606a611d5, step
+  12 "Regenerate the metadata emissions and compare them byte for byte" ended `success`; its
+  last line `metadata emissions: 4 files current`, after the three parts (`component`,
+  `connectors.oauth2`, `connectors.approval_issuers`).
+- Statement 6: "repository gate" job 139714078337 (run 45748988866, attempt 2; attempt 1, job
+  139671926182, was cancelled after 90 minutes in `apt-get update`, before the gate started).
+  The test step printed `Summary [ 466.033s] 4546 tests run: 4546 passed (4 slow), 229
+  skipped`. The 6 tests of `connectors-build::main cli_spec_mapping_adversary::` passed (the
+  slowest 0.022 s), among them `the_er_rs_citation_lands_on_the_cursor_expiry_path` 0.009 s and
+  `the_body_finder_returns_the_same_function_from_two_texts` 0.004 s;
+  `metadata_conformance::tests::the_committed_metadata_emissions_are_current` passed in
+  0.009 s. The slowest test of the step took 46.6 s (`gate: ten slowest tests`); none is over
+  60 s.
+
+Every statement holds; the story moved to implemented on this record.

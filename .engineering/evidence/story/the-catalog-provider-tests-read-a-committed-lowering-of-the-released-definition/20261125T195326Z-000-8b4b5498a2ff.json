@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-25T19:53:26Z",
+  "actor": "human:operator",
+  "artifact": "story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job slow 139453848986 of pull request 311, head d3a4bf0dd: ignored --family timing: executed 3, failed 0, missing 0, unknown 0; released_lowering::slow_lane_the_committed_lowering_equals_a_fresh_lowering passed",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45684630741/job/139453848986"
+  }
+}

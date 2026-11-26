@@ -17,7 +17,7 @@ scope:
   path: apps/connectors/tests/mcp_tool_call_shapes_adversary.rs
 - confidence: cited
   path: apps/connectors/tests/security_mcp_deadline.rs
-revision: 11
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T07:57:04Z", actor: "human:operator", revision: 9}
 - {from: "proposed", to: "active", at: "2026-11-25T07:57:04Z", actor: "human:operator", revision: 10}
@@ -244,3 +244,30 @@ the gate at 20 s. story:two-mcp-tests-wait-out-the-20-s-request-budget-a-listed-
 holds them and names three ways to shorten them.
 
 Open until the jobs of the pull request: the durations of the six tests in the forge's gate job.
+
+Read from the forge on 2026-11-26, pull request 309 (head 7f6d60b4e, merged as da99b5b4f):
+"repository gate" job 139190571676 (run 45609953156). Its checkout printed `HEAD is now at
+ae56018 Merge 7f6d60b4e… into ace8e554c…`; the test step printed `Summary [ 730.303s] 4522 tests
+run: 4522 passed (4 slow), 225 skipped`. The six tests, as nextest printed them:
+
+| Test | s |
+|---|---|
+| `security_control_a_late_reply_to_a_paused_reader_keeps_the_session` | 6.775 |
+| `security_an_on_time_reply_written_across_its_deadline_keeps_the_session` | 22.321 |
+| `a_walk_that_outlasts_the_request_budget_answers_the_records_taken` | 16.762 |
+| `adversary_a_lost_session_leaves_no_provider_read_open` | 4.360 |
+| `adversary_stdin_closed_while_the_store_is_held_exits_successfully` | 1.998 |
+| `adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready` | 6.997 |
+| Sum | 59.213 |
+
+- Acceptance 1 is not met: 59.213 s against the bound of 42 s, over it by 17.2 s (arithmetic).
+  The two tests on the budget of 20 s take 39.083 s of it. Before: 85.3 s.
+- The same six in the later gate job 139714078337 of pull request 313 (attempt 2): 5.406,
+  21.441, 16.073, 2.852, 0.890 and 5.150 s, 51.812 s summed, over the bound by 9.8 s. That job
+  is a record, not the one the statement names.
+- Acceptance 3 and 4 have no subject (no ignored test was added); the gate job's ignored step of
+  pull request 309 ended with `executed` 4, `failed` 0, `missing` 0, `unknown` 0.
+
+The story stays active and is not moved to implemented: acceptance 1 missed. The two tests on
+the budget of 20 s are held by
+story:two-mcp-tests-wait-out-the-20-s-request-budget-a-listed-tool-needs.

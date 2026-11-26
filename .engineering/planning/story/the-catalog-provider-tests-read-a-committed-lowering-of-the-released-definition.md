@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition
 kind: story
-status: active
+status: implemented
 title: '40 catalog provider tests read a committed lowering of the released definition: about 94.9 s become an estimated 9.7 s'
 summary: engine() lowers the released definition per call, about 1.5 s each; a committed generated directory with a digest of its sources replaces it; 26 tests that lower a changed definition keep theirs
 relations:
@@ -23,10 +23,11 @@ scope:
   path: adapters/catalog/tests/released_lowering.rs
 - confidence: inferred
   path: crates/connectors-catalog/tests/fixtures/released-github-lowering
-revision: 14
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T07:57:05Z", actor: "human:operator", revision: 11}
 - {from: "proposed", to: "active", at: "2026-11-25T07:57:05Z", actor: "human:operator", revision: 12}
+- {from: "active", to: "implemented", at: "2026-11-26T20:08:52Z", actor: "human:operator", revision: 16, decided_on: {"recorded":{"test_result":2,"review_outcome":2}}}
 ---
 ## Defect
 
@@ -296,3 +297,29 @@ Not established: the bytes of a lowering on macOS (no workflow of the repository
 `connectors-catalog-provider` there) and on the forge's runner; whether a change of the
 toolchain or of a dependency feature alters the bytes; that the write and compare arms of the
 lane test follow `mode` (no gate test covers the lane test's body).
+
+Read from the forge on 2026-11-26, pull request 311 (head d3a4bf0dd, merged as 28b4b5431),
+opened after story:the-lane-slow-runs-the-ignored-timing-family was on main (pull request 304).
+
+- Acceptance 1: "repository gate" job 139453849771 (run 45684630758). Its checkout printed
+  `HEAD is now at 6d122b9 Merge d3a4bf0dd… into fbb053301…`; the test step printed
+  `Summary [ 565.166s] 4541 tests run: 4541 passed (4 slow), 226 skipped`. The 40 tests have 40
+  `PASS` lines in `connectors-catalog-provider::main`: 15 of `github_definition_reads::`, 19 of
+  `github_definition_reads_adversary::`, 6 of `definition_published_features_adversary::the_released_`.
+  Their durations sum to 1.026 s (arithmetic), under the bound of 15 s by 13.974 s; the slowest,
+  `the_raw_reads_hold_exactly_1_mib`, 0.101 s. Before: about 94.9 s.
+- Acceptance 2: at d3a4bf0dd, `git grep -c "definition::lower"` finds 0 in the two reads files
+  and 1 in `definition_published_features_adversary.rs`.
+- Acceptance 3, 4, 5 and 7: in the same job the 19 tests of `released_lowering::` passed, among
+  them `the_committed_lowering_is_current` 0.006 s, `a_changed_input_byte_changes_the_digest`
+  0.005 s, `a_stale_digest_prints_the_regeneration_command` 0.006 s and
+  `a_changed_byte_in_a_copy_of_the_fixture_fails_the_comparison` 0.006 s.
+- Acceptance 6: "slow" job 139453848986 (run 45684630741) of head d3a4bf0dd, `ignored --family
+  timing --required --only-prerequisite provider`:
+  `connectors-catalog-provider::main::released_lowering::slow_lane_the_committed_lowering_equals_a_fresh_lowering`
+  has `"status": "passed"`; `executed` 3, `failed` 0, `missing` 0, `unknown` 0. It passed again
+  in the "slow" job 139671925405 of pull request 313. So a lowering on the forge's Linux runner
+  writes the bytes of the committed directory.
+- Acceptance 8: the gate job's ignored step: `executed` 4, `failed` 0, `missing` 0, `unknown` 0.
+
+Every acceptance holds; the story moved to implemented on this record.

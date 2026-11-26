@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
 kind: story
-status: active
+status: implemented
 title: 'The Entity Runtime registry is built once per process: 108.0 s become an estimated 76 s'
 summary: Every persist and fresh open of the metadata store parses the compiled-in bundle and builds the registry again; one process-wide value replaces 2,729 builds and 2,293 second parses in eleven tests
 relations:
@@ -14,10 +14,11 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-revision: 9
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 7}
 - {from: "proposed", to: "active", at: "2026-11-25T11:38:54Z", actor: "human:operator", revision: 8}
+- {from: "active", to: "implemented", at: "2026-11-26T20:08:48Z", actor: "human:operator", revision: 11, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
@@ -447,7 +448,47 @@ Mutants the three tests were run against, each taken back: the value keyed per s
 building its own (red with (0, 4)), and the two above. With the two added tests,
 `test(/^local::metadata::/)` runs 117 tests and 117 pass.
 
-Read from the pull request's job and not from a run on the build host: the forge half of
-statement 3 and statement 4.
+Read from the forge on 2026-11-26: the forge half of statement 3 and statement 4, from pull
+request 313, whose branch merged this story's commit 8df1671f7 with three other stories. The diff
+of 8df1671f7 against its first parent names one file outside the planning store, `er.rs`; the
+pull request's diff also holds the files of the other three stories.
+
+- The job: "repository gate" job 139714078337 (run 45748988866, attempt 2) of head 606a611d5.
+  Attempt 1 (job 139671926182) was cancelled after 90 minutes in `apt-get update`, before the
+  gate started; it was not a run again for a time bound.
+- Statement 3, the forge half: the job's test step printed `Summary [ 466.033s] 4546 tests run:
+  4546 passed (4 slow), 229 skipped`. The three tests of this story passed:
+  `persists_and_fresh_opens_build_the_definitions_once_per_process` 0.414 s,
+  `adversary_the_bundle_is_read_only_where_the_once_test_counts_it` 0.020 s,
+  `adversary_first_use_from_eight_threads_at_once_builds_the_definitions_once` 0.294 s.
+- Statement 4, the base: the job's checkout printed `HEAD is now at 826ab34 Merge 606a611d5…
+  into e1908013e…`, so the base commit is e1908013e. The newest gate job on main at or before it
+  that ran the test step is job 139671125964 (run 45748746486, the push of e1908013e; `gate: test
+  step ran 641.4 s (budget 120 s)`).
+
+The eleven durations as nextest printed them (`PASS [ <s>s]`), in the order of the list above:
+
+| Test | Base, job 139671125964, s | Pull request 313, job 139714078337, s |
+|---|---|---|
+| 1 | 24.690 | 10.755 |
+| 2 | 22.677 | 10.403 |
+| 3 | 10.987 | 7.089 |
+| 4 | 13.692 | 6.062 |
+| 5 | 10.959 | 3.934 |
+| 6 | 10.517 | 6.035 |
+| 7 | 9.851 | 7.626 |
+| 8 | 8.610 | 4.128 |
+| 9 | 9.034 | 3.675 |
+| 10 | 9.218 | 4.098 |
+| 11 | 8.810 | 4.420 |
+| Sum | 139.045 | 68.225 |
+
+- Bound: 139.045 − 16.0 = 123.0 s (arithmetic). 68.225 s is under it by 54.8 s: statement 4
+  holds. Against the plan's base of 108.0 s (bound 92.0 s) it holds too.
+- The base job's eleven took 31.0 s more than job 138270416028 of the plan (139.045 − 108.0,
+  arithmetic). That the runners differ is a reading of two jobs, not a measurement.
+- No test of the eleven is over 60 s in either job (largest: 24.690 s in the base job).
+
+Every statement holds; the story moved to implemented on this record.
 
 Not measured: the cost of a `Registry` clone and the memory the shared value holds.

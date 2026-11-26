@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-26T04:20:42Z",
+  "actor": "human:operator",
+  "artifact": "story:the-specification-cites-er-rs-by-function-name-not-by-line",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job slow 139671925405 of pull request 313, head 606a611d5: step Regenerate the metadata emissions and compare them byte for byte, success, metadata emissions: 4 files current",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45748988824/job/139671925405"
+  }
+}

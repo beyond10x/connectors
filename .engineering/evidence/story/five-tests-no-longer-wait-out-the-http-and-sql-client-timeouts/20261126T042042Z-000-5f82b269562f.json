@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-26T04:20:42Z",
+  "actor": "human:operator",
+  "artifact": "story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "forge job slow 139671925405 of pull request 313, head 606a611d5: ignored --family timing: executed 6, failed 0, missing 0, unknown 0; the three slow_lane_ tests of this story passed (15.014 s, 5.025 s, 10.091 s between the running lines)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45748988824/job/139671925405"
+  }
+}
