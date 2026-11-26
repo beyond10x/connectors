@@ -8,7 +8,8 @@ summary: A write operation declares a read-back beside its preflight; after an u
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:landed-write-is-not-unknown-after-the-owners-budget
-revision: 1
+- depends_on: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
+revision: 2
 ---
 ## Gap
 
@@ -39,3 +40,10 @@ To be written once the design is settled.
 
 Informed by story:landed-write-is-not-unknown-after-the-owners-budget, whose workaround is this
 read-back.
+
+## Exit
+
+The read-back extends the exit rule of story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice:
+an unknown write that the read confirms exits 0 with `confirmed_by`; one it does not confirm exits 3. The
+read runs inside the write's deadline, which has no budget of its own for it yet (UNMAPPED: the
+read's share of the 20 s write deadline; `deadline_seconds` is refused beside `--idempotency-key`).
