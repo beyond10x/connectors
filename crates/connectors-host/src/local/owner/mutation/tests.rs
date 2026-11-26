@@ -28,6 +28,7 @@ fn production_finish_audit_recovers_a_lost_acknowledgement_on_the_real_clock() {
                 stage: Stage::Response,
             }),
             standing: None,
+            tries: None,
         },
         source_audit: SourceAudit {
             instance: "alpha".into(),
@@ -102,6 +103,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         stage: Stage::Response,
                     }),
                     standing: None,
+                    tries: None,
                 },
                 source_audit: SourceAudit {
                     instance: "alpha".into(),
@@ -548,6 +550,7 @@ fn standing_is_named_for_an_attempt_and_absent_without_a_store() {
                 replayed: false,
                 cause: None,
                 standing: None,
+                tries: None,
             },
             source_audit: SourceAudit {
                 instance: "leaf".into(),

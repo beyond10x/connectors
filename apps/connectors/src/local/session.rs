@@ -61,6 +61,10 @@ pub(super) struct Session {
     /// The full answer of an `invoke` given `--fields` or `--each`, kept for
     /// shaping once the runner has checked and printed it.
     pub answer: Option<Value>,
+    /// An `invoke --retry-not-attempted` write answered `unknown`: the
+    /// command exits 3, not 1
+    /// (story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice).
+    pub unknown_retried: bool,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
@@ -140,6 +144,7 @@ impl Session {
             revealed: None,
             shaping: None,
             answer: None,
+            unknown_retried: false,
         }))
     }
     /// The preparsed callable and its context, when the arguments parsed.

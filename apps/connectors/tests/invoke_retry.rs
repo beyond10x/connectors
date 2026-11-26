@@ -617,31 +617,19 @@ const PROVIDER_TIMEOUT: &str = "provider_timeout";
 // ---------------------------------------------------------------------------
 // The acceptance statements.
 
-/// Statement 1: under a standing grant of `max_per_hour` 1, preflights 1 and
-/// 2 answer the provider's timeout; with `--retry-not-attempted 3` the write
-/// is applied on its third try, and without the option it is `not_attempted`.
+/// Statement 1, under a standing grant of `max_per_hour` 1 whose preflights 1
+/// and 2 answer the provider's timeout: with `--retry-not-attempted 3` the
+/// write is applied on its third try.
 #[test]
 fn a_write_whose_first_two_preflights_time_out_is_applied_on_its_third_try() {
     let site = Site::new(Grant {
         values: vec![true],
         max_per_hour: 1,
     });
-    let script = Script {
+    site.script(&Script {
         preflights: vec![PROVIDER_TIMEOUT, PROVIDER_TIMEOUT],
         ..Default::default()
-    };
-    // Without the option: today's answer, and the grant's use given back.
-    site.script(&script);
-    let (code, data) = refused(&site.invoke(true, &["--idempotency-key", "plain-1"]));
-    assert_eq!(code, Some(1), "{data}");
-    assert_eq!(
-        data["mutation"]["classification"], "not_attempted",
-        "{data}"
-    );
-    assert!(data["mutation"].get("tries").is_none(), "{data}");
-    assert_eq!(site.log(), ["preflight true"]);
-    // With it: three tries, one commit.
-    site.script(&script);
+    });
     let result = answered(&site.invoke(
         true,
         &["--idempotency-key", "retry-1", "--retry-not-attempted", "3"],
@@ -658,6 +646,29 @@ fn a_write_whose_first_two_preflights_time_out_is_applied_on_its_third_try() {
             "commit true"
         ]
     );
+}
+
+/// Statement 1, the same site and script without the option: today's
+/// answer, `not_attempted` after one preflight, with no `tries`. A test of
+/// its own, so each stays under statement 15's 5 s.
+#[test]
+fn the_same_write_without_the_option_is_not_attempted() {
+    let site = Site::new(Grant {
+        values: vec![true],
+        max_per_hour: 1,
+    });
+    site.script(&Script {
+        preflights: vec![PROVIDER_TIMEOUT, PROVIDER_TIMEOUT],
+        ..Default::default()
+    });
+    let (code, data) = refused(&site.invoke(true, &["--idempotency-key", "plain-1"]));
+    assert_eq!(code, Some(1), "{data}");
+    assert_eq!(
+        data["mutation"]["classification"], "not_attempted",
+        "{data}"
+    );
+    assert!(data["mutation"].get("tries").is_none(), "{data}");
+    assert_eq!(site.log(), ["preflight true"]);
 }
 
 /// Statement 2: an unknown effect is never sent again: exit 3 with the

@@ -13,6 +13,18 @@
   pull-request workflow `musl-static.yml` builds and checks them when `Cargo.lock`,
   `rust-toolchain.toml` or the cargo configuration changes. The musl binaries use musl's own
   memory allocator; no faster allocator is linked until one is measured on the forge.
+- `connectors invoke --retry-not-attempted <n>` tries a keyed write up to `n` times, 1 to 10
+  (story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice). The owner
+  makes the tries one after another on the instance's worker, inside the write's 20-second
+  deadline, and makes another only while the provider answered the preflight with its own
+  timeout or capacity answer and nothing was sent; every other answer ends the tries, and a
+  write classified `applied`, `refused` or `unknown` is never sent again. No try starts after
+  the caller was interrupted, or with less left before the deadline than the last try took
+  plus 3 seconds. A try made again records no attempt and spends no proof and no grant use.
+  The answer's `mutation.tries` names the tries made, 0 on a same-key replay; a write
+  classified `unknown` exits 3 under the option. The option without `--idempotency-key`, or
+  outside 1 to 10, is `invalid_input` naming `retry_not_attempted` at `arguments`. Without
+  the option a write answers as before, with no `tries`.
 
 ### Fixed
 
