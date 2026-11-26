@@ -9,14 +9,15 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 - depends_on: story:a-clock-refusal-of-issue-and-invoke-names-its-sources
-revision: 1
+- depends_on: story:an-unknown-write-is-settled-by-a-declared-read-back
+revision: 2
 ---
 ## Gap
 
 A consumer asked that `invoke` retry every write that connectors classifies `not_attempted`,
 naming unavailable, timeout and the approval-clock refusal.
 story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice retries only the
-provider's own answers to the preflight (timeout, capacity, unavailable). This story owns the
+provider's own timeout and capacity answers to the preflight. This story owns the
 host-side causes it leaves out:
 
 - a clock refusal at stage `admission`, after the owner's second attempt: the host answers it
@@ -27,6 +28,9 @@ host-side causes it leaves out:
 - the host's own timeout of a hung preflight, which ends the adapter child
   (`crates/connectors-host/src/local/runtime/process.rs:1083-1085`), so a next try needs a fresh
   child and the hang has already used most of the 20 s write deadline;
+- a provider's `unavailable` answer to the preflight, which the host reads as `Failure::Unavailable`
+  with origin host today (`crates/connectors-host/src/local/runtime.rs:529-531`,
+  `crates/connectors-host/src/local/owner.rs:389-394`), so it needs an origin marker first;
 - a busy or unavailable adapter (`PluginBusy`, origin host).
 
 ## Change, to be designed

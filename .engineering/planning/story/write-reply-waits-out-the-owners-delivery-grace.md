@@ -11,6 +11,7 @@ relations:
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-errors-are-readable
+- depends_on: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 revision: 1
 ---
 ## Defect
