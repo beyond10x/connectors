@@ -16,6 +16,11 @@
 
 ### Fixed
 
+- A provider call whose budget ends before its connection opened, the TLS handshake included,
+  answers `Timeout` without the provider's-timeout mark: no request was sent
+  (story:a-provider-budget-that-ends-in-an-unanswered-tls-handshake-is-marked-as-the-providers-timeout).
+  Before, it was marked as the provider's timeout. A connect may use the whole budget; a call
+  sent on an open connection whose budget ends is the provider's timeout, as before.
 - The host and the mounted custody make the `close_range` and `renameat2` system calls
   through `syscall`, not through the C library's wrappers, which the musl that Rust links
   statically does not have; the workspace built for glibc only. The calls, their flags and
