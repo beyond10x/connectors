@@ -18,7 +18,7 @@ scope:
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/tests/provider_timeout_adversary.rs
-revision: 15
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T14:38:58Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"review_outcome":19}}}
 - {from: "proposed", to: "active", at: "2026-11-25T16:33:14Z", actor: "human:operator", revision: 14, decided_on: {"recorded":{"review_outcome":19}}}
@@ -281,3 +281,46 @@ whole request head before the call ended. The story names `Timeout` and
 
 Not run: the two `slow_lane_` tests of the file, and no mutant of the change. The figures of
 the forge's "repository gate" job for acceptances 5, 6 and 7 are added with the pull request.
+
+## As built, second commit: no lead (decision D1)
+
+An adversary pass on 55210be72 found two defects of the lead. A handshake answered at 800 ms of
+a 1,000 ms budget was refused at 751 ms, and a call with 560 ms left was refused where one with
+495 ms left was answered 200. The operator decided on 2026-11-26 (D1 = A): no early cut; the
+connect is bounded by the end of the budget, and a budget that ends before this request's
+connection opened is reported as a connection that did not open.
+
+Commit 3082871f9 on the same branch, on top of 55210be72: 3 files, 587 lines added and 56
+removed (`crates/connectors-host/src/http.rs`,
+`crates/connectors-host/tests/provider_budget_connect_adversary.rs`, new,
+`crates/connectors-host/tests/provider_timeout_adversary.rs`).
+
+- `BudgetConnectLayer` became `WatchedConnectLayer`. It bounds no connect. `CONNECT_LEAD`,
+  `CONNECT_BOUND_MIN_REMAINING` and `CONNECT_UNTIL` are gone.
+- `send` opens a task-local `CONNECTS` watch per request. A connect the layer started that is
+  dropped before it ends is recorded there. When reqwest answers a timeout and such a connect
+  was dropped, `send` answers `not_opened()`, an unmarked `Timeout`. Every other error goes
+  through `provider_error` as before.
+- The pool race: when a pooled connection wins, hyper-util moves the started connect into a
+  task of its own and runs it to its end, so it is not dropped while the request waits, and
+  the request sent on the pooled connection stays the provider's timeout. A flag "a connection
+  was delivered" would have classed that request as not opened; the commit does not use one.
+
+Red first, at 55210be72: 6 adversary cases ran, 3 passed and 3 failed (the 560/495 ms pair,
+the handshake answered in the last 250 ms, and an unpolled thread over the lead). With the
+change, `provider_budget_connect_adversary` and `provider_timeout_adversary`: 12 ran, 12
+passed, 2 `slow_lane_` skipped, slowest 1.61 s. A seventh case,
+`a_request_sent_on_a_pooled_connection_while_its_own_connect_runs_is_the_providers_timeout`,
+builds the pool race (2 connections accepted, the budgeted request read on the first) and
+passes. `connectors-host` lib tests under `http::`: 17 of 17. `http_budget`, `http_upgrade`,
+`upgrade_adversary` and `http`: 25 of 25, slowest 2.55 s. Clippy with `-D warnings` and the
+format check pass.
+
+Two adversary cases asserted the lead and were changed: the call of
+`a_budget_that_ends_before_the_tcp_connection_opens_is_not_marked` now ends between 900 ms and
+2 s, and in `a_budget_bounds_its_own_connect_and_not_that_of_a_request_beside_it` the request
+without a budget is answered after 1,200 ms.
+
+Open: a connection whose TCP and TLS are up and whose HTTP/2 handshake is pending when the
+budget ends is still marked as the provider's timeout (HTTP/1 does no network I/O in that
+step). `upgrade()` does not go through `send`, so its connect is not watched, as before.
