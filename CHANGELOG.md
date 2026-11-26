@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.78.3 — 2026-11-26
+
+### Changed
+
+- The metadata store builds the Entity Runtime registry and the map of its commands once per
+  process (story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process).
+  Before, every persist and every fresh open of the store parsed the compiled-in definition
+  bundle (469,676 bytes) and built the registry again, and a persist parsed it a second time.
+  A failed build is kept and answered as `metadata_unavailable` on every later call. Records,
+  errors and their order do not change.
+
+### Development
+
+Nothing in this section changes an installed binary: a release build reads none of the
+variables below, and the SQL change is reached only by the adapter's own tests.
+
+- `connectors_sdk::debug_override_ms` is the one place a build with `debug_assertions` reads a
+  `CONNECTORS_TEST_OVERRIDE_*` variable; the owner is handed every such variable in a debug
+  build (story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build).
+  The HTTP client's request and connect timeouts are read through it, with production's 15 s
+  and 5 s as defaults.
+- The SQL adapter's query deadline no longer panics on a query timeout too large to add to the
+  time now; production's query timeout stays 10 s, and only the adapter's tests set another
+  (story:five-tests-no-longer-wait-out-the-http-and-sql-client-timeouts).
+- The gate's `cargo run` calls name their program with `--bin`, so the three programs build
+  with the workspace's feature set; the gate's workspace build no longer compiles 40 crates a
+  second time (story:the-forges-gate-job-compiles-once-and-prints-its-time-per-step).
+- The lane `slow` runs every `slow_lane_` test, each bound to 60 s.
+- Tests of the gate's test step no longer wait out production timeouts and locks: the
+  catalog provider tests read a committed lowering of the released definition, the MySQL test
+  fixture sets `TCP_NODELAY`, and tests of the host, the CLI, the MCP server, the custody jail
+  and the adapters wait for what they assert. Each change is a story of
+  `story:the-gates-test-step-ends-within-120-s-on-the-forge`.
+
 ## 0.78.2 — 2026-11-24
 
 ### Changed
