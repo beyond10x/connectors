@@ -56,9 +56,15 @@ jobs:
       # ring and libsqlite3-sys compile C for that target.
       - name: Install the C compiler of the Windows lint
         if: steps.scope.outputs.run != 'false'
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends gcc-mingw-w64-x86-64
+          apt="apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+          for attempt in 1 2 3; do
+            sudo timeout -k 10 180 $apt update && break
+            test "$attempt" -lt 3 || exit 1
+            sleep 10
+          done
+          sudo timeout -k 10 300 $apt install --yes --no-install-recommends gcc-mingw-w64-x86-64
           x86_64-w64-mingw32-gcc --version
       - name: Install the pinned ess release
         if: steps.scope.outputs.run != 'false'
@@ -128,6 +134,7 @@ jobs:
       options: --privileged
     steps:
       - name: Install system packages
+        timeout-minutes: 15
         run: |
           pacman -Syu --noconfirm base-devel git curl jq sqlite rustup cmake pkgconf openssl \
             dbus gcr gcr-4 dconf glib2 libcap-ng libgcrypt systemd-libs p11-kit
