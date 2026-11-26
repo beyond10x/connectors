@@ -39,7 +39,7 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: inferred
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 26
+revision: 27
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-26T22:47:13Z", actor: "human:operator", revision: 25}
 - {from: "proposed", to: "active", at: "2026-11-26T22:47:14Z", actor: "human:operator", revision: 26}
@@ -217,7 +217,7 @@ All calls with `--output json` and `--idempotency-key`, against the fixture abov
 14. A fixture whose every preflight answers the provider's timeout after 2 s, called with
     `--retry-not-attempted 10` and sent SIGINT once the log holds its first preflight, exits 130;
     6 s after the signal the log holds 1 preflight.
-15. Each test runs under 5 s, except 5 (under 21 s) and 14 (under 10 s).
+15. Each test runs under 5 s, except 5 (under 21 s), 14 (under 10 s), and 7 and 9 (under 8 s; see As built).
 
 ## Not in this story
 
@@ -239,3 +239,48 @@ All calls with `--output json` and `--idempotency-key`, against the fixture abov
 
 Filed from a consumer repository's request on 2026-11-26, ordered after pull request 315.
 Revised after rounds 1 to 6 of the plan critics (acceptance, design, scope and parallel-safety lanes).
+
+## As built
+
+Five commits on the branch `story/invoke-retry-not-attempted`, on top of 8d7de9cec:
+b62690d2c (the model: `retry_not_attempted` and `tries` in `ess/domains/cli.yaml`, the exit-3
+row and paragraph in `contracts/cli/v1alpha1/semantics.md`), dd15e84ae and 55e712987 (the
+regenerated metadata definitions, emissions and operation-type digests), c70251722 (the
+write-serving stand-in and `apps/connectors/tests/invoke_retry.rs`) and dc2956241 (the
+product change). 33 files.
+
+- The loop is in `crates/connectors-host/src/local/owner/supervisor.rs` (`Retry`,
+  `tried_again`, `another_try`, `RETRY_RESERVE`, `Task::again`); without whitespace changes it
+  adds 135 lines.
+- `WriteRequest` gains `retry_not_attempted`, the owner refuses it outside 1 to 10, and
+  `watch_gone` ends the loop when the client's connection closes
+  (`crates/connectors-host/src/local/owner/transport.rs`). `WRITE_VERSION` is unchanged.
+- `MutationObservation` gains `tries`, never stored in the ledger
+  (`crates/connectors-host/src/local/owner/mutation.rs`).
+- The CLI adds the flag, the argument refusals, `tries` 0 on a replay it answers itself, and
+  exit 3 (`apps/connectors/src/local.rs`, `local/invoke.rs`, `local/operations.rs`,
+  `local/session.rs`). A CLI-side `outcome_unknown` (an owner answer the CLI never read) carries
+  no `tries`; the model comment and the contract say so.
+- Test support: `approval_keys::install_for_tests`, reachable only from tests.
+
+Red, on c70251722 before the product change: 15 tests ran, 4 passed and 11 failed. Statements
+10 and 11 passed because the model was already committed; statement 14 passed vacuously,
+since one try is all a write makes without the change. Statement 14 was shown not vacuous by a
+mutant that ignores the client-gone check: it failed after 8.949 s with three preflights
+logged where one was expected.
+
+Green: 16 tests ran (statement 1 is split in two so each stays under 5 s), 16 passed in
+19.743 s. Times from the parallel run: statement 5 15.47 s (bound 21 s), statement 14 8.92 s
+(bound 10 s), statement 7 5.83 s, statement 9 5.04 s (4.55 s alone), every other test under
+5 s. `connectors-build`: 385 of 385. connectors-host owner modules (mutation, supervisor,
+transport): 87 of 87. Clippy with `-D warnings` on connectors-host and connectors, Linux and
+`x86_64-pc-windows-gnu`: exit 0. The generators' `--check` modes and
+`connectors-docs generate --check`: exit 0.
+
+Departure from statement 15: statement 7 takes 5.83 s (5.81 s alone), over its 5 s bound.
+Each try costs about 450 ms in the existing write path: three ledger observations of about
+70 ms (one before the try in `supervisor.rs`, two at `execution.rs:282`) and `issuance::resolve`
+at about 28 ms; the site setup takes 1.9 s, `connect` 1.16 s of it. Statement 7 makes 6 tries
+and 2 commits, so it cannot be under 5 s without changing the write path. The bound of
+statements 7 and 9 is 8 s, under the 60 s bound of every test; the per-try cost is
+story:a-write-try-costs-less-than-450-ms-in-the-owner (draft).
