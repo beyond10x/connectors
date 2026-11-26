@@ -883,10 +883,10 @@ interrupted `invoke` starts none) and while the time the last try took plus
 3 seconds is left before the write's deadline; otherwise the last try's
 answer stands. A try made again records no attempt and spends no proof and
 no grant use, so `--approval-file` and a standing grant both admit each try.
-The answer is the last try's, in today's envelope, and its `mutation` carries
-`tries`: the number of tries made, or 0 on a same-key replay answered before
-any try. Without the option `mutation` carries no `tries`. A write classified
-`unknown` exits 3 with the option and 1 without it.
+The answer is the last try's, in today's envelope; its `mutation` carries `tries`, the
+tries made, 0 on a same-key replay answered before any try, and none without the
+option or on an `outcome_unknown` whose owner answer the CLI never read. A write
+classified `unknown` exits 3 with the option and 1 without it.
 
 The result is `InvokeResult`: `connector`, `instance`, `operation`, `revision`
 and the provider's `result`, with `request_id`, `mutation` and `source_audit` when

@@ -1964,9 +1964,11 @@ types:
       # the host and pinned by tests.
       - {name: standing, type: "Optional<connectors.cli.StandingReference>"}
       # ESS-LIMIT: tries is present exactly when the invoke named
-      # retry_not_attempted: 0 on a same-key replay answered before any try,
-      # otherwise the number of tries the owner made. Absent without the
-      # option, so every other answer keeps its bytes. ESS declares no
+      # retry_not_attempted and the owner's answer reached the CLI: 0 on a
+      # same-key replay answered before any try, otherwise the number of tries
+      # the owner made. Absent without the option, so every other answer keeps
+      # its bytes, and on an `outcome_unknown` the CLI answers for an owner
+      # whose answer it never read. ESS declares no
       # invariant on a CLI type, so the presence rule is enforced by the host
       # and pinned by apps/connectors/tests/invoke_retry.rs.
       - {name: tries, type: "Optional<Integer>"}
@@ -2068,7 +2070,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1798, docs/local-connection-registry.md:235-236;
+    # contracts/cli/v1alpha1/semantics.md:1825, docs/local-connection-registry.md:235-236;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -2228,7 +2230,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1802) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1829) and the host
     # removal path (metadata/er.rs `removal_command`) only expires Active cursors. The error name is
     # the decision; no source names one.
 
