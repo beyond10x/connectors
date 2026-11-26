@@ -1201,8 +1201,11 @@ fn worker(
         // again, on this worker and its child, while its try answered
         // `not_attempted` for a cause of the closed set ([`tried_again`]),
         // tries are left, the caller is connected and the reserve before the
-        // write's deadline holds ([`another_try`]). A try that answered with
-        // a replay is not counted: it made no try of its own.
+        // write's deadline holds ([`another_try`]). A pass counts as a try
+        // only when it ran `mutation::execute` and did not answer with a
+        // replay: a pass answered from the key's ledger row before execution
+        // (a same-key `idempotency_conflict`, a replay of an attempt still in
+        // flight, which both read `replayed: false`) made no try of its own.
         let (retry, write_until) = match &mut job.task {
             Task::Write { retry, until, .. } => (retry.take(), Some(*until)),
             _ => (None, None),
@@ -1211,6 +1214,8 @@ fn worker(
         let mut result = loop {
             let started = Instant::now();
             let next = retry.as_ref().and_then(|_| job.task.again());
+            // Set when the write was answered from the ledger before execution.
+            let mut observed = false;
             let result = (|| {
                 // A cancelled read is dropped here, unrun, and frees its slot.
                 if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
@@ -1330,6 +1335,7 @@ fn worker(
                     if let Some(value) =
                         mutation::observe(&paths, &job.alias, &request, key.as_deref(), *until)?
                     {
+                        observed = true;
                         return Ok(Output::Write(value));
                     }
                 }
@@ -2033,7 +2039,9 @@ fn worker(
             let (Some(retry), Some(until), Some(next)) = (&retry, write_until, next) else {
                 break result;
             };
-            if matches!(&result, Ok(Output::Write(delivery)) if !delivery.mutation.replayed) {
+            if !observed
+                && matches!(&result, Ok(Output::Write(delivery)) if !delivery.mutation.replayed)
+            {
                 tries = tries.saturating_add(1);
             }
             if !tried_again(&result) || !another_try(retry, tries, started.elapsed(), until) {

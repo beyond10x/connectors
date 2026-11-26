@@ -2061,7 +2061,7 @@ never replay a possible write after interruption, timeout or lost response.
 | known revoked connection | `revoked` | 1 |
 | current permission missing | `forbidden` (or shared `not_granted`) | 1 |
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
-| `invoke` write classified `unknown` under `--retry-not-attempted` (`mutation.classification = unknown`, `mutation.tries` named; [invoking an operation](#invoking-an-operation)); without the option it exits 1 | `outcome_unknown` | 3 |
+| `invoke` write classified `unknown` under `--retry-not-attempted` (`mutation.classification = unknown`; `mutation.tries` named except on an `outcome_unknown` the CLI answers for an owner whose answer it never read; [invoking an operation](#invoking-an-operation)); without the option it exits 1 | `outcome_unknown` | 3 |
 | `setup owner-stop`: state directory, owner socket or lock file of another user (`stage = stop`, `next_action = check_configuration`) | `forbidden` | 1 |
 | `setup owner-stop`: the lifetime lock is held and no owner answers within the bound; nothing is signalled (`stage = stop`, `next_action = retry_explicitly`) | `unavailable` | 1 |
 | `setup owner-stop`: the owner accepted the request and still holds the lifetime lock at the bound (`stage = stop`, `next_action = retry_explicitly`) | `timeout` | 1 |
