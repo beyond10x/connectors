@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
 kind: story
-status: proposed
+status: active
 title: 'The Entity Runtime registry is built once per process: 108.0 s become an estimated 76 s'
 summary: Every persist and fresh open of the metadata store parses the compiled-in bundle and builds the registry again; one process-wide value replaces 2,729 builds and 2,293 second parses in eleven tests
 relations:
@@ -14,9 +14,10 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T11:18:22Z", actor: "human:operator", revision: 7}
+- {from: "proposed", to: "active", at: "2026-11-25T11:38:54Z", actor: "human:operator", revision: 8}
 ---
 ## Defect
 
@@ -358,3 +359,95 @@ story:where-do-the-82-s-of-the-eleven-store-tests-go-that-the-registry-story-lea
   process.
 - The parse sites of the tests (`registry_of`, `adversary_w3_tests.rs`): unchanged.
 - `every_page_is_one_the_model_admits`: the story of the MySQL test fixture.
+
+## As built
+
+Built on 2026-11-25. One file changed under `crates/`,
+`crates/connectors-host/src/local/metadata/er.rs`.
+
+The shared value: `struct Definitions { registry, commands }`, held by
+`static DEFINITIONS: OnceLock<Option<Definitions>>` inside `shared_definitions()`. The build
+(`build_definitions`) is the old body of `registry()` in its order, then the map of commands. A
+failed build is stored as `None` and answered as `Failure::MetadataUnavailable` on every call.
+`persist_batch` and `record_writer_for_tests` borrow the value. `registry()` keeps its
+signature and returns a clone; `open`, `provider_open` and `provision_with_lock` call it as
+before and have no changed line.
+
+Where the code differs from the Change section:
+
+- Point 1, order: the map of commands is built after `validate_all`. Before, `persist_batch`
+  built it ahead of `registry()`. Every failure on either path is
+  `Failure::MetadataUnavailable`.
+- Established (c): `registry()` now has three callers outside the test module, not five; the
+  two that borrowed call `shared_definitions()`.
+- `model_digest()` stands at lines 1036 to 1046 of the base, not 1035 to 1045.
+
+Statement 1. Every run:
+`cargo nextest run -p connectors-host -E 'test(persists_and_fresh_opens_build_the_definitions_once_per_process)'`
+on the build host.
+
+- Red, with point 5 alone (the two `timed` seams and the new test): the test failed with
+  "(builds, parses) of the definitions over five persists, three fresh opens and a second
+  store on this thread", left (17, 30), right (0, 0). The story expected at least 8 builds and
+  13 parses before the second store; the test reads its counts once, after the second store.
+  By arithmetic over the counts: 13 calls of `persist_batch`, 3 opens and 1 provision make 17
+  builds, and 13 × 2 + 3 + 1 make 30 parses. Each `State::suppress` reaches `persist_batch`
+  twice, and the second store's `Metadata::initialize` once.
+- Green with points 1 to 4: 1 passed, 0.388 s.
+- Shown red and taken back: `persist_batch` parsing the bundle itself failed the same
+  assertion with (0, 13) (the story said 6 parses; it is 13 for the reason above); the value
+  kept in a `thread_local!` failed the assertion of the new thread with (1, 1).
+- The test asserts more than the story listed: at least 6 recorded batches on the test's
+  thread (`er.execute_batch`), so that the six persists are known to have written; at least
+  one fresh open on the new thread; and `fresh_opens()` as a rise from a value taken after the
+  first `registry()` call.
+
+Statement 2: under `crates/` the diff names `er.rs` only. Outside `mod tests`: the three new
+items `Definitions`, `shared_definitions` and `build_definitions`, `registry()`,
+`definition_bundle()` (the seam), `record_writer_for_tests` (three hunks) and `persist_batch`
+(seven hunks: the borrow, and the `&` dropped at six call sites). Inside `mod tests`: one hunk,
+the new test at the end of the module.
+
+Statement 3, before the push, on the build host, each set once on the final tree:
+
+- the eleven tests in one run side by side: 11 passed. Durations in the order of the list
+  above: 12.080, 12.805, 7.547, 6.353, 5.677, 6.470, 8.094, 4.603, 3.911, 4.034 and 5.096 s,
+  76.670 s summed (arithmetic). Tests 1 to 7 and 11 are over 5 s. This run is not the figure
+  of statement 4: run 5 of the measurement ran one test at a time.
+- `test(/^local::metadata::/)` of `connectors-host`: 115 run, 115 passed, none over 5 s.
+- `test(/^cli_spec_mapping_adversary::/)` of `connectors-build`: 6 run, 6 passed.
+- `cargo fmt --check`, `cargo clippy -p connectors-host --all-targets -- -D warnings` and the
+  same lint for `x86_64-pc-windows-gnu` with `-p connectors`: exit status 0 each.
+
+An adversary read of the change, after it was green. No change of behaviour was found: no
+caller relies on a fresh registry or changes the one it gets; every failure of the build is
+`Failure::MetadataUnavailable` before and after, at the same point of `persist_batch`, `open`
+and `provision_with_lock`; the build reads only compiled-in bytes; the crate lints with and
+without the feature `test-support`.
+
+One finding, a warning, and what was done about it. The new test stayed green under two
+defects its claim excludes: a `persist_batch` that parses the compiled-in bytes with an
+expression of its own (as `model_digest()` does), and a `registry()` that registers every
+definition again from the shared registry on every call. Its two counts see a parse only in
+`definition_bundle()` and a build only in the closure of `shared_definitions()`. Two more tests
+close that, so `mod tests` gains three tests where statement 2 said one:
+
+- `adversary_the_bundle_is_read_only_where_the_once_test_counts_it`: one call of
+  `definition_bundle()` is one counted parse, and by the text of `er.rs` outside its test
+  module and of `er/ledger.rs` the bundle is named at two places, `definition_bundle()` and
+  `build_definitions()` are each called at one, a registry is started at one, and each seam
+  stands once. It was red under both defects above. It is a check of text: a parse in another
+  file, or `Registry::default()`, passes it.
+- `adversary_first_use_from_eight_threads_at_once_builds_the_definitions_once`: eight threads
+  started together each initialize a store and persist once; among them at most one build,
+  and exactly one under nextest. 0.370 s.
+
+Mutants the three tests were run against, each taken back: the value keyed per store path
+(the story's test red with (1, 1)), keyed per simulated process (red with (3, 3)), `registry()`
+building its own (red with (0, 4)), and the two above. With the two added tests,
+`test(/^local::metadata::/)` runs 117 tests and 117 pass.
+
+Read from the pull request's job and not from a run on the build host: the forge half of
+statement 3 and statement 4.
+
+Not measured: the cost of a `Registry` clone and the memory the shared value holds.

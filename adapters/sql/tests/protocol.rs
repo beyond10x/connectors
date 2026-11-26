@@ -5,9 +5,13 @@ use connectors_core::{ErrorCode, Result};
 use connectors_sdk::{Adapter, Credential, Secret};
 use connectors_sql::{Config, Sql};
 use serde_json::{Value, json};
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    ops::Range,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -512,8 +516,14 @@ async fn text_null_and_empty_parameters_reach_bind_without_interpolation() {
     assert_eq!(result["rows"], json!([["42", null]]));
 }
 
+/// The query timeout the gate's tests build the adapter with, in place of production's 10 s.
+const SHORT_QUERY_TIMEOUT: Duration = Duration::from_millis(1_000);
+
+/// A read whose statement the server never answers. The adapter's query timeout is
+/// `query_timeout`, or production's when there is none.
 async fn stalled(
     ignore_cancel: bool,
+    query_timeout: Option<Duration>,
 ) -> (
     tokio::task::JoinHandle<Result<Value>>,
     tokio::task::JoinHandle<()>,
@@ -525,6 +535,10 @@ async fn stalled(
         ..Scenario::default()
     })
     .await;
+    let sql = match query_timeout {
+        Some(query_timeout) => sql.with_query_timeout(query_timeout),
+        None => sql,
+    };
     let call = tokio::spawn(async move {
         sql.invoke("query.read", json!({"query":"SELECT 1", "limit":1}))
             .await
@@ -535,14 +549,27 @@ async fn stalled(
     (call, server)
 }
 
-#[tokio::test]
-async fn deadline_sends_the_backend_cancel_key_and_drains_the_connection() {
-    let (call, server) = stalled(false).await;
-    let error = tokio::time::timeout(std::time::Duration::from_secs(13), call)
+/// The adapter's own deadline on a statement that hangs: it refuses with `timeout`, cancels
+/// the statement on the server with the backend's cancel key and drains the connection.
+/// `refused_within` is how long after the call started the refusal may come: no sooner than
+/// its start, sooner than its end.
+async fn the_deadline_cancels_and_drains(
+    query_timeout: Option<Duration>,
+    refused_within: Range<Duration>,
+) {
+    let started = tokio::time::Instant::now();
+    let (call, server) = stalled(false, query_timeout).await;
+    let error = tokio::time::timeout_at(started + refused_within.end, call)
         .await
         .unwrap()
         .unwrap()
         .unwrap_err();
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed >= refused_within.start,
+        "refused after {elapsed:?}, sooner than {:?}",
+        refused_within.start
+    );
     assert_eq!(error.code, ErrorCode::Timeout);
     tokio::time::timeout(std::time::Duration::from_secs(1), server)
         .await
@@ -550,9 +577,27 @@ async fn deadline_sends_the_backend_cancel_key_and_drains_the_connection() {
         .unwrap();
 }
 
+/// At a query timeout of 1 s: no sooner than it, and within 6 s, which production's 10 s
+/// would not meet.
+#[tokio::test]
+async fn deadline_sends_the_backend_cancel_key_and_drains_the_connection() {
+    the_deadline_cancels_and_drains(
+        Some(SHORT_QUERY_TIMEOUT),
+        SHORT_QUERY_TIMEOUT..Duration::from_secs(6),
+    )
+    .await;
+}
+
+/// Lane `slow`: the one run that lives through production's `QUERY_TIMEOUT` of 10 s.
+#[tokio::test]
+#[ignore = "lane slow: waits out the production query timeout of 10 s"]
+async fn slow_lane_deadline_sends_the_backend_cancel_key_and_drains_the_connection() {
+    the_deadline_cancels_and_drains(None, Duration::from_secs(10)..Duration::from_secs(13)).await;
+}
+
 #[tokio::test]
 async fn dropping_the_invocation_still_cancels_the_database() {
-    let (call, server) = stalled(false).await;
+    let (call, server) = stalled(false, Some(SHORT_QUERY_TIMEOUT)).await;
     call.abort();
     assert!(call.await.unwrap_err().is_cancelled());
     tokio::time::timeout(std::time::Duration::from_secs(3), server)
@@ -563,7 +608,7 @@ async fn dropping_the_invocation_still_cancels_the_database() {
 
 #[tokio::test]
 async fn unresponsive_database_cannot_extend_the_cleanup_budget() {
-    let (call, server) = stalled(true).await;
+    let (call, server) = stalled(true, Some(SHORT_QUERY_TIMEOUT)).await;
     call.abort();
     assert!(call.await.unwrap_err().is_cancelled());
     tokio::time::timeout(std::time::Duration::from_secs(3), server)
@@ -1377,4 +1422,38 @@ async fn postgresql_a_row_past_the_limit_sharing_the_last_ordering_value_refuses
     .await
     .unwrap();
     assert_eq!(page["items"].as_array().unwrap().len(), 2);
+}
+
+/// `Sql::with_query_timeout` says of every value: "The request bound less the cleanup time
+/// still caps the query." At the largest `Duration` the statement must therefore reach the
+/// server and hang there under that cap, like any other read: the call is still waiting when
+/// the server has the statement, and it is not ended by the sum of the time now and the query
+/// timeout.
+#[tokio::test]
+async fn the_largest_query_timeout_is_capped_by_the_request_bound() {
+    let started = Arc::new(tokio::sync::Notify::new());
+    let (sql, server) = fixture(Scenario {
+        hang_on_execute: Some(started.clone()),
+        ..Scenario::default()
+    })
+    .await;
+    let sql = sql.with_query_timeout(Duration::MAX);
+    let mut call = tokio::spawn(async move {
+        sql.invoke("query.read", json!({"query":"SELECT 1", "limit":1}))
+            .await
+    });
+    tokio::select! {
+        ended = &mut call => {
+            panic!("the call ended before its statement reached the server: {ended:?}")
+        }
+        reached = tokio::time::timeout(Duration::from_secs(3), started.notified()) => {
+            reached.expect("the statement did not reach the server within 3 s")
+        }
+    }
+    call.abort();
+    assert!(call.await.unwrap_err().is_cancelled());
+    tokio::time::timeout(Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
 }

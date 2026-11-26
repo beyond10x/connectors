@@ -553,6 +553,11 @@ async fn mysql_tls_trusts_exactly_the_configured_ca() {
     assert_eq!(server.log.lock().unwrap().sessions, sessions);
 }
 
+/// The query timeout the tests of a stalled read build the adapter with, in place of
+/// production's 10 s.
+const SHORT_QUERY_TIMEOUT: Duration = Duration::from_millis(1_000);
+
+/// A read whose statement the server never answers.
 async fn stalled(ignore_kill: bool) -> (tokio::task::JoinHandle<Result<Value>>, Server) {
     let started = Arc::new(tokio::sync::Notify::new());
     let server = start(Script {
@@ -561,7 +566,7 @@ async fn stalled(ignore_kill: bool) -> (tokio::task::JoinHandle<Result<Value>>, 
         ..Script::default()
     })
     .await;
-    let sql = adapter(&server);
+    let sql = adapter(&server).with_query_timeout(SHORT_QUERY_TIMEOUT);
     let call = tokio::spawn(async move {
         sql.invoke("query.read", json!({"query":"SELECT 1","limit":1}))
             .await
@@ -583,14 +588,23 @@ async fn killed(server: &Server, within: Duration) {
     );
 }
 
+/// At a query timeout of 1 s: the refusal comes no sooner than it, and within 6 s of the
+/// call's start, which production's 10 s would not meet. No test lives through the 10 s on
+/// MySQL; on PostgreSQL the lane `slow` does (`protocol.rs`).
 #[tokio::test]
 async fn mysql_deadline_kills_the_running_query() {
+    let started = tokio::time::Instant::now();
     let (call, server) = stalled(false).await;
-    let error = tokio::time::timeout(Duration::from_secs(13), call)
+    let error = tokio::time::timeout_at(started + Duration::from_secs(6), call)
         .await
         .unwrap()
         .unwrap()
         .unwrap_err();
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed >= SHORT_QUERY_TIMEOUT,
+        "refused after {elapsed:?}, sooner than {SHORT_QUERY_TIMEOUT:?}"
+    );
     assert_eq!(error.code, ErrorCode::Timeout);
     assert!(!error.upstream_answer);
     killed(&server, Duration::from_secs(3)).await;

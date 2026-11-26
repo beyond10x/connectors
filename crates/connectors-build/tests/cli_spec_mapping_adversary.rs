@@ -177,24 +177,191 @@ fn the_build_digest_format_is_declared() {
     }
 }
 
-/// Every `er.rs:<a>-<b>` citation in cli.yaml must land on the cursor transition it names.
+/// The lines of the one function `name` in `source`, the text of a Rust file: from the one
+/// line that starts with `fn <name>(` to the next line that is `}` in the first column. It
+/// takes the text and no line number, so it finds the function wherever it stands.
+fn function_body<'a>(source: &'a str, name: &str) -> Vec<&'a str> {
+    let head = format!("fn {name}(");
+    let lines: Vec<&str> = source.lines().collect();
+    let starts: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.starts_with(&head))
+        .map(|(at, _)| at)
+        .collect();
+    assert_eq!(
+        starts.len(),
+        1,
+        "exactly one line starts with `{head}`; found at lines {:?}",
+        starts.iter().map(|at| at + 1).collect::<Vec<_>>()
+    );
+    let start = starts[0];
+    let length = lines[start..]
+        .iter()
+        .position(|line| *line == "}")
+        .unwrap_or_else(|| panic!("no `}}` in the first column after `{head}`"));
+    lines[start..=start + length].to_vec()
+}
+
+/// The index of the one line of `body` that holds `text`.
+fn the_one_line_with(body: &[&str], text: &str, function: &str) -> usize {
+    let at: Vec<usize> = body
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.contains(text))
+        .map(|(at, _)| at)
+        .collect();
+    assert_eq!(
+        at.len(),
+        1,
+        "exactly one line of `{function}` in er.rs holds {text}; its body reads:\n{}",
+        body.join("\n")
+    );
+    at[0]
+}
+
+/// `spec` holds `citation` as one literal on one comment line.
+fn assert_cites_by_name(spec: &str, citation: &str) {
+    let text = read(spec);
+    assert!(
+        text.lines()
+            .any(|line| line.trim_start().starts_with('#') && line.contains(citation)),
+        "{spec} no longer holds the citation {citation} on one comment line"
+    );
+}
+
+/// Every citation of `er.rs` by line (`er.rs:<digits>`) in the files under `directory`, as
+/// `<path>:<line>: <text>`. It means the file `er.rs` itself: `owner.rs:` and `server.rs:`
+/// do not match.
+fn er_rs_line_citations(directory: &Path, found: &mut Vec<String>) {
+    let cite = regex::Regex::new(r"(?:^|[^A-Za-z0-9_])er\.rs:[0-9]").unwrap();
+    let mut entries: Vec<PathBuf> = fs::read_dir(directory)
+        .unwrap_or_else(|e| panic!("{}: {e}", directory.display()))
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            er_rs_line_citations(&path, found);
+            continue;
+        }
+        let bytes = fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let shown = path.strip_prefix(root()).unwrap_or(&path).display();
+        for (at, line) in String::from_utf8_lossy(&bytes).lines().enumerate() {
+            if cite.is_match(line) {
+                found.push(format!("{shown}:{}: {}", at + 1, line.trim()));
+            }
+        }
+    }
+}
+
+/// A comment under `ess/` cites `er.rs` by function name, never by line: the lines of
+/// `er.rs` move with every change above them, and `ess/domains/*.yaml` are inputs of the
+/// committed metadata emissions, so a corrected line number costs a regeneration.
+///
+/// Two comments make a claim about the host's mapping of row changes to commands. For
+/// each, the file still holds the citation by name, and the function it names still holds
+/// the arm the comment speaks of, as text. Whoever changes such an arm (another state, a
+/// second arm for the same command) fails this test and reads the comment again:
+///
+/// - `ess/domains/cli.yaml`: "the host removal path (metadata/er.rs `removal_command`)
+///   only expires Active cursors".
+/// - `ess/domains/auth_bindings.yaml`: "The host
+///   (crates/connectors-host/src/local/metadata/er.rs `update_command`) maps no Revoked row
+///   change to this command", which is `PublishBinding`.
+///
+/// A citation `er.rs:<digits>` in any file under `ess/` fails the test, which names the
+/// file and the line.
 #[test]
 fn the_er_rs_citation_lands_on_the_cursor_expiry_path() {
-    let spec = read("ess/domains/cli.yaml");
+    let mut by_line = Vec::new();
+    er_rs_line_citations(&root().join("ess"), &mut by_line);
+    assert!(
+        by_line.is_empty(),
+        "a comment under ess/ cites er.rs by line; cite the function by name instead \
+         (metadata/er.rs `<function>`):\n{}",
+        by_line.join("\n")
+    );
+
     let er = read("crates/connectors-host/src/local/metadata/er.rs");
-    let lines: Vec<&str> = er.lines().collect();
-    let cite = regex::Regex::new(r"er\.rs:(\d+)-(\d+)").unwrap();
-    let mut seen = 0;
-    for c in cite.captures_iter(&spec) {
-        seen += 1;
-        let (a, b): (usize, usize) = (c[1].parse().unwrap(), c[2].parse().unwrap());
-        let cited = lines[a - 1..b].join("\n");
-        assert!(
-            cited.contains("ConnectionListCursor"),
-            "cli.yaml cites er.rs:{a}-{b} for the cursor removal path, which reads:\n{cited}"
-        );
+
+    assert_cites_by_name("ess/domains/cli.yaml", "metadata/er.rs `removal_command`");
+    let body = function_body(&er, "removal_command");
+    let arm = the_one_line_with(
+        &body,
+        r#""connectors.cli.ConnectionListCursor""#,
+        "removal_command",
+    );
+    assert_eq!(
+        body[arm].trim(),
+        r#"("connectors.cli.ConnectionListCursor", "Active") => {"#,
+        "cli.yaml says the host removal path only expires Active cursors"
+    );
+    let command = the_one_line_with(
+        &body,
+        r#""connectors.cli.ExpireConnectionListCursor""#,
+        "removal_command",
+    );
+    assert_eq!(
+        command,
+        arm + 1,
+        "the one line of removal_command that names ExpireConnectionListCursor follows the \
+         arm for an Active cursor; it reads:\n{}",
+        body[command]
+    );
+
+    assert_cites_by_name(
+        "ess/domains/auth_bindings.yaml",
+        "metadata/er.rs `update_command`",
+    );
+    let body = function_body(&er, "update_command");
+    let command = the_one_line_with(
+        &body,
+        r#""connectors.auth_bindings.PublishBinding""#,
+        "update_command",
+    );
+    assert_eq!(
+        body[command - 1].trim(),
+        r#"("connectors.auth_bindings.Connection", ("Live" | "Stale", "Live")) => {"#,
+        "auth_bindings.yaml says the host maps no Revoked row change to PublishBinding"
+    );
+}
+
+/// The body finder does not depend on where a function stands: two texts hold the same
+/// function at different lines, each after another function with another body, and it
+/// returns the same lines from both.
+#[test]
+fn the_body_finder_returns_the_same_function_from_two_texts() {
+    let wanted = "\
+fn wanted(state: &str) -> Option<&'static str> {
+    match state {
+        \"Active\" => Some(\"Expire\"),
+        _ => None,
     }
-    assert!(seen > 0, "no er.rs citation found");
+}
+";
+    let other = "\
+fn other() -> u8 {
+    if true {
+        7
+    } else {
+        8
+    }
+}
+";
+    let near = format!("{other}\n{wanted}\nfn wanted_later() {{}}\n");
+    let far = format!(
+        "use std::fmt;\n{}{other}\n// A comment.\n\n{wanted}",
+        "\n".repeat(10)
+    );
+    let expected: Vec<&str> = wanted.lines().collect();
+    assert_eq!(function_body(&near, "wanted"), expected);
+    assert_eq!(function_body(&far, "wanted"), expected);
+    assert_ne!(
+        near.lines().position(|line| line == expected[0]),
+        far.lines().position(|line| line == expected[0]),
+        "the two texts hold the function at different lines"
+    );
 }
 
 /// Control: the two semantics.md citations the unit corrected land on their rules.
