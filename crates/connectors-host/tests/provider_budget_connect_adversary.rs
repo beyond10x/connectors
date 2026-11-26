@@ -459,12 +459,20 @@ async fn a_request_sent_on_a_pooled_connection_while_its_own_connect_runs_is_the
 
 /// A refused connection is `Unavailable` and unmarked, with a budget and without one: the
 /// layer leaves a connect error as it was.
+///
+/// Linux refuses a connect to a closed loopback port at once; Windows retries the SYN and
+/// reports the refusal after about 2 s. The budget outlasts that, so the refusal arrives
+/// while the connect is still inside it; a budget that ended first would be an unmarked
+/// `Timeout` by design. The call must end well before the budget, so the refusal, not the
+/// budget, ended it.
 #[tokio::test]
 async fn a_refused_connection_is_unavailable_with_and_without_a_budget() {
+    const BUDGET: Duration = Duration::from_secs(5);
+    const REFUSED_WITHIN: Duration = Duration::from_secs(4);
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     drop(listener);
-    for budget in [None, Some(Duration::from_millis(1000))] {
+    for budget in [None, Some(BUDGET)] {
         let http = ScopedHttp::from_config(&HttpConfig {
             base_url: format!("http://{address}/"),
             credential: None,
@@ -486,11 +494,15 @@ async fn a_refused_connection_is_unavailable_with_and_without_a_budget() {
             .await
             .map(|response| response.status)
             .map_err(|error| (error.code, error.upstream_answer));
+        let elapsed = started.elapsed();
         assert_eq!(
             result,
             Err((ErrorCode::Unavailable, false)),
-            "budget {budget:?}, after {:?}",
-            started.elapsed()
+            "budget {budget:?}, after {elapsed:?}"
+        );
+        assert!(
+            elapsed < REFUSED_WITHIN,
+            "budget {budget:?}: the refusal came after {elapsed:?}, not within {REFUSED_WITHIN:?}"
         );
     }
 }
