@@ -1822,6 +1822,12 @@ types:
   # wait for the read's turn and the provider's answer end; with walk it is each page's. It is
   # refused beside approval_file, idempotency_key or describe, and the CLI carries the
   # cutoff to the owner as the request deadline: the member itself never reaches it.
+  # retry_not_attempted (story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice)
+  # is the most tries of a keyed write, 1 to 10, absent by default, and needs idempotency_key.
+  # The owner tries the write again, on the instance's serialized worker and inside the write's
+  # deadline, only while a try answered not_attempted with no attempt recorded because the
+  # provider answered its preflight with its own timeout or capacity answer; it never sends a
+  # write classified applied, refused or unknown again. With it an unknown write exits 3.
   - name: connectors.cli.InvokeInput
     kind: struct
     fields:
@@ -1843,6 +1849,7 @@ types:
       - {name: max_pages, type: "Optional<Integer>"}
       - {name: out, type: "Optional<String>"}
       - {name: deadline_seconds, type: "Optional<Integer>"}
+      - {name: retry_not_attempted, type: "Optional<Integer>"}
   # An invoke's answer names the connector and instance; it never carries an adapter member.
   - name: connectors.cli.InvokeResult
     kind: struct
@@ -1956,6 +1963,13 @@ types:
       # declares no invariant on a CLI type, so the presence rule is enforced by
       # the host and pinned by tests.
       - {name: standing, type: "Optional<connectors.cli.StandingReference>"}
+      # ESS-LIMIT: tries is present exactly when the invoke named
+      # retry_not_attempted: 0 on a same-key replay answered before any try,
+      # otherwise the number of tries the owner made. Absent without the
+      # option, so every other answer keeps its bytes. ESS declares no
+      # invariant on a CLI type, so the presence rule is enforced by the host
+      # and pinned by apps/connectors/tests/invoke_retry.rs.
+      - {name: tries, type: "Optional<Integer>"}
 
 # ESS-LIMIT executable obligations (ESS 0.40 has no file-system, process, terminal
 # or OS-permission construct, no TOML/JSON reader-closure or codec construct, no

@@ -728,3 +728,5 @@ commands:
         source: {kind: option, long: out}
       - field: deadline_seconds
         source: {kind: option, long: deadline-seconds}
+      - field: retry_not_attempted
+        source: {kind: option, long: retry-not-attempted}
