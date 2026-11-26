@@ -1,0 +1,18 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "github",
+  "provider_id": "github",
+  "adapter_id": "catalog",
+  "catalog_provider": "github",
+  "default_endpoint": "https://api.github.com",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "github.token",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "GitHub token",
+      "identity": {"path": "user", "kind": "github.user", "subject_pointer": "/id"}
+    }
+  ]
+}
