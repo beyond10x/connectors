@@ -1,0 +1,6 @@
+{
+  "bundle": "github.bundle.json",
+  "connector": "github/connector.json",
+  "operations": "github/operations.json",
+  "provider": "github"
+}

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:the-catalog-provider-tests-read-a-committed-lowering-of-the-released-definition
 kind: story
-status: draft
+status: active
 title: '40 catalog provider tests read a committed lowering of the released definition: about 94.9 s become an estimated 9.7 s'
 summary: engine() lowers the released definition per call, about 1.5 s each; a committed generated directory with a digest of its sources replaces it; 26 tests that lower a changed definition keep theirs
 relations:
@@ -23,7 +23,10 @@ scope:
   path: adapters/catalog/tests/released_lowering.rs
 - confidence: inferred
   path: crates/connectors-catalog/tests/fixtures/released-github-lowering
-revision: 10
+revision: 14
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-25T07:57:05Z", actor: "human:operator", revision: 11}
+- {from: "proposed", to: "active", at: "2026-11-25T07:57:05Z", actor: "human:operator", revision: 12}
 ---
 ## Defect
 
@@ -216,3 +219,80 @@ takes the first.
   six `the_released_` tests in the job; the cost of `definition::lower` taken apart; every "after"
   figure on the forge; which further drafts change an input without a recorded scope on it (the
   critic inferred ten more from their defect sites; they were not read here).
+
+## As built (2026-11-25)
+
+Where the implementation differs from the Change and Acceptance sections, and what was run. All
+runs are from the build host of the shared pool. Three commits: the second follows the first
+adversary read (review-result:released-lowering-adversary-pass-1), the third the second
+(review-result:released-lowering-adversary-pass-2).
+
+Differences from the Change section:
+
+- Point 1: the directory holds six files, 425,123 bytes: `index.json`, `github.bundle.json`,
+  `github/operations.json` and `github/connector.json` as `definition::lower` writes them,
+  `lowered.json` for what it returns, and the record `inputs.json`.
+- Point 2: a file or directory whose name starts with `.` under an input root is not an input.
+  A failed read of an input fails with its path. The inputs today: 4 files of the definitions
+  tree and 14 `.rs` files, 18 rows.
+- Point 3: the module is compiled on Unix alone (`#![cfg(unix)]`), like its three callers.
+- Point 4: the record has the format `connectors-released-lowering/2` and also holds one sha256
+  per lowered file. The fast check recomputes these five hashes and fails when one differs, when
+  a lowered file is missing and when a file is there that the record does not name. It still
+  lowers nothing. Reason: with the inputs alone in the record, a lowered file edited by hand
+  passed the fast check and the engine build (three failing cases of the first adversary read).
+  The check compares the format first and compares the input rows in every run. A record that
+  does not parse, a list in which two rows name one path, and a digest that is not the one of
+  its rows each fail with a sentence that says so and with the regeneration command. The text
+  for an added input says to remove a file that is not to be committed. The text for a wrong
+  digest does not print the current digest.
+- Point 5: the lane test writes for the value `1` alone. Any other set value is refused, an empty
+  one too, and a set variable is refused when `CI` is set to any value. Before, any set value
+  wrote and compared nothing.
+- What the fast check cannot see: a lowered file edited together with its row in `inputs.json`.
+  The lane test, which lowers again and compares every byte, sees it. The module comment says so.
+- Not bound by the check: the field `regenerate` of the record and the record's whitespace. A
+  link that points nowhere inside the committed directory fails with its path and without the
+  regeneration command. A lowered file replaced by a link to equal bytes is not noticed as a
+  link.
+
+Tests of the module: 19 in the gate and the ignored lane test. The five names of the story are
+unchanged. Eight came with the second commit and seven with the third; each takes under 0.2 s.
+
+Seen red:
+
+- First commit: 21 compile errors for the missing functions; 4 of 4 gate tests failed on stubs
+  without the fixture; the comparison test failed on a comparison stubbed to equal.
+- Second commit: the eight new tests against the behaviour of the first commit, 12 tests run, 4
+  passed, 8 failed. The final code against the record of the first commit: 5 of 12 failed, the
+  fast check with the two format names and the regeneration command.
+- Third commit: ten copies of the module with one behaviour removed each, in two runs. Each
+  copy failed the test that names the behaviour: 10 failed of 190 tests run, then 1 of 38. The
+  module itself passed in both runs. The second adversary read had shown that six of these
+  behaviours could be removed with all 12 gate tests of the second commit green.
+
+Runs after the third commit:
+
+- The 40 tests: 108.7 s before the change, one run; 1.0 s after the second commit, the slowest
+  0.09 s. The third commit does not change what they run on.
+- The story's filter, 59 tests: passed, and 10 of 10 repeated runs.
+- `cargo clippy --locked -p connectors-catalog-provider --tests -- -D warnings` ended 0.
+- The lane test ran twice in write mode, once for each of the first two commits, to make the
+  directory. The second run changed `inputs.json` alone: the five lowered files kept their
+  bytes. It did not run in comparison mode. One case of each adversary read lowered into a
+  temporary directory and found the committed files of that commit equal byte for byte.
+
+Acceptance as built:
+
+- 2 holds: `definition::lower` is called 0 times in the two reads files and once in
+  `definition_published_features_adversary.rs`.
+- 3, 4, 5 and 7 pass on the build host.
+- 1 is open until the forge's gate job of the pull request.
+- 6 and 8 are open until story:the-lane-slow-runs-the-ignored-timing-family is on main: the rule
+  that puts a `slow_lane_` test into the timing family is that story's change. The pull request
+  of this story opens after it.
+
+Not established: the bytes of a lowering on macOS (no workflow of the repository runs a test of
+`connectors-catalog-provider` there) and on the forge's runner; whether a change of the
+toolchain or of a dependency feature alters the bytes; that the write and compare arms of the
+lane test follow `mode` (no gate test covers the lane test's body).

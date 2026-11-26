@@ -228,6 +228,8 @@ struct Provider {
     requests: Arc<AtomicUsize>,
     /// [`STALL`] answers whose connection the client still held open 8 s on.
     stalled_open: Arc<AtomicUsize>,
+    /// [`STALL`] answers whose connection the client closed inside those 8 s.
+    stalled_closed: Arc<AtomicUsize>,
 }
 
 impl Provider {
@@ -238,11 +240,14 @@ impl Provider {
         let counted = requests.clone();
         let stalled_open = Arc::new(AtomicUsize::new(0));
         let open = stalled_open.clone();
+        let stalled_closed = Arc::new(AtomicUsize::new(0));
+        let closed = stalled_closed.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { return };
                 let counted = counted.clone();
                 let open = open.clone();
+                let closed = closed.clone();
                 std::thread::spawn(move || {
                     loop {
                         let mut head = Vec::new();
@@ -268,14 +273,29 @@ impl Provider {
                             std::thread::sleep(Duration::from_secs(25));
                         }
                         if n == STALL {
-                            std::thread::sleep(Duration::from_secs(8));
+                            // The answer is held 8 s. A client that closes
+                            // the connection inside them is counted closed
+                            // at once and gets no answer; one that still
+                            // holds it after them is counted open. Every
+                            // stalled read gets exactly one of the two.
+                            let until = Instant::now() + Duration::from_secs(8);
                             stream.set_nonblocking(true).unwrap();
-                            if stream
-                                .peek(&mut [0u8; 1])
-                                .is_err_and(|e| e.kind() == std::io::ErrorKind::WouldBlock)
-                            {
-                                open.fetch_add(1, Ordering::SeqCst);
+                            // Held: silent, or with bytes waiting. Anything
+                            // else (end of file, a reset): the client let go.
+                            let held =
+                                |stream: &std::net::TcpStream| match stream.peek(&mut [0u8; 1]) {
+                                    Err(e) => e.kind() == std::io::ErrorKind::WouldBlock,
+                                    Ok(waiting) => waiting > 0,
+                                };
+                            while held(&stream) && Instant::now() < until {
+                                std::thread::sleep(Duration::from_millis(10));
                             }
+                            if !held(&stream) {
+                                closed.fetch_add(1, Ordering::SeqCst);
+                                let _ = stream.shutdown(Shutdown::Both);
+                                return;
+                            }
+                            open.fetch_add(1, Ordering::SeqCst);
                             stream.set_nonblocking(false).unwrap();
                         }
                         let body = format!("{{\"observed\":{n}}}");
@@ -294,6 +314,7 @@ impl Provider {
             address,
             requests,
             stalled_open,
+            stalled_closed,
         }
     }
     fn requests(&self) -> usize {
@@ -1112,7 +1133,9 @@ fn adversary_legacy_window_admits_no_tool_request() {
 /// a call's read budget, so a read dispatched under a live lease now runs to
 /// its declared budget. Once the session has ended (`lost`, exit 1, about
 /// 5 s after stdin closed), the provider read it started must not still be
-/// held open by the owner side 8 s after dispatch.
+/// held open by the owner side 8 s after dispatch. The provider watches the
+/// read's connection for those 8 s, so the test ends when the provider has
+/// seen it closed and sleeps nothing out.
 #[test]
 fn adversary_a_lost_session_leaves_no_provider_read_open() {
     let served = Served::new();
@@ -1131,9 +1154,22 @@ fn adversary_a_lost_session_leaves_no_provider_read_open() {
     std::thread::sleep(Duration::from_millis(100));
     let _ = peer.exit(false);
     let ended = dispatched.elapsed();
-    std::thread::sleep(Duration::from_millis(9000).saturating_sub(dispatched.elapsed()));
+    // The provider's verdict on the read: closed, as soon as it sees that, or
+    // still open 8 s after it took the request. Waiting for the verdict, not
+    // for a time, keeps a slow machine from passing before the provider has
+    // looked. The 20 s bound outlasts the provider's 8 s two and a half times
+    // and is reached only when the provider gave no verdict at all.
+    let open = &served.provider.stalled_open;
+    let closed = &served.provider.stalled_closed;
+    while open.load(Ordering::SeqCst) + closed.load(Ordering::SeqCst) == 0 {
+        assert!(
+            dispatched.elapsed() < Duration::from_secs(20),
+            "the provider gave no verdict on the stalled read"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
     assert_eq!(
-        served.provider.stalled_open.load(Ordering::SeqCst),
+        open.load(Ordering::SeqCst),
         0,
         "the session ended {ended:?} after dispatch, yet 8 s after dispatch its provider \
          read was still open, waiting for the answer"
@@ -1166,7 +1202,9 @@ fn hold_store(served: &Served) -> fs::File {
 /// from the moment the provider has the request until 1 s after it answers,
 /// so the owner's own record of the read waits on the lock too. Renewal must
 /// not wait on it: the reply arrives under a renewed lease and a later ping is
-/// answered.
+/// answered. No reply may be there before the release: one that is shows the
+/// owner answered without its record waiting for the store; an owner that
+/// reaches its record only after the release passes here unseen.
 #[test]
 fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready() {
     let served = Served::new();
@@ -1191,6 +1229,11 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
             String::from_utf8_lossy(&stderr)
         );
     }
+    let early = peer.frames.try_recv().ok();
+    assert!(
+        early.is_none(),
+        "the reply came while the store was held: {early:?}"
+    );
     drop(lock);
     let reply = peer.recv();
     assert_eq!(reply["id"], 2, "{reply}");
@@ -1259,26 +1302,30 @@ fn adversary_a_request_past_its_deadline_answers_timeout_and_the_session_continu
 
 /// § 3.5 graceful close with the store held: end-of-file ends the session
 /// without any renewal, so the lock the owner (here the test) holds does not
-/// delay the exit, and the exit is successful.
+/// delay the exit, and the exit is successful. The store stays held until the
+/// exit has been timed: a thread holds it and lets go when the test says so,
+/// or when the test fails and drops its end of the channel.
 #[test]
 fn adversary_stdin_closed_while_the_store_is_held_exits_successfully() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     assert!(peer.request(1, "ping", json!({})).get("result").is_some());
     let lock = hold_store(&served);
-    let release = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(7));
+    let (release, released) = mpsc::channel::<()>();
+    let holder = std::thread::spawn(move || {
+        let _ = released.recv();
         drop(lock);
     });
     let started = Instant::now();
     let (lines, _) = peer.exit(true);
+    let exited = started.elapsed();
     assert!(
-        started.elapsed() < Duration::from_secs(3),
-        "exit took {:?} with the store held",
-        started.elapsed()
+        exited < Duration::from_secs(3),
+        "exit took {exited:?} with the store held"
     );
     assert_eq!(lines.len(), 1, "only the ping reply: {lines:?}");
-    release.join().unwrap();
+    release.send(()).unwrap();
+    holder.join().unwrap();
 }
 
 /// § 3.3 renewal "re-admits the same owner incarnation" and starts nothing:

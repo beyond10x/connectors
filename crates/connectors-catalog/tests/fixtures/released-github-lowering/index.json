@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "provider": "github",
+      "file_name": "github.bundle.json",
+      "bundle_sha256": "fc0ce38a1de73ae14a245dbdd0a2376f71bec60ca9e1b43c161b7b54d7fe2f1e",
+      "source_sha256": "5e9edc27c465626b020eb6d9b4d5892e93b4e96f8c7af53ff952ac59b48c0df9",
+      "operations": 859,
+      "unsupported": 1
+    }
+  ]
+}
