@@ -7,7 +7,7 @@ title: Five store tests end within 60 s at host load
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-- depends_on: story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run
+- depends_on: story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process
 scope:
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/governed/tests/bounded_realization_security.rs
@@ -19,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: crates/connectors-host/tests/metadata_reopen_adversary.rs
-revision: 9
+revision: 12
 ---
 ## Defect
 
@@ -124,9 +124,9 @@ story:grown-store-replay-test-flake.
   the log the record names. Those `uptime` lines show whether the load of 60 was reached; a run
   below it is recorded with its load and does not meet this statement.
 - Each ends within 60 s at that load: by a smaller store or fewer iterations that still shows
-  what the test shows (stated per test), or by a shared fixture built once per run (a saved
-  store under `target/` keyed by the digest of its sources; a `OnceLock` is not that under
-  cargo-nextest), not by a longer timeout.
+  what the test shows (stated per test), not by a longer timeout. The other route this
+  statement named, a saved store built once per run under `target/`, is measured and closed
+  for these tests (the last paragraph of this story).
 - The filterset of story:entity-runtime-0330-records-name-definition-by-digest, acceptance
   line 8, exits 0 within 120 s at that load.
 - `cargo nextest run -p connectors-host -E 'test(owner::)'` exits 0 within 120 s at that load,
@@ -140,9 +140,19 @@ What each test asserts.
 ## Order with the test-step stories
 
 The stories that decompose story:the-gates-test-step-ends-within-120-s-on-the-forge own the change
-for the tests they name (story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run for
-eight tests named here and the two of the `http_standing_grant` binaries,
+for the tests they name
+(story:the-entity-runtime-registry-and-the-definition-bundle-are-built-once-per-process for
+eight tests named here and the two of the `http_standing_grant` binaries; until 2026-11-25 that
+was story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, which was measured and
+is not built,
 story:the-100-run-capacity-stress-keeps-10-runs-in-the-gate for the stress test,
 story:seven-cli-tests-of-a-slow-owner-start-no-longer-wait-out-the-10-s-connect-wait for one test);
-this story keeps its acceptance, 60 s at host load, and is measured after the eighteen-tests story
+this story keeps its acceptance, 60 s at host load, and is measured after the registry story
 lands, which its `depends_on` edge to that story records.
+
+The registry story does not promise 60 s at load: it removes 30.6 % of the eleven tests' time on
+the build host (7.7 % in `a_read_invoke…`) and its acceptance is a sum of forge durations. When a
+test named here is still over 60 s at host load after it, this story keeps the change for that
+test. The route "a shared fixture" is measured and closed for it: a template store saves 33 to
+38 ms per store (the section "Measured (2026-11-25): not built as written" of the archived
+story).

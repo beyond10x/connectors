@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:four-host-tests-no-longer-wait-out-the-30-s-lock-wait
 kind: story
-status: active
+status: implemented
 title: 'Four host tests no longer wait out the 30 s lock wait: 122.0 s become an estimated 5.5 s'
 summary: Four tests of connectors-host live through WAIT_BOUND (30 s); existing test seams and one new child action replace the wait, and one run at 30 s stays in the lane slow
 relations:
@@ -19,10 +19,11 @@ scope:
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/tests/local_foundation.rs
-revision: 11
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-25T03:48:47Z", actor: "human:operator", revision: 9}
+- {from: "active", to: "implemented", at: "2026-11-25T12:32:36Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Defect
 
@@ -118,8 +119,9 @@ timed).
   name.
 
 No other story of this set writes these four files.
-story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run reads `metadata.rs` as an
-input of a digest and does not write it.
+story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, which planned to read
+`metadata.rs` as an input of a digest, is archived and was not built. The stories that took its
+place name none of the four files in their scope.
 
 ## Not in this story
 

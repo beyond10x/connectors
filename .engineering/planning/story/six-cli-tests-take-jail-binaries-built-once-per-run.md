@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:six-cli-tests-take-jail-binaries-built-once-per-run
 kind: story
-status: active
+status: implemented
 title: 'Six CLI tests link their binaries into the jail instead of copying them: 50.7 s, no saving estimated'
 summary: Each mounted-container test copies about 133 MB of binaries into its jail; Jail::install hard-links them and copies only where it cannot link
 relations:
@@ -14,10 +14,11 @@ scope:
   path: crates/connectors-custody/src/mounted/fixture.rs
 - confidence: cited
   path: crates/connectors-custody/src/mounted/tests.rs
-revision: 11
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T03:09:52Z", actor: "human:operator", revision: 8}
 - {from: "proposed", to: "active", at: "2026-11-25T03:09:52Z", actor: "human:operator", revision: 9}
+- {from: "active", to: "implemented", at: "2026-11-25T12:32:36Z", actor: "human:operator", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Defect
 

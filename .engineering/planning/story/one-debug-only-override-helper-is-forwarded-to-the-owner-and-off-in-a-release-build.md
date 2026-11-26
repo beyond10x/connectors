@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:one-debug-only-override-helper-is-forwarded-to-the-owner-and-off-in-a-release-build
 kind: story
-status: active
+status: implemented
 title: One debug-only override helper is forwarded to the owner and off in a release build
 summary: A copied cfg(debug_assertions) pattern becomes one helper in connectors-sdk; the owner spawn forwards by prefix; one release-build test proves an override is off
 relations:
@@ -25,10 +25,11 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: cited
   path: crates/connectors-sdk/src/lib.rs
-revision: 10
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-25T05:07:24Z", actor: "human:operator", revision: 7}
 - {from: "proposed", to: "active", at: "2026-11-25T05:07:25Z", actor: "human:operator", revision: 8}
+- {from: "active", to: "implemented", at: "2026-11-25T12:32:37Z", actor: "human:operator", revision: 12, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Defect
 
@@ -127,10 +128,9 @@ that test, and the proof of point 4 would not cover them.
    tree of this story. The same module holds both sides with two texts of its own: a text that
    calls `std::env::var("CONNECTORS_TEST_OVERRIDE_EXAMPLE_MS")` is reported with its line, and a
    text that passes the same name to `debug_override_ms` is not. The gate's test step runs the
-   module. The command selects tests of `connectors-build` only, so the setup script of
-   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, whose filter names
-   `connectors-host` and `connectors-sql`, does not run for it (that story lists the filter's
-   support in cargo-nextest 0.9.143 as not established).
+   module. The command selects tests of `connectors-build` only. No setup script runs for it:
+   story:eighteen-tests-take-a-template-store-or-jail-built-once-per-run, which planned one for
+   `connectors-host` and `connectors-sql`, is archived and was not built.
 
 ## Scope
 
