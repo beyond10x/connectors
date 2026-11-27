@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 kind: story
-status: active
+status: implemented
 title: invoke retries a write that was not attempted and never sends an applied or unknown write twice
 summary: 'invoke --retry-not-attempted <n>: the owner retries a write that was not attempted for a closed set of causes, inside the write''s deadline with a reserve; tries in the answer; exit 3 for unknown with the option'
 relations:
@@ -39,10 +39,11 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: inferred
   path: website/docs/reference/contracts/model/domains/connectors-cli.md
-revision: 27
+revision: 28
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-26T22:47:13Z", actor: "human:operator", revision: 25}
 - {from: "proposed", to: "active", at: "2026-11-26T22:47:14Z", actor: "human:operator", revision: 26}
+- {from: "active", to: "implemented", at: "2026-11-27T08:25:32Z", actor: "human:operator", revision: 28, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Gap
 
