@@ -75,6 +75,17 @@ fn read_window(text: Option<&str>) -> Option<u64> {
     }
 }
 
+/// The most tries of a keyed write `--retry-not-attempted` names: a whole
+/// number from 1 to 10. `None` for anything else.
+pub(super) fn retry_tries(text: &str) -> Option<u8> {
+    if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    text.parse::<u8>()
+        .ok()
+        .filter(|tries| (1..=10).contains(tries))
+}
+
 /// A read's one cutoff (story:invoke-admission-queues-under-load), in
 /// milliseconds since the epoch: `window_ms` after `instant_ms`, the instant
 /// taken once. A cold read waits for the greeting of the owner it starts until
@@ -482,6 +493,8 @@ struct Request {
     out: Option<String>,
     /// `--deadline-seconds` as given.
     deadline_seconds: Option<String>,
+    /// `--retry-not-attempted` as given.
+    retry_not_attempted: Option<String>,
 }
 
 /// Where an `invoke`'s input document comes from.
@@ -633,6 +646,7 @@ fn parse(args: &[OsString]) -> Option<Request> {
         max_pages: text("max_pages"),
         out: text("out"),
         deadline_seconds: text("deadline_seconds"),
+        retry_not_attempted: text("retry_not_attempted"),
     })
 }
 
@@ -972,6 +986,17 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     {
         return Err(refused("idempotency_key"));
     }
+    // `--retry-not-attempted` (story:invoke-retries-a-write-that-was-not-
+    // attempted-and-never-sends-one-twice) is the most tries of a keyed
+    // write, decided from the arguments before anything is read or sent.
+    let retry = match request.retry_not_attempted.as_deref() {
+        Some(text) => Some(
+            retry_tries(text)
+                .filter(|_| request.idempotency_key.is_some())
+                .ok_or_else(|| refused("retry_not_attempted"))?,
+        ),
+        None => None,
+    };
     // `--deadline-seconds` is a read's (story:invoke-admission-queues-under-load).
     // Whether this is a read is decided from the arguments, as the owner
     // start below is, before anything is read, started or sent.
@@ -1228,6 +1253,9 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     if let Some(key) = &request.idempotency_key {
         rewritten.push(format!("--idempotency-key={key}").into());
     }
+    if let Some(tries) = retry {
+        rewritten.push(format!("--retry-not-attempted={tries}").into());
+    }
     rewritten.extend(after);
     let shaping = (fields.is_some() || each.is_some()).then_some(Shaping {
         fields,
@@ -1311,6 +1339,7 @@ pub(super) fn dispatch(
         "input",
         "approval_file",
         "idempotency_key",
+        "retry_not_attempted",
     ] {
         if let Some(value) = call.input.get(field).filter(|v| !v.is_null()) {
             input[field] = value.clone();

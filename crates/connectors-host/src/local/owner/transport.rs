@@ -104,6 +104,13 @@ struct WriteRequest {
     revision: String,
     deadline_monotonic_ns: u64,
     idempotency_key: Option<String>,
+    /// `invoke --retry-not-attempted <n>`: the most tries of the write, 1 to
+    /// 10 (story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice).
+    /// Absent otherwise, so a request without it keeps its bytes. The format
+    /// stays `connectors-owner/2`: a client reaches only an owner of its own
+    /// build (`WriteClient::connect`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retry_not_attempted: Option<u8>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -1299,6 +1306,10 @@ impl WriteClient {
             Ok(Self(client))
         })
     }
+    /// The write `request` through the owner. `retry_not_attempted` is
+    /// `invoke --retry-not-attempted`: the most tries the owner makes of a
+    /// keyed write that was not attempted for a cause of the closed set, 1 to
+    /// 10; anything else is `invalid_input` and nothing is sent.
     pub fn invoke(
         mut self,
         adapter: &str,
@@ -1306,8 +1317,12 @@ impl WriteClient {
         key: Option<&str>,
         proof: Option<&Secret>,
         deadline: mutation::Deadline,
+        retry_not_attempted: Option<u8>,
     ) -> Result<mutation::Delivery> {
         let until = deadline.until()?;
+        if retry_not_attempted.is_some_and(|tries| key.is_none() || !(1..=10).contains(&tries)) {
+            return Err(Code::InvalidInput.into());
+        }
         crate::local::protected::cancellation()?;
         let control = WriteRequest {
             format: WRITE_VERSION.into(),
@@ -1318,6 +1333,7 @@ impl WriteClient {
             revision: request.revision.into(),
             deadline_monotonic_ns: deadline.ticks(),
             idempotency_key: key.map(str::to_owned),
+            retry_not_attempted,
         };
         let response = (|| {
             channel::write(
@@ -2556,7 +2572,26 @@ fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
         approval_issuance::TARGET_LIMIT,
     )?;
     let until = mutation::Deadline::from_ticks(frame.control.deadline_monotonic_ns)?.until()?;
-    let result = write_action(owner, frame.control, frame.secret, frame.document, until);
+    // With `--retry-not-attempted` the stream is watched while the write
+    // runs: once the caller is gone (an interrupted `invoke` closes it), no
+    // further try starts. The try under way is not cancelled.
+    let gone = supervisor::Cancel::default();
+    let finished = Arc::new(AtomicBool::new(false));
+    let watcher = match frame.control.retry_not_attempted {
+        Some(_) => Some(watch_gone(stream, until, &gone, &finished)?),
+        None => None,
+    };
+    let result = write_action(
+        owner,
+        frame.control,
+        frame.secret,
+        frame.document,
+        until,
+        gone,
+    );
+    // The watcher ends at its next poll; the answer does not wait for it.
+    finished.store(true, Ordering::SeqCst);
+    drop(watcher);
     let (reply, document) = match result {
         Ok(mut value) => {
             value.validate()?;
@@ -2588,12 +2623,50 @@ fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     )?;
     Ok(())
 }
+/// Reads the stream of a write made with `--retry-not-attempted` until
+/// `finished` or `until`, and sets `gone` when the stream closes, fails or
+/// carries anything: the caller sends nothing after its request, so any of
+/// them means it no longer waits for the answer. The watcher reads a clone of
+/// the stream (on Windows a duplicate of the pipe handle) while the exchange
+/// writes its reply on the stream itself.
+fn watch_gone(
+    stream: &channel::Stream,
+    until: Instant,
+    gone: &supervisor::Cancel,
+    finished: &Arc<AtomicBool>,
+) -> Result<std::thread::JoinHandle<()>> {
+    let mut reader = stream.try_clone().map_err(|_| Code::Unavailable)?;
+    let (gone, finished) = (gone.clone(), finished.clone());
+    std::thread::Builder::new()
+        .name("connectors-local-write-watch".into())
+        .spawn(move || {
+            let ended = || {
+                if finished.load(Ordering::SeqCst) {
+                    Err(runtime::Failure::Interrupted)
+                } else {
+                    Ok(())
+                }
+            };
+            let _ = channel::read_with_cancel::<WriteRequest>(
+                &mut reader,
+                until,
+                false,
+                0,
+                Some(&ended),
+            );
+            if !finished.load(Ordering::SeqCst) {
+                gone.cancel();
+            }
+        })
+        .map_err(|_| Code::Unavailable.into())
+}
 fn write_action(
     owner: &Owner,
     request: WriteRequest,
     proof: Secret,
     document: Vec<u8>,
     until: Instant,
+    gone: supervisor::Cancel,
 ) -> Result<mutation::Delivery> {
     if owner.shutdown.load(Ordering::SeqCst) {
         return Err(Code::Unavailable.into());
@@ -2601,6 +2674,22 @@ fn write_action(
     if request.format != WRITE_VERSION || proof.0.len() > 20 * 1024 {
         return Err(Code::InvalidInput.into());
     }
+    // `--retry-not-attempted` names 1 to 10 tries of a keyed write.
+    let retry = match request.retry_not_attempted {
+        Some(tries) if (1..=10).contains(&tries) && request.idempotency_key.is_some() => {
+            Some(supervisor::Retry { tries, gone })
+        }
+        Some(_) => return Err(Code::InvalidInput.into()),
+        None => None,
+    };
+    // A same-key replay answered before any try names no try of its own.
+    let named = retry.is_some();
+    let replayed = |mut delivery: mutation::Delivery| {
+        if named {
+            delivery.mutation.tries = Some(0);
+        }
+        delivery
+    };
     let document = String::from_utf8(document).map_err(|_| Code::InvalidInput)?;
     let target = approval_issuance::Request {
         connection: &request.connection,
@@ -2621,7 +2710,7 @@ fn write_action(
         + until.saturating_duration_since(Instant::now()).as_millis() as u64;
     if let Some(original) = original {
         if !original.pending || !owner.pool.idle(&adapter)? {
-            return Ok(original.delivery);
+            return Ok(replayed(original.delivery));
         }
         return match owner.pool.run(
             &request.adapter,
@@ -2637,7 +2726,7 @@ fn write_action(
             },
             deadline,
         )? {
-            supervisor::Output::Write(value) => Ok(value),
+            supervisor::Output::Write(value) => Ok(replayed(value)),
             _ => Err(Code::OutcomeUnknown.into()),
         };
     }
@@ -2657,6 +2746,7 @@ fn write_action(
                 Some(proof)
             },
             until,
+            retry,
         },
         deadline,
     )? {

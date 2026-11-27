@@ -2,70 +2,285 @@
 format: aep.planning-md/3
 id: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 kind: story
-status: draft
+status: active
 title: invoke retries a write that was not attempted and never sends an applied or unknown write twice
-summary: 'Client-side write safety for invoke: --retry-not-attempted <n> and --read-back <op>, one JSON line, exit 0/1/3, so a consumer needs no wrapper'
+summary: 'invoke --retry-not-attempted <n>: the owner retries a write that was not attempted for a closed set of causes, inside the write''s deadline with a reserve; tries in the answer; exit 3 for unknown with the option'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- informed_by: story:landed-write-is-not-unknown-after-the-owners-budget
+scope:
+- confidence: inferred
+  path: CHANGELOG.md
+- confidence: inferred
+  path: apps/connectors-cli-contract/binding.json
+- confidence: inferred
+  path: apps/connectors-cli-contract/completions
+- confidence: inferred
+  path: apps/connectors/Cargo.toml
+- confidence: inferred
+  path: apps/connectors/spec/cli.yaml
+- confidence: inferred
+  path: apps/connectors/src/local/invoke.rs
+- confidence: inferred
+  path: apps/connectors/src/local/operations.rs
+- confidence: inferred
+  path: apps/connectors/tests
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/mutation.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/mutation/execution.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/supervisor.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/transport.rs
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: inferred
+  path: website/docs/reference/contracts/model/domains/connectors-cli.md
+revision: 27
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-26T22:47:13Z", actor: "human:operator", revision: 25}
+- {from: "proposed", to: "active", at: "2026-11-26T22:47:14Z", actor: "human:operator", revision: 26}
 ---
 ## Gap
 
 A consumer that calls `connectors invoke` for a write writes its own wrapper around the call
-today. Each wrapper holds the same five parts:
+today. Each wrapper holds a lock shared by parallel calls to one instance, a retry of a call
+that connectors classifies `not_attempted` up to N tries within one deadline, no second send
+after a write classified applied or unknown, an optional read-back for an unknown write, and a
+bound on the size of the store the wrapper keeps.
 
-- a lock shared by parallel calls to one instance;
-- a retry of a call that connectors classifies `not_attempted` (the provider unavailable, a
-  timeout before the write was sent, a refused approval-clock acquisition), up to N tries
-  within one deadline;
-- no second send after a write classified applied or unknown;
-- an optional read-back operation that settles an unknown write;
-- a bound on the size of the store the wrapper keeps.
+What connectors already does, so this story does not build it again:
 
-`classification` and the `not_attempted` settlement exist in the host today
-(`crates/connectors-host/src/local/owner/mutation.rs`, `Classification::NotAttempted`;
-`crates/connectors-host/src/local/service.rs`, the `not_attempted` settlement). What is missing
-is a client-side contract that uses them, so that a consumer needs no wrapper.
+- Sends to one instance are serialized across processes: one owner per state directory under
+  its lifetime lock (`crates/connectors-host/src/local/owner/transport.rs:1564-1572`) runs an
+  instance's exchanges on one serialized worker (`contracts/service/local-mutations.md:147-149`).
+  The wrapper's lock is not needed.
+- The host's keyed ledger is the store: at most 10,000 attempts per instance
+  (`crates/connectors-host/src/local/mutations/types.rs:189`). Between tries the owner keeps
+  only a count. The wrapper's store is not needed.
+- A refused clock acquisition already gets one owner-side second attempt
+  (story:an-approved-write-survives-one-refused-clock-acquisition).
+- An applied, refused or unknown write is never sent again under the same idempotency key: the
+  ledger replays its answer (`crates/connectors-host/src/local/owner/mutation.rs:603-610`,
+  `apps/connectors/src/local/operations.rs:223-227`).
+
+What is missing is the retry of a write that was not attempted. The read-back is
+story:an-unknown-write-is-settled-by-a-declared-read-back.
+
+## Design first
+
+- `connectors.cli.InvokeInput` (`ess/domains/cli.yaml:1825`) gains `retry_not_attempted`, an
+  integer from 1 to 10, absent by default; it needs `idempotency_key`.
+  `connectors.cli.MutationObservation` (`ess/domains/cli.yaml:1944`) gains `tries`: present only
+  when `retry_not_attempted` was given; 0 when the answer is a same-key replay answered before
+  any try (`operations.rs:223-227`, `crates/connectors-host/src/local/owner/mutation/execution.rs:282-284`),
+  else the number of tries made.
+- The answer keeps today's envelope: `.result.mutation` on stdout with exit 0,
+  `.error.data.mutation` on stderr otherwise, under `--output json`.
+- The exit table (`contracts/cli/v1alpha1/semantics.md:1984`) gains a row: a write classified
+  `unknown` exits 3, only when `--retry-not-attempted` was given. Without the option an unknown
+  write exits 1 as today. Exit 3 is free: invoke uses 0, 1, 2 and 130.
+- The specification change is validated with `ess specify validate` before code.
 
 ## Change
 
-`connectors invoke` gains two options:
+`connectors invoke` gains `--retry-not-attempted <n>`. The CLI passes `n` to the owner.
 
-- `--retry-not-attempted <n>`: a call that answers `not_attempted` is sent again, up to `n`
-  tries in total, all inside the call's one deadline. A call that answers applied, refused,
-  failed or unknown is never sent again.
-- `--read-back <operation>`: after an unknown write, the named read operation runs once; when
-  its answer shows the write, the result names it in `confirmed_by`.
+- The loop wraps the supervisor's write job from the check that replaces a child that no
+  longer runs (`crates/connectors-host/src/local/owner/supervisor.rs:1133-1140`) through the
+  call of `mutation::execute` (`supervisor.rs:1326`), on the instance's serialized worker. Each
+  try runs on the worker's child, as the job does today: a provider timeout or capacity answer
+  to the preflight leaves the child live (`crates/connectors-host/src/local/runtime/process.rs:1079-1087`),
+  and a child that no longer runs is replaced by that check.
+- A try is repeated only when it answered `not_attempted` with `mutation.attempt` null and the
+  cause is the provider's own answer to the preflight: `ProviderTimeout` or `ProviderCapacity`
+  (`crates/connectors-host/src/local/runtime.rs:102-103`; code `timeout` or `capacity` with
+  origin provider, `owner.rs:353-355`, `:389-395`; stage `dispatch`, where the host's own
+  timeout is stage `admission`,
+  `crates/connectors-host/src/local/runtime/process/write_tests.rs:948-965`;
+  `next_action = retry_explicitly`, `semantics.md:2443-2444`). That is the closed set. Every
+  other `not_attempted` ends the loop with its answer: the host's own timeout, a clock refusal,
+  an `unavailable` (a provider's unavailable answer is read as `Failure::Unavailable` with
+  origin host today, `runtime.rs:529-531`, `owner.rs:389-394`, so it cannot be told from a
+  busy or unavailable adapter), `idempotency_conflict`, `approval_required`, `rate_limited`,
+  `forbidden`, an aborted attempt.
+- A try after the first starts only while the client's connection is open. A write job
+  carries no cancel (`transport.rs:2644-2660`), and an interrupted `invoke` (exit 130) only
+  stops reading (`transport.rs:1330-1341`); after it no further try starts.
+- A retried try leaves no ledger row for its key: it ends before `prepare`
+  (`execution.rs:557-562`), so the next try passes the replay check of the key
+  (`observe_as`, `execution.rs:282-284`). The loop does not change how a try is audited.
+- Reserve: another try starts only while the duration of the try just ended plus 3 s (the
+  first reading's reserve of `contracts/service/clock.md:251-256`) is left before the write's
+  deadline (today 20 s per write: `Deadline::start()` at `apps/connectors/src/local/session.rs:68`,
+  the value at `crates/connectors-host/src/local/owner/mutation.rs:276`). Otherwise the
+  loop ends with the last try's answer, so a `not_attempted` near the deadline is not turned
+  into `outcome_unknown` by the write client (`transport.rs:1330-1341`). The reserve is no
+  budget for the commit: a late try whose preflight passes can still end `unknown` in its
+  commit, as one try can today (story:landed-write-is-not-unknown-after-the-owners-budget).
+- Approvals: every retried try ends before `prepare`, where a per-input proof is spent and a
+  grant use is bound (`execution.rs:565-614`); an unbound grant use is given back
+  (`execution.rs:133`). So `--approval-file` and a standing grant both work with the option,
+  and the retried tries spend no proof and no grant use.
 
-Calls of one process to one instance take one lock, so parallel calls do not interleave their
-retries. Whatever the client keeps between tries is bounded in size.
 
-The answer is one JSON line with `classification`, the number of tries, and `confirmed_by`
-after a read-back. Exit codes:
+## Wire
 
-- 0: applied, also when a read-back confirmed an unknown write;
-- 1: refused or failed;
-- 3: unknown, and the read-back (if any) did not find the write.
+The CLI passes `n` to the owner as a new member `retry_not_attempted` of `WriteRequest`
+(`crates/connectors-host/src/local/owner/transport.rs:98-107`), read by `exchange_write`
+(`transport.rs:2551-2665`). `WRITE_VERSION` stays `connectors-owner/2` (`transport.rs:72`):
+`WriteClient::connect` refuses an owner of another build with `owner_build_mismatch`, next
+action `stop_owner`, before any `WriteRequest` is sent (`transport.rs:1291-1298`,
+`contracts/cli/v1alpha1/owner.md:94-97`), so the new member reaches only an owner of the same
+build. A bump would turn that answer into `unavailable` after the 10 s connect bound.
+
+## Shares files with
+
+- story:write-reply-waits-out-the-owners-delivery-grace: `WriteClient::invoke` in
+  `transport.rs`. That story extends the client's read window that this story's reserve rule
+  reads; this story goes first and the other one revises the reserve when it lands.
+- story:landed-write-is-not-unknown-after-the-owners-budget: `exchange_write` in
+  `transport.rs`. This story goes first.
+- story:owner-cancel-frees-queue-slot: the worker's job path in `supervisor.rs` (:702, :1105).
+  This story's stop rule rests on a write job carrying no cancel; that story, landing later,
+  replaces the stop rule's check of the open connection with the cancel.
+- story:connections-list-answers-through-the-owner (active): `contracts/cli/v1alpha1/semantics.md`
+  (:1378-1380 there, :1984 here) and `transport.rs` (:1061-1093, :2782-2793, :3120-3157 there,
+  :98-107, :1302-1341, :2551-2665 here). The regions do not overlap.
+
+## Test fixture
+
+None exists. `write_tests.rs` is a `#[cfg(test)]` module of connectors-host
+(`process.rs:2389-2390`) that tests in `apps/connectors` cannot reach, and
+`apps/connectors/tests/support/standin.rs` serves no writes. The story builds one stand-in
+adapter in the harness=false test-binary pattern of `standin.rs` that serves V2 writes with a
+counted preflight script (the answer of the k-th preflight, with an optional delay), one
+commit answer (success; a refusal after the send, classified `refused`, such as a declared
+conflict status, `semantics.md:2445-2447`; or an unknown effect: the stand-in logs the commit
+line and exits without answering), and an ordered log of one line per preflight and per commit
+carrying the input's `value`, each line written when the request arrives, before any delay;
+it accepts `{"value": true}` and `{"value": false}`. A provider
+timeout is its answer `Failure::from_provider(Timeout.answered())`; the adapter's own timeout
+is `Failure::from_provider(Timeout)` without `.answered()`, which the host reads as
+`Failure::Timeout`, origin host (`runtime.rs:524`). Each is returned at once or after the named
+delay, not the 15 s HTTP cutoff. The CLI tests configure it with mounted custody
+(`connectors_custody::mounted::fixture`, as `apps/connectors/tests/local_mcp_server_write_refusal.rs:25`)
+and a local clock source (`crates/connectors-host/tests/fixtures/clock/server.rs`), so a write
+reaches its commit.
 
 ## Acceptance
 
-1. A fake provider that answers `timeout` (classified `not_attempted`) twice and then success,
-   called with `--retry-not-attempted 3`, gives one JSON line with `classification` applied and
-   3 tries, exit 0; the provider received 3 sends.
-2. A fake provider that answers so the write is `unknown`, called with
-   `--retry-not-attempted 3`, gives exit 3, and the provider received one write.
-3. With `--read-back <op>` and a fake provider whose read shows the unknown write, the line
-   names `confirmed_by: <op>` and the exit is 0; the provider received one write.
-4. Two parallel `invoke` calls to one instance with `--retry-not-attempted` do not overlap their
-   sends at the fake provider.
-5. Each test runs under 5 s; no test waits out a production timeout.
+All calls with `--output json` and `--idempotency-key`, against the fixture above.
+
+1. Under a standing grant of `max_per_hour` 1, a fixture whose preflights 1 and 2 answer the
+   provider's timeout, called with `--retry-not-attempted 3`, prints one stdout line with
+   `result.mutation.classification` `applied` and `result.mutation.tries` 3, and exits 0. The
+   log reads preflight, preflight, preflight, commit. Before the change the call exits 2
+   (unknown flag); without the option it exits 1 with `not_attempted`.
+2. A fixture whose commit answers an unknown effect, called with `--retry-not-attempted 3`,
+   exits 3 with `error.data.mutation.classification` `unknown` and `tries` 1; the log holds 1
+   commit. Without the option the same call exits 1 and `error.data.mutation` has no `tries`.
+3. A fixture whose commit refuses, called with `--retry-not-attempted 3`, exits 1 with
+   `refused` and `tries` 1; the log holds 1 commit.
+4. A fixture whose every preflight answers the provider's timeout, called with
+   `--retry-not-attempted 2`, exits 1 with `not_attempted` and `tries` 2; the log holds 2
+   preflights and 0 commits.
+5. A fixture whose every preflight answers the provider's timeout after 6 s, called with
+   `--retry-not-attempted 10`, exits 1 with `not_attempted` and `tries` 2, within 20 s: the
+   third try would not leave 6 s plus 3 s.
+6. `--retry-not-attempted 2` without `--idempotency-key`, and `--retry-not-attempted` 0 and 11
+   with one, each exit 2 with `error.data.code` `invalid_input`, `field` `retry_not_attempted`,
+   `stage` `arguments`; the log is empty.
+7. Two processes with inputs `value` true and false and two different idempotency keys, each
+   `--retry-not-attempted 3`, against a
+   fixture whose preflights 1, 2, 4 and 5 answer the provider's timeout, both exit 0 with
+   `tries` 3, and the log reads three preflights and a commit of one value, then three
+   preflights and a commit of the other.
+8. A preflight answering 403 (`not_attempted`, `forbidden`), called with
+   `--retry-not-attempted 3`, exits 1 with `tries` 1; the log holds 1 preflight.
+9. A same-key replay of statement 1's call exits 0 with `applied` and `tries` 0; the log gains
+   nothing.
+10. `ess/domains/cli.yaml` declares `retry_not_attempted` in `connectors.cli.InvokeInput` and
+    `tries` in `connectors.cli.MutationObservation`, both `Optional<Integer>`, and
+    `ess specify validate` exits 0 on it.
+11. The exit table of `contracts/cli/v1alpha1/semantics.md` has a row: a write classified
+    `unknown` under `--retry-not-attempted` exits 3.
+12. A fixture whose preflight 1 answers the provider's capacity answer and whose preflight 2
+    succeeds, called with `--approval-file` for the input and `--retry-not-attempted 2`, exits 0
+    `applied` with `tries` 2; the log reads preflight, preflight, commit.
+13. A fixture whose preflight 1 answers the adapter's own timeout and whose preflight 2
+    succeeds, called with `--retry-not-attempted 3`, exits 1 `not_attempted` with `tries` 1,
+    `error.data.code` `timeout` and `stage` `admission`; the log holds 1 preflight.
+14. A fixture whose every preflight answers the provider's timeout after 2 s, called with
+    `--retry-not-attempted 10` and sent SIGINT once the log holds its first preflight, exits 130;
+    6 s after the signal the log holds 1 preflight.
+15. Each test runs under 5 s, except 5 (under 21 s), 14 (under 10 s), and 7 and 9 (under 8 s; see As built).
 
 ## Not in this story
 
-- Retry of a read: a read is idempotent and has its own path.
-- A change to how the host classifies a call.
+- The host-side `not_attempted` causes: a clock refusal at `admission` (a bare `unavailable`
+  without a clock marker today, `crates/connectors-host/src/local/owner.rs:261-272`; the owner
+  already makes one second attempt), the host's own timeout of a preflight (it ends the child,
+  `process.rs:1083-1085`; a preflight that hangs to the write's deadline reaches the client as
+  `outcome_unknown`, `process.rs:1030`, `transport.rs:1331-1341`), a provider's `unavailable`
+  answer (origin host today), and a busy or unavailable adapter. Owned by the draft
+  story:invoke-retries-host-side-not-attempted-causes, which depends on this story and on
+  story:a-clock-refusal-of-issue-and-invoke-names-its-sources.
+- The read-back of an unknown write: story:an-unknown-write-is-settled-by-a-declared-read-back.
+- An unknown whose provider request landed and settled after the owner's budget:
+  story:landed-write-is-not-unknown-after-the-owners-budget.
+- A write deadline named by the caller; a change to how the host classifies a call;
+  re-preparing an aborted key in the ledger; retry of a read.
 
 ## Order
 
-Filed from a consumer repository's request on 2026-11-26. Ordered after the current wave
-(`integration/wave5`): no implementation starts before that wave's pull request merges.
+Filed from a consumer repository's request on 2026-11-26, ordered after pull request 315.
+Revised after rounds 1 to 6 of the plan critics (acceptance, design, scope and parallel-safety lanes).
+
+## As built
+
+Five commits on the branch `story/invoke-retry-not-attempted`, on top of 8d7de9cec:
+b62690d2c (the model: `retry_not_attempted` and `tries` in `ess/domains/cli.yaml`, the exit-3
+row and paragraph in `contracts/cli/v1alpha1/semantics.md`), dd15e84ae and 55e712987 (the
+regenerated metadata definitions, emissions and operation-type digests), c70251722 (the
+write-serving stand-in and `apps/connectors/tests/invoke_retry.rs`) and dc2956241 (the
+product change). 33 files.
+
+- The loop is in `crates/connectors-host/src/local/owner/supervisor.rs` (`Retry`,
+  `tried_again`, `another_try`, `RETRY_RESERVE`, `Task::again`); without whitespace changes it
+  adds 135 lines.
+- `WriteRequest` gains `retry_not_attempted`, the owner refuses it outside 1 to 10, and
+  `watch_gone` ends the loop when the client's connection closes
+  (`crates/connectors-host/src/local/owner/transport.rs`). `WRITE_VERSION` is unchanged.
+- `MutationObservation` gains `tries`, never stored in the ledger
+  (`crates/connectors-host/src/local/owner/mutation.rs`).
+- The CLI adds the flag, the argument refusals, `tries` 0 on a replay it answers itself, and
+  exit 3 (`apps/connectors/src/local.rs`, `local/invoke.rs`, `local/operations.rs`,
+  `local/session.rs`). A CLI-side `outcome_unknown` (an owner answer the CLI never read) carries
+  no `tries`; the model comment and the contract say so.
+- Test support: `approval_keys::install_for_tests`, reachable only from tests.
+
+Red, on c70251722 before the product change: 15 tests ran, 4 passed and 11 failed. Statements
+10 and 11 passed because the model was already committed; statement 14 passed vacuously,
+since one try is all a write makes without the change. Statement 14 was shown not vacuous by a
+mutant that ignores the client-gone check: it failed after 8.949 s with three preflights
+logged where one was expected.
+
+Green: 16 tests ran (statement 1 is split in two so each stays under 5 s), 16 passed in
+19.743 s. Times from the parallel run: statement 5 15.47 s (bound 21 s), statement 14 8.92 s
+(bound 10 s), statement 7 5.83 s, statement 9 5.04 s (4.55 s alone), every other test under
+5 s. `connectors-build`: 385 of 385. connectors-host owner modules (mutation, supervisor,
+transport): 87 of 87. Clippy with `-D warnings` on connectors-host and connectors, Linux and
+`x86_64-pc-windows-gnu`: exit 0. The generators' `--check` modes and
+`connectors-docs generate --check`: exit 0.
+
+Departure from statement 15: statement 7 takes 5.83 s (5.81 s alone), over its 5 s bound.
+Each try costs about 450 ms in the existing write path: three ledger observations of about
+70 ms (one before the try in `supervisor.rs`, two at `execution.rs:282`) and `issuance::resolve`
+at about 28 ms; the site setup takes 1.9 s, `connect` 1.16 s of it. Statement 7 makes 6 tries
+and 2 commits, so it cannot be under 5 s without changing the write path. The bound of
+statements 7 and 9 is 8 s, under the 60 s bound of every test; the per-try cost is
+story:a-write-try-costs-less-than-450-ms-in-the-owner (draft).

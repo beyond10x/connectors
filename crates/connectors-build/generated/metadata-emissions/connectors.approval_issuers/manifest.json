@@ -10,8 +10,8 @@
       }
     ],
     "scenarios": 34,
-    "spec_digest": "6266717a17916c31d85dd96b5195ce98222b72af9f9f46a30afab97de3bbd4de",
-    "suite_digest": "sha256:85b1cc3457d3147cbc680ccf89d362d48c056d90870a4d11eb5a68aa376a863f"
+    "spec_digest": "38c9bb838d420ab111444bdeb27868d92b3c110688c4652fb616f3d299a12e18",
+    "suite_digest": "sha256:e61a00c336bc79ccfc9586c2ed8df1484dda8dfd8d545eef311532c0fdf95db6"
   },
   "component": "local-metadata-authority",
   "format": "ess-mutation-manifest/7",
@@ -794,8 +794,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.ConfirmKeyDeletion/deleted/connectors.approval_issuers.KeyDeleted/connectors.approval_issuers.KeyPublished",
-      "spec_digest": "296bdd0194cf2798a7e8d8cceeaa86aa61b524e65d5fe4648080598fcf101c9f",
-      "suite_digest": "sha256:3c1a0a500c8dbee79fa82e363b260baa169cd28514c3a24d46ebc1ddf3d09928"
+      "spec_digest": "02591ff9b0925ada248d03b7d5e7d25df7ec44c5027494e88f57d177aba1c406",
+      "suite_digest": "sha256:03ae22b1fd469350b6d7f135698c21e3f5bad7f84e02c6350f07d9e6ea74571a"
     },
     {
       "change": "`emits: [connectors.approval_issuers.KeyPublished]` becomes `emits: [connectors.approval_issuers.KeyDeleted]`",
@@ -812,8 +812,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.PublishKey/published/connectors.approval_issuers.KeyPublished/connectors.approval_issuers.KeyDeleted",
-      "spec_digest": "008904123d2bb4df2c9367a331e2ce19e44e765d613d6245632dd8c87c4b8760",
-      "suite_digest": "sha256:ed7a10d24f28a59575154c8aeb298685c0b6bd2af1807b7a73097ee536c495be"
+      "spec_digest": "d3353e60c7baad46ccad562d59586375cb58df53f5e0389a15773404989c084c",
+      "suite_digest": "sha256:79c298338464c2da7ccb143cd1d487a4b2ff455d02d78e76bec61b615b58dfbd"
     },
     {
       "change": "`emits: [connectors.approval_issuers.KeyRetiring]` becomes `emits: [connectors.approval_issuers.KeyDeleted]`",
@@ -830,8 +830,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.RetireKey/retiring/connectors.approval_issuers.KeyRetiring/connectors.approval_issuers.KeyDeleted",
-      "spec_digest": "339961137fdb41280cbb8283fe1eecc1a3ca18248d85eb35832be97b5787551a",
-      "suite_digest": "sha256:0cf7be2356ba05bb03fbacfaca80cd01ee20d01e067f378ad36a6475ba8abbf0"
+      "spec_digest": "73e188386967a5f30b3400434ae0f60af3cac494ba7fdd52d44b7acf21605cac",
+      "suite_digest": "sha256:07f8f66233a9f6968036e870a0065d159b96b49b6a4c9225cda5495791f89685"
     },
     {
       "change": "`emits: [connectors.approval_issuers.KeyRevoked]` becomes `emits: [connectors.approval_issuers.KeyDeleted]`",
@@ -848,8 +848,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.RevokeKey/revoked/connectors.approval_issuers.KeyRevoked/connectors.approval_issuers.KeyDeleted",
-      "spec_digest": "cbe0fc10f058a035299f1528f68669165d6ad6c0c69bd3344469e2e067419059",
-      "suite_digest": "sha256:3ed11a7932825d9256126d96174d228d590b41ccf31a98eb5a5801a2a50a5927"
+      "spec_digest": "b015229dfb82123f6c85ab917fff0aadff0883fc797d85dbb02acfe2bb5bee0a",
+      "suite_digest": "sha256:db66e6b3e33d9d4bad6b3e9adccd23430e388a449cc29653a209defab8cf234a"
     },
     {
       "change": "`emits: [connectors.approval_issuers.KeyStaged]` becomes `emits: [connectors.approval_issuers.KeyDeleted]`",
@@ -866,8 +866,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.StageKey/staged/connectors.approval_issuers.KeyStaged/connectors.approval_issuers.KeyDeleted",
-      "spec_digest": "232a3c75f339b42a6a44ec33d8dbda1acebb88492a17a47dfc3d94d077d3bfbd",
-      "suite_digest": "sha256:597941f1e870c534e027695c8026ff7a2107bee148e300dbe2d27b11d4959453"
+      "spec_digest": "5d76a9e3d0caa227498e1958d7b1b4f7b59ea2d8d4b887da89a5c8a85b8deb3b",
+      "suite_digest": "sha256:0b0ead0eadfd4b011dbe72435376834313ae6ba134aa88227a4f8f441cd59222"
     },
     {
       "change": "`emits: [connectors.feed.ItemRemoved]` becomes `emits: [connectors.feed.ItemRestored]`",
@@ -905,8 +905,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict",
-      "spec_digest": "3714366a0a3061eba5fdc48c782940ba4ca6c2e19a6e1403cc1df96a670c13ed",
-      "suite_digest": "sha256:c9907cd3d6b3c80bb2c4ead1a9481eb7196ebc1a7f9b17d88715632798aafd3d"
+      "spec_digest": "8c542b33f9747841136d0f66d5a7b56b15b30785d12da5f1af4a9c6bfbe0465d",
+      "suite_digest": "sha256:f572afb2a9f579febd26a78d5502fae44ef8dc9e523fc13320937c6a92aff0f2"
     },
     {
       "change": "`error: connectors.approval_issuers.IssuerRevisionReused` becomes `error: connectors.approval_issuers.IssuerRevisionConflict`",
@@ -923,8 +923,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-reused",
-      "spec_digest": "7068a981d7e80e2bc0d9ea32291cf75aaec3ff8fd9d5fa43bd6369c541545a2d",
-      "suite_digest": "sha256:21671c5eba1d61e10730516c53ed39522a4062f124a27e4c76c324d792178075"
+      "spec_digest": "5b20da16c6c0988fc18c8ffdbf91fd4556378b1a6e1e5dd26fcef40b26ca6814",
+      "suite_digest": "sha256:2762250cc1b85a0ff53023d309ef3ddbf222e243039f4cee31f7df6343f4a867"
     },
     {
       "change": "`error: connectors.approval_issuers.KeyStateConflict` becomes `error: connectors.approval_issuers.IssuerRevisionConflict`",
@@ -941,8 +941,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.ConfirmKeyDeletion/conflict",
-      "spec_digest": "771355b1f4de66cd9bee00207a6e49f6c78414b0f42243da93651f39fd5486e9",
-      "suite_digest": "sha256:d66064c5fc378f530d9ef4f26d3d31e6b132c4b06cbb61ef0d7011124aad3e02"
+      "spec_digest": "27c5241e148d45a501fbe4bbd05203aa4dbd27b16b7f1846a53cda6166d15e28",
+      "suite_digest": "sha256:8bbc5afc0cefad5100d0bc506e8ea683e07dc8995b2d21660c91371d51270162"
     },
     {
       "change": "`error: connectors.approval_issuers.KeyStateConflict` becomes `error: connectors.approval_issuers.IssuerRevisionConflict`",
@@ -959,8 +959,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.PublishKey/conflict",
-      "spec_digest": "ab50ea9b34e949b368269ce38f729ab354f5b27cce91a602dd6e1c8c851f26c8",
-      "suite_digest": "sha256:3d181f287b281ed3cb0e20b6c7f745b350429626c626865e98008e7b131a733b"
+      "spec_digest": "e7ced15986fb716146117b2b5e7371cdd856b32d7dbaaaf020d6f6192655b5a2",
+      "suite_digest": "sha256:6da6743ed53016fe61a8cc2e1ff05c1d375b22741a1177e90c1b0d56260da60e"
     },
     {
       "change": "`error: connectors.approval_issuers.KeyStateConflict` becomes `error: connectors.approval_issuers.IssuerRevisionConflict`",
@@ -977,8 +977,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.RetireKey/conflict",
-      "spec_digest": "0ca4e200999f9f2a61eade13b25fd71025388e66c193b1454c616cf27bdce760",
-      "suite_digest": "sha256:e94786f24876f7d8240c5a438fa90a6acb1aeb5e3b842b93ca9bfe45f63421fd"
+      "spec_digest": "3ced15d1a32da59fab1f7fcffb0b7c01d7b42d0cda52dea81112a5bfa63ccb97",
+      "suite_digest": "sha256:610a16eb3163f320403c460e5d4388258b8e2d3f8bb02af81735bb6ac81a8ea3"
     },
     {
       "change": "`error: connectors.approval_issuers.KeyStateConflict` becomes `error: connectors.approval_issuers.IssuerRevisionConflict`",
@@ -995,8 +995,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.RevokeKey/conflict",
-      "spec_digest": "9477bdc03336043e344e68029c332bfcd65632e5a9519c57e310f70a3e225e6d",
-      "suite_digest": "sha256:3fe911e818dc26bca5cd423ba2a33448cde24fee2e06ff0ed68b5d897df2944b"
+      "spec_digest": "8efd2d8228ba7c5133af0081c598471c1ef921d139f192a43aa601e8c44a7548",
+      "suite_digest": "sha256:b0342f997713b2d4baf8e3616c4ad18af5f221d73e5d22270e7b1ed5c3ccacb9"
     },
     {
       "change": "`error: connectors.auth_bindings.Refused` becomes `error: connectors.auth_bindings.AcquisitionResultMismatch`",
@@ -1909,8 +1909,8 @@
       ],
       "scenarios": 35,
       "site": "connectors.approval_issuers.ApprovalSigningKey.retire/Candidate",
-      "spec_digest": "3aa8a2ac0a0e9c3d995eb4faca195db6d0a864f0c56a7603e47a501161273014",
-      "suite_digest": "sha256:b18a992cded7795e6fc15d9c9266c13a251b7301611f763a287c6b1dd28c6171"
+      "spec_digest": "9f569ff0c63eb92bebeb441533b57bca69bc1ea9a83492daf92cc3b83d1a10be",
+      "suite_digest": "sha256:2fcf450a27347a5f0d29526e404418886dff4483c6aa0be356daac8346c0ac3a"
     },
     {
       "change": "`from: [Candidate, Retired]` becomes `from: [Candidate]`",
@@ -1949,8 +1949,8 @@
       ],
       "scenarios": 35,
       "site": "connectors.approval_issuers.ApprovalSigningKey.revoke/Candidate",
-      "spec_digest": "a5ed81c0eacfc5e62a30a84e12f15e463b035eec13896fb726c87bc98df1dac7",
-      "suite_digest": "sha256:e1600657900f7cf201743402538d017ccfdb08cf4043d9c95bea21c8ebed0f07"
+      "spec_digest": "fe4b66792a2145a37405ff67f8a7c82126c4b67b90206b73fcbee067158d7122",
+      "suite_digest": "sha256:9add3912925cc7622b7fc8d53e3ec17e84c094e3134c482134fafa2268306b52"
     },
     {
       "change": "`from: [Completing, Pending]` becomes `from: [Pending]`",
@@ -2464,8 +2464,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict/when_subject",
-      "spec_digest": "56f4b375d95240fbe8bbb57fefade6f9828afa79f1e0a3104ab9963363e005ff",
-      "suite_digest": "sha256:60eb406a9fe49b272ee75f29adc8b59f40184dca2605349c4b28a3d42c278d4f"
+      "spec_digest": "d5820df4792c9ad8695b98c337ab14f542590079c58669ce52d9e257491c63c1",
+      "suite_digest": "sha256:4d6d634131ec983796c7be903595e55221364f1a7003ec5f5566d2806599bbc5"
     },
     {
       "change": "`when_subject: revision == input.revision` becomes `when_subject: not (revision == input.revision)`",
@@ -2482,8 +2482,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-reused/when_subject",
-      "spec_digest": "5b2edf7c4d1056515a77e86e2cc44c56d7a3e4aa890649ab57528c752fd8f6f3",
-      "suite_digest": "sha256:0d55e629d5f255af6f14e88d692757a2f06b1377213e44865135f561a6f967e7"
+      "spec_digest": "739b9013c142e937d33b14fb3d164cb6328e2dc5d0693c040c2c8cd13c817618",
+      "suite_digest": "sha256:87a8ccc0ae997ca85571b081bd516789107d9786d9c6257017ea7f915215e3f9"
     },
     {
       "change": "`when: decision == allow` becomes `when: not (decision == allow)`",
@@ -3123,8 +3123,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/revision-conflict/revision-reused",
-      "spec_digest": "daef4e6e0de5f6a445386d4c51cfc8169eab5096aad10983f569306bcefe50c3",
-      "suite_digest": "sha256:70f42d9c97532cb5fd3f27d9950e3536c54c0362c90df0deb5291f59815bac14"
+      "spec_digest": "aba1f319346426c3856cff084b0bf5bb53f27dfa10742bdcf7083fe5fbd76223",
+      "suite_digest": "sha256:2dd15485860f1888b7f9a17f144249a4c1dd13ce3f5e63e6ebf35da0153cad9c"
     },
     {
       "change": "`name-taken` (`(defined(connector_id) and defined(name) and defined(name_held_by))`) and `endpoint-required` (`(defined(connector_id) and not (defined(endpoint)) and not (defined(connector_default_endpoint)) and (not (defined(name)) or not (defined(name_held_by))))`) change places, so `endpoint-required` answers where both hold",
@@ -3288,8 +3288,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/advanced/revision",
-      "spec_digest": "c669ccd59b175b82ea547b2b7942fe142321f98da083a17a6719fa937e6378a0",
-      "suite_digest": "sha256:bb988210f949b19a0df491ddf17231f3fe656145bfc5d4fb29eaa7bc193db58b"
+      "spec_digest": "97a94cf2b22999c4e8e384fb028222174ec1298372f151c97193c4e7682d7534",
+      "suite_digest": "sha256:c4fd3e13574a011223aeb8b4735ad6689c24053efa980c30159275bfb12e3fb1"
     },
     {
       "change": "`binary_version: input.binary_version` is no longer set",
@@ -3418,8 +3418,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.AdvanceIssuerRevision/advanced/revision",
-      "spec_digest": "f074dee0c5df99c79a868bb8d86468cfb92e659b6981b6acd22cd20522b63462",
-      "suite_digest": "sha256:e23b95ce592aedb986d46ff3368e911eba31962742e0054bc2b9a334fe6311d3"
+      "spec_digest": "74f37fb61ba76f1bf6b1b296b06cd53e62c3bc781e90b405ce20291055f3494e",
+      "suite_digest": "sha256:632d421e30f9253cf976cb52967cc9c402e67b8f52004caab673b5e5776f6009"
     },
     {
       "change": "`custody_scope_ref: input.custody_scope_ref` becomes `custody_scope_ref: input.issuer_id`",
@@ -3436,8 +3436,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.BindIssuer/bound/custody_scope_ref",
-      "spec_digest": "0a6678794c0a7c8006f07b1d12ddaaefed69a4b4a3df24bbb4f591bd7070e8ab",
-      "suite_digest": "sha256:a6e0b231854d9e409d8fa02f747e22a5b299f7211eb000379c5deabcdf430855"
+      "spec_digest": "8d3e695ac50666ddb5d08fb96d0ca963bf05329939f808718f7dc67c9413a4c6",
+      "suite_digest": "sha256:1495b40d1bd2b565abce1474d0d76cc09c8d68272b19d3ffc577ce348b841abb"
     },
     {
       "change": "`instance_id: input.instance_id` becomes `instance_id: mutant-literal`",
@@ -3454,8 +3454,8 @@
       ],
       "scenarios": 37,
       "site": "connectors.approval_issuers.BindIssuer/bound/instance_id",
-      "spec_digest": "67a63d6f6d70c4baabb58cbc952ed879eb940cdce6292a19f2bce161a88606fe",
-      "suite_digest": "sha256:3b7309225e7e35bc715ec4ad207f363154aa0996657b94d2ed5182d46ec82271"
+      "spec_digest": "7c195dd3e635542840a8eb6acf2009dba869964a725a0f601ca0c20a8492c36c",
+      "suite_digest": "sha256:a52013030656a5b8851fa3e0241e89b53429f4b02138f4bc3ba99e3512173881"
     },
     {
       "change": "`revision: input.revision` becomes `revision: input.issuer_id`",
@@ -3472,8 +3472,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.BindIssuer/bound/revision",
-      "spec_digest": "c57297e0ecf9d4dc929d621ce15a227f8242e0e39b55162a2c35365003711bc3",
-      "suite_digest": "sha256:c43b037c45d77d4130f7a5c429dc6fc76178fd05580ccb178e4e3f88fbd085d7"
+      "spec_digest": "203ba3919828f311a4acbd778118d5edd601bd2dc4bf7af545bceef72900d761",
+      "suite_digest": "sha256:cc4fa825fd14d689a666275497cc959de87846e589043e154c779af73290d630"
     },
     {
       "change": "`issuer_id: input.issuer_id` becomes `issuer_id: input.key_id`",
@@ -3490,8 +3490,8 @@
       ],
       "scenarios": 36,
       "site": "connectors.approval_issuers.StageKey/staged/issuer_id",
-      "spec_digest": "5f3e03b84b481df9dcec54121663e31b4fc2285fdfa5e7a67147c0a7324379cc",
-      "suite_digest": "sha256:3e484743fb482da2c79d21a8e7a5ff192367251dfe66c91dafdf803739c062a2"
+      "spec_digest": "73b706e60ee7323780e33c589e2d06f18e56342cadcf39dfadcf2a70f516bbba",
+      "suite_digest": "sha256:6af24420d95b49ca8856ae4cda1bda717afc5e1093e05a76f66b75b9ebb9ceff"
     },
     {
       "change": "`material_version: input.material_version` becomes `material_version: input.key_id`",
@@ -3508,8 +3508,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.StageKey/staged/material_version",
-      "spec_digest": "8ec99ccb42d711cf24407600c14e66d41ddcb4615213097c65fde0255ffb9609",
-      "suite_digest": "sha256:066cb92de4a24a7854f0dee1d36063b2a7ea141944b916d7756d869ffb495d47"
+      "spec_digest": "cc2b94238aac427ca8679dde709ae899acc0a1cb840c18fce4ad85925ed385f2",
+      "suite_digest": "sha256:632ad2c73b73be6a0635d6e869ba0cf488dcc4b773cc86886c91d24ec7a223bf"
     },
     {
       "change": "`not_after_unix_ms: input.not_after_unix_ms` becomes `not_after_unix_ms: input.not_before_unix_ms`",
@@ -3526,8 +3526,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.StageKey/staged/not_after_unix_ms",
-      "spec_digest": "9c5beca291df9fbb4f18664957d56e5e30ef8c6b418be8424b7b0f70ae68ed87",
-      "suite_digest": "sha256:28cf200738a58aaa237dcd9c155fb7d38490b737835d724b75c45b2061c26f96"
+      "spec_digest": "3e9c3b237c60f47c4547f4445132284356415a2785efdd2439c121c85e98b1ab",
+      "suite_digest": "sha256:3ff0872f45fb4eadb895800dde1ddb91a709996e314700616e18b4de22f3fca3"
     },
     {
       "change": "`not_before_unix_ms: input.not_before_unix_ms` becomes `not_before_unix_ms: input.not_after_unix_ms`",
@@ -3544,8 +3544,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.StageKey/staged/not_before_unix_ms",
-      "spec_digest": "01893ad57526b5891371dfb49a8a4c2de082f7c2acc88b9b6e541c3426f43f43",
-      "suite_digest": "sha256:c149a2771da6a7cfc2d84214f9cfb099062a5208244ebf8c1075bdb76dce3ea4"
+      "spec_digest": "a5e75592f44eab27fb05c8d395ac0b4ddcd91edff7b7d52714e7c6432479e798",
+      "suite_digest": "sha256:ac86b1d2639317e927818654675c70e0cb9721d2894c2b8c91d806c8f02774a2"
     },
     {
       "change": "`public_key: input.public_key` becomes `public_key: mutant-literal`",
@@ -3562,8 +3562,8 @@
       ],
       "scenarios": 34,
       "site": "connectors.approval_issuers.StageKey/staged/public_key",
-      "spec_digest": "570e3c5102ae195c716ed160365999dd4121f62dfe0c0e60eb884966ea59cacf",
-      "suite_digest": "sha256:1f3bc9dcd4614f26d7a990983ece09d1440696676daf2015d0265f6ea1b746cd"
+      "spec_digest": "388fe023e761fa893670505e9019da6a509dbfa89766bda351e5e00e65017050",
+      "suite_digest": "sha256:92fa2aac15e7f6f04da77aaee85c3be27f7c7a32dc814d525874912e5de136f5"
     },
     {
       "change": "`instance_id: input.instance_id` becomes `instance_id: input.profile_record_ref`",
@@ -4336,7 +4336,7 @@
       "site": "connectors.sessions.Session.renew"
     }
   ],
-  "spec_digest": "6266717a17916c31d85dd96b5195ce98222b72af9f9f46a30afab97de3bbd4de",
+  "spec_digest": "38c9bb838d420ab111444bdeb27868d92b3c110688c4652fb616f3d299a12e18",
   "specification": "connectors v1",
   "unavailable_sites": [
     {

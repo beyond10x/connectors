@@ -560,6 +560,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -1227,6 +1233,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -1860,6 +1872,12 @@
                                     "kind": "string"
                                   }
                                 }
+                              }
+                            },
+                            "tries": {
+                              "kind": "optional",
+                              "of": {
+                                "kind": "integer"
                               }
                             }
                           }
@@ -2501,6 +2519,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -3145,6 +3169,12 @@
                                   }
                                 }
                               }
+                            },
+                            "tries": {
+                              "kind": "optional",
+                              "of": {
+                                "kind": "integer"
+                              }
                             }
                           }
                         }
@@ -3785,6 +3815,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -4459,6 +4495,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -5087,6 +5129,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -5749,6 +5797,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -6426,6 +6480,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -7101,6 +7161,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -7778,6 +7844,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -8453,6 +8525,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -9130,6 +9208,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -9799,6 +9883,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -10487,6 +10577,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -11171,6 +11267,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -11845,6 +11947,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -12702,6 +12810,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -13330,6 +13444,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -14098,6 +14218,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -14832,6 +14958,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -15472,6 +15604,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -16184,6 +16322,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -16946,6 +17090,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -17697,6 +17847,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -18352,6 +18508,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -19162,6 +19324,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -19812,6 +19980,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -20429,6 +20603,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -21072,6 +21252,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -21352,6 +21538,12 @@
                 "kind": "string"
               }
             },
+            "retry_not_attempted": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            },
             "revision": {
               "kind": "string"
             },
@@ -21465,6 +21657,12 @@
                           "kind": "string"
                         }
                       }
+                    }
+                  },
+                  "tries": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "integer"
                     }
                   }
                 }
@@ -21904,6 +22102,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -22582,6 +22786,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -23276,6 +23486,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -23956,6 +24172,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -24585,6 +24807,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -25271,6 +25499,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -25886,6 +26120,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -26689,6 +26929,12 @@
                           }
                         }
                       }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
+                      }
                     }
                   }
                 }
@@ -27299,6 +27545,12 @@
                             "kind": "string"
                           }
                         }
+                      }
+                    },
+                    "tries": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "integer"
                       }
                     }
                   }
@@ -28911,6 +29163,13 @@
           "source": {
             "kind": "option",
             "long": "deadline-seconds"
+          }
+        },
+        {
+          "field": "retry_not_attempted",
+          "source": {
+            "kind": "option",
+            "long": "retry-not-attempted"
           }
         }
       ]

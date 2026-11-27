@@ -6635,6 +6635,7 @@ mod signed_tests {
             replayed: true,
             cause: None,
             standing: None,
+            tries: None,
         };
         named(&mut observation, last.unwrap(), &site.state);
         assert_eq!(

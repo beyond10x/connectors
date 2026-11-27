@@ -192,6 +192,13 @@ pub struct MutationObservation {
     /// attempt. Absent otherwise, so every other answer keeps its bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub standing: Option<Standing>,
+    /// Present only on the answer to `invoke --retry-not-attempted`: the
+    /// tries the owner made, 0 on a same-key replay answered before any try
+    /// (story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice).
+    /// Never stored: the ledger keeps every entry's earlier bytes, and a
+    /// replay names the tries of its own call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tries: Option<u32>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -530,6 +537,7 @@ fn delivery(
             replayed: false,
             cause: None,
             standing: None,
+            tries: None,
         },
         source_audit: SourceAudit {
             instance: current.adapter.instance_id.clone(),

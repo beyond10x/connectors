@@ -374,6 +374,33 @@ impl Store {
             .ok_or(Failure::OutcomeUnknown)?
             .view)
     }
+    /// Test support: the public key of `seed` published as the instance's
+    /// active approval key, as [`Store::init`] publishes a key whose seed
+    /// custody acknowledged, but with no custody write. The caller keeps the
+    /// seed and signs with it itself (`approvals::Signer::from_seed`): under
+    /// the read-only `mounted_secret` binding no key is made any other way,
+    /// and the owner reads only the public key. Only tests build it.
+    ///
+    /// # Errors
+    /// The store's refusal, as `init`'s; `Conflict` when the instance has a
+    /// key already.
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn install_for_tests(&self, seed: &Secret) -> Result<View> {
+        let _lease = Lease::acquire(&self.path, LOCK, true)?;
+        let (record, key) = self.stage(None, None, &public_key(seed)?)?;
+        let mut metadata = Metadata::update_approval_keys(&self.path)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        tx.execute(
+            "UPDATE local_approval_keys SET state='active' WHERE key_id=?1 AND state='candidate'",
+            [key.to_string()],
+        )
+        .map_err(db)?;
+        bump(&tx, record.issuer_id)?;
+        tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist()?;
+        Ok(self.load(&metadata)?.ok_or(Failure::NotFound)?.view)
+    }
     pub fn revoke(&self, revision: Uuid, key: Uuid) -> Result<View> {
         let _lease = Lease::acquire(&self.path, LOCK, true)?;
         let mut metadata = Metadata::update_approval_keys(&self.path)?;

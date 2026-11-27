@@ -4,6 +4,8 @@ id: story:landed-write-is-not-unknown-after-the-owners-budget
 kind: story
 status: draft
 title: A write that reached the provider is not reported unknown when the owner's 20 s budget ran out
+relations:
+- depends_on: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 revision: 1
 ---
 ## Outcome

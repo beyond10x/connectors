@@ -877,6 +877,32 @@ validates its stored credential again because only the provider executable
 changed ends that validation and its retries at the earlier of this deadline
 and the validation's 30-second capture lease.
 
+`--retry-not-attempted <n>`
+(story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice)
+names the most tries of a keyed write: a whole number from 1 to 10. A value
+outside that, and the flag without `--idempotency-key`, are `invalid_input`
+naming `retry_not_attempted` at `arguments`, before an owner is started or
+anything is sent. The owner makes the tries one after another on the
+instance's serialized worker, inside the write's one deadline, each as one
+write is made today, on the worker's running adapter process. A try is made
+again only when it answered `not_attempted` with no attempt recorded
+(`mutation.attempt` null) because the provider answered its preflight with
+its own timeout or capacity answer (`code` `timeout` or `capacity`, `stage =
+dispatch`, `next_action = retry_explicitly`); every other answer ends the
+tries with that answer, among them the host's own timeout (`stage =
+admission`), `unavailable`, a clock refusal, `forbidden`, `rate_limited`,
+`approval_required` and `idempotency_conflict`. A write classified
+`applied`, `refused` or `unknown` is never sent again. Another try starts
+only while the instance's owner still holds the caller's connection (an
+interrupted `invoke` starts none) and while the time the last try took plus
+3 seconds is left before the write's deadline; otherwise the last try's
+answer stands. A try made again records no attempt and spends no proof and
+no grant use, so `--approval-file` and a standing grant both admit each try.
+The answer is the last try's, in today's envelope; its `mutation` carries `tries`, the
+tries made, 0 on a same-key replay answered before any try, and none without the
+option or on an `outcome_unknown` whose owner answer the CLI never read. A write
+classified `unknown` exits 3 with the option and 1 without it.
+
 The result is `InvokeResult`: `connector`, `instance`, `operation`, `revision`
 and the provider's `result`, with `request_id`, `mutation` and `source_audit` when
 the invoke produced them. No answer of `invoke` (result, refusal or
@@ -884,7 +910,8 @@ help) names a configured entry by its alias. Every `invalid_input` of `invoke`
 names the argument it refused in `Failure.field`: `target`, `operation`,
 `connection`, `schema`, `revision`, `input`, `approval_file`,
 `idempotency_key`, `definition`, `definitions_root`, `credential_file`,
-`fields`, `each`, `walk`, `max_pages`, `out` or `deadline_seconds`.
+`fields`, `each`, `walk`, `max_pages`, `out`, `deadline_seconds` or
+`retry_not_attempted`.
 
 ### Standing grants
 
@@ -2034,6 +2061,7 @@ never replay a possible write after interruption, timeout or lost response.
 | known revoked connection | `revoked` | 1 |
 | current permission missing | `forbidden` (or shared `not_granted`) | 1 |
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
+| `invoke` write classified `unknown` under `--retry-not-attempted` (`mutation.classification = unknown`; `mutation.tries` named except on an `outcome_unknown` the CLI answers for an owner whose answer it never read; [invoking an operation](#invoking-an-operation)); without the option it exits 1 | `outcome_unknown` | 3 |
 | `setup owner-stop`: state directory, owner socket or lock file of another user (`stage = stop`, `next_action = check_configuration`) | `forbidden` | 1 |
 | `setup owner-stop`: the lifetime lock is held and no owner answers within the bound; nothing is signalled (`stage = stop`, `next_action = retry_explicitly`) | `unavailable` | 1 |
 | `setup owner-stop`: the owner accepted the request and still holds the lifetime lock at the bound (`stage = stop`, `next_action = retry_explicitly`) | `timeout` | 1 |

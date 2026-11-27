@@ -45,7 +45,7 @@ pub const CREDENTIAL_ENV_HELP: &str = "The name of an environment variable holdi
 
 /// The help of the `invoke` arguments (story:connectors-do-short-invocation;
 /// `contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
-pub const INVOKE_HELP: [(&str, &str); 20] = [
+pub const INVOKE_HELP: [(&str, &str); 21] = [
     (
         "field:target",
         "The connector, and after one `/` its instance; the instance may be left out when the connector has only one; with --definition the target may be left out, the file naming the connector",
@@ -113,6 +113,10 @@ pub const INVOKE_HELP: [(&str, &str); 20] = [
     (
         "field:deadline_seconds",
         "A read's deadline in seconds, 1 to 120 [default: 30]: the owner start, the wait for the read's turn and the provider's answer end by it; with --walk each page's; refused on a write and with --describe",
+    ),
+    (
+        "field:retry_not_attempted",
+        "With --idempotency-key: the most tries of a write, 1 to 10, made again only while the provider answered the preflight with its own timeout or capacity answer and nothing was sent; the answer names `tries`, and a write classified unknown exits 3",
     ),
 ];
 

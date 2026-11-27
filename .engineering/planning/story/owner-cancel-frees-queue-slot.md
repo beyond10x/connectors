@@ -8,6 +8,7 @@ tags:
 - from-finding
 relations:
 - informed_by: review-result:owner-cancel-adversary-r1-20261111
+- depends_on: story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice
 revision: 1
 ---
 ## Finding

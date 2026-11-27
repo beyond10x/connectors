@@ -37,6 +37,8 @@ pub(super) enum Task {
         key: Option<String>,
         proof: Option<Secret>,
         until: Instant,
+        /// `invoke --retry-not-attempted`: the tries the write may take.
+        retry: Option<Retry>,
     },
     ObserveWrite {
         connection: String,
@@ -70,6 +72,37 @@ impl Task {
             _ => Ok(None),
         }
     }
+    /// The same write once more, for another try of `invoke
+    /// --retry-not-attempted`: the same request, key, proof bytes and
+    /// deadline. `None` for every other task. The retry itself stays with
+    /// the job, never with a try.
+    fn again(&self) -> Option<Self> {
+        let Self::Write {
+            connection,
+            operation,
+            schema,
+            revision,
+            document,
+            key,
+            proof,
+            until,
+            ..
+        } = self
+        else {
+            return None;
+        };
+        Some(Self::Write {
+            connection: connection.clone(),
+            operation: operation.clone(),
+            schema: schema.clone(),
+            revision: revision.clone(),
+            document: document.clone(),
+            key: key.clone(),
+            proof: proof.as_ref().map(|proof| Secret(proof.0.clone())),
+            until: *until,
+            retry: None,
+        })
+    }
     /// The job's cutoff: a bounded read's budget, otherwise its wall deadline.
     fn until(&self, wall_deadline: u64) -> Result<Instant> {
         match self.bounded_until()? {
@@ -77,6 +110,55 @@ impl Task {
             None => until(wall_deadline),
         }
     }
+}
+
+/// The tries of a keyed write `invoke --retry-not-attempted <n>` asks for
+/// (story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice).
+pub(super) struct Retry {
+    /// The most tries, 1 to 10.
+    pub tries: u8,
+    /// Set once the caller's connection is gone: no further try starts. A
+    /// write job carries no cancel; this is read only between tries.
+    pub gone: Cancel,
+}
+/// What must still be left before the write's deadline, beyond as long as
+/// the try just ended took, for another try to start: the first reading's
+/// reserve (contracts/service/clock.md).
+const RETRY_RESERVE: Duration = Duration::from_secs(3);
+
+/// Whether a try's answer is one another try is made for: the write was not
+/// attempted, no attempt is recorded, and the provider answered the
+/// preflight with its own timeout or capacity answer (`stage = dispatch`,
+/// `next_action = retry_explicitly`). The closed set: the host's own
+/// timeout (`stage = admission`), an `unavailable`, a clock refusal and every
+/// approval or grant refusal end the tries with their answer, as do an
+/// applied, refused or unknown write, which is never sent again.
+fn tried_again(result: &Result<Output>) -> bool {
+    use mutation::{Classification, FailureCode};
+    let Ok(Output::Write(delivery)) = result else {
+        return false;
+    };
+    let observation = &delivery.mutation;
+    observation.classification == Classification::NotAttempted
+        && observation.attempt.is_none()
+        && !observation.replayed
+        && delivery.result.is_none()
+        && delivery.error.as_ref().is_some_and(|error| {
+            error.origin == Origin::Provider
+                && matches!(
+                    error.code,
+                    FailureCode::Owner(Code::Timeout | Code::Capacity)
+                )
+                && error.next_action(observation.classification) == "retry_explicitly"
+        })
+}
+
+/// Whether another try may start after one that took `took`: the caller is
+/// still connected and `took` plus [`RETRY_RESERVE`] is left before `until`.
+fn another_try(retry: &Retry, tries: u8, took: Duration, until: Instant) -> bool {
+    tries < retry.tries
+        && !retry.gone.cancelled()
+        && until.saturating_duration_since(Instant::now()) > took + RETRY_RESERVE
 }
 
 /// `mutex`, awaited no longer than a bounded read's `deadline`. Without one it
@@ -1114,814 +1196,864 @@ fn worker(
         };
         // `busy` now covers this job; it is no longer queued.
         drop(job.queued.take());
-        let result = (|| {
-            // A cancelled read is dropped here, unrun, and frees its slot.
-            if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
-                return Err(Code::Interrupted.into());
-            }
-            // A read's recollection of the same connection and revision ran
-            // while this revalidation was queued, and this one joined it.
-            if let Some(answer) = job.reply.answered() {
-                return answer.map(Output::Value);
-            }
-            job.task.until(job.deadline)?;
-            let bounded_until = job.task.bounded_until()?;
-            if stopped.load(Ordering::SeqCst) {
-                return Err(Code::Unavailable.into());
-            }
-            let mut guard = lock_before(&control, bounded_until)?;
-            if let Some(active) = child.as_mut()
-                && !active.running()?
-            {
-                child = None;
-                guard.child = None;
-                guard.failed = true;
-                guard.stopping = false;
-            }
-            guard.check(job.epoch)?;
-            // A governed read is admitted against current configuration and
-            // policy before it launches or reaches any adapter process.
-            if let Task::Invoke {
-                connection,
-                operation,
-                schema,
-                revision,
-                document,
-                governed: true,
-                projection_revision,
-                budget,
-            } = &job.task
-            {
-                let input = std::str::from_utf8(document).map_err(|_| Code::InvalidInput)?;
-                governed::bounded::resolve(
-                    &paths,
-                    &job.alias,
-                    &approval_issuance::Request {
+        // `invoke --retry-not-attempted` (story:invoke-retries-a-write-that-
+        // was-not-attempted-and-never-sends-one-twice): the write job runs
+        // again, on this worker and its child, while its try answered
+        // `not_attempted` for a cause of the closed set ([`tried_again`]),
+        // tries are left, the caller is connected and the reserve before the
+        // write's deadline holds ([`another_try`]). A pass counts as a try
+        // only when it ran `mutation::execute` and did not answer with a
+        // replay: a pass answered from the key's ledger row before execution
+        // (a same-key `idempotency_conflict`, a replay of an attempt still in
+        // flight, which both read `replayed: false`) made no try of its own.
+        let (retry, write_until) = match &mut job.task {
+            Task::Write { retry, until, .. } => (retry.take(), Some(*until)),
+            _ => (None, None),
+        };
+        let mut tries = 0u8;
+        let mut result = loop {
+            let started = Instant::now();
+            let next = retry.as_ref().and_then(|_| job.task.again());
+            // Set when the write was answered from the ledger before execution.
+            let mut observed = false;
+            let result = (|| {
+                // A cancelled read is dropped here, unrun, and frees its slot.
+                if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                    return Err(Code::Interrupted.into());
+                }
+                // A read's recollection of the same connection and revision ran
+                // while this revalidation was queued, and this one joined it.
+                if let Some(answer) = job.reply.answered() {
+                    return answer.map(Output::Value);
+                }
+                job.task.until(job.deadline)?;
+                let bounded_until = job.task.bounded_until()?;
+                if stopped.load(Ordering::SeqCst) {
+                    return Err(Code::Unavailable.into());
+                }
+                let mut guard = lock_before(&control, bounded_until)?;
+                if let Some(active) = child.as_mut()
+                    && !active.running()?
+                {
+                    child = None;
+                    guard.child = None;
+                    guard.failed = true;
+                    guard.stopping = false;
+                }
+                guard.check(job.epoch)?;
+                // A governed read is admitted against current configuration and
+                // policy before it launches or reaches any adapter process.
+                if let Task::Invoke {
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    document,
+                    governed: true,
+                    projection_revision,
+                    budget,
+                } = &job.task
+                {
+                    let input = std::str::from_utf8(document).map_err(|_| Code::InvalidInput)?;
+                    governed::bounded::resolve(
+                        &paths,
+                        &job.alias,
+                        &approval_issuance::Request {
+                            connection,
+                            operation,
+                            schema,
+                            revision,
+                            input,
+                        },
+                        projection_revision
+                            .as_deref()
+                            .map(|revision| (read_policy.as_ref(), revision)),
+                        *budget,
+                    )?;
+                }
+                let (config, current) = selected(&paths, &job.alias)?;
+                if current.instance_id != job.adapter.instance_id {
+                    return Err(Code::LifecycleConflict.into());
+                }
+                if current.selection() != job.adapter.selection() {
+                    return Err(Code::LifecycleConflict.into());
+                }
+                if let Task::ObserveWrite {
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    document,
+                    key,
+                    until,
+                } = &job.task
+                {
+                    // Earlier jobs have ended. No original native preparation or
+                    // gate winner can survive this worker's serialized boundary.
+                    // Clock acquisition must not hold lifecycle or policy locks.
+                    drop(guard);
+                    let request = approval_issuance::Request {
                         connection,
                         operation,
                         schema,
                         revision,
-                        input,
-                    },
-                    projection_revision
-                        .as_deref()
-                        .map(|revision| (read_policy.as_ref(), revision)),
-                    *budget,
-                )?;
-            }
-            let (config, current) = selected(&paths, &job.alias)?;
-            if current.instance_id != job.adapter.instance_id {
-                return Err(Code::LifecycleConflict.into());
-            }
-            if current.selection() != job.adapter.selection() {
-                return Err(Code::LifecycleConflict.into());
-            }
-            if let Task::ObserveWrite {
-                connection,
-                operation,
-                schema,
-                revision,
-                document,
-                key,
-                until,
-            } = &job.task
-            {
-                // Earlier jobs have ended. No original native preparation or
-                // gate winner can survive this worker's serialized boundary.
-                // Clock acquisition must not hold lifecycle or policy locks.
-                drop(guard);
-                let request = approval_issuance::Request {
-                    connection,
-                    operation,
-                    schema,
-                    revision,
-                    input: document,
-                };
-                return mutation::recover_observation(
-                    &paths,
-                    &job.alias,
-                    &request,
-                    key,
-                    *until,
-                    Quiescent {
-                        instance: &current.instance_id,
-                        _child: &mut child,
-                    },
-                )
-                .map(Output::Write);
-            }
-            if let Task::Write {
-                connection,
-                operation,
-                schema,
-                revision,
-                document,
-                key,
-                until,
-                ..
-            } = &job.task
-            {
-                let request = approval_issuance::Request {
-                    connection,
-                    operation,
-                    schema,
-                    revision,
-                    input: document,
-                };
-                // Even a queued winner is observed before suppression is lifted
-                // or this worker starts any adapter child.
-                if let Some(value) =
-                    mutation::observe(&paths, &job.alias, &request, key.as_deref(), *until)?
-                {
-                    return Ok(Output::Write(value));
-                }
-            }
-            if let Task::Validate { capture_epoch, .. } = &job.task {
-                if *capture_epoch != job.epoch {
-                    return Err(Code::LifecycleConflict.into());
-                }
-                if child.is_none() {
-                    return Err(Code::Unavailable.into());
-                }
-            }
-            let resume = resumes_suppression(&job.task);
-            match &job.task {
-                Task::Validate { profile, .. } | Task::Revalidate { profile, .. }
-                    if !current.permissions.profiles.contains(profile) =>
-                {
-                    return Err(Code::Forbidden.into());
-                }
-                Task::Invoke { operation, .. } | Task::Write { operation, .. }
-                    if !current.permissions.operations.contains(operation) =>
-                {
-                    return Err(Code::Forbidden.into());
-                }
-                _ => {}
-            }
-            if !resume && state.suppressed(&current.instance_id)? {
-                return Err(Code::Unavailable.into());
-            }
-            if child.is_some() && selection != current.selection() {
-                // The running process was launched under an earlier adapter
-                // entry and serves nothing the configured one is asked for, so
-                // no retry could pass this point. A job that launches the
-                // adapter when none runs stops it and launches the configured
-                // one, as `adapters stop` and the next launch would. Earlier
-                // jobs have ended; a new epoch fences any queued under the old
-                // process, among them a credential validation captured by it.
-                if !replaces_a_stale_child(&job.task) {
-                    return Err(Code::LifecycleConflict.into());
-                }
-                let next = guard.epoch.checked_add(1).ok_or(Code::Capacity)?;
-                guard.epoch = next;
-                job.epoch = next;
-                guard.child = None;
-                // Dropping the child kills its exact process and reaps it.
-                child = None;
-            }
-            if resume {
-                state.suppress(&current.instance_id, false)?;
-            }
-            drop(guard);
-            let launch = Launch {
-                control: &control,
-                launches: &launches,
-                state: &state,
-                directory: &paths.state,
-                stopped: &stopped,
-                current: &current,
-                epoch: job.epoch,
-            };
-            if child.is_none() {
-                child = Some(launch.run(job.deadline, bounded_until)?);
-                selection = current.selection();
-            }
-            // A read cancelled while its adapter launched goes no further:
-            // no recollection and no credential read follows the cancel
-            // (contracts/cli/v1alpha1/owner.md). The launched adapter stays.
-            if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
-                return Err(Code::Interrupted.into());
-            }
-            let execution_until = job.task.until(job.deadline)?;
-            let active = child.as_mut().ok_or(Code::Unavailable)?;
-            match job.task {
-                Task::ObserveWrite { .. } => Err(Code::OutcomeUnknown.into()),
-                Task::Write {
-                    connection,
-                    operation,
-                    schema,
-                    revision,
-                    document,
-                    key,
-                    proof,
-                    until,
-                } => {
-                    let request = approval_issuance::Request {
-                        connection: &connection,
-                        operation: &operation,
-                        schema: &schema,
-                        revision: &revision,
-                        input: &document,
+                        input: document,
                     };
-                    mutation::execute(
+                    return mutation::recover_observation(
                         &paths,
                         &job.alias,
-                        mutation::Invocation {
-                            request,
-                            key: key.as_deref(),
-                            proof,
-                            until,
-                        },
-                        active,
-                        mutation::Control {
-                            lifecycle: &control,
-                            epoch: job.epoch,
-                            stopped: &stopped,
-                            pool: &pool,
+                        &request,
+                        key,
+                        *until,
+                        Quiescent {
+                            instance: &current.instance_id,
+                            _child: &mut child,
                         },
                     )
-                    .map(Output::Write)
+                    .map(Output::Write);
                 }
-                Task::Ensure { .. } => Ok(Output::Bootstrap(active.bootstrap().clone(), job.epoch)),
-                // A validation refused under every alternative binding keeps
-                // the reason naming each answer (private-adapter.md).
-                Task::Validate {
-                    profile, secret, ..
-                } => Ok(Output::Baseline(
-                    active
-                        .validate_explained(
-                            &profile,
-                            &secret,
-                            job.deadline.min(connectors_sdk::now_ms() + 30_000),
-                        )
-                        .map_err(validation_refusal)?,
-                )),
-                Task::Revalidate {
-                    connection,
-                    revision,
-                    profile,
-                } => {
-                    let registry = registry::Registry::with_system_clock(&paths.state);
-                    let binding = saved_binding(active.bootstrap(), &profile)?;
-                    let captured = registry.capture_revalidation(
-                        &binding,
-                        &connection,
-                        &revision,
-                        connectors_sdk::now_ms(),
-                        job.deadline,
-                    )?;
-                    let prior = active
-                        .bootstrap()
-                        .effective_binding(captured.prior_binding());
-                    revalidate(
-                        &Scope {
-                            paths: &paths,
-                            alias: &job.alias,
-                            config: &config,
-                            current: &current,
-                            control: &control,
-                            stopped: &stopped,
-                            epoch: job.epoch,
-                            deadline: job.deadline,
-                            profile: &profile,
-                        },
-                        active,
-                        &registry,
-                        &binding,
-                        captured,
-                        Admission::Explicit {
-                            connection: &connection,
-                            revision: &revision,
-                        },
-                    )?;
-                    let observed = registry.describe(
-                        &current.instance_id,
-                        &current.adapter_id,
-                        current.configured(),
-                        &connection,
-                        connectors_sdk::now_ms(),
-                        true,
-                    )?;
-                    // The validation selected another binding than the
-                    // evidence it replaced (contracts/cli/v1alpha1/semantics.md,
-                    // "Bound connections").
-                    let rebound = match (prior, observed.binding.clone()) {
-                        (Some(from), Some(to)) if from != to => Some(json!({"from":from,"to":to})),
-                        _ => None,
-                    };
-                    let mut value = json!({"connection":connection_value(&job.alias,observed)});
-                    if let Some(rebound) = rebound {
-                        value["rebound"] = rebound;
-                    }
-                    Ok(Output::Value(value))
-                }
-                Task::Invoke {
+                if let Task::Write {
                     connection,
                     operation,
-                    schema: expected_schema,
+                    schema,
                     revision,
                     document,
-                    governed,
-                    projection_revision,
-                    budget,
-                } => {
-                    // A governed read names its own refusals for a connection
-                    // that is not ready or lacks a scope.
-                    let refused = |error: registry::Failure| -> Error {
-                        if governed {
-                            governed::registry_error(error)
-                        } else {
-                            error.into()
-                        }
+                    key,
+                    until,
+                    ..
+                } = &job.task
+                {
+                    let request = approval_issuance::Request {
+                        connection,
+                        operation,
+                        schema,
+                        revision,
+                        input: document,
                     };
-                    // The description the caller read names its binding by
-                    // its revision; the read runs under that binding's view
-                    // only if its captured evidence selected it.
-                    let declared = active.bootstrap().clone();
-                    let described = declared.described_binding(&revision)?;
-                    let bootstrap = declared.bound(described.as_deref())?;
-                    if bootstrap.descriptor()?.revision != revision
-                        || schema(&bootstrap, &operation)? != expected_schema
+                    // Even a queued winner is observed before suppression is lifted
+                    // or this worker starts any adapter child.
+                    if let Some(value) =
+                        mutation::observe(&paths, &job.alias, &request, key.as_deref(), *until)?
                     {
-                        return Err(Code::StaleDescription.into());
+                        observed = true;
+                        return Ok(Output::Write(value));
                     }
-                    let requirement = bootstrap
-                        .requirements
-                        .iter()
-                        .find(|r| r.operation == operation)
-                        .ok_or(Code::NotFound)?;
-                    if requirement.effect != runtime::Effect::Read {
-                        return Err(Code::Unsupported.into());
+                }
+                if let Task::Validate { capture_epoch, .. } = &job.task {
+                    if *capture_epoch != job.epoch {
+                        return Err(Code::LifecycleConflict.into());
                     }
-                    if !current.permissions.profiles.contains(&requirement.profile) {
+                    if child.is_none() {
+                        return Err(Code::Unavailable.into());
+                    }
+                }
+                let resume = resumes_suppression(&job.task);
+                match &job.task {
+                    Task::Validate { profile, .. } | Task::Revalidate { profile, .. }
+                        if !current.permissions.profiles.contains(profile) =>
+                    {
                         return Err(Code::Forbidden.into());
                     }
-                    runtime::channel::depth(&document)?;
-                    // A governed read keeps every admitted number exactly and
-                    // refuses a duplicate member (`connectors_core::json`).
-                    let value: Value = if governed {
-                        connectors_core::json::decode(&document, 64)
-                            .map_err(|_| Code::InvalidInput)?
-                    } else {
-                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?
-                    };
-                    connectors_sdk::validate(
-                        &bootstrap
-                            .descriptor()?
-                            .operation(&operation)
-                            .map_err(|_| Code::NotFound)?
-                            .input_schema,
-                        &value,
-                    )
-                    .map_err(|_| Code::InvalidInput)?;
-                    let registry = registry::Registry::with_system_clock(&paths.state);
-                    let binding = bootstrap.binding(&requirement.profile)?;
-                    if budget.is_some() {
-                        approval_issuance::check(execution_until)?;
+                    Task::Invoke { operation, .. } | Task::Write { operation, .. }
+                        if !current.permissions.operations.contains(operation) =>
+                    {
+                        return Err(Code::Forbidden.into());
                     }
-                    // A bounded read's recollection and executable follow-up
-                    // end by its budget's original cutoff, never by the longer
-                    // request deadline.
-                    let read_deadline = match bounded_until {
-                        Some(cutoff) => {
-                            let left = cutoff.saturating_duration_since(Instant::now());
-                            job.deadline.min(connectors_sdk::now_ms().saturating_add(
-                                u64::try_from(left.as_millis()).unwrap_or(u64::MAX),
-                            ))
-                        }
-                        None => job.deadline,
-                    };
-                    let capture = || {
-                        registry.capture_read(
+                    _ => {}
+                }
+                if !resume && state.suppressed(&current.instance_id)? {
+                    return Err(Code::Unavailable.into());
+                }
+                if child.is_some() && selection != current.selection() {
+                    // The running process was launched under an earlier adapter
+                    // entry and serves nothing the configured one is asked for, so
+                    // no retry could pass this point. A job that launches the
+                    // adapter when none runs stops it and launches the configured
+                    // one, as `adapters stop` and the next launch would. Earlier
+                    // jobs have ended; a new epoch fences any queued under the old
+                    // process, among them a credential validation captured by it.
+                    if !replaces_a_stale_child(&job.task) {
+                        return Err(Code::LifecycleConflict.into());
+                    }
+                    let next = guard.epoch.checked_add(1).ok_or(Code::Capacity)?;
+                    guard.epoch = next;
+                    job.epoch = next;
+                    guard.child = None;
+                    // Dropping the child kills its exact process and reaps it.
+                    child = None;
+                }
+                if resume {
+                    state.suppress(&current.instance_id, false)?;
+                }
+                drop(guard);
+                let launch = Launch {
+                    control: &control,
+                    launches: &launches,
+                    state: &state,
+                    directory: &paths.state,
+                    stopped: &stopped,
+                    current: &current,
+                    epoch: job.epoch,
+                };
+                if child.is_none() {
+                    child = Some(launch.run(job.deadline, bounded_until)?);
+                    selection = current.selection();
+                }
+                // A read cancelled while its adapter launched goes no further:
+                // no recollection and no credential read follows the cancel
+                // (contracts/cli/v1alpha1/owner.md). The launched adapter stays.
+                if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                    return Err(Code::Interrupted.into());
+                }
+                let execution_until = job.task.until(job.deadline)?;
+                let active = child.as_mut().ok_or(Code::Unavailable)?;
+                match job.task {
+                    Task::ObserveWrite { .. } => Err(Code::OutcomeUnknown.into()),
+                    Task::Write {
+                        connection,
+                        operation,
+                        schema,
+                        revision,
+                        document,
+                        key,
+                        proof,
+                        until,
+                        retry: _,
+                    } => {
+                        let request = approval_issuance::Request {
+                            connection: &connection,
+                            operation: &operation,
+                            schema: &schema,
+                            revision: &revision,
+                            input: &document,
+                        };
+                        mutation::execute(
+                            &paths,
+                            &job.alias,
+                            mutation::Invocation {
+                                request,
+                                key: key.as_deref(),
+                                proof,
+                                until,
+                            },
+                            active,
+                            mutation::Control {
+                                lifecycle: &control,
+                                epoch: job.epoch,
+                                stopped: &stopped,
+                                pool: &pool,
+                            },
+                        )
+                        .map(Output::Write)
+                    }
+                    Task::Ensure { .. } => {
+                        Ok(Output::Bootstrap(active.bootstrap().clone(), job.epoch))
+                    }
+                    // A validation refused under every alternative binding keeps
+                    // the reason naming each answer (private-adapter.md).
+                    Task::Validate {
+                        profile, secret, ..
+                    } => Ok(Output::Baseline(
+                        active
+                            .validate_explained(
+                                &profile,
+                                &secret,
+                                job.deadline.min(connectors_sdk::now_ms() + 30_000),
+                            )
+                            .map_err(validation_refusal)?,
+                    )),
+                    Task::Revalidate {
+                        connection,
+                        revision,
+                        profile,
+                    } => {
+                        let registry = registry::Registry::with_system_clock(&paths.state);
+                        let binding = saved_binding(active.bootstrap(), &profile)?;
+                        let captured = registry.capture_revalidation(
                             &binding,
                             &connection,
-                            &requirement.scopes,
+                            &revision,
                             connectors_sdk::now_ms(),
                             job.deadline,
-                        )
-                    };
-                    // Evidence still current that would lapse before this read
-                    // could use it: under half its own lifetime (not the
-                    // profile's bound, which the provider's probe may undercut)
-                    // and under the read's own remaining deadline left. The
-                    // use, and so the provider deadline, never outlasts the
-                    // evidence; fresh evidence admits its read at once.
-                    let lapses_early = |captured: &registry::ReadUse| {
-                        let now = connectors_sdk::now_ms();
-                        let window = (captured.evidence_lifetime_ms() / 2)
-                            .min(read_deadline.saturating_sub(now));
-                        captured.expires_at_ms() < now.saturating_add(window)
-                    };
-                    let captured = match capture() {
-                        Ok(captured) if !lapses_early(&captured) => captured,
-                        // Only the provider executable changed since the
-                        // connection was saved (D12): its stored credential is
-                        // validated once under this executable, which the
-                        // registry follows when the recorded identity answers
-                        // and refuses, changing nothing, otherwise. No
-                        // credential entry, no question. The evidence that
-                        // validation records is fresh, so the read it admits
-                        // recollects nothing.
-                        Err(registry::Failure::ExecutableChanged) => {
-                            let selection = config.selection();
-                            super::follow_executable_within(
-                                &registry,
-                                &binding,
-                                &connection,
-                                read_deadline,
-                                super::EXECUTABLE_LEASE_MS,
-                                super::stored_material(&paths, &selection),
-                                || {
-                                    let guard = lock_before(&control, bounded_until)?;
-                                    guard.check(job.epoch)?;
-                                    if stopped.load(Ordering::SeqCst) {
-                                        return Err(Code::Unavailable.into());
-                                    }
-                                    Ok(guard)
-                                },
-                                // `until` is the earlier of the read's deadline
-                                // and the capture's lease: no attempt is sent,
-                                // and no pause taken, past the instant the
-                                // registry stops recording its result.
-                                |material, until| {
-                                    revalidate_with_retries(
-                                        until,
-                                        || {
-                                            let result = active.validate(
-                                                &requirement.profile,
-                                                material,
-                                                until,
-                                            );
-                                            (result, active.running().unwrap_or(false))
-                                        },
-                                        || stopped.load(Ordering::SeqCst),
-                                        std::thread::sleep,
-                                    )
-                                },
-                            )?;
-                            capture().map_err(refused)?
-                        }
-                        // Only the evidence lapsed, or is about to, for an
-                        // intact credential: recollect it once from the
-                        // retained custody version, as `connections
-                        // revalidate` would, within this read's deadline, then
-                        // capture the read against it. Still not current after
-                        // that is the read's refusal.
-                        //
-                        // A recollection run only because current evidence
-                        // would lapse early keeps the read use captured on it:
-                        // a failure that records no credential refusal leaves
-                        // that evidence current, and the read is served on it.
-                        result @ (Ok(_) | Err(registry::Failure::EvidenceExpired)) => {
-                            let early = result.ok();
-                            let recollected = (|| -> Result<()> {
-                                let now = connectors_sdk::now_ms();
-                                // Early, it is bounded by the evidence the read
-                                // was admitted on, less the half the read keeps
-                                // for itself, never by the read's own deadline: a
-                                // hanging probe then still leaves the read
-                                // served on that evidence. Evidence too short
-                                // to leave the recollection as long as the read
-                                // keeps is too short to serve the read on
-                                // after a failed one: the recollection then
-                                // runs as for lapsed evidence, within the
-                                // read's deadline, and is never skipped
-                                // (contracts/cli/v1alpha1/semantics.md: the
-                                // read "recollects it first").
-                                let bound = match &early {
-                                    Some(early)
-                                        if early.expires_at_ms().saturating_sub(now)
-                                            > 2 * EARLY_READ_MARGIN_MS =>
-                                    {
-                                        now + (early.expires_at_ms() - now) / 2
-                                    }
-                                    _ => read_deadline,
-                                };
-                                let expires = bound.min(now.saturating_add(30_000));
-                                let recollection = registry.capture_recollection(
-                                    &binding,
-                                    &connection,
-                                    now,
-                                    expires,
-                                )?;
-                                // This is the same recollection a revalidation
-                                // runs: a revalidation of this connection at
-                                // this revision joins it, and one already
-                                // queued behind this job takes its answer
-                                // (contracts/cli/v1alpha1/owner.md).
-                                let member = Flight::lead_or_join(
-                                    &flights,
-                                    (
-                                        job.adapter.instance_id.clone(),
-                                        connection.clone(),
-                                        recollection.revision().to_owned(),
-                                    ),
-                                    Answer::Rerun,
-                                )?;
-                                let joiners = std::cell::Cell::new(None);
-                                let revalidated = revalidate(
-                                    &Scope {
-                                        paths: &paths,
-                                        alias: &job.alias,
-                                        config: &config,
-                                        current: &current,
-                                        control: &control,
-                                        stopped: &stopped,
-                                        epoch: job.epoch,
-                                        deadline: expires,
-                                        profile: &requirement.profile,
-                                    },
-                                    active,
-                                    &registry,
-                                    &binding,
-                                    recollection,
-                                    Admission::ReadRecollection { joiners: &joiners },
-                                );
-                                // Its joiners answer what an explicit
-                                // revalidation answers: its refusal, a
-                                // transient one included, so that none runs a
-                                // probe of its own. Only a refusal an explicit
-                                // revalidation goes on past (changed mounted
-                                // material, which it re-pins) answers them
-                                // nothing, and each runs its own: a flight this
-                                // recollection leads answers them that as it
-                                // is dropped, and a queued revalidation whose
-                                // flight it joined runs its own job.
-                                if let Err(error) = revalidated {
-                                    if let Some(answer @ Answer::Joined(_)) = joiners.take() {
-                                        member.answer(answer);
-                                    }
-                                    return Err(error);
-                                }
-                                if let Ok(observed) = registry.describe(
-                                    &current.instance_id,
-                                    &current.adapter_id,
-                                    current.configured(),
-                                    &connection,
-                                    connectors_sdk::now_ms(),
-                                    true,
-                                ) {
-                                    member.answer(Answer::Joined(Ok(json!({
-                                        "connection": connection_value(&job.alias, observed)
-                                    }))));
-                                }
-                                Ok(())
-                            })();
-                            match (recollected, early) {
-                                (Ok(()), early) => {
-                                    // The recollection's publication moved
-                                    // the fence past the early use.
-                                    if let Some(early) = early {
-                                        registry.cancel_read(early, connectors_sdk::now_ms())?;
-                                    }
-                                    capture().map_err(refused)?
-                                }
-                                (Err(error), None) => return Err(error),
-                                (Err(error), Some(early)) => {
-                                    // A credential refusal cut the material
-                                    // off: the connection admits no read.
-                                    // Anything else left the evidence the
-                                    // read was captured on current.
-                                    let admitted = registry.admit_read(
-                                        &binding,
-                                        &connection,
-                                        &requirement.scopes,
-                                        connectors_sdk::now_ms(),
-                                    );
-                                    if admitted.is_err() {
-                                        registry.cancel_read(early, connectors_sdk::now_ms())?;
-                                        return Err(error);
-                                    }
-                                    // A probe that timed out ended the adapter
-                                    // process; the read is served by a new one,
-                                    // launched within that evidence.
-                                    if !active.running()? {
-                                        match launch.run(early.expires_at_ms(), bounded_until) {
-                                            Ok(new) => *active = new,
-                                            Err(error) => {
-                                                registry
-                                                    .cancel_read(early, connectors_sdk::now_ms())?;
-                                                return Err(error);
-                                            }
-                                        }
-                                    }
-                                    early
-                                }
+                        )?;
+                        let prior = active
+                            .bootstrap()
+                            .effective_binding(captured.prior_binding());
+                        revalidate(
+                            &Scope {
+                                paths: &paths,
+                                alias: &job.alias,
+                                config: &config,
+                                current: &current,
+                                control: &control,
+                                stopped: &stopped,
+                                epoch: job.epoch,
+                                deadline: job.deadline,
+                                profile: &profile,
+                            },
+                            active,
+                            &registry,
+                            &binding,
+                            captured,
+                            Admission::Explicit {
+                                connection: &connection,
+                                revision: &revision,
+                            },
+                        )?;
+                        let observed = registry.describe(
+                            &current.instance_id,
+                            &current.adapter_id,
+                            current.configured(),
+                            &connection,
+                            connectors_sdk::now_ms(),
+                            true,
+                        )?;
+                        // The validation selected another binding than the
+                        // evidence it replaced (contracts/cli/v1alpha1/semantics.md,
+                        // "Bound connections").
+                        let rebound = match (prior, observed.binding.clone()) {
+                            (Some(from), Some(to)) if from != to => {
+                                Some(json!({"from":from,"to":to}))
                             }
+                            _ => None,
+                        };
+                        let mut value = json!({"connection":connection_value(&job.alias,observed)});
+                        if let Some(rebound) = rebound {
+                            value["rebound"] = rebound;
                         }
-                        other => other.map_err(refused)?,
-                    };
-                    // Evidence that selected another binding than the one the
-                    // caller described, a recollection's rebinding among
-                    // them, refuses the read unsent: the next description is
-                    // the bound one (contracts/cli/v1alpha1/semantics.md).
-                    if declared.effective_binding(captured.operation_binding()) != described {
-                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                        return Err(Code::StaleDescription.into());
+                        Ok(Output::Value(value))
                     }
-                    // The last check before the stored credential is opened:
-                    // a read cancelled during its launch or recollection reads
-                    // none (contracts/cli/v1alpha1/owner.md).
-                    if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
-                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                        return Err(Code::Interrupted.into());
-                    }
-                    let version = captured.version();
-                    let selection = config.selection();
-                    // A bounded read gives up its custody answer once its
-                    // budget's cutoff passes.
-                    let material = if budget.is_some() {
-                        custody::Store::read_for_until(
-                            version,
-                            &selection,
-                            &paths.state,
-                            execution_until,
-                        )
-                    } else {
-                        custody::Store::open_for(version.scope(), &selection, &paths.state)
-                            .and_then(|store| store.read(version))
-                    };
-                    let material = match material {
-                        Ok(value) => value,
-                        Err(e) => {
-                            if super::read_invalidates(&selection, e) {
-                                registry.invalidate_read(
-                                    &captured,
-                                    registry::InvalidCredential::Missing,
-                                    connectors_sdk::now_ms(),
-                                )?;
-                            }
-                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                            if budget.is_some() {
-                                approval_issuance::check(execution_until)?;
-                            }
-                            return Err(super::read_error(&selection, e));
-                        }
-                    };
-                    let partition = captured.partition().to_owned();
-                    let deadline = captured.expires_at_ms();
-                    let checked: Result<()> = (|| {
-                        let (latest_config, latest) = selected(&paths, &job.alias)?;
-                        if latest.selection() != current.selection()
-                            || latest_config.selection() != config.selection()
-                        {
-                            return Err(Code::LifecycleConflict.into());
-                        }
-                        // A governed read whose operation was withdrawn is
-                        // no longer granted.
-                        if !latest.permissions.operations.contains(&operation) {
-                            return Err(if governed {
-                                Code::NotGranted
+                    Task::Invoke {
+                        connection,
+                        operation,
+                        schema: expected_schema,
+                        revision,
+                        document,
+                        governed,
+                        projection_revision,
+                        budget,
+                    } => {
+                        // A governed read names its own refusals for a connection
+                        // that is not ready or lacks a scope.
+                        let refused = |error: registry::Failure| -> Error {
+                            if governed {
+                                governed::registry_error(error)
                             } else {
-                                Code::Forbidden
+                                error.into()
                             }
-                            .into());
+                        };
+                        // The description the caller read names its binding by
+                        // its revision; the read runs under that binding's view
+                        // only if its captured evidence selected it.
+                        let declared = active.bootstrap().clone();
+                        let described = declared.described_binding(&revision)?;
+                        let bootstrap = declared.bound(described.as_deref())?;
+                        if bootstrap.descriptor()?.revision != revision
+                            || schema(&bootstrap, &operation)? != expected_schema
+                        {
+                            return Err(Code::StaleDescription.into());
                         }
-                        if !latest.permissions.profiles.contains(&requirement.profile) {
+                        let requirement = bootstrap
+                            .requirements
+                            .iter()
+                            .find(|r| r.operation == operation)
+                            .ok_or(Code::NotFound)?;
+                        if requirement.effect != runtime::Effect::Read {
+                            return Err(Code::Unsupported.into());
+                        }
+                        if !current.permissions.profiles.contains(&requirement.profile) {
                             return Err(Code::Forbidden.into());
                         }
-                        Ok(())
-                    })();
-                    if let Err(error) = checked {
-                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                        return Err(error);
-                    }
-                    let guard = match lock_before(&control, bounded_until) {
-                        Ok(guard) => guard,
-                        Err(error) => {
-                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                            return Err(error);
-                        }
-                    };
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| {
+                        runtime::channel::depth(&document)?;
+                        // A governed read keeps every admitted number exactly and
+                        // refuses a duplicate member (`connectors_core::json`).
+                        let value: Value = if governed {
+                            connectors_core::json::decode(&document, 64)
+                                .map_err(|_| Code::InvalidInput)?
+                        } else {
+                            connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?
+                        };
+                        connectors_sdk::validate(
+                            &bootstrap
+                                .descriptor()?
+                                .operation(&operation)
+                                .map_err(|_| Code::NotFound)?
+                                .input_schema,
+                            &value,
+                        )
+                        .map_err(|_| Code::InvalidInput)?;
+                        let registry = registry::Registry::with_system_clock(&paths.state);
+                        let binding = bootstrap.binding(&requirement.profile)?;
                         if budget.is_some() {
                             approval_issuance::check(execution_until)?;
                         }
-                        if stopped.load(Ordering::SeqCst) {
-                            return Err(Code::Unavailable.into());
-                        }
-                        // The final fence: a governed read is admitted once
-                        // more against current configuration and policy
-                        // immediately before it is dispatched.
-                        if governed {
-                            let input =
-                                std::str::from_utf8(&document).map_err(|_| Code::InvalidInput)?;
-                            governed::bounded::resolve(
-                                &paths,
-                                &job.alias,
-                                &approval_issuance::Request {
-                                    connection: &connection,
-                                    operation: &operation,
-                                    schema: &expected_schema,
-                                    revision: &revision,
-                                    input,
-                                },
-                                projection_revision
-                                    .as_deref()
-                                    .map(|revision| (read_policy.as_ref(), revision)),
-                                budget,
-                            )?;
-                        }
-                        Ok(())
-                    }) {
-                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                        return Err(error);
-                    }
-                    // Refused once the pool stopped waiting and reported the
-                    // host's own timeout: nothing is dispatched after that.
-                    if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
-                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                        return Err(Code::Interrupted.into());
-                    }
-                    if let Err(error) = job.dispatch.begin() {
-                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                        return Err(error);
-                    }
-                    let dispatched = registry
-                        .dispatch_read(captured, connectors_sdk::now_ms())
-                        .map_err(refused)?;
-                    drop(guard);
-                    let result = if let Some(budget) = budget {
-                        // The provider call keeps the budget's original
-                        // cutoff, constrained by the evidence's expiry.
-                        until(deadline)
-                            .map_err(|_| runtime::Failure::Timeout)
-                            .and_then(|until| budget.constrain(until))
-                            .and_then(|budget| {
-                                let halted = || match job.cancel.as_ref() {
-                                    Some(cancel) if cancel.cancelled() => {
-                                        Err(runtime::Failure::Interrupted)
+                        // A bounded read's recollection and executable follow-up
+                        // end by its budget's original cutoff, never by the longer
+                        // request deadline.
+                        let read_deadline = match bounded_until {
+                            Some(cutoff) => {
+                                let left = cutoff.saturating_duration_since(Instant::now());
+                                job.deadline.min(connectors_sdk::now_ms().saturating_add(
+                                    u64::try_from(left.as_millis()).unwrap_or(u64::MAX),
+                                ))
+                            }
+                            None => job.deadline,
+                        };
+                        let capture = || {
+                            registry.capture_read(
+                                &binding,
+                                &connection,
+                                &requirement.scopes,
+                                connectors_sdk::now_ms(),
+                                job.deadline,
+                            )
+                        };
+                        // Evidence still current that would lapse before this read
+                        // could use it: under half its own lifetime (not the
+                        // profile's bound, which the provider's probe may undercut)
+                        // and under the read's own remaining deadline left. The
+                        // use, and so the provider deadline, never outlasts the
+                        // evidence; fresh evidence admits its read at once.
+                        let lapses_early = |captured: &registry::ReadUse| {
+                            let now = connectors_sdk::now_ms();
+                            let window = (captured.evidence_lifetime_ms() / 2)
+                                .min(read_deadline.saturating_sub(now));
+                            captured.expires_at_ms() < now.saturating_add(window)
+                        };
+                        let captured = match capture() {
+                            Ok(captured) if !lapses_early(&captured) => captured,
+                            // Only the provider executable changed since the
+                            // connection was saved (D12): its stored credential is
+                            // validated once under this executable, which the
+                            // registry follows when the recorded identity answers
+                            // and refuses, changing nothing, otherwise. No
+                            // credential entry, no question. The evidence that
+                            // validation records is fresh, so the read it admits
+                            // recollects nothing.
+                            Err(registry::Failure::ExecutableChanged) => {
+                                let selection = config.selection();
+                                super::follow_executable_within(
+                                    &registry,
+                                    &binding,
+                                    &connection,
+                                    read_deadline,
+                                    super::EXECUTABLE_LEASE_MS,
+                                    super::stored_material(&paths, &selection),
+                                    || {
+                                        let guard = lock_before(&control, bounded_until)?;
+                                        guard.check(job.epoch)?;
+                                        if stopped.load(Ordering::SeqCst) {
+                                            return Err(Code::Unavailable.into());
+                                        }
+                                        Ok(guard)
+                                    },
+                                    // `until` is the earlier of the read's deadline
+                                    // and the capture's lease: no attempt is sent,
+                                    // and no pause taken, past the instant the
+                                    // registry stops recording its result.
+                                    |material, until| {
+                                        revalidate_with_retries(
+                                            until,
+                                            || {
+                                                let result = active.validate(
+                                                    &requirement.profile,
+                                                    material,
+                                                    until,
+                                                );
+                                                (result, active.running().unwrap_or(false))
+                                            },
+                                            || stopped.load(Ordering::SeqCst),
+                                            std::thread::sleep,
+                                        )
+                                    },
+                                )?;
+                                capture().map_err(refused)?
+                            }
+                            // Only the evidence lapsed, or is about to, for an
+                            // intact credential: recollect it once from the
+                            // retained custody version, as `connections
+                            // revalidate` would, within this read's deadline, then
+                            // capture the read against it. Still not current after
+                            // that is the read's refusal.
+                            //
+                            // A recollection run only because current evidence
+                            // would lapse early keeps the read use captured on it:
+                            // a failure that records no credential refusal leaves
+                            // that evidence current, and the read is served on it.
+                            result @ (Ok(_) | Err(registry::Failure::EvidenceExpired)) => {
+                                let early = result.ok();
+                                let recollected = (|| -> Result<()> {
+                                    let now = connectors_sdk::now_ms();
+                                    // Early, it is bounded by the evidence the read
+                                    // was admitted on, less the half the read keeps
+                                    // for itself, never by the read's own deadline: a
+                                    // hanging probe then still leaves the read
+                                    // served on that evidence. Evidence too short
+                                    // to leave the recollection as long as the read
+                                    // keeps is too short to serve the read on
+                                    // after a failed one: the recollection then
+                                    // runs as for lapsed evidence, within the
+                                    // read's deadline, and is never skipped
+                                    // (contracts/cli/v1alpha1/semantics.md: the
+                                    // read "recollects it first").
+                                    let bound = match &early {
+                                        Some(early)
+                                            if early.expires_at_ms().saturating_sub(now)
+                                                > 2 * EARLY_READ_MARGIN_MS =>
+                                        {
+                                            now + (early.expires_at_ms() - now) / 2
+                                        }
+                                        _ => read_deadline,
+                                    };
+                                    let expires = bound.min(now.saturating_add(30_000));
+                                    let recollection = registry.capture_recollection(
+                                        &binding,
+                                        &connection,
+                                        now,
+                                        expires,
+                                    )?;
+                                    // This is the same recollection a revalidation
+                                    // runs: a revalidation of this connection at
+                                    // this revision joins it, and one already
+                                    // queued behind this job takes its answer
+                                    // (contracts/cli/v1alpha1/owner.md).
+                                    let member = Flight::lead_or_join(
+                                        &flights,
+                                        (
+                                            job.adapter.instance_id.clone(),
+                                            connection.clone(),
+                                            recollection.revision().to_owned(),
+                                        ),
+                                        Answer::Rerun,
+                                    )?;
+                                    let joiners = std::cell::Cell::new(None);
+                                    let revalidated = revalidate(
+                                        &Scope {
+                                            paths: &paths,
+                                            alias: &job.alias,
+                                            config: &config,
+                                            current: &current,
+                                            control: &control,
+                                            stopped: &stopped,
+                                            epoch: job.epoch,
+                                            deadline: expires,
+                                            profile: &requirement.profile,
+                                        },
+                                        active,
+                                        &registry,
+                                        &binding,
+                                        recollection,
+                                        Admission::ReadRecollection { joiners: &joiners },
+                                    );
+                                    // Its joiners answer what an explicit
+                                    // revalidation answers: its refusal, a
+                                    // transient one included, so that none runs a
+                                    // probe of its own. Only a refusal an explicit
+                                    // revalidation goes on past (changed mounted
+                                    // material, which it re-pins) answers them
+                                    // nothing, and each runs its own: a flight this
+                                    // recollection leads answers them that as it
+                                    // is dropped, and a queued revalidation whose
+                                    // flight it joined runs its own job.
+                                    if let Err(error) = revalidated {
+                                        if let Some(answer @ Answer::Joined(_)) = joiners.take() {
+                                            member.answer(answer);
+                                        }
+                                        return Err(error);
                                     }
-                                    _ => Ok(()),
-                                };
-                                active.invoke_bounded_until_cancelled(
-                                    &operation,
-                                    &revision,
-                                    &partition,
-                                    &material,
-                                    &document,
-                                    budget,
-                                    Some(&halted),
-                                )
-                            })
-                            .map_err(runtime::Refusal::from)
-                    } else if governed {
-                        active.invoke_lossless(
-                            described.as_deref(),
-                            &operation,
-                            &revision,
-                            &partition,
-                            &material,
-                            &document,
-                            deadline,
-                        )
-                    } else {
-                        active.invoke_bound(
-                            described.as_deref(),
-                            &operation,
-                            &revision,
-                            &partition,
-                            &material,
-                            &document,
-                            deadline,
-                        )
-                    };
-                    // A cancel ended the adapter process on purpose, which is
-                    // not the unexpected termination `failed` names
-                    // (contracts/cli/v1alpha1/semantics.md, "restart =
-                    // never"): its record is cleared so the instance reads
-                    // `not_running` and the next job launches anew. A control
-                    // another start or stop moved on is left as it is.
-                    if job.cancel.as_ref().is_some_and(Cancel::cancelled)
-                        && matches!(&result, Err(refusal) if refusal.failure == runtime::Failure::Interrupted)
-                        && let Ok(mut guard) = control.lock()
-                        && guard.epoch == job.epoch
-                    {
-                        child = None;
-                        guard.child = None;
-                    }
-                    // The provider refused the stored credential as unauthorized
-                    // (a refresh token answered `invalid_grant`, a token or basic
-                    // entry answered 401): the connection is Stale until a
-                    // reconnect publishes (story:connection-stale-state, decision
-                    // 15 of story:ess-connector-vocabulary-model). A refused
-                    // cached access token is not one (decision 16): the catalog
-                    // adapter drops it and sends the read once more with a fresh
-                    // exchange, and reports `invalid_credential` only when that
-                    // exchange, or its fresh token, is refused too.
-                    match &result {
-                        Err(refusal) if refusal.failure == runtime::Failure::InvalidCredential => {
-                            registry.refuse_read(dispatched, connectors_sdk::now_ms())?
+                                    if let Ok(observed) = registry.describe(
+                                        &current.instance_id,
+                                        &current.adapter_id,
+                                        current.configured(),
+                                        &connection,
+                                        connectors_sdk::now_ms(),
+                                        true,
+                                    ) {
+                                        member.answer(Answer::Joined(Ok(json!({
+                                            "connection": connection_value(&job.alias, observed)
+                                        }))));
+                                    }
+                                    Ok(())
+                                })();
+                                match (recollected, early) {
+                                    (Ok(()), early) => {
+                                        // The recollection's publication moved
+                                        // the fence past the early use.
+                                        if let Some(early) = early {
+                                            registry
+                                                .cancel_read(early, connectors_sdk::now_ms())?;
+                                        }
+                                        capture().map_err(refused)?
+                                    }
+                                    (Err(error), None) => return Err(error),
+                                    (Err(error), Some(early)) => {
+                                        // A credential refusal cut the material
+                                        // off: the connection admits no read.
+                                        // Anything else left the evidence the
+                                        // read was captured on current.
+                                        let admitted = registry.admit_read(
+                                            &binding,
+                                            &connection,
+                                            &requirement.scopes,
+                                            connectors_sdk::now_ms(),
+                                        );
+                                        if admitted.is_err() {
+                                            registry
+                                                .cancel_read(early, connectors_sdk::now_ms())?;
+                                            return Err(error);
+                                        }
+                                        // A probe that timed out ended the adapter
+                                        // process; the read is served by a new one,
+                                        // launched within that evidence.
+                                        if !active.running()? {
+                                            match launch.run(early.expires_at_ms(), bounded_until) {
+                                                Ok(new) => *active = new,
+                                                Err(error) => {
+                                                    registry.cancel_read(
+                                                        early,
+                                                        connectors_sdk::now_ms(),
+                                                    )?;
+                                                    return Err(error);
+                                                }
+                                            }
+                                        }
+                                        early
+                                    }
+                                }
+                            }
+                            other => other.map_err(refused)?,
+                        };
+                        // Evidence that selected another binding than the one the
+                        // caller described, a recollection's rebinding among
+                        // them, refuses the read unsent: the next description is
+                        // the bound one (contracts/cli/v1alpha1/semantics.md).
+                        if declared.effective_binding(captured.operation_binding()) != described {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(Code::StaleDescription.into());
                         }
-                        _ => registry.release_read(dispatched, connectors_sdk::now_ms())?,
+                        // The last check before the stored credential is opened:
+                        // a read cancelled during its launch or recollection reads
+                        // none (contracts/cli/v1alpha1/owner.md).
+                        if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(Code::Interrupted.into());
+                        }
+                        let version = captured.version();
+                        let selection = config.selection();
+                        // A bounded read gives up its custody answer once its
+                        // budget's cutoff passes.
+                        let material = if budget.is_some() {
+                            custody::Store::read_for_until(
+                                version,
+                                &selection,
+                                &paths.state,
+                                execution_until,
+                            )
+                        } else {
+                            custody::Store::open_for(version.scope(), &selection, &paths.state)
+                                .and_then(|store| store.read(version))
+                        };
+                        let material = match material {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if super::read_invalidates(&selection, e) {
+                                    registry.invalidate_read(
+                                        &captured,
+                                        registry::InvalidCredential::Missing,
+                                        connectors_sdk::now_ms(),
+                                    )?;
+                                }
+                                registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                                if budget.is_some() {
+                                    approval_issuance::check(execution_until)?;
+                                }
+                                return Err(super::read_error(&selection, e));
+                            }
+                        };
+                        let partition = captured.partition().to_owned();
+                        let deadline = captured.expires_at_ms();
+                        let checked: Result<()> = (|| {
+                            let (latest_config, latest) = selected(&paths, &job.alias)?;
+                            if latest.selection() != current.selection()
+                                || latest_config.selection() != config.selection()
+                            {
+                                return Err(Code::LifecycleConflict.into());
+                            }
+                            // A governed read whose operation was withdrawn is
+                            // no longer granted.
+                            if !latest.permissions.operations.contains(&operation) {
+                                return Err(if governed {
+                                    Code::NotGranted
+                                } else {
+                                    Code::Forbidden
+                                }
+                                .into());
+                            }
+                            if !latest.permissions.profiles.contains(&requirement.profile) {
+                                return Err(Code::Forbidden.into());
+                            }
+                            Ok(())
+                        })();
+                        if let Err(error) = checked {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(error);
+                        }
+                        let guard = match lock_before(&control, bounded_until) {
+                            Ok(guard) => guard,
+                            Err(error) => {
+                                registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                                return Err(error);
+                            }
+                        };
+                        if let Err(error) = guard.check(job.epoch).and_then(|_| {
+                            if budget.is_some() {
+                                approval_issuance::check(execution_until)?;
+                            }
+                            if stopped.load(Ordering::SeqCst) {
+                                return Err(Code::Unavailable.into());
+                            }
+                            // The final fence: a governed read is admitted once
+                            // more against current configuration and policy
+                            // immediately before it is dispatched.
+                            if governed {
+                                let input = std::str::from_utf8(&document)
+                                    .map_err(|_| Code::InvalidInput)?;
+                                governed::bounded::resolve(
+                                    &paths,
+                                    &job.alias,
+                                    &approval_issuance::Request {
+                                        connection: &connection,
+                                        operation: &operation,
+                                        schema: &expected_schema,
+                                        revision: &revision,
+                                        input,
+                                    },
+                                    projection_revision
+                                        .as_deref()
+                                        .map(|revision| (read_policy.as_ref(), revision)),
+                                    budget,
+                                )?;
+                            }
+                            Ok(())
+                        }) {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(error);
+                        }
+                        // Refused once the pool stopped waiting and reported the
+                        // host's own timeout: nothing is dispatched after that.
+                        if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(Code::Interrupted.into());
+                        }
+                        if let Err(error) = job.dispatch.begin() {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(error);
+                        }
+                        let dispatched = registry
+                            .dispatch_read(captured, connectors_sdk::now_ms())
+                            .map_err(refused)?;
+                        drop(guard);
+                        let result = if let Some(budget) = budget {
+                            // The provider call keeps the budget's original
+                            // cutoff, constrained by the evidence's expiry.
+                            until(deadline)
+                                .map_err(|_| runtime::Failure::Timeout)
+                                .and_then(|until| budget.constrain(until))
+                                .and_then(|budget| {
+                                    let halted = || match job.cancel.as_ref() {
+                                        Some(cancel) if cancel.cancelled() => {
+                                            Err(runtime::Failure::Interrupted)
+                                        }
+                                        _ => Ok(()),
+                                    };
+                                    active.invoke_bounded_until_cancelled(
+                                        &operation,
+                                        &revision,
+                                        &partition,
+                                        &material,
+                                        &document,
+                                        budget,
+                                        Some(&halted),
+                                    )
+                                })
+                                .map_err(runtime::Refusal::from)
+                        } else if governed {
+                            active.invoke_lossless(
+                                described.as_deref(),
+                                &operation,
+                                &revision,
+                                &partition,
+                                &material,
+                                &document,
+                                deadline,
+                            )
+                        } else {
+                            active.invoke_bound(
+                                described.as_deref(),
+                                &operation,
+                                &revision,
+                                &partition,
+                                &material,
+                                &document,
+                                deadline,
+                            )
+                        };
+                        // A cancel ended the adapter process on purpose, which is
+                        // not the unexpected termination `failed` names
+                        // (contracts/cli/v1alpha1/semantics.md, "restart =
+                        // never"): its record is cleared so the instance reads
+                        // `not_running` and the next job launches anew. A control
+                        // another start or stop moved on is left as it is.
+                        if job.cancel.as_ref().is_some_and(Cancel::cancelled)
+                            && matches!(&result, Err(refusal) if refusal.failure == runtime::Failure::Interrupted)
+                            && let Ok(mut guard) = control.lock()
+                            && guard.epoch == job.epoch
+                        {
+                            child = None;
+                            guard.child = None;
+                        }
+                        // The provider refused the stored credential as unauthorized
+                        // (a refresh token answered `invalid_grant`, a token or basic
+                        // entry answered 401): the connection is Stale until a
+                        // reconnect publishes (story:connection-stale-state, decision
+                        // 15 of story:ess-connector-vocabulary-model). A refused
+                        // cached access token is not one (decision 16): the catalog
+                        // adapter drops it and sends the read once more with a fresh
+                        // exchange, and reports `invalid_credential` only when that
+                        // exchange, or its fresh token, is refused too.
+                        match &result {
+                            Err(refusal)
+                                if refusal.failure == runtime::Failure::InvalidCredential =>
+                            {
+                                registry.refuse_read(dispatched, connectors_sdk::now_ms())?
+                            }
+                            _ => registry.release_read(dispatched, connectors_sdk::now_ms())?,
+                        }
+                        if governed {
+                            return result.map(Output::Document).map_err(Error::from);
+                        }
+                        read_answer(&job.alias, &operation, &revision, result?).map(Output::Read)
                     }
-                    if governed {
-                        return result.map(Output::Document).map_err(Error::from);
-                    }
-                    read_answer(&job.alias, &operation, &revision, result?).map(Output::Read)
                 }
+            })();
+            let (Some(retry), Some(until), Some(next)) = (&retry, write_until, next) else {
+                break result;
+            };
+            if !observed
+                && matches!(&result, Ok(Output::Write(delivery)) if !delivery.mutation.replayed)
+            {
+                tries = tries.saturating_add(1);
             }
-        })();
+            if !tried_again(&result) || !another_try(retry, tries, started.elapsed(), until) {
+                break result;
+            }
+            job.task = next;
+        };
+        if retry.is_some()
+            && let Ok(Output::Write(delivery)) = &mut result
+        {
+            delivery.mutation.tries = Some(u32::from(tries));
+        }
         if result.is_err()
             && let Ok(mut guard) = control.lock()
             && guard.starting
@@ -2331,6 +2463,7 @@ mod maintenance_tests {
                 key: None,
                 proof: None,
                 until: Instant::now(),
+                retry: None,
             },
             Task::Revalidate {
                 connection: text(),
@@ -2450,6 +2583,7 @@ mod suppression_tests {
                 key: None,
                 proof: None,
                 until,
+                retry: None,
             },
             Task::Revalidate {
                 connection: text(),

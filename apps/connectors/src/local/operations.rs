@@ -218,13 +218,40 @@ pub(super) fn dispatch_tagged(
     if key.is_some_and(|key| key.is_empty() || key.len() > 256) {
         return Err(about("idempotency_key")(Code::InvalidInput.into()));
     }
+    // `--retry-not-attempted` (story:invoke-retries-a-write-that-was-not-
+    // attempted-and-never-sends-one-twice): 1 to 10 tries of a keyed write.
+    let retry = match call
+        .input
+        .get("retry_not_attempted")
+        .filter(|v| !v.is_null())
+    {
+        Some(value) => Some(
+            value
+                .as_u64()
+                .and_then(|tries| u8::try_from(tries).ok())
+                .filter(|tries| (1..=10).contains(tries) && key.is_some())
+                .ok_or_else(|| about("retry_not_attempted")(Code::InvalidInput.into()))?,
+        ),
+        None => None,
+    };
+    // A same-key replay answered here, before any try, names no try.
+    let replayed = |mut delivery: mutation::Delivery| {
+        if retry.is_some() {
+            delivery.mutation.tries = Some(0);
+        }
+        delivery
+    };
     // Current result-access admission and exact-key observation happen before
     // even opening the proof file, unlocking custody or starting the owner.
     let original = mutation::observe_original(&paths, alias, &request, key, until)?;
     if let Some(original) = &original
         && !original.pending
     {
-        return Ok(project(call, &bootstrap, original.delivery.clone())?);
+        return Ok(project(
+            call,
+            &bootstrap,
+            replayed(original.delivery.clone()),
+        )?);
     }
     let pending = original.is_some();
     let value = {
@@ -243,7 +270,7 @@ pub(super) fn dispatch_tagged(
                 // Another caller may have reserved the same key while protected
                 // entry failed. Reveal only a currently admitted exact winner.
                 if let Some(value) = mutation::observe(&paths, alias, &request, key, until)? {
-                    return Ok(project(call, &bootstrap, value)?);
+                    return Ok(project(call, &bootstrap, replayed(value))?);
                 }
                 return Err(about("approval_file")(error));
             }
@@ -263,7 +290,7 @@ pub(super) fn dispatch_tagged(
             return Ok(super::invoke::approval_required());
         }
         let result = owner::WriteClient::connect(&paths, true, deadline)
-            .and_then(|client| client.invoke(alias, &request, key, proof.as_ref(), deadline))
+            .and_then(|client| client.invoke(alias, &request, key, proof.as_ref(), deadline, retry))
             .map_err(|mut error| {
                 if pending
                     && matches!(

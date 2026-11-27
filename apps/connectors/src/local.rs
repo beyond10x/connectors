@@ -92,6 +92,11 @@ fn run_selected(
         Some(&mut session::NativeValidator(session.clone())),
     );
     session.borrow_mut().finish(&mut output);
+    // An unknown write under `--retry-not-attempted` exits 3, never 1; an
+    // interruption keeps 130.
+    if output.exit_code == 1 && session.borrow().unknown_retried {
+        output.exit_code = 3;
+    }
     // `invoke --fields` or `--each` (story:invoke-shapes-its-result): the full
     // answer the runner checked and printed is shaped; a refusal is not.
     let answer = session.borrow_mut().answer.take();
@@ -201,6 +206,17 @@ impl LocalHandler {
                 && let HandlerReply::Success(result) = &reply
             {
                 session.answer = Some(result.clone());
+            }
+            // A write `--retry-not-attempted` left `unknown` exits 3
+            // (contracts/cli/v1alpha1/semantics.md, the exit table).
+            if let HandlerReply::Error { data, .. } = &reply
+                && data["mutation"]["classification"] == "unknown"
+                && call
+                    .input
+                    .get("retry_not_attempted")
+                    .is_some_and(|tries| !tries.is_null())
+            {
+                session.unknown_retried = true;
             }
             return reply;
         }
