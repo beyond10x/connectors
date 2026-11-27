@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.79.0 — 2026-11-26
 
 ### Added
 
@@ -25,6 +25,19 @@
   through `syscall`, not through the C library's wrappers, which the musl that Rust links
   statically does not have; the workspace built for glibc only. The calls, their flags and
   their errors are unchanged.
+
+### Development
+
+Nothing in this section changes an installed binary.
+
+- The sixteen `ess_model` tests of the SQL adapter read schemas generated once per test run
+  (story:the-sixteen-ess-model-tests-read-schemas-generated-once-per-run).
+- Two MCP tests no longer wait out the 20 s request budget a listed tool needs
+  (story:two-mcp-tests-wait-out-the-20-s-request-budget-a-listed-tool-needs).
+- Ten `connectors-host` tests of the clock's second attempt end below quorum at once and no
+  longer race a 2 s to 5 s write deadline on a slow runner.
+- The gate's `apt-get update` runs under a time bound per attempt with three attempts, and the
+  package steps of the gate have a step time limit.
 
 ## 0.78.3 — 2026-11-26
 
