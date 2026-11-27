@@ -245,7 +245,7 @@ fn owner_replay(cli: &Cli, request: &approval_issuance::Request<'_>) -> Value {
     let deadline = mutation::Deadline::start().unwrap();
     let delivery = owner::WriteClient::connect(&cli.paths, false, deadline)
         .unwrap()
-        .invoke("gitlab", request, Some("owned-merge"), None, deadline)
+        .invoke("gitlab", request, Some("owned-merge"), None, deadline, None)
         .unwrap();
     serde_json::to_value(delivery).unwrap()
 }
@@ -1375,6 +1375,7 @@ fn journey_case(mode: u8) {
                 Some("second-owned-merge"),
                 Some(&proof),
                 deadline,
+                None,
             )
             .unwrap();
         let refused = serde_json::to_value(refused).unwrap();
