@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-27T07:27:02Z",
+  "actor": "human:operator",
+  "artifact": "story:invoke-retries-a-write-that-was-not-attempted-and-never-sends-one-twice",
+  "kind": "story",
+  "revision": 27,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate, pull request 317 head 7d9c55c58",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/45954892771/job/140358975371"
+  }
+}
